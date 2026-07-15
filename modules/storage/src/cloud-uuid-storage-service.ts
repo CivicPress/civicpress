@@ -69,7 +69,13 @@ import { DownloadOps } from './cloud-uuid-storage/download-ops.js';
 import { FileMgmtOps } from './cloud-uuid-storage/file-mgmt-ops.js';
 import { BatchOps } from './cloud-uuid-storage/batch-ops.js';
 import { StreamingOps } from './cloud-uuid-storage/streaming-ops.js';
-import { parseSizeString } from './cloud-uuid-storage/internals.js';
+import {
+  parseSizeString,
+  getLocalStoragePath,
+  SIDECAR_SUFFIX,
+} from './cloud-uuid-storage/internals.js';
+import { promises as fsp } from 'fs';
+import nodePath from 'path';
 
 export class CloudUuidStorageService {
   // NOTE: All instance fields below are public so the ops collaborators
@@ -506,6 +512,74 @@ export class CloudUuidStorageService {
     ...args: Parameters<FileMgmtOps['updateFile']>
   ): Promise<boolean> {
     return this.fileMgmtOps.updateFile(...args);
+  }
+
+  /**
+   * FA-STOR-004: rebuild the storage_files DB rows from on-disk sidecar
+   * manifests (local provider). Recovers file→metadata reachability after a DB
+   * loss without any external backup. Returns how many rows were restored.
+   */
+  async reconstructFromManifests(): Promise<{
+    restored: number;
+    failed: number;
+  }> {
+    if (!this.databaseService) {
+      throw new Error('Database service not initialized');
+    }
+    const root = getLocalStoragePath(this);
+    let restored = 0;
+    let failed = 0;
+
+    const walk = async (dir: string): Promise<string[]> => {
+      let entries: import('fs').Dirent[];
+      try {
+        entries = await fsp.readdir(dir, { withFileTypes: true });
+      } catch {
+        return [];
+      }
+      const found: string[] = [];
+      for (const entry of entries) {
+        const full = nodePath.join(dir, entry.name);
+        if (entry.isDirectory()) {
+          found.push(...(await walk(full)));
+        } else if (entry.name.endsWith(SIDECAR_SUFFIX)) {
+          found.push(full);
+        }
+      }
+      return found;
+    };
+
+    const sidecars = await walk(root);
+    for (const sidecarPath of sidecars) {
+      try {
+        const manifest = JSON.parse(await fsp.readFile(sidecarPath, 'utf8'));
+        await this.databaseService.upsertStorageFile({
+          id: manifest.id,
+          original_name: manifest.original_name,
+          stored_filename: manifest.stored_filename,
+          folder: manifest.folder,
+          relative_path: manifest.relative_path,
+          provider_path: manifest.provider_path,
+          size: manifest.size,
+          mime_type: manifest.mime_type,
+          description: manifest.description ?? undefined,
+          uploaded_by: manifest.uploaded_by ?? undefined,
+        });
+        restored++;
+      } catch (error) {
+        failed++;
+        this.logger.warn('Failed to restore file from sidecar manifest', {
+          sidecarPath,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+
+    this.logger.info('Reconstructed storage rows from sidecar manifests', {
+      restored,
+      failed,
+    });
+    return { restored, failed };
   }
 
   // ----- Batch operation delegations -----

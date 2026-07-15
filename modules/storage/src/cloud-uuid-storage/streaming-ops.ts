@@ -27,6 +27,7 @@ import {
   generateStoredFilenameFromName,
   getLocalStoragePath,
   logOperation,
+  writeSidecarManifest,
 } from './internals.js';
 import type { CloudUuidStorageService } from '../cloud-uuid-storage-service.js';
 
@@ -199,6 +200,19 @@ export class StreamingOps {
 
       // Save to database
       await host.databaseService.createStorageFile(storageFile);
+
+      // FA-STOR-004: write a disk sidecar for DB-loss recovery (best-effort).
+      try {
+        await writeSidecarManifest(host, storageFile);
+      } catch (sidecarError) {
+        host.logger.warn('Failed to write storage sidecar manifest', {
+          fileId: storageFile.id,
+          error:
+            sidecarError instanceof Error
+              ? sidecarError.message
+              : String(sidecarError),
+        });
+      }
 
       // Invalidate cache for folder
       if (host.cacheAdapter) {

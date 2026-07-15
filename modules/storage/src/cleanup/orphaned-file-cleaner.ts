@@ -16,6 +16,7 @@ import type {
 } from '../types/storage.types.js';
 import fs from 'fs-extra';
 import path from 'path';
+import { SIDECAR_SUFFIX } from '../cloud-uuid-storage/internals.js';
 import { loadAwsS3Sdk } from '../cloud-uuid-storage/sdk-loader.js';
 import type { S3Client } from '@aws-sdk/client-s3';
 import type { ContainerClient } from '@azure/storage-blob';
@@ -76,6 +77,11 @@ export class OrphanedFileCleaner {
     const storageFiles = await this.listStorageFiles(provider);
     const storageFileMap = new Map<string, { path: string; size?: number }>();
     for (const file of storageFiles) {
+      // FA-STOR-004: sidecar manifests intentionally have no DB row — never
+      // treat them as orphans (that would delete the recovery metadata).
+      if (file.path.endsWith(SIDECAR_SUFFIX)) {
+        continue;
+      }
       storageFileMap.set(file.path, { path: file.path, size: file.size });
     }
 

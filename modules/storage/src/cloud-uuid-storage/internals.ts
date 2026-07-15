@@ -21,6 +21,7 @@
  */
 
 import path from 'path';
+import { promises as fs } from 'fs';
 import type { Logger } from '@civicpress/core';
 import type {
   StorageConfig,
@@ -28,6 +29,12 @@ import type {
   StorageOperation,
   MulterFile,
 } from '../types/storage.types.js';
+
+// FA-STOR-004: a sidecar written next to each stored file so file→metadata is
+// recoverable without the SQLite DB. Losing the DB previously made every stored
+// file unreachable via the API (no manifest); the sidecar lets the DB be
+// rebuilt from disk.
+export const SIDECAR_SUFFIX = '.meta.json';
 
 /**
  * Host accessor surface used by collaborators. The orchestrator class
@@ -200,6 +207,63 @@ export function getLocalStoragePath(host: StorageHostLike): string {
       : path.resolve(host.basePath, storagePath);
   }
   return path.resolve(host.basePath, 'storage');
+}
+
+/**
+ * FA-STOR-004: write a `<file>.meta.json` sidecar next to a locally-stored file.
+ * Best-effort — a sidecar failure must never fail the upload (the DB row is
+ * still authoritative), so callers log and continue. No-op for non-local
+ * providers (cloud objects are recovered from the provider's own metadata).
+ */
+export async function writeSidecarManifest(
+  host: StorageHostLike,
+  storageFile: StorageFile
+): Promise<void> {
+  const activeProvider = host.config.active_provider || 'local';
+  if (activeProvider !== 'local') return;
+  const fullPath = path.join(
+    getLocalStoragePath(host),
+    storageFile.relative_path
+  );
+  const manifest = {
+    id: storageFile.id,
+    original_name: storageFile.original_name,
+    stored_filename: storageFile.stored_filename,
+    folder: storageFile.folder,
+    relative_path: storageFile.relative_path,
+    provider_path: storageFile.provider_path,
+    size: storageFile.size,
+    mime_type: storageFile.mime_type,
+    description: storageFile.description ?? null,
+    uploaded_by: storageFile.uploaded_by ?? null,
+    created_at:
+      storageFile.created_at instanceof Date
+        ? storageFile.created_at.toISOString()
+        : storageFile.created_at,
+    updated_at:
+      storageFile.updated_at instanceof Date
+        ? storageFile.updated_at.toISOString()
+        : storageFile.updated_at,
+  };
+  await fs.writeFile(
+    fullPath + SIDECAR_SUFFIX,
+    JSON.stringify(manifest, null, 2),
+    'utf8'
+  );
+}
+
+/**
+ * FA-STOR-004: remove a file's sidecar (best-effort). No-op for non-local.
+ */
+export async function deleteSidecarManifest(
+  host: StorageHostLike,
+  relativePath: string
+): Promise<void> {
+  const activeProvider = host.config.active_provider || 'local';
+  if (activeProvider !== 'local') return;
+  const fullPath =
+    path.join(getLocalStoragePath(host), relativePath) + SIDECAR_SUFFIX;
+  await fs.rm(fullPath, { force: true });
 }
 
 /**

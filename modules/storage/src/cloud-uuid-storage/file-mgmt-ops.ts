@@ -14,7 +14,7 @@ import {
   withTimeout,
   getTimeoutForOperation,
 } from '../utils/timeout.js';
-import { logOperation } from './internals.js';
+import { logOperation, SIDECAR_SUFFIX } from './internals.js';
 import type { CloudUuidStorageService } from '../cloud-uuid-storage-service.js';
 
 export interface FileMgmtOpsDeps {
@@ -176,6 +176,8 @@ export class FileMgmtOps {
     if (await fs.pathExists(file.provider_path)) {
       await fs.remove(file.provider_path);
     }
+    // FA-STOR-004: remove the sidecar manifest alongside the file.
+    await fs.remove(file.provider_path + SIDECAR_SUFFIX);
   }
 
   /**

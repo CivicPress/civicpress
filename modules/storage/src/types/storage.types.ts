@@ -117,6 +117,19 @@ export interface StorageDatabaseService {
     description?: string;
     uploaded_by?: string;
   }): Promise<void>;
+  // FA-STOR-004: insert-or-replace, used by manifest reconstruction.
+  upsertStorageFile(file: {
+    id: string;
+    original_name: string;
+    stored_filename: string;
+    folder: string;
+    relative_path: string;
+    provider_path: string;
+    size: number;
+    mime_type: string;
+    description?: string;
+    uploaded_by?: string;
+  }): Promise<void>;
   getStorageFileById(id: string): Promise<StorageFile | null>;
   getStorageFilesByFolder(folder: string): Promise<StorageFile[]>;
   getAllStorageFiles(): Promise<StorageFile[]>;
