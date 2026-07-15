@@ -78,27 +78,33 @@ export function formatBytes(bytes: number): string {
 }
 
 /**
- * Generate stored filename with UUID
+ * Generate stored filename with UUID.
+ *
+ * FA-CORE-017: the buffer-upload path used to emit an UNsanitized base name
+ * (`${baseName}.${uuid}${ext}`), diverging from the stream path and letting a
+ * hostile original name steer the on-disk/provider key. Both paths now share
+ * the sanitizing generator so the stored key is always a safe identifier.
  */
 export function generateStoredFilename(file: MulterFile, uuid: string): string {
-  const extension = path.extname(file.originalname);
-  const baseName = path.basename(file.originalname, extension);
-
-  // Keep original filename readable: "document.550e8400-....pdf"
-  return `${baseName}.${uuid}${extension}`;
+  return generateStoredFilenameFromName(file.originalname, uuid);
 }
 
 /**
- * Generate stored filename from original name (for stream uploads)
+ * Generate a sanitized stored filename from an original name. Base name and
+ * extension are both reduced to a safe character class; the file id keeps the
+ * on-disk key unique and recoverable. (Used by every upload path.)
  */
 export function generateStoredFilenameFromName(
   originalName: string,
   fileId: string
 ): string {
-  const ext = path.extname(originalName);
-  const baseName = path.basename(originalName, ext);
+  const rawExt = path.extname(originalName);
+  const baseName = path.basename(originalName, rawExt);
   const sanitizedBaseName = baseName.replace(/[^a-zA-Z0-9-_]/g, '_');
-  return `${sanitizedBaseName}_${fileId}${ext}`;
+  // Keep only alnum + dot in the extension so a hostile ext can't smuggle
+  // separators/path chars into the stored key.
+  const sanitizedExt = rawExt.replace(/[^a-zA-Z0-9.]/g, '');
+  return `${sanitizedBaseName}_${fileId}${sanitizedExt}`;
 }
 
 /**

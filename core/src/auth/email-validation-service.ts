@@ -733,9 +733,12 @@ export class EmailValidationService {
         [verification.user_id]
       );
 
-      // Clean up verification token
-      await this.db.execute('DELETE FROM email_verifications WHERE token = ?', [
-        token,
+      // Consume the verification token. FA-CORE-012: the `token` column stores
+      // a SHA-256 hash, not the raw/signed token, so a DELETE ... WHERE token =
+      // <raw token> matched nothing and the single-use guarantee was broken.
+      // Delete by primary key from the row verifyToken already resolved.
+      await this.db.execute('DELETE FROM email_verifications WHERE id = ?', [
+        verification.id,
       ]);
 
       logger.info(

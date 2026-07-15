@@ -327,6 +327,42 @@ describe('EmailValidationService', () => {
     });
   });
 
+  describe('Initial Email Verification', () => {
+    // FA-CORE-012: verifyCurrentEmail must consume the token so it cannot be
+    // replayed. Previously it deleted WHERE token = <raw token> but the column
+    // stores a SHA-256 hash, so the row was never removed → token stayed valid.
+    it('consumes the token so it cannot be reused (FA-CORE-012)', async () => {
+      const userId = await databaseService.createUserWithPassword({
+        username: 'verifyme',
+        email: 'verifyme@example.com',
+        name: 'Verify Me',
+        role: 'public',
+        passwordHash: 'hashedpassword',
+        auth_provider: 'password',
+        email_verified: false,
+      });
+
+      const send = await emailValidationService.sendEmailVerification(userId);
+      expect(send.success).toBe(true);
+      const token = send.verificationToken as string;
+      expect(token).toBeTruthy();
+
+      // First use succeeds.
+      const first = await emailValidationService.verifyCurrentEmail(token);
+      expect(first.success).toBe(true);
+
+      // The row is gone — a replay of the same token is rejected.
+      const rows = await databaseService.query(
+        'SELECT COUNT(*) as n FROM email_verifications WHERE user_id = ?',
+        [userId]
+      );
+      expect(Number(rows[0].n)).toBe(0);
+
+      const second = await emailValidationService.verifyCurrentEmail(token);
+      expect(second.success).toBe(false);
+    });
+  });
+
   describe('Token Cleanup', () => {
     it('should clean up expired tokens', async () => {
       // Check if email_verifications table exists

@@ -102,16 +102,16 @@ describe('cloud-uuid-storage internals — formatBytes (W2-T18 characterization)
 });
 
 describe('cloud-uuid-storage internals — generateStoredFilename* (W2-T18 characterization)', () => {
-  it('injects UUID between basename and extension: "file.<uuid>.ext"', () => {
+  // FA-CORE-017: the buffer path now shares the sanitizing generator, so the
+  // stored key is always a safe identifier (base slugged, id separated by "_").
+  it('slugs the basename and appends the id: "<slug>_<id>.ext"', () => {
     const file = { originalname: 'document.pdf' } as MulterFile;
-    expect(generateStoredFilename(file, 'abc-123')).toBe(
-      'document.abc-123.pdf'
-    );
+    expect(generateStoredFilename(file, 'abc-123')).toBe('document_abc-123.pdf');
   });
 
-  it('handles names with multiple dots: keeps only the last as extension', () => {
+  it('slugs interior dots in multi-dot names (only the last is the extension)', () => {
     const file = { originalname: 'archive.tar.gz' } as MulterFile;
-    expect(generateStoredFilename(file, 'uid')).toBe('archive.tar.uid.gz');
+    expect(generateStoredFilename(file, 'uid')).toBe('archive_tar_uid.gz');
   });
 
   it('generateStoredFilenameFromName slugs the basename (non-alphanumeric → _)', () => {
@@ -124,6 +124,13 @@ describe('cloud-uuid-storage internals — generateStoredFilename* (W2-T18 chara
     expect(generateStoredFilenameFromName('hello-world_v2.txt', 'uid')).toBe(
       'hello-world_v2_uid.txt'
     );
+  });
+
+  it('sanitizes a hostile extension (no spaces/separators survive)', () => {
+    const file = { originalname: 'report.pd f' } as MulterFile;
+    const out = generateStoredFilename(file, 'uid');
+    expect(out).toBe('report_uid.pdf');
+    expect(out).not.toContain(' ');
   });
 });
 
