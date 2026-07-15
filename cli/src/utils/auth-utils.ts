@@ -1,12 +1,46 @@
 import { CivicPress } from '@civicpress/core';
 import { Logger } from '@civicpress/core';
 import * as path from 'path';
+import * as os from 'os';
+import { readFileSync } from 'fs';
 
 /**
  * Authentication utilities for CLI commands
  */
 export class AuthUtils {
   private static logger = new Logger();
+
+  /**
+   * FA-CLI-003: a token passed on the command line (`--token`) is visible in
+   * shell history and to any local process via `ps`/`/proc`. Resolve the token
+   * from safer sources in priority order:
+   *   1. --token (explicit; warned as deprecated)
+   *   2. CIVIC_TOKEN environment variable
+   *   3. ~/.civicpress/token file
+   */
+  private static resolveToken(token: string | undefined): {
+    token: string | undefined;
+    fromFlag: boolean;
+  } {
+    if (token) {
+      return { token, fromFlag: true };
+    }
+    if (process.env.CIVIC_TOKEN) {
+      return { token: process.env.CIVIC_TOKEN, fromFlag: false };
+    }
+    try {
+      const fileToken = readFileSync(
+        path.join(os.homedir(), '.civicpress', 'token'),
+        'utf-8'
+      ).trim();
+      if (fileToken) {
+        return { token: fileToken, fromFlag: false };
+      }
+    } catch {
+      // no token file — fall through
+    }
+    return { token: undefined, fromFlag: false };
+  }
 
   /**
    * Validate authentication token and return user info
@@ -19,15 +53,26 @@ export class AuthUtils {
     shouldOutputJson: boolean = false
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ): Promise<any> {
+    // FA-CLI-003: resolve from --token / CIVIC_TOKEN / ~/.civicpress/token.
+    const { token: resolvedToken, fromFlag } = this.resolveToken(token);
+
+    if (fromFlag && !shouldOutputJson) {
+      this.logger.warn(
+        '⚠️  --token is visible in shell history and process listings; ' +
+          'prefer the CIVIC_TOKEN env var or a ~/.civicpress/token file'
+      );
+    }
+
     // Check if token is provided
-    if (!token) {
+    if (!resolvedToken) {
       if (shouldOutputJson) {
         console.log(
           JSON.stringify(
             {
               success: false,
               error: 'Authentication required',
-              details: 'Use --token to provide a session token',
+              details:
+                'Provide a token via CIVIC_TOKEN, ~/.civicpress/token, or --token',
             },
             null,
             2
@@ -35,11 +80,15 @@ export class AuthUtils {
         );
       } else {
         this.logger.error('❌ Authentication required');
-        this.logger.info('💡 Use --token to provide a session token');
+        this.logger.info(
+          '💡 Set CIVIC_TOKEN or write ~/.civicpress/token (preferred), or use --token'
+        );
         this.logger.info('💡 Run "civic auth:login" to get a session token');
       }
       process.exit(1);
     }
+
+    token = resolvedToken;
 
     try {
       // Initialize CivicPress

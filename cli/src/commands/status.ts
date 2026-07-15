@@ -64,20 +64,6 @@ export function statusCommand(cli: CAC) {
       const coreMod: any = await import('@civicpress/core');
       const audit = new coreMod.AuditLogger();
       try {
-        // Validate status (see VALID_STATUSES module-level export above)
-        if (!VALID_STATUSES.includes(newStatus)) {
-          cliError(
-            `Invalid status: ${newStatus}`,
-            'INVALID_STATUS',
-            {
-              requestedStatus: newStatus,
-              validStatuses: VALID_STATUSES,
-            },
-            'status'
-          );
-          process.exit(1);
-        }
-
         // Initialize CivicPress (will auto-discover config)
         // Get data directory from config discovery
         const { loadConfig } = await import('@civicpress/core');
@@ -91,6 +77,32 @@ export function statusCommand(cli: CAC) {
         if (!dataDir) {
           throw new Error('dataDir is not configured');
         }
+
+        // FA-CLI-004: validate against the config-driven status list (which
+        // includes config-only statuses like pending_review/expired) rather
+        // than a hardcoded whitelist. VALID_STATUSES stays as the fallback.
+        let validStatuses = VALID_STATUSES;
+        try {
+          const configStatuses = coreMod.CentralConfigManager.getRecordStatusKeys();
+          if (Array.isArray(configStatuses) && configStatuses.length > 0) {
+            validStatuses = configStatuses;
+          }
+        } catch {
+          // config not readable — fall back to VALID_STATUSES
+        }
+        if (!validStatuses.includes(newStatus)) {
+          cliError(
+            `Invalid status: ${newStatus}`,
+            'INVALID_STATUS',
+            {
+              requestedStatus: newStatus,
+              validStatuses,
+            },
+            'status'
+          );
+          process.exit(1);
+        }
+
         const civic = new CivicPress({ dataDir });
 
         const recordsDir = path.join(dataDir, 'records');

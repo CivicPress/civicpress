@@ -73,8 +73,10 @@ export const createCommand = (cli: CAC) => {
       }
 
       try {
-        // Validate record type (includes new types)
-        const validTypes = [
+        // FA-CLI-004: validate against the config-driven record types (so
+        // config-defined custom types are accepted) rather than a hardcoded
+        // whitelist. Fall back to the built-in defaults if config is unreadable.
+        const FALLBACK_TYPES = [
           'bylaw',
           'policy',
           'proposal',
@@ -84,6 +86,15 @@ export const createCommand = (cli: CAC) => {
           'geography',
           'session',
         ];
+        let validTypes = FALLBACK_TYPES;
+        try {
+          const configTypes = coreMod.CentralConfigManager.getRecordTypeKeys();
+          if (Array.isArray(configTypes) && configTypes.length > 0) {
+            validTypes = configTypes;
+          }
+        } catch {
+          // config not readable — fall back to the built-in defaults
+        }
         if (!validTypes.includes(type)) {
           cliError(
             `Invalid record type: ${type}`,
