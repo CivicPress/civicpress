@@ -640,6 +640,10 @@ describe('SessionController', () => {
           device: 'bb-001',
           av_file: 'storage-uuid-1',
           redaction_status: 'pending',
+          // Re-audit: a (re-)linked av_file clears any prior public variant so a
+          // re-recorded session never keeps serving the old recording.
+          public_file: null,
+          redaction_attempts: 0,
         },
         expect.objectContaining({ username: 'system' }),
         expect.objectContaining({ precondition: expect.any(Function) })

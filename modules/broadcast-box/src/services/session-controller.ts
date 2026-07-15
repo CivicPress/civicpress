@@ -539,6 +539,13 @@ export class SessionController {
         device: session.deviceId,
         av_file: storageFileId,
         redaction_status: 'pending',
+        // Re-audit (FA-BB-002 invariant): a new av_file means the previously
+        // published public variant no longer corresponds to the current
+        // recording. Clear it (and the retry counter) so nothing public is
+        // served until the worker verifies a redacted variant of THIS file —
+        // otherwise a re-recorded session kept serving the OLD recording.
+        public_file: null,
+        redaction_attempts: 0,
       },
       {
         id: 1, // System user
