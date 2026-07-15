@@ -283,6 +283,107 @@ describe('SessionController', () => {
     });
   });
 
+  // FA-BB-008: when a DeviceCommandService is wired (production), start_session
+  // is ack-gated — the session only reaches 'recording' after the device
+  // confirms, and a delivery failure leaves the session 'failed', not a phantom
+  // 'recording'.
+  describe('startSession — ack-gated (FA-BB-008)', () => {
+    const buildController = (executeCommand: any) => {
+      const controller = new SessionController(
+        mockDeviceManager,
+        mockConnectionTracker,
+        mockRoomManager,
+        mockProtocol,
+        mockRecordManager,
+        (sessionController as any).db,
+        mockLogger,
+        { executeCommand } as any
+      );
+      (controller as any).sessionModel = (sessionController as any).sessionModel;
+      (controller as any).deviceEventModel = (
+        sessionController as any
+      ).deviceEventModel;
+      return controller;
+    };
+
+    const primeHappyDevice = () => {
+      mockDeviceManager.getDevice.mockResolvedValue({
+        id: 'device-id',
+        status: 'active',
+      });
+      mockConnectionTracker.isConnected.mockReturnValue(true);
+      mockConnectionTracker.getConnectionState.mockReturnValue({
+        state: { status: 'idle' },
+      });
+      mockRecordManager.getRecord.mockResolvedValue({
+        id: 'session-id',
+        type: 'session',
+      });
+      const sm = (sessionController as any).sessionModel;
+      sm.create.mockResolvedValue({
+        id: 'bsid',
+        deviceId: 'device-id',
+        civicpressSessionId: 'session-id',
+        status: 'pending',
+      });
+      sm.update.mockImplementation(async (_id: string, patch: any) => ({
+        id: 'bsid',
+        deviceId: 'device-id',
+        civicpressSessionId: 'session-id',
+        ...patch,
+      }));
+    };
+
+    it('reaches recording only after the device acks', async () => {
+      const executeCommand = vi.fn().mockResolvedValue({ success: true });
+      const controller = buildController(executeCommand);
+      primeHappyDevice();
+
+      const result = await controller.startSession({
+        deviceId: 'device-id',
+        civicpressSessionId: 'session-id',
+        metadata: {},
+      });
+
+      expect(executeCommand).toHaveBeenCalledWith(
+        expect.objectContaining({ action: 'start_session' })
+      );
+      expect(result.status).toBe('recording');
+    });
+
+    it('marks the session failed and rethrows when the device never acks', async () => {
+      const executeCommand = vi
+        .fn()
+        .mockRejectedValue(new Error('Device device-id is not connected'));
+      const controller = buildController(executeCommand);
+      primeHappyDevice();
+
+      const sm = (sessionController as any).sessionModel;
+      const deviceEventModel = (sessionController as any).deviceEventModel;
+
+      await expect(
+        controller.startSession({
+          deviceId: 'device-id',
+          civicpressSessionId: 'session-id',
+          metadata: {},
+        })
+      ).rejects.toThrow('not connected');
+
+      // Session was flipped to 'failed', never to 'recording'.
+      expect(sm.update).toHaveBeenCalledWith(
+        'bsid',
+        expect.objectContaining({ status: 'failed' })
+      );
+      const recordingUpdate = sm.update.mock.calls.find(
+        (c: any[]) => c[1]?.status === 'recording'
+      );
+      expect(recordingUpdate).toBeUndefined();
+      expect(deviceEventModel.create).toHaveBeenCalledWith(
+        expect.objectContaining({ eventType: 'session.failed' })
+      );
+    });
+  });
+
   describe('stopSession', () => {
     it('should stop a recording session', async () => {
       const sessionId = 'session-id';

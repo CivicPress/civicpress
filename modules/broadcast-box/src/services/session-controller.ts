@@ -19,6 +19,7 @@ import type { DeviceManager } from './device-manager.js';
 import type { DeviceConnectionTracker } from './device-connection-tracker.js';
 import type { RoomManager } from '@civicpress/realtime';
 import type { ProtocolHandler } from '../websocket/protocol.js';
+import type { DeviceCommandService } from './device-command-service.js';
 
 export class SessionController {
   private sessionModel: BroadcastSessionModel;
@@ -31,7 +32,11 @@ export class SessionController {
     private protocol: ProtocolHandler,
     private recordManager: RecordManager,
     private db: DatabaseService,
-    private logger: Logger
+    private logger: Logger,
+    // FA-BB-008: when present, start_session is delivered via the ack-gated
+    // command service so the session only becomes 'recording' once the device
+    // confirms it. Optional so existing constructors keep working.
+    private deviceCommandService?: DeviceCommandService
   ) {
     this.sessionModel = new BroadcastSessionModel(db, logger);
     this.deviceEventModel = new DeviceEventModel(db, logger);
@@ -249,20 +254,62 @@ export class SessionController {
 
     const created = await this.sessionModel.create(session);
 
-    // Send start_session command to device (sources are set via sources.set; only quality in config)
-    const command = this.protocol.createCommand('start_session', {
+    // FA-BB-008: deliver start_session and only advance the FSM to 'recording'
+    // once the device has actually confirmed it. Previously the row was flipped
+    // to 'recording' immediately after a fire-and-forget send, so a dead socket
+    // or a device that never processed the command left the FSM lying about the
+    // device's real state.
+    const startPayload = {
       sessionId: created.id,
       civicpressSessionId: created.civicpressSessionId,
       config: {
         quality: request.metadata?.quality,
         pip: request.metadata?.pip,
       },
-    });
+    };
 
-    // Send start_session to the device (creates the room on demand if missing).
-    await this.deliverToDevice(request.deviceId, command);
+    try {
+      if (this.deviceCommandService) {
+        // executeCommand resolves ONLY on a successful device ack and rejects
+        // on disconnect / timeout / nack.
+        await this.deviceCommandService.executeCommand({
+          deviceId: request.deviceId,
+          action: 'start_session',
+          payload: startPayload,
+          source: { type: 'api' },
+        });
+      } else {
+        // Legacy path (no command service injected): best-effort delivery.
+        const command = this.protocol.createCommand(
+          'start_session',
+          startPayload
+        );
+        await this.deliverToDevice(request.deviceId, command);
+      }
+    } catch (error) {
+      // The device never confirmed — mark the session failed and surface the
+      // error rather than reporting a recording that isn't happening.
+      await this.sessionModel.update(created.id, { status: 'failed' });
+      await this.deviceEventModel.create({
+        id: uuidv4(),
+        deviceId: request.deviceId,
+        eventType: 'session.failed',
+        eventData: {
+          sessionId: created.id,
+          civicpressSessionId: created.civicpressSessionId,
+          error: error instanceof Error ? error.message : String(error),
+        },
+      });
+      coreError(
+        `start_session was not acknowledged by device ${request.deviceId}`,
+        'BROADCAST_START_SESSION_UNACKED',
+        { sessionId: created.id },
+        { operation: 'broadcast-box:session:start' }
+      );
+      throw error;
+    }
 
-    // Update session status to recording
+    // Update session status to recording (device confirmed).
     const updated = await this.sessionModel.update(created.id, {
       status: 'recording',
       startedAt: new Date(),

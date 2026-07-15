@@ -374,6 +374,11 @@ export async function registerBroadcastBoxServices(
       const protocol = c.resolve<ProtocolHandler>('broadcastBoxProtocol');
       const recordManager = c.resolve<RecordManager>('recordManager');
       const db = c.resolve<DatabaseService>('database');
+      // FA-BB-008: ack-gate start_session through the command service so the
+      // session only reaches 'recording' once the device confirms it.
+      const deviceCommandService = c.resolve<DeviceCommandService>(
+        'broadcastBoxDeviceCommandService'
+      );
       return new SessionController(
         deviceManager,
         connectionTracker,
@@ -381,7 +386,8 @@ export async function registerBroadcastBoxServices(
         protocol,
         recordManager,
         db,
-        logger
+        logger,
+        deviceCommandService
       );
     }
   );
