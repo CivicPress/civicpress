@@ -167,32 +167,41 @@ export function resolveVisibility(
       .filter((s) => s.visibility === 'public')
       .map((s) => ({ start: s.start, end: s.end }))
   );
-  const hiddenDeclared = segments
-    .filter((s) => s.visibility !== 'public')
-    .map((s) => ({ start: s.start, end: s.end }));
-
-  if (hiddenDeclared.length === 0) {
-    const fullCover =
-      publicMerged.length === 1 &&
-      publicMerged[0].start <= FULL_COVER_EPSILON_S &&
-      publicMerged[0].end >= declaredDurationS - FULL_COVER_EPSILON_S;
-    if (attested || fullCover) return { kind: 'all_public' };
-    // Public segments with uncovered timeline and no attestation: the gaps are
-    // UNKNOWN. Only the declared public ranges may surface; hide the gaps.
-    const gaps = subtractRanges(
-      [{ start: 0, end: mediaDurationS }],
-      publicMerged
-    );
-    return partialFrom(publicMerged, gaps, leadPadS, trailPadS, mediaDurationS);
-  }
-
-  return partialFrom(
-    publicMerged,
-    hiddenDeclared,
-    leadPadS,
-    trailPadS,
-    mediaDurationS
+  // Any non-public label hides its window; where a declared in_camera window
+  // overlaps a public one, in_camera wins (subtracted from public below).
+  const hiddenDeclared = mergeRanges(
+    segments
+      .filter((s) => s.visibility !== 'public')
+      .map((s) => ({ start: s.start, end: s.end }))
   );
+
+  // A time point is PUBLIC iff it is inside a declared public segment AND not
+  // inside any declared in_camera window.
+  const publicEffective = subtractRanges(publicMerged, hiddenDeclared);
+
+  // FA-BB-002 (re-audit hardening): "full cover" must be measured against the
+  // ACTUAL media duration (mediaDurationS = the probed file length), not the
+  // manifest-declared timeline. A file longer than its declared timeline (a
+  // device tail overrun, or an adversarial short manifest) would otherwise be
+  // copied out RAW as all_public, publishing the undeclared tail.
+  const fullCover =
+    publicEffective.length === 1 &&
+    publicEffective[0].start <= FULL_COVER_EPSILON_S &&
+    publicEffective[0].end >= mediaDurationS - FULL_COVER_EPSILON_S;
+  if (attested || fullCover) return { kind: 'all_public' };
+
+  // Everything that is not EFFECTIVELY public over the actual media duration is
+  // hidden — declared in_camera windows, uncovered gaps BETWEEN public segments,
+  // and any undeclared tail past the manifest. UNKNOWN ⇒ hidden (fail closed),
+  // applied symmetrically whether or not an in_camera window was declared. (The
+  // previous mixed-visibility branch hid only the declared windows and published
+  // the gaps; the all-public branch ignored a media file longer than declared —
+  // both fail-OPEN paths the re-audit caught.)
+  const hidden = subtractRanges(
+    [{ start: 0, end: mediaDurationS }],
+    publicEffective
+  );
+  return partialFrom(publicEffective, hidden, leadPadS, trailPadS, mediaDurationS);
 }
 
 function partialFrom(

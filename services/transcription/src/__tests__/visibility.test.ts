@@ -219,4 +219,41 @@ describe('resolveVisibility — fail-closed matrix', () => {
     if (d.kind !== 'partial') return;
     expect(d.publicRanges).toEqual([{ start: 0, end: 10 }]);
   });
+
+  // FA-BB-002 (re-audit): a media file LONGER than its declared timeline must
+  // NOT be treated as all_public — the undeclared tail is UNKNOWN → hidden.
+  it('does not publish an undeclared tail when the media is longer than declared', () => {
+    const d = resolveVisibility(
+      {
+        duration_s: 60,
+        segments: [{ start: 0, end: 60, visibility: 'public' }],
+      },
+      { leadPadS: 0, trailPadS: 0, mediaDurationS: 120 } // ffprobe: real MP4 is 120s
+    );
+    expect(d.kind).toBe('partial'); // NOT all_public
+    if (d.kind !== 'partial') return;
+    expect(d.publicRanges).toEqual([{ start: 0, end: 60 }]);
+    expect(d.hiddenRanges).toEqual([{ start: 60, end: 120 }]); // tail hidden
+  });
+
+  // FA-BB-002 (re-audit): with a mix of public + in_camera segments, an
+  // UNCOVERED gap between segments is UNKNOWN and must be hidden, not published.
+  it('hides an uncovered gap in a mixed-visibility timeline', () => {
+    const d = resolveVisibility(
+      {
+        duration_s: 30,
+        segments: [
+          { start: 0, end: 10, visibility: 'public' },
+          // gap 10–20 is declared by NOTHING → UNKNOWN
+          { start: 20, end: 30, visibility: 'in_camera' },
+        ],
+      },
+      { leadPadS: 0, trailPadS: 0, mediaDurationS: 30 }
+    );
+    expect(d.kind).toBe('partial');
+    if (d.kind !== 'partial') return;
+    expect(d.publicRanges).toEqual([{ start: 0, end: 10 }]);
+    // Both the uncovered gap (10–20) and the in_camera window (20–30) are hidden.
+    expect(d.hiddenRanges).toEqual([{ start: 10, end: 30 }]);
+  });
 });
