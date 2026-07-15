@@ -1,6 +1,6 @@
-export default defineNuxtPlugin(async (nuxtApp) => {
+export default defineNuxtPlugin(async (_nuxtApp) => {
   // Initialize CSRF token on plugin load (client-side only)
-  if (process.client) {
+  if (import.meta.client) {
     const { ensureCsrfToken } = useCsrf();
     // Fetch CSRF token asynchronously (don't block plugin initialization)
     ensureCsrfToken().catch((error) => {
@@ -21,8 +21,14 @@ export default defineNuxtPlugin(async (nuxtApp) => {
         url.includes('/api/v1/docs') ||
         url.includes('/api/v1/auth/csrf-token'); // CSRF endpoint is public
 
-      // Get headers object and normalize to plain object
-      const headers = options.headers as any;
+      // Get headers object and normalize to plain object.
+      // ofetch types `options.headers` as a union including `HeadersInit`
+      // (object-literal / Headers / [string, string][]); the narrowing
+      // below covers all three branches.
+      const headers = options.headers as
+        | HeadersInit
+        | Record<string, string>
+        | undefined;
       const headersObj: Record<string, string> = {};
 
       // Convert headers to object format
@@ -38,7 +44,7 @@ export default defineNuxtPlugin(async (nuxtApp) => {
 
       // Add CSRF token for state-changing methods (even if Bearer token bypasses it)
       // This ensures consistency and future-proofing for cookie-based sessions
-      if (!isPublicEndpoint && process.client) {
+      if (!isPublicEndpoint && import.meta.client) {
         const method = (options.method as string) || 'GET';
         if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method.toUpperCase())) {
           const { getCsrfToken, ensureCsrfToken } = useCsrf();
@@ -64,10 +70,12 @@ export default defineNuxtPlugin(async (nuxtApp) => {
         }
       }
 
-      // Update headers (use 'as any' to handle type compatibility)
-      options.headers = headersObj as any;
+      // Update headers — ofetch's typed `options.headers` is `Headers` after
+      // normalization in this onRequest hook; assign through HeadersInit which
+      // covers the `Record<string, string>` case at the runtime boundary.
+      options.headers = headersObj as unknown as typeof options.headers;
     },
-    async onResponseError({ request, options, response, error }) {
+    async onResponseError({ request: _request, options, response, error: _error }) {
       // Enhanced error handling with automatic user feedback
       const { handleError } = useErrorHandler();
 
@@ -89,7 +97,10 @@ export default defineNuxtPlugin(async (nuxtApp) => {
       };
 
       // Determine if the request attempted authenticated access
-      const headers = options?.headers as any;
+      const headers = options?.headers as
+        | HeadersInit
+        | Record<string, string>
+        | undefined;
       const hasAuthHeader = (() => {
         if (!headers) return false;
         if (headers instanceof Headers) return headers.has('Authorization');

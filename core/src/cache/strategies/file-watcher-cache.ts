@@ -19,6 +19,7 @@ import { Logger } from '../../utils/logger.js';
 /**
  * File watcher cache implementation
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export class FileWatcherCache<T extends {} = any> implements ICacheStrategy<T> {
   private memoryCache: MemoryCache<T>;
   private readonly config: Required<
@@ -229,7 +230,7 @@ export class FileWatcherCache<T extends {} = any> implements ICacheStrategy<T> {
   /**
    * Handle file change event
    */
-  private handleFileChange(filePath: string, eventType: string): void {
+  private handleFileChange(filePath: string, _eventType: string): void {
     // Debounce rapid changes
     const existingTimer = this.debounceTimers.get(filePath);
     if (existingTimer) {

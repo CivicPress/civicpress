@@ -1,26 +1,28 @@
 import { Router, Response } from 'express';
 import { param } from 'express-validator';
 import { AuthenticatedRequest, requirePermission } from '../middleware/auth.js';
-import { sendSuccess, logApiRequest } from '../utils/api-logger.js';
+import { logApiRequest } from '../utils/api-logger.js';
 
 export const workflowsRouter = Router();
+
+// api-004 (Critical) — was returning fake 200 OK while looking live to
+// callers. Now returns 501 Not Implemented with a clear message and
+// planned milestone. Auth gates retained so the surface stays bounded.
+const NOT_IMPLEMENTED = {
+  error: 'not_implemented',
+  code: 'NOT_IMPLEMENTED',
+  message:
+    'Workflow management is planned for v0.4.x. See docs/audits/2026-05-16-manifesto-fit-findings.md (api-004).',
+  retry_after_milestone: 'v0.4.x',
+};
 
 // GET /api/v1/workflows - List all workflows
 workflowsRouter.get(
   '/',
   requirePermission('workflows:view'),
   (req: AuthenticatedRequest, res: Response) => {
-    logApiRequest(req, { operation: 'list_workflows' });
-
-    sendSuccess(
-      {
-        workflows: [],
-        total: 0,
-      },
-      req,
-      res,
-      { operation: 'list_workflows' }
-    );
+    logApiRequest(req, { operation: 'list_workflows', status: 'not_implemented' });
+    res.status(501).json(NOT_IMPLEMENTED);
   }
 );
 
@@ -30,19 +32,8 @@ workflowsRouter.get(
   requirePermission('workflows:view'),
   param('id').isString().notEmpty(),
   (req: AuthenticatedRequest, res: Response) => {
-    logApiRequest(req, { operation: 'get_workflow' });
-
-    const { id } = req.params;
-    sendSuccess(
-      {
-        id,
-        name: 'Sample Workflow',
-        status: 'active',
-      },
-      req,
-      res,
-      { operation: 'get_workflow' }
-    );
+    logApiRequest(req, { operation: 'get_workflow', status: 'not_implemented' });
+    res.status(501).json(NOT_IMPLEMENTED);
   }
 );
 
@@ -51,19 +42,8 @@ workflowsRouter.post(
   '/',
   requirePermission('workflows:manage'),
   (req: AuthenticatedRequest, res: Response) => {
-    logApiRequest(req, { operation: 'create_workflow' });
-
-    sendSuccess(
-      {
-        message: 'Workflow created successfully',
-      },
-      req,
-      res,
-      {
-        operation: 'create_workflow',
-        statusCode: 201,
-      }
-    );
+    logApiRequest(req, { operation: 'create_workflow', status: 'not_implemented' });
+    res.status(501).json(NOT_IMPLEMENTED);
   }
 );
 
@@ -73,17 +53,8 @@ workflowsRouter.put(
   requirePermission('workflows:manage'),
   param('id').isString().notEmpty(),
   (req: AuthenticatedRequest, res: Response) => {
-    logApiRequest(req, { operation: 'update_workflow' });
-
-    const { id } = req.params;
-    sendSuccess(
-      {
-        message: `Workflow ${id} updated successfully`,
-      },
-      req,
-      res,
-      { operation: 'update_workflow' }
-    );
+    logApiRequest(req, { operation: 'update_workflow', status: 'not_implemented' });
+    res.status(501).json(NOT_IMPLEMENTED);
   }
 );
 
@@ -93,16 +64,7 @@ workflowsRouter.delete(
   requirePermission('workflows:manage'),
   param('id').isString().notEmpty(),
   (req: AuthenticatedRequest, res: Response) => {
-    logApiRequest(req, { operation: 'delete_workflow' });
-
-    const { id } = req.params;
-    sendSuccess(
-      {
-        message: `Workflow ${id} deleted successfully`,
-      },
-      req,
-      res,
-      { operation: 'delete_workflow' }
-    );
+    logApiRequest(req, { operation: 'delete_workflow', status: 'not_implemented' });
+    res.status(501).json(NOT_IMPLEMENTED);
   }
 );

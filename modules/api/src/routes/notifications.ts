@@ -1,10 +1,11 @@
 import { Router } from 'express';
-import { authMiddleware, requirePermission } from '../middleware/auth.js';
+import { requirePermission } from '../middleware/auth.js';
 import {
   AuditLogger,
   NotificationService,
   NotificationConfig,
   AuthTemplate,
+  EmailChannel,
 } from '@civicpress/core';
 
 const router = Router();
@@ -14,21 +15,22 @@ const audit = new AuditLogger();
 router.use(requirePermission('system:admin'));
 
 // Normalize metadata-shaped values { value, type, ... } to plain scalars
-function normalizeMetadata<T = any>(input: any): T {
+function normalizeMetadata<T = unknown>(input: unknown): T {
   if (input == null) return input as T;
   if (Array.isArray(input))
-    return input.map((i) => normalizeMetadata(i)) as any;
+    return input.map((i) => normalizeMetadata(i)) as unknown as T;
   if (typeof input === 'object') {
+    const obj = input as Record<string, unknown>;
     if (
-      'value' in input &&
-      Object.keys(input).some((k) =>
+      'value' in obj &&
+      Object.keys(obj).some((k) =>
         ['type', 'description', 'required', 'options', 'value'].includes(k)
       )
     ) {
-      return normalizeMetadata((input as any).value) as T;
+      return normalizeMetadata(obj.value) as T;
     }
-    const out: any = {};
-    for (const [k, v] of Object.entries(input)) out[k] = normalizeMetadata(v);
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(obj)) out[k] = normalizeMetadata(v);
     return out as T;
   }
   return input as T;
@@ -55,68 +57,77 @@ router.post('/test', async (req, res) => {
       });
     }
 
-    // Build a minimal inline email channel using SendGrid or SMTP
+    // Build the canonical EmailChannel for this test send (Phase 2c.5 T3 —
+    // closes the 4th ad-hoc EmailChannel impl that Phase 2c T6 missed).
     const effectiveProvider = provider || emailConfig.provider || 'sendgrid';
-    const rawCreds =
-      (emailConfig as any)[effectiveProvider] || (emailConfig as any).sendgrid;
-    const credentials = normalizeMetadata(rawCreds);
+    // Provider-specific credential blocks (sendgrid / smtp / nodemailer / etc.)
+    // are stored as siblings of the typed channel fields; lookup is dynamic.
+    const cfgRecord = emailConfig as unknown as Record<string, unknown>;
+    const rawCreds = cfgRecord[effectiveProvider] ?? cfgRecord.sendgrid;
+    const credentials = normalizeMetadata<Record<string, unknown>>(rawCreds);
 
-    const emailChannel = {
+    let channel: EmailChannel;
+    if (effectiveProvider === 'smtp' || effectiveProvider === 'nodemailer') {
+      channel = new EmailChannel({
+        smtp: {
+          host: String(credentials.host || ''),
+          port: Number(credentials.port ?? 587),
+          secure: Boolean(credentials.secure),
+          auth: credentials.auth as { user: string; pass: string } | undefined,
+          // FA-API-017: validate the SMTP server cert by default. Only an
+          // explicit tls block may opt out (e.g. a self-signed test relay).
+          tls: (credentials.tls as { rejectUnauthorized: boolean } | undefined) || {
+            rejectUnauthorized: true,
+          },
+        },
+        defaultFrom: credentials.from as string | undefined,
+      });
+    } else {
+      channel = new EmailChannel({
+        sendgrid: { apiKey: String(credentials.apiKey || '') },
+        defaultFrom: credentials.from as string | undefined,
+      });
+    }
+
+    // Wrap the canonical EmailChannel in a NotificationChannel-shaped adapter
+    // so NotificationService.registerChannel + sendNotification keeps working.
+    // NotificationChannel is an abstract class, not an interface — the adapter
+    // is structurally compatible with the subset NotificationService actually
+    // calls (getName, isEnabled, send), so we cast through `unknown` rather
+    // than subclass it (subclassing would require implementing abstract `test`,
+    // `validateConfig`, `getCapabilities` which the test endpoint doesn't use).
+    const notificationChannel = {
       getName() {
         return 'email';
       },
       isEnabled() {
         return true;
       },
-      async send(request: any) {
+      async send(request: {
+        content?: { subject?: string; text?: string; body?: string; html?: string };
+      }) {
         const subj =
           request?.content?.subject || subject || 'CivicPress Notification';
         const bodyText =
           request?.content?.text || request?.content?.body || message || '';
         const bodyHtml = request?.content?.html || undefined;
-
-        if (
-          effectiveProvider === 'smtp' ||
-          effectiveProvider === 'nodemailer'
-        ) {
-          const nodemailer = await import('nodemailer');
-          const transporter = nodemailer.createTransport({
-            host: String(credentials.host || ''),
-            port: Number(credentials.port ?? 587),
-            secure: Boolean(credentials.secure),
-            auth: credentials.auth,
-            tls: credentials.tls || { rejectUnauthorized: false },
-          } as any);
-          await transporter.verify();
-          const info = await transporter.sendMail({
-            from: credentials.from,
-            to,
-            subject: subj,
-            text: bodyText,
-            html: bodyHtml,
-          });
-          return { success: true, messageId: info.messageId };
-        }
-
-        // Default to SendGrid
-        const sg = await import('@sendgrid/mail');
-        sg.default.setApiKey(credentials.apiKey);
-        const resp = await sg.default.send({
+        const result = await channel.send({
           to,
-          from: credentials.from,
           subject: subj,
           text: bodyText,
           html: bodyHtml,
         });
-        return {
-          success: true,
-          messageId: resp?.[0]?.headers?.['x-message-id'] || `sg_${Date.now()}`,
-        };
+        return { success: true, messageId: result.messageId };
       },
     };
 
     const service = new NotificationService(config);
-    service.registerChannel('email', emailChannel as any);
+    service.registerChannel(
+      'email',
+      notificationChannel as unknown as Parameters<
+        NotificationService['registerChannel']
+      >[1]
+    );
 
     // Register a simple template and send
     const tmpl = new AuthTemplate(
@@ -131,10 +142,10 @@ router.post('/test', async (req, res) => {
       data: {},
     });
 
-    const actor = (req as any).user || {};
+    const actor = req.user;
     await audit.log({
       source: 'api',
-      actor: { id: actor.id, username: actor.username, role: actor.role },
+      actor: { id: actor?.id, username: actor?.username, role: actor?.role },
       action: 'notifications:test',
       target: { type: 'notification', name: 'test_email' },
       outcome: result.success ? 'success' : 'failure',
@@ -142,19 +153,20 @@ router.post('/test', async (req, res) => {
     });
 
     return res.json({ success: true, data: result });
-  } catch (error: any) {
-    const actor = (req as any).user || {};
+  } catch (error: unknown) {
+    const actor = req.user;
+    const errorMessage = error instanceof Error ? error.message : String(error);
     await audit.log({
       source: 'api',
-      actor: { id: actor.id, username: actor.username, role: actor.role },
+      actor: { id: actor?.id, username: actor?.username, role: actor?.role },
       action: 'notifications:test',
       target: { type: 'notification', name: 'test_email' },
       outcome: 'failure',
-      message: String(error?.message || error),
+      message: errorMessage,
     });
     return res.status(500).json({
       success: false,
-      error: error?.message || 'Failed to send test email',
+      error: errorMessage || 'Failed to send test email',
     });
   }
 });

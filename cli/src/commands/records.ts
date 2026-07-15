@@ -13,14 +13,12 @@ import {
 } from '@civicpress/core';
 import {
   getGlobalOptionsFromArgs,
-  initializeLogger,
   initializeCliOutput,
 } from '../utils/global-options.js';
 import {
   cliSuccess,
   cliError,
   cliInfo,
-  cliWarn,
   cliStartOperation,
 } from '../utils/cli-output.js';
 
@@ -47,6 +45,7 @@ export function registerRecordsCommand(cli: CAC) {
     .option('--data-dir <path>', 'Override data directory (defaults to config)')
     .option('--json', 'Output results as JSON')
     .option('--silent', 'Suppress non-error output')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .action(async (options: any) => {
       // Initialize CLI output with global options
       const globalOptions = getGlobalOptionsFromArgs();

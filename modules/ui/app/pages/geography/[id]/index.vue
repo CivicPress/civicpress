@@ -338,8 +338,12 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
+import { extractErrorMessage, type ApiResponse } from '~/utils/api-response';
 import { useRoute, useRouter } from 'vue-router';
 import { useAuthStore } from '~/stores/auth';
+import GeographyMap from '~/components/GeographyMap.vue';
+import GeographyLinkedRecords from '~/components/GeographyLinkedRecords.vue';
+import SystemFooter from '~/components/SystemFooter.vue';
 // Define GeographyFile type locally to avoid import issues
 interface GeographyFile {
   id: string;
@@ -356,13 +360,11 @@ interface GeographyFile {
   };
   created_at: string;
   updated_at: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   metadata?: any;
   file_path?: string;
   content?: string;
 }
-import GeographyMap from '~/components/GeographyMap.vue';
-import GeographyLinkedRecords from '~/components/GeographyLinkedRecords.vue';
-import SystemFooter from '~/components/SystemFooter.vue';
 
 // Route and router
 const route = useRoute();
@@ -375,6 +377,7 @@ const loading = ref(true);
 const error = ref<string | null>(null);
 const geographyFile = ref<GeographyFile | null>(null);
 const rawContent = ref('');
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const parsedData = ref<any>(null);
 
 // Computed properties
@@ -411,7 +414,7 @@ const loadGeographyFile = async () => {
     const id = route.params.id as string;
     const response = (await useNuxtApp().$civicApi(
       `/api/v1/geography/${id}`
-    )) as any;
+    )) as ApiResponse<GeographyFile>;
 
     if (response.success) {
       geographyFile.value = response.data;
@@ -422,7 +425,7 @@ const loadGeographyFile = async () => {
       // Parse content for statistics
       await parseContent();
     } else {
-      error.value = response.error || t('geography.failedToLoad');
+      error.value = extractErrorMessage(response) || t('geography.failedToLoad');
     }
   } catch (err) {
     console.error('Error loading geography file:', err);
@@ -440,7 +443,7 @@ const loadRawContent = async () => {
     // In the future, we could fetch the raw file content
     const response = (await useNuxtApp().$civicApi(
       `/api/v1/geography/${geographyFile.value.id}`
-    )) as any;
+    )) as ApiResponse<{ content?: string }>;
     if (response.success && response.data.content) {
       rawContent.value = response.data.content;
     }
@@ -459,6 +462,7 @@ const parseContent = async () => {
       parsedData.value = {
         featureCount: data.features?.length || 0,
         geometryTypes:
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           data.features?.map((f: any) => f.geometry?.type).filter(Boolean) ||
           [],
       };

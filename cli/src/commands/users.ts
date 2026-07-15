@@ -8,7 +8,6 @@ import {
 import {
   cliSuccess,
   cliError,
-  cliInfo,
   cliStartOperation,
 } from '../utils/cli-output.js';
 
@@ -345,12 +344,13 @@ export default function setupUsersCommand(cli: CAC) {
         }
         const authService = civic.getAuthService();
 
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const updates: any = {};
         if (email) updates.email = email;
         if (name) updates.name = name;
         if (role) updates.role = role;
         if (password) {
-          // SECURITY GUARD: Check if user can set password
+          // SECURITY GUARD: Check if user can set password.
           if (!authService.canSetPassword(targetUser)) {
             const provider = authService.getUserAuthProvider(targetUser);
             cliError(
@@ -383,6 +383,15 @@ export default function setupUsersCommand(cli: CAC) {
 
         // Get the updated user data
         const updatedUser = await dbService.getUserById(targetUser.id);
+        if (!updatedUser) {
+          cliError(
+            'User not found after update',
+            'USER_NOT_FOUND',
+            undefined,
+            'users:update'
+          );
+          process.exit(1);
+        }
 
         const message = role
           ? `User updated successfully: ${targetUser.username} (role: ${role})`
@@ -737,6 +746,7 @@ export default function setupUsersCommand(cli: CAC) {
           process.exit(1);
         }
         await civic.shutdown();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } catch (error: any) {
         cliError(
           'Error changing password',
@@ -898,6 +908,7 @@ export default function setupUsersCommand(cli: CAC) {
           process.exit(1);
         }
         await civic.shutdown();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } catch (error: any) {
         cliError(
           'Error setting password',
@@ -1051,6 +1062,7 @@ export default function setupUsersCommand(cli: CAC) {
           process.exit(1);
         }
         await civic.shutdown();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } catch (error: any) {
         cliError(
           'Error requesting email change',
@@ -1071,7 +1083,7 @@ export default function setupUsersCommand(cli: CAC) {
     .command('users:verify-email <token>', 'Verify email change with token')
     .option('--json', 'Output as JSON')
     .option('--silent', 'Suppress output')
-    .action(async (token, options) => {
+    .action(async (token, _options) => {
       // Initialize CLI output with global options
       const globalOptions = getGlobalOptionsFromArgs();
       initializeCliOutput(globalOptions);
@@ -1114,6 +1126,7 @@ export default function setupUsersCommand(cli: CAC) {
           process.exit(1);
         }
         await civic.shutdown();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } catch (error: any) {
         cliError(
           'Error verifying email',
@@ -1242,6 +1255,7 @@ export default function setupUsersCommand(cli: CAC) {
           process.exit(1);
         }
         await civic.shutdown();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } catch (error: any) {
         cliError(
           'Error cancelling email change',
@@ -1365,6 +1379,7 @@ export default function setupUsersCommand(cli: CAC) {
         });
 
         await civic.shutdown();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } catch (error: any) {
         cliError(
           'Error getting security info',

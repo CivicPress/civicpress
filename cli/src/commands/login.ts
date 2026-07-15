@@ -1,24 +1,21 @@
 import { CAC } from 'cac';
-import chalk from 'chalk';
 import { CivicPress } from '@civicpress/core';
 import * as fs from 'fs';
 import inquirer from 'inquirer';
 import {
-  initializeLogger,
   getGlobalOptionsFromArgs,
   initializeCliOutput,
 } from '../utils/global-options.js';
 import {
   cliSuccess,
   cliError,
-  cliInfo,
   cliWarn,
   cliStartOperation,
 } from '../utils/cli-output.js';
 
 // Node.js globals
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 declare const process: any;
-declare const console: any;
 
 export const loginCommand = (cli: CAC) => {
   cli
@@ -31,6 +28,7 @@ export const loginCommand = (cli: CAC) => {
     })
     .option('--logout', 'Log out and clear current session')
     .option('--status', 'Show current authentication status')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .action(async (options: any) => {
       // Initialize CLI output with global options
       const globalOptions = getGlobalOptionsFromArgs();
@@ -95,8 +93,10 @@ export const loginCommand = (cli: CAC) => {
     });
 };
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function handleLogin(civic: CivicPress, options: any): Promise<void> {
   const authService = civic.getAuthService();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let session: any;
 
   try {

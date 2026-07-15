@@ -4,7 +4,6 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { QuotaManager } from '../quota/quota-manager.js';
-import { StorageUsageReporter } from '../reporting/storage-usage-reporter.js';
 import { QuotaExceededError } from '../errors/storage-errors.js';
 import { Logger } from '@civicpress/core';
 

@@ -72,10 +72,10 @@ router.post(
       } else if (
         req.body &&
         typeof req.body === 'object' &&
-        (req.body as any).content
+        typeof (req.body as { content?: unknown }).content === 'string'
       ) {
         // Fallback: check if content was sent in JSON format
-        content = (req.body as any).content;
+        content = (req.body as { content: string }).content;
       }
       // If content is undefined, validateConfiguration will load from disk
 
@@ -90,27 +90,27 @@ router.post(
       });
 
       // Optional audit logging (don't require auth for validation)
-      const actor = (req as any).user || {};
-      if (actor.id) {
+      const actor = req.user;
+      if (actor?.id) {
         await audit.log({
           source: 'api',
-          actor: { id: actor.id, username: actor.username, role: actor.role },
+          actor: { id: actor?.id, username: actor?.username, role: actor?.role },
           action: 'config:validate',
           target: { type: 'config', id: type },
           outcome: validation?.valid ? 'success' : 'failure',
           message: validation?.valid
             ? undefined
-            : (validation?.errors?.[0] as any),
+            : String(validation?.errors?.[0] ?? ''),
           metadata: validation,
         });
       }
     } catch (error) {
-      const { type } = req.params || ({} as any);
-      const actor = (req as any).user || {};
-      if (actor.id) {
+      const { type } = req.params || {};
+      const actor = req.user;
+      if (actor?.id) {
         await audit.log({
           source: 'api',
-          actor: { id: actor.id, username: actor.username, role: actor.role },
+          actor: { id: actor?.id, username: actor?.username, role: actor?.role },
           action: 'config:validate',
           target: { type: 'config', id: type },
           outcome: 'failure',
@@ -127,9 +127,9 @@ router.post(
 
 // Secured configuration routes: require authenticated admin permission
 router.use((req, res, next) => {
-  const civicPress = (req as any).civicPress;
+  const civicPress = req.civicPress;
   if (!civicPress) return next();
-  return authMiddleware(civicPress)(req as any, res as any, next as any);
+  return authMiddleware(civicPress)(req, res, next);
 });
 router.use(requirePermission('config:manage'));
 
@@ -173,9 +173,18 @@ router.get('/metadata/:type', async (req, res) => {
   }
 });
 
+// FA-API-012: raised when the caller-supplied config type is not a bare name.
+class InvalidConfigTypeError extends Error {}
+
 function resolveRawPaths(type: string) {
   const key = (type || '').toLowerCase().trim();
   const canonical = key.startsWith('notif') ? 'notifications' : key;
+  // FA-API-012: the canonical name becomes a filesystem segment; reject anything
+  // that is not a bare config name so `../`, path separators, NUL, and absolute
+  // segments cannot escape the intended config directories.
+  if (!/^[a-z0-9-]+$/.test(canonical)) {
+    throw new InvalidConfigTypeError(`Invalid config type: ${type}`);
+  }
   const dataDir = CentralConfigManager.getDataDir();
   const userPath =
     canonical === 'notifications'
@@ -198,7 +207,9 @@ router.get('/raw/:type', async (req, res) => {
     let yaml: string | null = null;
     try {
       yaml = await readFile(userPath, 'utf-8');
-    } catch {}
+    } catch {
+      // intentional: user config file may not exist; fall back to defaults below
+    }
     if (!yaml) {
       yaml = await readFile(defaultPath, 'utf-8');
     }
@@ -206,6 +217,9 @@ router.get('/raw/:type', async (req, res) => {
     res.setHeader('Content-Type', 'text/yaml; charset=utf-8');
     res.status(200).send(yaml);
   } catch (error) {
+    if (error instanceof InvalidConfigTypeError) {
+      return res.status(400).json({ success: false, error: error.message });
+    }
     res.status(404).json({
       success: false,
       error: `Raw configuration not found: ${error}`,
@@ -240,25 +254,28 @@ router.put(
       });
 
       // Audit success
-      const actor = (req as any).user || {};
+      const actor = req.user;
       await audit.log({
         source: 'api',
-        actor: { id: actor.id, username: actor.username, role: actor.role },
+        actor: { id: actor?.id, username: actor?.username, role: actor?.role },
         action: 'config:raw:put',
         target: { type: 'config', id: type, path: userPath },
         outcome: 'success',
       });
     } catch (error) {
-      const { type } = req.params || ({} as any);
-      const actor = (req as any).user || {};
+      const { type } = req.params || {};
+      const actor = req.user;
       await audit.log({
         source: 'api',
-        actor: { id: actor.id, username: actor.username, role: actor.role },
+        actor: { id: actor?.id, username: actor?.username, role: actor?.role },
         action: 'config:raw:put',
         target: { type: 'config', id: type },
         outcome: 'failure',
         message: String(error),
       });
+      if (error instanceof InvalidConfigTypeError) {
+        return res.status(400).json({ success: false, error: error.message });
+      }
       res.status(500).json({
         success: false,
         error: `Failed to save raw configuration: ${error}`,
@@ -323,20 +340,20 @@ router.put('/:type', async (req, res) => {
       message: `Configuration ${type} saved successfully`,
     });
 
-    const actor = (req as any).user || {};
+    const actor = req.user;
     await audit.log({
       source: 'api',
-      actor: { id: actor.id, username: actor.username, role: actor.role },
+      actor: { id: actor?.id, username: actor?.username, role: actor?.role },
       action: 'config:save',
       target: { type: 'config', id: type },
       outcome: 'success',
     });
   } catch (error) {
-    const { type } = req.params || ({} as any);
-    const actor = (req as any).user || {};
+    const { type } = req.params || {};
+    const actor = req.user;
     await audit.log({
       source: 'api',
-      actor: { id: actor.id, username: actor.username, role: actor.role },
+      actor: { id: actor?.id, username: actor?.username, role: actor?.role },
       action: 'config:save',
       target: { type: 'config', id: type },
       outcome: 'failure',
@@ -364,20 +381,20 @@ router.post('/:type/reset', async (req, res) => {
       message: `Configuration ${type} reset to defaults successfully`,
     });
 
-    const actor = (req as any).user || {};
+    const actor = req.user;
     await audit.log({
       source: 'api',
-      actor: { id: actor.id, username: actor.username, role: actor.role },
+      actor: { id: actor?.id, username: actor?.username, role: actor?.role },
       action: 'config:reset',
       target: { type: 'config', id: type },
       outcome: 'success',
     });
   } catch (error) {
-    const { type } = req.params || ({} as any);
-    const actor = (req as any).user || {};
+    const { type } = req.params || {};
+    const actor = req.user;
     await audit.log({
       source: 'api',
-      actor: { id: actor.id, username: actor.username, role: actor.role },
+      actor: { id: actor?.id, username: actor?.username, role: actor?.role },
       action: 'config:reset',
       target: { type: 'config', id: type },
       outcome: 'failure',
@@ -403,6 +420,7 @@ router.get('/validate/all', async (req, res) => {
       'hooks',
       'notifications',
     ];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const results: Record<string, any> = {};
 
     for (const type of configTypes) {

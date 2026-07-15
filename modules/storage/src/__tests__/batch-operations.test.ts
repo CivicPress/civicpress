@@ -3,9 +3,9 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import type { StorageDatabaseService } from "../types/storage.types.js";
 import { CloudUuidStorageService } from '../cloud-uuid-storage-service.js';
 import { UnifiedCacheManager } from '@civicpress/core';
-import { Logger } from '@civicpress/core';
 import type {
   StorageConfig,
   MulterFile,
@@ -93,7 +93,9 @@ describe('Batch Operations', () => {
       '.test-storage',
       cacheManager
     );
-    storageService.setDatabaseService(databaseService);
+    storageService.setDatabaseService(
+      databaseService as unknown as StorageDatabaseService
+    );
   });
 
   describe('Batch Upload', () => {

@@ -14,14 +14,14 @@ export interface DiagnosticIssue {
     estimatedDuration?: number;
   };
   recommendations?: readonly string[] | string[];
-  details?: any;
+  details?: Record<string, unknown>;
 }
 
 export interface DiagnosticCheck {
   name: string;
   status: 'pass' | 'warning' | 'error';
   message?: string;
-  details?: any;
+  details?: Record<string, unknown>;
 }
 
 export interface ComponentResult {
@@ -56,7 +56,7 @@ export interface FixResult {
   backupId?: string;
   rollbackAvailable?: boolean;
   duration?: number;
-  error?: any;
+  error?: unknown;
 }
 
 export const useDiagnostics = () => {
@@ -95,8 +95,11 @@ export const useDiagnostics = () => {
 
       if (response.success && response.data) {
         if (options?.component) {
-          // Single component result
-          componentResult.value = response.data as any;
+          // Single component result. The /diagnose endpoint returns a
+          // DiagnosticReport with a single-element `components` array when a
+          // component filter is given; the api also serves the bare
+          // ComponentResult on the component-scoped path, so accept either.
+          componentResult.value = response.data as unknown as ComponentResult;
         } else {
           // Full report
           report.value = response.data;
@@ -106,8 +109,8 @@ export const useDiagnostics = () => {
       } else {
         throw new Error('Invalid response format');
       }
-    } catch (err: any) {
-      error.value = err.message || 'Failed to run diagnostics';
+    } catch (err: unknown) {
+      error.value = (err instanceof Error ? err.message : '') || 'Failed to run diagnostics';
       throw err;
     } finally {
       loading.value = false;
@@ -158,16 +161,17 @@ export const useDiagnostics = () => {
         `/api/v1/diagnose?${params.toString()}`
       )) as {
         success: boolean;
-        data: DiagnosticReport & { fixResults?: FixResult[] };
+        data: DiagnosticReport & {
+          fixResults?: FixResult[];
+          autoFixResults?: FixResult[];
+        };
       };
 
       if (response.success && response.data) {
-        // The API should return fix results in the response
-        // If not, we'll need to parse them from the report
+        // The API should return fix results in the response.
+        // Older versions used `autoFixResults`; new ones use `fixResults`.
         const fixResults =
-          (response.data as any).fixResults ||
-          (response.data as any).autoFixResults ||
-          [];
+          response.data.fixResults || response.data.autoFixResults || [];
 
         // Refresh the report after fixes
         await runAll();
@@ -176,8 +180,8 @@ export const useDiagnostics = () => {
       } else {
         throw new Error('Invalid response format');
       }
-    } catch (err: any) {
-      error.value = err.message || 'Failed to auto-fix issues';
+    } catch (err: unknown) {
+      error.value = (err instanceof Error ? err.message : '') || 'Failed to auto-fix issues';
       throw err;
     } finally {
       fixing.value = false;

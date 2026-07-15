@@ -1,0 +1,621 @@
+/**
+ * UploadProcessor Unit Tests
+ */
+
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { UploadProcessor } from '../services/upload-processor.js';
+import type { Logger } from '@civicpress/core';
+import * as fs from 'fs/promises';
+import * as path from 'path';
+import * as os from 'os';
+import * as crypto from 'crypto';
+
+describe('UploadProcessor', () => {
+  let processor: UploadProcessor;
+  let mockDb: any;
+  let mockStorageService: any;
+  let testDir: string;
+  let mockLogger: Logger;
+  let mockHookSystem: any;
+
+  beforeEach(async () => {
+    testDir = await fs.mkdtemp(
+      path.join(os.tmpdir(), 'broadcast-box-upload-test-')
+    );
+    await fs.mkdir(path.join(testDir, 'tmp', 'uploads'), { recursive: true });
+
+    mockDb = {
+      getAdapter: vi.fn().mockReturnValue({
+        execute: vi.fn(),
+        query: vi.fn(),
+      }),
+    };
+
+    mockStorageService = {
+      uploadFile: vi.fn().mockResolvedValue({
+        success: true,
+        file: {
+          id: 'storage-file-id',
+          original_name: 'test.mp4',
+        },
+      }),
+      uploadFileStream: vi.fn().mockResolvedValue({
+        success: true,
+        file: {
+          id: 'storage-file-id',
+          original_name: 'test.mp4',
+        },
+      }),
+    };
+
+    mockLogger = {
+      info: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+      debug: vi.fn(),
+    } as any;
+
+    mockHookSystem = { emit: vi.fn(), registerHook: vi.fn() };
+
+    processor = new UploadProcessor(
+      mockDb,
+      mockStorageService,
+      testDir,
+      mockLogger,
+      mockHookSystem
+    );
+
+    await processor.initialize();
+  });
+
+  afterEach(async () => {
+    try {
+      await fs.rm(testDir, { recursive: true, force: true });
+    } catch (error) {
+      // Ignore cleanup errors
+    }
+  });
+
+  describe('createUpload', () => {
+    it('should create a new upload job', async () => {
+      const request = {
+        sessionId: 'session-id',
+        fileName: 'test.mp4',
+        fileSize: 1000000,
+        fileHash: 'test-hash',
+        mimeType: 'video/mp4',
+      };
+
+      // Mock upload model with db property
+      const mockSessionDb = {
+        getAdapter: vi.fn().mockReturnValue({
+          query: vi.fn().mockResolvedValue([{ device_id: 'device-id' }]),
+        }),
+      };
+
+      const mockUploadModel = {
+        db: mockSessionDb,
+        create: vi.fn().mockResolvedValue({
+          id: 'upload-id',
+          sessionId: request.sessionId,
+          deviceId: 'device-id',
+          fileName: request.fileName,
+          fileSize: request.fileSize,
+          fileHash: request.fileHash,
+          mimeType: request.mimeType,
+          status: 'pending',
+          progressPercent: 0,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        }),
+      };
+
+      (processor as any).uploadModel = mockUploadModel;
+
+      const result = await processor.createUpload(request);
+
+      expect(result).toBeDefined();
+      expect(result.fileName).toBe(request.fileName);
+      expect(result.status).toBe('pending');
+      expect(mockUploadModel.create).toHaveBeenCalled();
+    });
+
+    it('FA-BB-003: rejects fileName path traversal before any row/dir is created', async () => {
+      const mockUploadModel = { db: mockDb, create: vi.fn() };
+      (processor as any).uploadModel = mockUploadModel;
+
+      const base = {
+        sessionId: 'session-id',
+        fileSize: 1000,
+        fileHash: 'h',
+        mimeType: 'video/mp4',
+      };
+      for (const fileName of [
+        '../../../.civic/hooks.yml',
+        '..\\..\\evil.mp4',
+        'a/b.mp4',
+        '..',
+        '.',
+        '',
+        'x'.repeat(256),
+        'nul\0byte.mp4',
+      ]) {
+        await expect(
+          processor.createUpload({ ...base, fileName })
+        ).rejects.toThrow(/Invalid fileName/);
+      }
+      expect(mockUploadModel.create).not.toHaveBeenCalled();
+      // No upload directory was created for any rejected attempt.
+      const dirs = await fs.readdir(path.join(testDir, 'tmp', 'uploads'));
+      expect(dirs).toHaveLength(0);
+    });
+
+    it('FA-BB-003: plain basenames (incl. dots inside) stay accepted', async () => {
+      const mockSessionDb = {
+        getAdapter: vi.fn().mockReturnValue({
+          query: vi.fn().mockResolvedValue([{ device_id: 'device-id' }]),
+        }),
+      };
+      const mockUploadModel = {
+        db: mockSessionDb,
+        create: vi.fn().mockImplementation(async (u: any) => ({
+          ...u,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        })),
+      };
+      (processor as any).uploadModel = mockUploadModel;
+
+      const result = await processor.createUpload({
+        sessionId: 'session-id',
+        fileName: 'meeting..2026-07-13.recording.mp4',
+        fileSize: 1000,
+        fileHash: 'h',
+        mimeType: 'video/mp4',
+      });
+      expect(result.fileName).toBe('meeting..2026-07-13.recording.mp4');
+    });
+  });
+
+  describe('processChunk', () => {
+    it('should process an upload chunk', async () => {
+      const uploadId = 'upload-id';
+      const chunk = Buffer.from('test chunk data');
+      const chunkNumber = 0;
+
+      // Ensure upload directory exists
+      const uploadDir = path.join(testDir, 'tmp', 'uploads', uploadId);
+      await fs.mkdir(uploadDir, { recursive: true });
+
+      const mockUploadModel = {
+        getById: vi
+          .fn()
+          .mockResolvedValueOnce({
+            id: uploadId,
+            status: 'pending',
+            fileName: 'test.mp4',
+          })
+          .mockResolvedValueOnce({
+            id: uploadId,
+            status: 'uploading',
+            fileName: 'test.mp4',
+          }),
+        update: vi.fn().mockResolvedValue({
+          id: uploadId,
+          status: 'uploading',
+          progressPercent: 0,
+        }),
+      };
+
+      (processor as any).uploadModel = mockUploadModel;
+
+      await processor.processChunk(uploadId, chunk, chunkNumber);
+
+      // Check that chunk file was written
+      const chunkPath = path.join(uploadDir, `chunk-${chunkNumber}`);
+      const chunkExists = await fs
+        .access(chunkPath)
+        .then(() => true)
+        .catch(() => false);
+      expect(chunkExists).toBe(true);
+
+      expect(mockUploadModel.update).toHaveBeenCalled();
+    });
+
+    it('should throw error if upload not found', async () => {
+      const mockUploadModel = {
+        getById: vi.fn().mockResolvedValue(null),
+      };
+
+      (processor as any).uploadModel = mockUploadModel;
+
+      await expect(
+        processor.processChunk('unknown-id', Buffer.from('data'), 0)
+      ).rejects.toThrow('Upload job not found');
+    });
+
+    it('should throw error if upload already complete', async () => {
+      const mockUploadModel = {
+        getById: vi.fn().mockResolvedValue({
+          id: 'upload-id',
+          status: 'complete',
+        }),
+      };
+
+      (processor as any).uploadModel = mockUploadModel;
+
+      await expect(
+        processor.processChunk('upload-id', Buffer.from('data'), 0)
+      ).rejects.toThrow('already complete');
+    });
+  });
+
+  describe('finalizeUpload', () => {
+    it('should finalize upload and store in storage', async () => {
+      const uploadId = 'upload-id';
+      const fileName = 'test.mp4';
+      const fileData = Buffer.from('test file content');
+      const fileHash = crypto
+        .createHash('sha256')
+        .update(fileData)
+        .digest('hex');
+
+      // Create chunks
+      const uploadDir = path.join(testDir, 'tmp', 'uploads', uploadId);
+      await fs.mkdir(uploadDir, { recursive: true });
+      await fs.writeFile(path.join(uploadDir, 'chunk-0'), fileData);
+
+      const mockUploadModel = {
+        getById: vi
+          .fn()
+          .mockResolvedValueOnce({
+            id: uploadId,
+            sessionId: 'session-id',
+            deviceId: 'device-id',
+            fileName,
+            filePath: path.join(uploadDir, fileName),
+            fileSize: fileData.length,
+            fileHash,
+            mimeType: 'video/mp4',
+            status: 'uploading',
+          })
+          .mockResolvedValueOnce({
+            id: uploadId,
+            status: 'complete',
+            storageLocation: 'storage-file-id',
+          }),
+        update: vi.fn().mockResolvedValue({
+          id: uploadId,
+          status: 'complete',
+          storageLocation: 'storage-file-id',
+        }),
+      };
+
+      (processor as any).uploadModel = mockUploadModel;
+
+      // Storage uploadFileStream returns { success, file: { id } } — the id IS the
+      // stored file's UUID (there is no separate `uuid` field on the response).
+      mockStorageService.uploadFileStream.mockResolvedValue({
+        success: true,
+        file: {
+          id: 'storage-file-id',
+          original_name: fileName,
+        },
+      });
+
+      // finalizeUpload returns the stored file id.
+      const storageUuid = await processor.finalizeUpload(uploadId);
+
+      expect(storageUuid).toBe('storage-file-id');
+      expect(mockStorageService.uploadFileStream).toHaveBeenCalled();
+      // FA-BB-002 fail-closed: the raw original lands in the PRIVATE
+      // recordings_raw folder, never directly in the public 'recordings'.
+      expect(
+        mockStorageService.uploadFileStream.mock.calls[0][0].folder
+      ).toBe('recordings_raw');
+      expect(mockUploadModel.update).toHaveBeenCalled();
+      // Announces completion (broadcast-session id + storage uuid + device) so
+      // the workflow trigger links the A/V to its session record + writes capture.
+      expect(mockHookSystem.emit).toHaveBeenCalledWith(
+        'broadcast-box:recording:complete',
+        {
+          sessionId: 'session-id',
+          storageFileId: 'storage-file-id',
+          deviceId: 'device-id',
+        }
+      );
+    });
+
+    it('should throw error if hash mismatch', async () => {
+      const uploadId = 'upload-id';
+      const fileName = 'test.mp4';
+      const fileData = Buffer.from('test file content');
+      const wrongHash = 'wrong-hash';
+
+      // Create chunks
+      const uploadDir = path.join(testDir, 'tmp', 'uploads', uploadId);
+      await fs.mkdir(uploadDir, { recursive: true });
+      await fs.writeFile(path.join(uploadDir, 'chunk-0'), fileData);
+
+      const mockUploadModel = {
+        getById: vi.fn().mockResolvedValue({
+          id: uploadId,
+          sessionId: 'session-id',
+          deviceId: 'device-id',
+          fileName,
+          fileSize: fileData.length,
+          fileHash: wrongHash,
+          mimeType: 'video/mp4',
+          status: 'uploading',
+        }),
+        update: vi.fn(),
+      };
+
+      (processor as any).uploadModel = mockUploadModel;
+
+      await expect(processor.finalizeUpload(uploadId)).rejects.toThrow(
+        'Hash mismatch'
+      );
+    });
+  });
+
+  describe('getUpload', () => {
+    it('should get upload by ID', async () => {
+      const uploadId = 'upload-id';
+      const mockUpload = {
+        id: uploadId,
+        sessionId: 'session-id',
+        status: 'uploading',
+      };
+
+      const mockUploadModel = {
+        getById: vi.fn().mockResolvedValue(mockUpload),
+      };
+
+      (processor as any).uploadModel = mockUploadModel;
+
+      const result = await processor.getUpload(uploadId);
+
+      expect(result).toEqual(mockUpload);
+    });
+  });
+
+  describe('listUploads', () => {
+    it('should list uploads with filters', async () => {
+      const filters = { sessionId: 'session-id', status: 'uploading' };
+      const mockUploads = [
+        { id: 'upload-1', sessionId: 'session-id', status: 'uploading' },
+        { id: 'upload-2', sessionId: 'session-id', status: 'uploading' },
+      ];
+
+      const mockUploadModel = {
+        list: vi.fn().mockResolvedValue(mockUploads),
+      };
+
+      (processor as any).uploadModel = mockUploadModel;
+
+      const result = await processor.listUploads(filters);
+
+      expect(result).toEqual(mockUploads);
+      expect(mockUploadModel.list).toHaveBeenCalledWith(filters);
+    });
+  });
+
+  describe('ownership enforcement (expectedDeviceId)', () => {
+    const req = {
+      sessionId: 'session-id',
+      fileName: 'r.mp4',
+      fileSize: 10,
+      fileHash: 'h',
+      mimeType: 'video/mp4',
+    };
+
+    it('createUpload rejects when the session is owned by another device', async () => {
+      const mockUploadModel = {
+        db: {
+          getAdapter: vi.fn().mockReturnValue({
+            query: vi.fn().mockResolvedValue([{ device_id: 'device-A' }]),
+          }),
+        },
+        create: vi.fn(),
+      };
+      (processor as any).uploadModel = mockUploadModel;
+
+      await expect(processor.createUpload(req, 'device-B')).rejects.toThrow(
+        'Forbidden'
+      );
+      expect(mockUploadModel.create).not.toHaveBeenCalled();
+    });
+
+    it('createUpload rejects when the session does not exist', async () => {
+      const mockUploadModel = {
+        db: {
+          getAdapter: vi.fn().mockReturnValue({
+            query: vi.fn().mockResolvedValue([]),
+          }),
+        },
+        create: vi.fn(),
+      };
+      (processor as any).uploadModel = mockUploadModel;
+
+      await expect(processor.createUpload(req, 'device-A')).rejects.toThrow(
+        'Forbidden'
+      );
+      expect(mockUploadModel.create).not.toHaveBeenCalled();
+    });
+
+    it('createUpload succeeds when the session is owned by the device', async () => {
+      const mockUploadModel = {
+        db: {
+          getAdapter: vi.fn().mockReturnValue({
+            query: vi.fn().mockResolvedValue([{ device_id: 'device-A' }]),
+          }),
+        },
+        create: vi.fn().mockResolvedValue({
+          id: 'upload-id',
+          sessionId: 'session-id',
+          deviceId: 'device-A',
+          status: 'pending',
+        }),
+      };
+      (processor as any).uploadModel = mockUploadModel;
+
+      const result = await processor.createUpload(req, 'device-A');
+      expect(result.deviceId).toBe('device-A');
+      expect(mockUploadModel.create).toHaveBeenCalled();
+    });
+
+    it('processChunk rejects a chunk from another device', async () => {
+      const mockUploadModel = {
+        getById: vi.fn().mockResolvedValue({
+          id: 'upload-id',
+          deviceId: 'device-A',
+          status: 'uploading',
+        }),
+        update: vi.fn(),
+      };
+      (processor as any).uploadModel = mockUploadModel;
+
+      await expect(
+        processor.processChunk('upload-id', Buffer.from('x'), 0, 'device-B')
+      ).rejects.toThrow('Forbidden');
+      expect(mockUploadModel.update).not.toHaveBeenCalled();
+    });
+
+    it('finalizeUpload rejects a finalize from another device', async () => {
+      const mockUploadModel = {
+        getById: vi.fn().mockResolvedValue({
+          id: 'upload-id',
+          deviceId: 'device-A',
+          status: 'uploading',
+        }),
+        update: vi.fn(),
+      };
+      (processor as any).uploadModel = mockUploadModel;
+
+      await expect(
+        processor.finalizeUpload('upload-id', 'device-B')
+      ).rejects.toThrow('Forbidden');
+      expect(mockUploadModel.update).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('FA-BB-007: size caps and declared-size enforcement', () => {
+    it('createUpload rejects an over-cap or nonsense declared fileSize', async () => {
+      const mockUploadModel = { db: mockDb, create: vi.fn() };
+      (processor as any).uploadModel = mockUploadModel;
+
+      const base = {
+        sessionId: 'session-id',
+        fileName: 'big.mp4',
+        fileHash: 'h',
+        mimeType: 'video/mp4',
+      };
+      for (const fileSize of [
+        17 * 1024 * 1024 * 1024, // above the 16 GiB default cap
+        0,
+        -5,
+        1.5,
+        Number.MAX_SAFE_INTEGER + 2,
+        NaN,
+      ]) {
+        await expect(
+          processor.createUpload({ ...base, fileSize })
+        ).rejects.toThrow(/Invalid fileSize/);
+      }
+      expect(mockUploadModel.create).not.toHaveBeenCalled();
+    });
+
+    it('processChunk rejects bytes beyond the declared fileSize and fails the upload', async () => {
+      const uploadId = 'upload-overflow';
+      const uploadDir = path.join(testDir, 'tmp', 'uploads', uploadId);
+      await fs.mkdir(uploadDir, { recursive: true });
+
+      const upload = {
+        id: uploadId,
+        deviceId: 'device-id',
+        status: 'uploading',
+        fileName: 'test.mp4',
+        fileSize: 10, // declared budget: 10 bytes
+      };
+      const mockUploadModel = {
+        getById: vi.fn().mockResolvedValue(upload),
+        update: vi.fn(),
+      };
+      (processor as any).uploadModel = mockUploadModel;
+
+      // 8 bytes fit the 10-byte budget.
+      await processor.processChunk(uploadId, Buffer.from('12345678'), 0);
+
+      // 8 more would blow it → rejected, upload failed, chunks cleaned up.
+      await expect(
+        processor.processChunk(uploadId, Buffer.from('12345678'), 1)
+      ).rejects.toThrow(/exceeded its declared fileSize/);
+      expect(mockUploadModel.update).toHaveBeenCalledWith(
+        uploadId,
+        expect.objectContaining({ status: 'failed' })
+      );
+
+      // Re-sending the SAME chunk number is an overwrite, not extra budget.
+      const upload2 = { ...upload, id: 'upload-resend' };
+      const dir2 = path.join(testDir, 'tmp', 'uploads', upload2.id);
+      await fs.mkdir(dir2, { recursive: true });
+      mockUploadModel.getById = vi.fn().mockResolvedValue(upload2);
+      await processor.processChunk(upload2.id, Buffer.from('12345678'), 0);
+      await expect(
+        processor.processChunk(upload2.id, Buffer.from('87654321'), 0)
+      ).resolves.toBeUndefined();
+    });
+
+    it('processChunk rejects a non-integer chunkNumber', async () => {
+      const mockUploadModel = {
+        getById: vi.fn().mockResolvedValue({
+          id: 'upload-id',
+          deviceId: 'device-id',
+          status: 'uploading',
+          fileSize: 1000,
+        }),
+        update: vi.fn(),
+      };
+      (processor as any).uploadModel = mockUploadModel;
+
+      for (const bad of [-1, 1.5, NaN, Infinity]) {
+        await expect(
+          processor.processChunk('upload-id', Buffer.from('x'), bad)
+        ).rejects.toThrow(/Invalid chunkNumber/);
+      }
+    });
+
+    it('finalizeUpload rejects when the combined size differs from the declared fileSize', async () => {
+      const uploadId = 'upload-size-mismatch';
+      const uploadDir = path.join(testDir, 'tmp', 'uploads', uploadId);
+      await fs.mkdir(uploadDir, { recursive: true });
+
+      const content = Buffer.from('actual-content'); // 14 bytes
+      await fs.writeFile(path.join(uploadDir, 'chunk-0'), content);
+      const hash = crypto.createHash('sha256').update(content).digest('hex');
+
+      const mockUploadModel = {
+        getById: vi.fn().mockResolvedValue({
+          id: uploadId,
+          deviceId: 'device-id',
+          status: 'uploading',
+          fileName: 'test.mp4',
+          fileSize: 9999, // declared ≠ actual
+          fileHash: hash, // hash matches, so ONLY the size check can catch it
+        }),
+        update: vi.fn(),
+      };
+      (processor as any).uploadModel = mockUploadModel;
+
+      await expect(processor.finalizeUpload(uploadId)).rejects.toThrow(
+        /Size mismatch/
+      );
+      expect(mockStorageService.uploadFileStream).not.toHaveBeenCalled();
+      expect(mockUploadModel.update).toHaveBeenCalledWith(
+        uploadId,
+        expect.objectContaining({ status: 'failed' })
+      );
+    });
+  });
+});

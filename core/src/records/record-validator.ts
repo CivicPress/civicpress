@@ -267,7 +267,7 @@ export class RecordValidator {
   private static validateFieldTypes(
     record: RecordData,
     errors: ValidationError[],
-    warnings: ValidationError[]
+    _warnings: ValidationError[]
   ): void {
     // ID must be string
     if (record.id && typeof record.id !== 'string') {
@@ -325,7 +325,7 @@ export class RecordValidator {
   private static validateFieldFormats(
     record: RecordData,
     errors: ValidationError[],
-    warnings: ValidationError[]
+    _warnings: ValidationError[]
   ): void {
     // Validate ID format (alphanumeric, hyphens, underscores)
     if (record.id && !/^[a-zA-Z0-9_-]+$/.test(record.id)) {
@@ -579,7 +579,7 @@ export class RecordValidator {
   private static validateAttachedFiles(
     record: RecordData,
     errors: ValidationError[],
-    warnings: ValidationError[]
+    _warnings: ValidationError[]
   ): void {
     if (!record.attachedFiles || record.attachedFiles.length === 0) return;
 

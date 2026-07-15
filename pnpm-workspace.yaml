@@ -7,7 +7,11 @@ packages:
   - cli
   - core
   - modules/api
+  - modules/realtime
   - modules/ui
-  - modules/legal-register
+  - modules/schema-extensions/legal
   - modules/storage
+  - modules/broadcast-box
+  - services/*
+  - packages/*
   # - modules/serve (Astro frontend removed)

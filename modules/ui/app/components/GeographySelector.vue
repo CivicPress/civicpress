@@ -78,7 +78,7 @@
                 {{ file.name }}
               </p>
               <UBadge
-                :color="getCategoryColor(file.category) as any"
+                :color="getCategoryColor(file.category)"
                 variant="soft"
                 size="xs"
               >
@@ -133,11 +133,7 @@
     >
       <div class="flex justify-between items-center">
         <span class="text-sm text-gray-500">
-          {{
-            (t as any)('common.selected', selectedFiles.length, {
-              count: selectedFiles.length,
-            })
-          }}
+          {{ tPlural('common.selected', selectedFiles.length) }}
         </span>
         <div class="flex space-x-2">
           <UButton
@@ -164,8 +160,10 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue';
-import { useDebounceFn } from '@vueuse/core';
+import type { ApiResponse } from '~/utils/api-response';
+import type { NuxtUiColor } from '~/types/nuxt-ui-bridge';
 import type { GeographyFile, GeographyCategory } from '~/types/geography';
+import { useTypedI18n } from '~/composables/useTypedI18n';
 
 // Props
 // Note: For v-model:selected-ids, Vue converts kebab-case to camelCase
@@ -197,8 +195,8 @@ const geographyFiles = ref<GeographyFile[]>([]);
 const searchQuery = ref('');
 const selectedCategory = ref<string | null>(null);
 
-// Computed
-const { t } = useI18n();
+// Composables
+const { t, tPlural } = useTypedI18n();
 
 const categoryOptions = computed(() => {
   const categories = new Set(
@@ -264,15 +262,6 @@ const toggleSelection = (file: GeographyFile) => {
   }
 };
 
-const removeSelection = (fileId: string) => {
-  const newIds = props.selectedIds.filter((id) => id !== fileId);
-  emit('update:selected-ids', newIds);
-};
-
-const previewFile = (file: GeographyFile) => {
-  emit('preview', file);
-};
-
 const confirmSelection = () => {
   emit('selection-change', selectedFiles.value);
 };
@@ -281,16 +270,16 @@ const clearSelection = () => {
   emit('update:selected-ids', []);
 };
 
-const getCategoryColor = (category: string) => {
-  const colors = {
-    Reference: 'blue',
-    Financial: 'green',
-    Legal: 'purple',
-    Planning: 'orange',
-    Environmental: 'emerald',
-    Infrastructure: 'gray',
+const getCategoryColor = (category: string): NuxtUiColor => {
+  const colors: Record<string, NuxtUiColor> = {
+    Reference: 'info',
+    Financial: 'success',
+    Legal: 'secondary',
+    Planning: 'warning',
+    Environmental: 'success',
+    Infrastructure: 'neutral',
   };
-  return colors[category as keyof typeof colors] || 'neutral';
+  return colors[category] || 'neutral';
 };
 
 const formatDate = (dateString: string) => {
@@ -303,7 +292,7 @@ const loadGeographyFiles = async () => {
     loading.value = true;
     error.value = null;
 
-    const response = (await useNuxtApp().$civicApi('/api/v1/geography')) as any;
+    const response = (await useNuxtApp().$civicApi('/api/v1/geography')) as ApiResponse;
 
     if (response.success && response.data?.files) {
       geographyFiles.value = response.data.files;
@@ -321,7 +310,7 @@ const loadGeographyFiles = async () => {
 // Watch for changes in selectedIds prop
 watch(
   () => props.selectedIds,
-  (newIds) => {
+  () => {
     // Watch for prop changes
   },
   { deep: true, immediate: true }

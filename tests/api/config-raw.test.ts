@@ -70,4 +70,34 @@ describe('Config RAW endpoints', () => {
       .set('Authorization', `Bearer ${token}`);
     expect(getRes.text).toContain('Test Org');
   });
+
+  // FA-API-012: :type is a filesystem segment; a URL-encoded ../ traversal must
+  // be rejected before any file read/write, not path-joined out of the config dir.
+  it('rejects a path-traversal config type on GET (FA-API-012)', async () => {
+    const authRes = await request(context.api.getApp())
+      .post('/api/v1/auth/simulated')
+      .send({ username: 'admin-user', role: 'admin' });
+    const token = authRes.body?.data?.session?.token as string;
+
+    const res = await request(context.api.getApp())
+      .get('/api/v1/config/raw/..%2f..%2f..%2fpackage')
+      .set('Authorization', `Bearer ${token}`);
+    expect(res.status).toBe(400);
+    expect(res.body?.error).toMatch(/invalid config type/i);
+  });
+
+  it('rejects a path-traversal config type on PUT (FA-API-012)', async () => {
+    const authRes = await request(context.api.getApp())
+      .post('/api/v1/auth/simulated')
+      .send({ username: 'admin-user', role: 'admin' });
+    const token = authRes.body?.data?.session?.token as string;
+
+    const res = await request(context.api.getApp())
+      .put('/api/v1/config/raw/..%2f..%2fevil')
+      .set('Authorization', `Bearer ${token}`)
+      .set('Content-Type', 'text/yaml')
+      .send('pwned: true\n');
+    expect(res.status).toBe(400);
+    expect(res.body?.error).toMatch(/invalid config type/i);
+  });
 });

@@ -1,35 +1,26 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref, watch, nextTick } from 'vue';
-import {
-  EditorView,
-  keymap,
-  lineNumbers,
-  highlightActiveLineGutter,
-  highlightSpecialChars,
-  drawSelection,
-  dropCursor,
-  rectangularSelection,
-  crosshairCursor,
-  highlightActiveLine,
-} from '@codemirror/view';
-import { EditorState, Compartment, type Extension } from '@codemirror/state';
-import { markdown } from '@codemirror/lang-markdown';
-import { oneDark } from '@codemirror/theme-one-dark';
-import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
-import { searchKeymap, highlightSelectionMatches } from '@codemirror/search';
-import {
-  autocompletion,
-  completionKeymap,
-  closeBrackets,
-  closeBracketsKeymap,
-} from '@codemirror/autocomplete';
-import {
-  foldGutter,
-  indentOnInput,
-  bracketMatching,
-  foldKeymap,
-} from '@codemirror/language';
+import { computed, ref } from 'vue';
+import CodeMirrorEditor from './CodeMirrorEditor.vue';
+import CollaborativeMarkdownEditor from './CollaborativeMarkdownEditor.vue';
+import { isLosslesslyRoundTrippable } from '~/utils/content-loss-guard';
 
+/**
+ * Editor host consumed by RecordForm. Chooses the editing surface:
+ *
+ *   - the single-user CodeMirror editor (default + safe fallback — edits the
+ *     raw Markdown text and never drops content), or
+ *   - the TipTap+Yjs collaborative editor.
+ *
+ * The collaborative editor is selected ONLY when collaborativeMode is
+ * requested, a recordId is available, AND the record's Markdown round-trips
+ * losslessly through @civicpress/editor-schema (the schema the realtime server
+ * uses to write the Yjs document back to the canonical Markdown file). If
+ * collab was requested for a real record but the content carries constructs the
+ * schema can't preserve (raw HTML, footnotes, …), a visible non-blocking notice
+ * explains the downgrade and editing continues in single-user mode. This is the
+ * content-loss guard: a collaborator's edits must never silently rewrite the
+ * archive file.
+ */
 interface Props {
   modelValue: string;
   placeholder?: string;
@@ -37,9 +28,11 @@ interface Props {
   theme?: 'light' | 'dark';
   minHeight?: string;
   maxHeight?: string;
+  /** Opt-in to the TipTap+Yjs collaborative editor (subject to the guard). */
+  collaborativeMode?: boolean;
+  /** Record id — required to open a realtime room for the collaborative path. */
+  recordId?: string;
 }
-
-const { t } = useI18n();
 
 const props = withDefaults(defineProps<Props>(), {
   placeholder: '',
@@ -47,11 +40,9 @@ const props = withDefaults(defineProps<Props>(), {
   theme: 'light',
   minHeight: '400px',
   maxHeight: '70vh',
+  collaborativeMode: false,
+  recordId: '',
 });
-
-const placeholderText = computed(
-  () => props.placeholder || t('records.enterContent')
-);
 
 const emit = defineEmits<{
   'update:modelValue': [value: string];
@@ -60,337 +51,131 @@ const emit = defineEmits<{
   blur: [];
 }>();
 
-const editorContainer = ref<HTMLDivElement | null>(null);
-let view: EditorView | null = null;
-const themeCompartment = new Compartment();
-const disabledCompartment = new Compartment();
+const { t } = useI18n();
 
-// Create editor state
-const createEditorState = (content: string) => {
-  return EditorState.create({
-    doc: content,
-    extensions: [
-      lineNumbers(),
-      highlightActiveLineGutter(),
-      highlightSpecialChars(),
-      history(),
-      foldGutter(),
-      drawSelection(),
-      dropCursor(),
-      EditorState.allowMultipleSelections.of(true),
-      indentOnInput(),
-      bracketMatching(),
-      closeBrackets(),
-      autocompletion(),
-      rectangularSelection(),
-      crosshairCursor(),
-      highlightActiveLine(),
-      highlightSelectionMatches(),
-      EditorView.lineWrapping,
-      keymap.of([
-        ...closeBracketsKeymap,
-        ...defaultKeymap,
-        ...searchKeymap,
-        ...historyKeymap,
-        ...foldKeymap,
-        ...completionKeymap,
-      ]),
-      markdown(),
-      themeCompartment.of(props.theme === 'dark' ? oneDark : []),
-      EditorView.updateListener.of((update) => {
-        if (update.docChanged) {
-          const newValue = update.state.doc.toString();
-          emit('update:modelValue', newValue);
-          emit('change', newValue);
-        }
-      }),
-      EditorView.contentAttributes.of({
-        'data-placeholder': placeholderText.value,
-      }),
-      EditorView.theme({
-        '&': {
-          height: '100%',
-        },
-        '.cm-content': {
-          padding: '0.5rem 0',
-          fontSize: '0.875rem', // Match prose-sm (14px) to align with preview
-        },
-        '.cm-line': {
-          fontSize: '0.875rem', // Ensure all lines use the same font size
-        },
-        '.cm-scroller': {
-          overflow: 'auto',
-          height: '100%',
-        },
-        '.cm-editor': {
-          height: '100%',
-        },
-        '.cm-focused': {
-          outline: 'none',
-        },
-      }),
-      disabledCompartment.of(EditorState.readOnly.of(props.disabled)),
-    ],
-  });
-};
-
-// Initialize editor
-onMounted(async () => {
-  await nextTick();
-  if (!editorContainer.value) return;
-
-  const state = createEditorState(props.modelValue);
-  view = new EditorView({
-    state,
-    parent: editorContainer.value,
-  });
-});
-
-// Update content when modelValue changes externally
-watch(
-  () => props.modelValue,
-  (newValue) => {
-    if (view && view.state.doc.toString() !== newValue) {
-      view.dispatch({
-        changes: {
-          from: 0,
-          to: view.state.doc.length,
-          insert: newValue,
-        },
-      });
-    }
-  }
+/** Collab requested for a real record (recordId present). */
+const collabRequested = computed(
+  () => props.collaborativeMode && props.recordId.length > 0
 );
 
-// Update theme
-watch(
-  () => props.theme,
-  (newTheme) => {
-    if (view) {
-      view.dispatch({
-        effects: themeCompartment.reconfigure(
-          newTheme === 'dark' ? oneDark : []
-        ),
-      });
-    }
-  }
+/** Whether the current content can be edited collaboratively without loss. */
+const contentRoundTrips = computed(() =>
+  isLosslesslyRoundTrippable(props.modelValue)
 );
 
-// Update disabled state
-watch(
-  () => props.disabled,
-  (disabled) => {
-    if (view) {
-      view.dispatch({
-        effects: disabledCompartment.reconfigure(
-          EditorState.readOnly.of(disabled)
-        ),
-      });
-    }
-  }
+/**
+ * Use the collaborative editor only when requested AND content round-trips.
+ *
+ * SSR safety: the collaborative editor opens a WebSocket and builds a
+ * ProseMirror EditorView (client-only). It never enters setup on the server
+ * because `collabRequested` needs a non-empty recordId, and the host
+ * (RecordForm) only populates the record id in onMounted (client-side) — so
+ * during SSR `collabRequested` is false and the CodeMirror surface renders.
+ */
+const useCollaborative = computed(
+  () => collabRequested.value && contentRoundTrips.value
 );
 
-// Cleanup
-onUnmounted(() => {
-  if (view) {
-    view.destroy();
-    view = null;
-  }
-});
+/**
+ * Show the downgrade notice only when collab was genuinely requested for a real
+ * record but the content blocks it — not when collab is simply off or no
+ * recordId was supplied (those are not user-visible downgrades).
+ */
+const showFallbackNotice = computed(
+  () => collabRequested.value && !contentRoundTrips.value
+);
 
-// Toolbar action methods
-const executeBold = () => {
-  if (!view) return;
-  const { from, to } = view.state.selection.main;
-  const selected = view.state.sliceDoc(from, to);
-  const replacement = selected ? `**${selected}**` : '****';
-  view.dispatch({
-    changes: { from, to, insert: replacement },
-    selection: { anchor: selected ? to + 4 : from + 2 },
-  });
+// Forward exposed methods to whichever surface is active so RecordForm's
+// editorRef (toolbar actions via useRecordEditorActions, focus/getValue, …)
+// works regardless of mode. The collaborative editor implements the same
+// command surface; methods it does not provide degrade to no-ops.
+const codeMirrorRef = ref<InstanceType<typeof CodeMirrorEditor> | null>(null);
+const collaborativeRef = ref<InstanceType<
+  typeof CollaborativeMarkdownEditor
+> | null>(null);
+
+const active = () =>
+  (useCollaborative.value ? collaborativeRef.value : codeMirrorRef.value) as
+    | Record<string, unknown>
+    | null;
+
+const callActive = (method: string, ...args: unknown[]): unknown => {
+  const target = active();
+  const fn = target?.[method];
+  if (typeof fn === 'function') return (fn as (...a: unknown[]) => unknown)(...args);
+  return undefined;
 };
 
-const executeItalic = () => {
-  if (!view) return;
-  const { from, to } = view.state.selection.main;
-  const selected = view.state.sliceDoc(from, to);
-  const replacement = selected ? `*${selected}*` : '**';
-  view.dispatch({
-    changes: { from, to, insert: replacement },
-    selection: { anchor: selected ? to + 2 : from + 1 },
-  });
-};
+const onUpdate = (value: string) => emit('update:modelValue', value);
+const onChange = (value: string) => emit('change', value);
+const onFocus = () => emit('focus');
+const onBlur = () => emit('blur');
 
-const executeCode = () => {
-  if (!view) return;
-  const { from, to } = view.state.selection.main;
-  const selected = view.state.sliceDoc(from, to);
-  const replacement = selected ? `\`${selected}\`` : '``';
-  view.dispatch({
-    changes: { from, to, insert: replacement },
-    selection: { anchor: selected ? to + 2 : from + 1 },
-  });
-};
-
-const executeHeading = (level: 1 | 2 | 3) => {
-  if (!view) return;
-  const { from } = view.state.selection.main;
-  const line = view.state.doc.lineAt(from);
-  const lineStart = line.from;
-  const lineText = line.text;
-
-  // Remove existing heading markers
-  const cleanedText = lineText.replace(/^#+\s*/, '');
-  const headingPrefix = '#'.repeat(level) + ' ';
-
-  view.dispatch({
-    changes: {
-      from: lineStart,
-      to: line.to,
-      insert: headingPrefix + cleanedText,
-    },
-    selection: {
-      anchor: lineStart + headingPrefix.length + cleanedText.length,
-    },
-  });
-};
-
-const executeBulletList = () => {
-  if (!view) return;
-  const { from } = view.state.selection.main;
-  const line = view.state.doc.lineAt(from);
-  const lineStart = line.from;
-  const lineText = line.text;
-
-  // Toggle bullet list
-  if (lineText.startsWith('- ')) {
-    view.dispatch({
-      changes: { from: lineStart, to: lineStart + 2, insert: '' },
-    });
-  } else {
-    view.dispatch({
-      changes: { from: lineStart, insert: '- ' },
-    });
-  }
-};
-
-const executeNumberedList = () => {
-  if (!view) return;
-  const { from } = view.state.selection.main;
-  const line = view.state.doc.lineAt(from);
-  const lineStart = line.from;
-  const lineText = line.text;
-
-  // Toggle numbered list
-  if (/^\d+\.\s/.test(lineText)) {
-    const match = lineText.match(/^(\d+\.\s)/);
-    if (match && match[1]) {
-      view.dispatch({
-        changes: {
-          from: lineStart,
-          to: lineStart + match[1].length,
-          insert: '',
-        },
-      });
-    }
-  } else {
-    view.dispatch({
-      changes: { from: lineStart, insert: '1. ' },
-    });
-  }
-};
-
-const executeBlockquote = () => {
-  if (!view) return;
-  const { from } = view.state.selection.main;
-  const line = view.state.doc.lineAt(from);
-  const lineStart = line.from;
-  const lineText = line.text;
-
-  // Toggle blockquote
-  if (lineText.startsWith('> ')) {
-    view.dispatch({
-      changes: { from: lineStart, to: lineStart + 2, insert: '' },
-    });
-  } else {
-    view.dispatch({
-      changes: { from: lineStart, insert: '> ' },
-    });
-  }
-};
-
-const executeHorizontalRule = () => {
-  if (!view) return;
-  const { from } = view.state.selection.main;
-  const line = view.state.doc.lineAt(from);
-  const insertText = '\n---\n';
-  view.dispatch({
-    changes: { from: line.to, insert: insertText },
-    selection: { anchor: line.to + insertText.length },
-  });
-};
-
-const executeLink = () => {
-  if (!view) return;
-  const { from, to } = view.state.selection.main;
-  const selected = view.state.sliceDoc(from, to);
-  const replacement = selected ? `[${selected}](url)` : '[text](url)';
-  const newAnchor = selected ? to + 3 : from + 1;
-  view.dispatch({
-    changes: { from, to, insert: replacement },
-    selection: { anchor: newAnchor },
-  });
-};
-
-const executeImage = () => {
-  if (!view) return;
-  const { from, to } = view.state.selection.main;
-  const selected = view.state.sliceDoc(from, to);
-  const replacement = `![${selected || 'alt text'}](url)`;
-  const newAnchor = selected ? from + replacement.length - 5 : from + 2; // Position cursor at 'url' or after 'alt text'
-  view.dispatch({
-    changes: { from, to, insert: replacement },
-    selection: { anchor: newAnchor },
-  });
-};
-
-// Expose methods
 defineExpose({
-  focus: () => view?.focus(),
-  blur: () => view?.contentDOM.blur(),
-  getValue: () => view?.state.doc.toString() || '',
-  setValue: (value: string) => {
-    if (view) {
-      view.dispatch({
-        changes: {
-          from: 0,
-          to: view.state.doc.length,
-          insert: value,
-        },
-      });
-    }
-  },
-  getEditor: () => view,
-  // Toolbar actions
-  executeBold,
-  executeItalic,
-  executeCode,
-  executeHeading,
-  executeBulletList,
-  executeNumberedList,
-  executeBlockquote,
-  executeHorizontalRule,
-  executeLink,
-  executeImage,
+  focus: () => callActive('focus'),
+  blur: () => callActive('blur'),
+  getValue: () => (callActive('getValue') as string) ?? props.modelValue,
+  setValue: (value: string) => callActive('setValue', value),
+  getEditor: () => callActive('getEditor'),
+  executeBold: () => callActive('executeBold'),
+  executeItalic: () => callActive('executeItalic'),
+  executeCode: () => callActive('executeCode'),
+  executeHeading: (level: 1 | 2 | 3) => callActive('executeHeading', level),
+  executeBulletList: () => callActive('executeBulletList'),
+  executeNumberedList: () => callActive('executeNumberedList'),
+  executeBlockquote: () => callActive('executeBlockquote'),
+  executeHorizontalRule: () => callActive('executeHorizontalRule'),
+  executeLink: () => callActive('executeLink'),
+  executeImage: () => callActive('executeImage'),
 });
 </script>
 
 <template>
-  <div ref="editorContainer" class="markdown-editor w-full h-full" />
+  <div class="markdown-editor-host w-full h-full flex flex-col">
+    <UAlert
+      v-if="showFallbackNotice"
+      color="warning"
+      variant="soft"
+      icon="i-lucide-triangle-alert"
+      :title="t('records.collaborativeUnavailableTitle')"
+      :description="t('records.collaborativeUnavailable')"
+      class="mb-2"
+    />
+
+    <CollaborativeMarkdownEditor
+      v-if="useCollaborative"
+      ref="collaborativeRef"
+      :record-id="recordId"
+      :model-value="modelValue"
+      :disabled="disabled"
+      :theme="theme"
+      :placeholder="placeholder"
+      class="flex-1 min-h-0"
+      @update:model-value="onUpdate"
+      @change="onChange"
+      @focus="onFocus"
+      @blur="onBlur"
+    />
+    <CodeMirrorEditor
+      v-else
+      ref="codeMirrorRef"
+      :model-value="modelValue"
+      :disabled="disabled"
+      :theme="theme"
+      :placeholder="placeholder"
+      :min-height="minHeight"
+      :max-height="maxHeight"
+      class="flex-1 min-h-0"
+      @update:model-value="onUpdate"
+      @change="onChange"
+      @focus="onFocus"
+      @blur="onBlur"
+    />
+  </div>
 </template>
 
 <style scoped>
-.markdown-editor {
+.markdown-editor-host {
   overflow: hidden;
 }
 </style>

@@ -140,36 +140,17 @@ export function setupTestData(context: TestContext) {
   return { civicDir };
 }
 
-// Note: CLI testing is disabled due to test environment limitations
-// The CLI works correctly when tested manually
-export async function runCivicCommand(
-  command: string,
-  cwd?: string
-): Promise<{ stdout: string; stderr: string; exitCode: number }> {
-  // For now, return a mock result since the test environment can't execute the CLI
-  // This allows tests to be written but they won't actually run the CLI
-  return {
-    stdout: '',
-    stderr: 'CLI testing disabled in this environment',
-    exitCode: 1,
-  };
-}
-
-export function expectCommandSuccess(result: {
-  stdout: string;
-  stderr: string;
-  exitCode: number;
-}) {
-  expect(result.exitCode).toBe(0);
-  expect(result.stderr).toBe('');
-}
-
-export function expectCommandFailure(
-  result: { stdout: string; stderr: string; exitCode: number },
-  expectedExitCode = 1
-) {
-  expect(result.exitCode).toBe(expectedExitCode);
-}
+// `runCivicCommand` + `expectCommandSuccess` + `expectCommandFailure`
+// removed in Phase 2c Task 10. The stub returned a fixed
+// "CLI testing disabled in this environment" error unconditionally,
+// and the 16 placeholder `tests/cli/*.test.ts` files that depended
+// on it (which only asserted that the stub's error fired) were
+// deleted alongside. Real CLI tests live in:
+//   - cli/src/commands/__tests__/  (Phase 2b unit + Phase 2c additions)
+//   - tests/cli/  (10 integration files that run the built binary via execSync)
+//
+// `createTestContext` + `cleanupTestContext` below are kept because
+// tests/core/config-discovery.test.ts still uses them.
 
 export function createMockRecord(
   testDir: string,

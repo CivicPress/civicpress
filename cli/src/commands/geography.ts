@@ -15,8 +15,6 @@ import {
 import {
   cliSuccess,
   cliError,
-  cliInfo,
-  cliWarn,
   cliStartOperation,
 } from '../utils/cli-output.js';
 
@@ -29,7 +27,9 @@ interface GeographyValidationOptions {
 
 interface GeographyFile {
   path: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   geography: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   validation: any;
 }
 
@@ -221,7 +221,7 @@ async function validateGeographyFile(
 
 async function scanDirectoryForGeography(
   dirPath: string,
-  options: GeographyValidationOptions
+  _options: GeographyValidationOptions
 ) {
   const fullPath = path.resolve(dirPath);
 
@@ -300,6 +300,7 @@ async function normalizeGeographyFile(
   };
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function extractGeographyFromContent(content: string): any {
   // Look for YAML frontmatter
   const frontmatterMatch = content.match(/^---\s*\n([\s\S]*?)\n---\s*\n/);
@@ -308,6 +309,7 @@ function extractGeographyFromContent(content: string): any {
   }
 
   try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const frontmatter = parseYaml(frontmatterMatch[1]) as any;
     return frontmatter.geography || null;
   } catch {
@@ -315,6 +317,7 @@ function extractGeographyFromContent(content: string): any {
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function updateGeographyInContent(content: string, geography: any): string {
   const frontmatterMatch = content.match(/^---\s*\n([\s\S]*?)\n---\s*\n/);
   if (!frontmatterMatch) {
@@ -324,6 +327,7 @@ function updateGeographyInContent(content: string, geography: any): string {
   }
 
   try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const frontmatter = parseYaml(frontmatterMatch[1]) as any;
     frontmatter.geography = geography;
     const newFrontmatter = stringifyYaml(frontmatter);
@@ -357,26 +361,3 @@ async function findMarkdownFiles(dirPath: string): Promise<string[]> {
   return files;
 }
 
-function displayGeographyValidationResult(
-  result: any,
-  options: GeographyValidationOptions
-) {
-  // This function is deprecated - output is now handled by cliSuccess
-  // Keeping function signature for backward compatibility but it won't be called
-}
-
-function displayGeographyScanResults(
-  results: any,
-  options: GeographyValidationOptions
-) {
-  // This function is deprecated - output is now handled by cliSuccess
-  // Keeping function signature for backward compatibility but it won't be called
-}
-
-function displayGeographyNormalizationResult(
-  result: any,
-  options: GeographyValidationOptions
-) {
-  // This function is deprecated - output is now handled by cliSuccess
-  // Keeping function signature for backward compatibility but it won't be called
-}

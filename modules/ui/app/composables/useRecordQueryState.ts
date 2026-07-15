@@ -51,7 +51,7 @@ export function buildQueryFromState(
  * Parse a route's query params into state
  */
 export function parseQueryToState(route: {
-  query: Record<string, any>;
+  query: Record<string, unknown>;
 }): RecordQueryState {
   const result: RecordQueryState = {};
   const q = route?.query || {};

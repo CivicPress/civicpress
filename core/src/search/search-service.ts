@@ -12,7 +12,7 @@ export interface SearchResult {
   title: string;
   content?: string;
   tags?: string;
-  metadata?: any;
+  metadata?: Record<string, unknown>;
   status?: string;
   created_at: string;
   updated_at: string;
@@ -87,7 +87,7 @@ export interface SearchService {
     title: string;
     content?: string;
     tags?: string;
-    metadata?: any;
+    metadata?: Record<string, unknown>;
   }): Promise<void>;
 
   /**

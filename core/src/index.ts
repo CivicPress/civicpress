@@ -92,6 +92,34 @@ export {
   DatabaseConfig,
   createDatabaseAdapter,
 } from './database/database-adapter.js';
+export type {
+  SqlParam,
+  SqlRow,
+  ExecuteResult,
+  Transaction,
+} from './database/database-adapter.js';
+export type {
+  UserRow,
+  ApiKeyRow,
+  ApiKeyWithUserRow,
+  SessionRow,
+  SessionWithUserRow,
+  RecordRow,
+  DraftRow,
+  StorageFileRow,
+  RecordLockRow,
+  AuditLogRow,
+  AuditLogWithUserRow,
+  SearchIndexRow,
+  EmailVerificationRow,
+  TableInfoRow,
+  IndexInfoRow,
+  TriggerInfoRow,
+  SqliteMasterNameRow,
+  LastInsertIdRow,
+  CountRow,
+  TotalRow,
+} from './database/types/row-types.js';
 
 // Export auth services
 export { AuthService, AuthUser, ApiKey, Session } from './auth/auth-service.js';
@@ -100,6 +128,11 @@ export {
   OAuthProviderManager,
 } from './auth/oauth-provider.js';
 export { AuthConfigManager } from './auth/auth-config.js';
+export {
+  LoginThrottle,
+  AccountLockedError,
+  parseDurationMs,
+} from './auth/login-throttle.js';
 export { RoleManager } from './auth/role-manager.js';
 export {
   EmailValidationService,
@@ -119,9 +152,14 @@ export {
   userIsAdmin,
   initializeRoleManager,
 } from './auth/role-utils.js';
+export {
+  isSimulatedAuthEnabled,
+  SIMULATED_AUTH_DISABLED_MESSAGE,
+} from './auth/simulated-auth-policy.js';
 
 // Export existing services
 export { GitEngine } from './git/git-engine.js';
+export type { GitCommit } from './git/git-engine.js';
 export { HookSystem } from './hooks/hook-system.js';
 export { WorkflowEngine } from './workflows/workflow-engine.js';
 export { WorkflowConfigManager } from './config/workflow-config.js';
@@ -134,6 +172,15 @@ export * from './cache/index.js';
 // Export DI container (for module integration)
 export { ServiceContainer } from './di/container.js';
 export type { ServiceContainer as IServiceContainer } from './di/container.js';
+
+// Module system (introduced Phase 2d W1-T2) — see docs/specs/module-contract.md
+export { ModuleResolver } from './modules/module-resolver.js';
+export type {
+  ModuleManifest,
+  LoadedModule,
+  ModuleCapabilities,
+  ModuleKind,
+} from './modules/module-manifest.js';
 
 export {
   TemplateService,
@@ -176,6 +223,7 @@ export {
   DatabaseError,
   FileSystemError,
   InternalError,
+  OptionalDependencyMissing,
 } from './errors/index.js';
 
 export {
@@ -273,7 +321,10 @@ export type {
 } from './indexing/indexing-service.js';
 
 // Export security services
-export { SecretsManager } from './security/secrets.js';
+export {
+  SecretsManager,
+  isSecretAutoGenerationAllowed,
+} from './security/secrets.js';
 export { CsrfProtection } from './security/csrf.js';
 export type { CsrfToken } from './security/csrf.js';
 
@@ -289,6 +340,7 @@ export {
   NotificationRateLimiter,
   NotificationLogger,
   AuthTemplate,
+  EmailChannel,
 } from './notifications/index.js';
 export type {
   NotificationRequest,
@@ -304,6 +356,11 @@ export type {
   RateLimitResult,
   SecurityValidationResult,
   LogEntry,
+  EmailMessage,
+  EmailChannelOptions,
+  EmailSendResult,
+  SmtpOptions,
+  SendGridOptions,
 } from './notifications/index.js';
 
 // Configuration Management

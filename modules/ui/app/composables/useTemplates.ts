@@ -1,4 +1,5 @@
 import { ref } from 'vue';
+import { errorMessage } from '~/utils/errors';
 
 /**
  * Template interface matching API response
@@ -15,12 +16,12 @@ export interface Template {
     required_fields?: string[];
     status_values?: string[];
     business_rules?: string[];
-    sections?: any[];
-    advanced_rules?: any[];
-    field_relationships?: any[];
-    custom_validators?: any[];
+    sections?: unknown[];
+    advanced_rules?: unknown[];
+    field_relationships?: unknown[];
+    custom_validators?: unknown[];
   };
-  sections?: any[];
+  sections?: unknown[];
   variables?: Array<{
     name: string;
     type: 'static' | 'dynamic' | 'conditional';
@@ -107,12 +108,9 @@ export function useTemplates() {
       } else {
         throw new Error('Invalid response from API');
       }
-    } catch (err: any) {
-      const errorMessage =
-        err?.data?.error?.message ||
-        err?.message ||
-        'Failed to fetch templates';
-      error.value = errorMessage;
+    } catch (err: unknown) {
+      const msg = errorMessage(err, 'Failed to fetch templates');
+      error.value = msg;
       templates.value = [];
       throw err;
     } finally {
@@ -141,10 +139,9 @@ export function useTemplates() {
       } else {
         throw new Error('Template not found');
       }
-    } catch (err: any) {
-      const errorMessage =
-        err?.data?.error?.message || err?.message || 'Failed to fetch template';
-      error.value = errorMessage;
+    } catch (err: unknown) {
+      const msg = errorMessage(err, 'Failed to fetch template');
+      error.value = msg;
       currentTemplate.value = null;
       throw err;
     } finally {
@@ -157,6 +154,7 @@ export function useTemplates() {
    */
   const previewTemplate = async (
     templateId: string,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     variables: Record<string, any>
   ) => {
     loading.value = true;
@@ -181,12 +179,9 @@ export function useTemplates() {
       } else {
         throw new Error('Failed to preview template');
       }
-    } catch (err: any) {
-      const errorMessage =
-        err?.data?.error?.message ||
-        err?.message ||
-        'Failed to preview template';
-      error.value = errorMessage;
+    } catch (err: unknown) {
+      const msg = errorMessage(err, 'Failed to preview template');
+      error.value = msg;
       throw err;
     } finally {
       loading.value = false;

@@ -1,8 +1,9 @@
 import { coreError } from '../utils/core-output.js';
+import type { NotificationRequest } from './notification-service.js';
 
 export interface QueuedNotification {
   id: string;
-  request: any;
+  request: NotificationRequest;
   attempts: number;
   nextAttempt: Date;
   maxAttempts: number;
@@ -34,7 +35,7 @@ export class NotificationQueue {
    * Process queue
    */
   async processQueue(
-    processor: (notification: any) => Promise<boolean>
+    processor: (notification: NotificationRequest) => Promise<boolean>
   ): Promise<void> {
     if (this.processing) {
       return;

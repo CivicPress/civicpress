@@ -110,12 +110,15 @@ export function buildFTS5Query(parsed: ParsedQuery): string {
   // FTS5: "word" matches exact word, "word*" matches prefix
   // We use both: word OR word* to match both exact words and prefixes
   parsed.words.forEach((word) => {
-    if (word.length > 0) {
-      // Escape special FTS5 characters
-      const escaped = word.replace(/["']/g, '');
+    // FA-CORE-003: emit the prefix term as a quoted FTS5 phrase-prefix. The
+    // previous bareword form (`word*`) left punctuation (foo-bar, a.b, colon:x)
+    // unquoted, raising a MATCH syntax error → 500 (query DoS / error oracle).
+    // Doubling embedded quotes keeps the token inside the phrase literal.
+    const escaped = word.replace(/"/g, '""');
+    if (escaped.trim().length > 0) {
       // Use exact match OR prefix match for better coverage
       // This matches both "bruit" (exact) and "bruit..." (prefix)
-      terms.push(`"${escaped}" OR ${escaped}*`);
+      terms.push(`"${escaped}" OR "${escaped}" *`);
     }
   });
 

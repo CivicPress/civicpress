@@ -256,10 +256,14 @@ describe('EmailValidationService', () => {
       });
       expect(requestResult.success).toBe(true);
 
-      // Manually expire the token in the email_verifications table
+      // Manually expire the token in the email_verifications table.
+      // Note: addressing by user_id (not by the public verificationToken) —
+      // the row's token column stores a sha256 hash of the raw token, not
+      // the signed/raw value returned to the caller, so a WHERE token = ?
+      // match on the public string would no-op.
       await databaseService.execute(
-        'UPDATE email_verifications SET expires_at = datetime("now", "-1 hour") WHERE token = ?',
-        [requestResult.verificationToken!]
+        'UPDATE email_verifications SET expires_at = datetime("now", "-1 hour") WHERE user_id = ? AND type = "change"',
+        [testUserId]
       );
 
       // Try to complete with expired token
@@ -320,6 +324,42 @@ describe('EmailValidationService', () => {
 
       expect(pendingChange.pendingEmail).toBeNull();
       expect(pendingChange.expiresAt).toBeNull();
+    });
+  });
+
+  describe('Initial Email Verification', () => {
+    // FA-CORE-012: verifyCurrentEmail must consume the token so it cannot be
+    // replayed. Previously it deleted WHERE token = <raw token> but the column
+    // stores a SHA-256 hash, so the row was never removed → token stayed valid.
+    it('consumes the token so it cannot be reused (FA-CORE-012)', async () => {
+      const userId = await databaseService.createUserWithPassword({
+        username: 'verifyme',
+        email: 'verifyme@example.com',
+        name: 'Verify Me',
+        role: 'public',
+        passwordHash: 'hashedpassword',
+        auth_provider: 'password',
+        email_verified: false,
+      });
+
+      const send = await emailValidationService.sendEmailVerification(userId);
+      expect(send.success).toBe(true);
+      const token = send.verificationToken as string;
+      expect(token).toBeTruthy();
+
+      // First use succeeds.
+      const first = await emailValidationService.verifyCurrentEmail(token);
+      expect(first.success).toBe(true);
+
+      // The row is gone — a replay of the same token is rejected.
+      const rows = await databaseService.query(
+        'SELECT COUNT(*) as n FROM email_verifications WHERE user_id = ?',
+        [userId]
+      );
+      expect(Number(rows[0].n)).toBe(0);
+
+      const second = await emailValidationService.verifyCurrentEmail(token);
+      expect(second.success).toBe(false);
     });
   });
 

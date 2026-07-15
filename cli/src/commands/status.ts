@@ -1,11 +1,9 @@
 import { CAC } from 'cac';
-import chalk from 'chalk';
 import { CivicPress, WorkflowConfigManager } from '@civicpress/core';
 import * as fs from 'fs';
 import * as path from 'path';
 import matter = require('gray-matter');
 import {
-  initializeLogger,
   getGlobalOptionsFromArgs,
   initializeCliOutput,
 } from '../utils/global-options.js';
@@ -16,10 +14,26 @@ import {
 import {
   cliSuccess,
   cliError,
-  cliInfo,
   cliWarn,
   cliStartOperation,
 } from '../utils/cli-output.js';
+
+/**
+ * Valid status values accepted by `civic status`.
+ *
+ * Must agree with the lifecycle statuses seeded by `init.ts`
+ * (see `record_statuses_config`). Phase 2c Task 11 added `'published'`
+ * to close the inconsistency surfaced by Phase 2b.
+ */
+export const VALID_STATUSES = [
+  'draft',
+  'proposed',
+  'approved',
+  'active',
+  'published',
+  'archived',
+  'rejected',
+];
 
 export function statusCommand(cli: CAC) {
   cli
@@ -38,6 +52,7 @@ export function statusCommand(cli: CAC) {
       '--dry-run-hooks <hooks>',
       'Dry-run specific hooks (comma-separated)'
     )
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .action(async (recordName: string, newStatus: string, options: any) => {
       // Initialize CLI output with global options
       const globalOptions = getGlobalOptionsFromArgs();
@@ -45,31 +60,10 @@ export function statusCommand(cli: CAC) {
 
       const endOperation = cliStartOperation('status');
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const coreMod: any = await import('@civicpress/core');
       const audit = new coreMod.AuditLogger();
       try {
-        // Validate status
-        const validStatuses = [
-          'draft',
-          'proposed',
-          'approved',
-          'active',
-          'archived',
-          'rejected',
-        ];
-        if (!validStatuses.includes(newStatus)) {
-          cliError(
-            `Invalid status: ${newStatus}`,
-            'INVALID_STATUS',
-            {
-              requestedStatus: newStatus,
-              validStatuses,
-            },
-            'status'
-          );
-          process.exit(1);
-        }
-
         // Initialize CivicPress (will auto-discover config)
         // Get data directory from config discovery
         const { loadConfig } = await import('@civicpress/core');
@@ -83,6 +77,32 @@ export function statusCommand(cli: CAC) {
         if (!dataDir) {
           throw new Error('dataDir is not configured');
         }
+
+        // FA-CLI-004: validate against the config-driven status list (which
+        // includes config-only statuses like pending_review/expired) rather
+        // than a hardcoded whitelist. VALID_STATUSES stays as the fallback.
+        let validStatuses = VALID_STATUSES;
+        try {
+          const configStatuses = coreMod.CentralConfigManager.getRecordStatusKeys();
+          if (Array.isArray(configStatuses) && configStatuses.length > 0) {
+            validStatuses = configStatuses;
+          }
+        } catch {
+          // config not readable — fall back to VALID_STATUSES
+        }
+        if (!validStatuses.includes(newStatus)) {
+          cliError(
+            `Invalid status: ${newStatus}`,
+            'INVALID_STATUS',
+            {
+              requestedStatus: newStatus,
+              validStatuses,
+            },
+            'status'
+          );
+          process.exit(1);
+        }
+
         const civic = new CivicPress({ dataDir });
 
         const recordsDir = path.join(dataDir, 'records');
@@ -158,6 +178,7 @@ export function statusCommand(cli: CAC) {
         }
 
         // Update frontmatter
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const updatedFrontmatter: any = {
           ...frontmatter,
           status: newStatus,
@@ -171,19 +192,6 @@ export function statusCommand(cli: CAC) {
         if (options.message) {
           updatedFrontmatter.status_message = options.message;
         }
-
-        // Create status color mapping
-        const statusColors: Record<string, any> = {
-          draft: chalk.yellow,
-          proposed: chalk.blue,
-          approved: chalk.green,
-          active: chalk.green,
-          archived: chalk.gray,
-          rejected: chalk.red,
-        };
-
-        const statusColor = statusColors[newStatus] || chalk.white;
-        const currentStatusColor = statusColors[currentStatus] || chalk.white;
 
         // Handle dry-run modes
         const isCompleteDryRun = options.dryRun;

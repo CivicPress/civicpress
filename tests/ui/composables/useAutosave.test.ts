@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { ref } from 'vue';
+import { ref, nextTick } from 'vue';
 import { useAutosave } from '~/composables/useAutosave';
 
 describe('useAutosave', () => {
@@ -147,5 +147,80 @@ describe('useAutosave', () => {
 
     // Should not save when disabled
     expect(onSave).not.toHaveBeenCalled();
+  });
+});
+
+describe('useAutosave — collaborativeMode', () => {
+  let onSave: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    onSave = vi.fn().mockResolvedValue(undefined);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('default mode: deep watcher triggers debouncedSave on change', async () => {
+    const data = ref({ field: 'a' });
+    const { start, stop } = useAutosave(data, { onSave, debounceMs: 0 });
+
+    start();
+    data.value.field = 'b';
+    await nextTick();
+    await new Promise((r) => setTimeout(r, 5));
+
+    expect(onSave).toHaveBeenCalled();
+    stop();
+  });
+
+  it('collaborativeMode: deep watcher does NOT trigger save on change', async () => {
+    const data = ref({ field: 'a' });
+    const { start, stop } = useAutosave(data, {
+      onSave,
+      debounceMs: 0,
+      collaborativeMode: true,
+    });
+
+    start();
+    data.value.field = 'b';
+    await nextTick();
+    await new Promise((r) => setTimeout(r, 50));
+
+    expect(onSave).not.toHaveBeenCalled();
+    stop();
+  });
+
+  it('collaborativeMode: explicit save() still fires onSave', async () => {
+    const data = ref({ field: 'a' });
+    const { save } = useAutosave(data, {
+      onSave,
+      collaborativeMode: true,
+    });
+
+    await save();
+
+    expect(onSave).toHaveBeenCalledTimes(1);
+  });
+
+  it('collaborativeMode: saveOnBlur() fires onSave', async () => {
+    const data = ref({ field: 'a' });
+    const { saveOnBlur } = useAutosave(data, {
+      onSave,
+      collaborativeMode: true,
+    });
+
+    await saveOnBlur();
+
+    expect(onSave).toHaveBeenCalledTimes(1);
+  });
+
+  it('saveOnBlur is exported in default (non-collab) mode too', async () => {
+    const data = ref({ field: 'a' });
+    const { saveOnBlur } = useAutosave(data, { onSave });
+
+    expect(typeof saveOnBlur).toBe('function');
+    await saveOnBlur();
+    expect(onSave).toHaveBeenCalledTimes(1);
   });
 });

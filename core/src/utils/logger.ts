@@ -43,13 +43,13 @@ export class Logger {
     return level <= this.level;
   }
 
-  private formatMessage(level: LogLevel, message: string, data?: any): string {
+  private formatMessage(level: LogLevel, message: string, data?: unknown): string {
     if (this.json) {
       return JSON.stringify({
         level: LogLevel[level],
         message,
         timestamp: new Date().toISOString(),
-        ...(data && { data }),
+        ...(data !== undefined && data !== null ? { data } : {}),
       });
     }
 
@@ -57,7 +57,7 @@ export class Logger {
       return message;
     }
 
-    const levelColors: Record<LogLevel, any> = {
+    const levelColors: Record<LogLevel, (text: string) => string> = {
       [LogLevel.ERROR]: chalk.red,
       [LogLevel.WARN]: chalk.yellow,
       [LogLevel.INFO]: chalk.blue,
@@ -70,7 +70,7 @@ export class Logger {
     return color(message);
   }
 
-  error(message: string, data?: any): void {
+  error(message: string, data?: unknown): void {
     // Suppress all output in JSON mode to avoid polluting CLI JSON output
     if (this.json) {
       return;
@@ -80,7 +80,7 @@ export class Logger {
     }
   }
 
-  warn(message: string, data?: any): void {
+  warn(message: string, data?: unknown): void {
     // Suppress warnings in JSON mode or silent mode to avoid polluting stdout
     if (this.json || this.level === LogLevel.SILENT) {
       return;
@@ -90,7 +90,7 @@ export class Logger {
     }
   }
 
-  info(message: string, data?: any): void {
+  info(message: string, data?: unknown): void {
     // Suppress all output in JSON mode to avoid polluting CLI JSON output
     if (this.json) {
       return;
@@ -100,7 +100,7 @@ export class Logger {
     }
   }
 
-  debug(message: string, data?: any): void {
+  debug(message: string, data?: unknown): void {
     // Suppress all output in JSON mode to avoid polluting CLI JSON output
     if (this.json) {
       return;
@@ -110,7 +110,7 @@ export class Logger {
     }
   }
 
-  verbose(message: string, data?: any): void {
+  verbose(message: string, data?: unknown): void {
     // Suppress all output in JSON mode to avoid polluting CLI JSON output
     if (this.json) {
       return;
@@ -121,7 +121,7 @@ export class Logger {
   }
 
   // Convenience methods for common patterns
-  success(message: string, data?: any): void {
+  success(message: string, data?: unknown): void {
     // Suppress all output in JSON mode to avoid polluting CLI JSON output
     if (this.json) {
       return;

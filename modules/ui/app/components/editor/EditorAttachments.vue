@@ -2,8 +2,9 @@
 import { ref, onMounted } from 'vue';
 import FileBrowserPopover from '~/components/storage/FileBrowserPopover.vue';
 import { useAttachmentTypes } from '~/composables/useAttachmentTypes';
+import { useTypedI18n } from '~/composables/useTypedI18n';
 
-const { t } = useI18n();
+const { t, tPlural } = useTypedI18n();
 
 interface Props {
   attachedFiles: Array<{
@@ -31,7 +32,13 @@ onMounted(async () => {
   await fetchAttachmentTypes();
 });
 
-const handleFilesSelected = (files: any[]) => {
+interface SelectedFile {
+  id: string;
+  relative_path: string;
+  original_name: string;
+}
+
+const handleFilesSelected = (files: SelectedFile[]) => {
   const newFiles = files.map((file) => ({
     id: file.id,
     path: file.relative_path,
@@ -45,9 +52,9 @@ const handleFilesSelected = (files: any[]) => {
 
   toast.add({
     title: t('records.filesAdded'),
-    description: (t as any)('records.filesAttachedToRecord', files.length, {
-      count: files.length,
-    }),
+    // vue-i18n's `t()` has overloads but TS picks the simplest; cast to access
+    // the (key, count, named-params) pluralization overload.
+    description: tPlural('records.filesAttachedToRecord', files.length),
     color: 'primary',
   });
 };
@@ -58,7 +65,10 @@ const removeFile = (index: number) => {
   emit('update:attachedFiles', updated);
 };
 
-const updateFileCategory = (index: number, category: any) => {
+const updateFileCategory = (
+  index: number,
+  category: string | { value?: string } | null | undefined
+) => {
   const updated = [...props.attachedFiles];
   const file = updated[index];
   if (file) {
@@ -89,16 +99,15 @@ const updateFileDescription = (index: number, description: string) => {
 };
 
 const getFileUrl = (fileId: string): string => {
-  if (!process.client) return '';
+  if (!import.meta.client) return '';
   const config = useRuntimeConfig();
   return `${config.public.civicApiUrl}/api/v1/storage/files/${fileId}`;
 };
 
 const downloadFile = async (fileId: string, fileName: string) => {
-  if (!process.client) return;
+  if (!import.meta.client) return;
 
   try {
-    const config = useRuntimeConfig();
     const authStore = useAuthStore();
 
     const response = await fetch(getFileUrl(fileId), {

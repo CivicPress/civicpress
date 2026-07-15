@@ -110,7 +110,7 @@ export class WorkflowConfigManager {
         'value' in config.transitions[fromStatus]
       ) {
         allowedTransitions =
-          (config.transitions[fromStatus] as any).value || [];
+          (config.transitions[fromStatus] as { value?: string[] }).value || [];
       }
     }
 
@@ -160,7 +160,7 @@ export class WorkflowConfigManager {
             'value' in roleConfig.can_transition[fromStatus]
           ) {
             allowedForRole =
-              (roleConfig.can_transition[fromStatus] as any).value || [];
+              (roleConfig.can_transition[fromStatus] as { value?: string[] }).value || [];
           }
         }
 
@@ -174,7 +174,7 @@ export class WorkflowConfigManager {
             'value' in roleConfig.can_transition['any']
           ) {
             anyTransitions =
-              (roleConfig.can_transition['any'] as any).value || [];
+              (roleConfig.can_transition['any'] as { value?: string[] }).value || [];
           }
           allowedForRole = [...allowedForRole, ...anyTransitions];
         }
@@ -229,7 +229,7 @@ export class WorkflowConfigManager {
         typeof actionPermissions === 'object' &&
         'value' in actionPermissions
       ) {
-        allowedTypes = (actionPermissions as any).value || [];
+        allowedTypes = (actionPermissions as { value?: string[] }).value || [];
       }
     }
 
@@ -252,6 +252,35 @@ export class WorkflowConfigManager {
     return { valid: true };
   }
 
+  /**
+   * The set of statuses that are DESTINATIONS in the transition graph — i.e.
+   * moving a record INTO one of them is a workflow-controlled transition
+   * (proposed/reviewed/approved/archived in the default config).
+   *
+   * FA-API-008: the generic write paths (create/update/publish) must validate
+   * a status change against the transition rules ONLY for these — a legal
+   * status that is not a transition target (e.g. `published`, set by the
+   * publish flow) is governed by that flow's own permission gate, not by the
+   * editorial transition graph.
+   */
+  async getControlledStatuses(): Promise<Set<string>> {
+    const config = await this.loadConfig();
+    const controlled = new Set<string>();
+    const collect = (raw: unknown) => {
+      let targets: string[] = [];
+      if (Array.isArray(raw)) {
+        targets = raw as string[];
+      } else if (raw && typeof raw === 'object' && 'value' in raw) {
+        targets = ((raw as { value?: string[] }).value || []) as string[];
+      }
+      targets.forEach((s) => controlled.add(s));
+    };
+    for (const raw of Object.values(config.transitions || {})) {
+      collect(raw);
+    }
+    return controlled;
+  }
+
   async getAvailableStatuses(recordType?: string): Promise<string[]> {
     const config = await this.loadConfig();
 
@@ -264,7 +293,7 @@ export class WorkflowConfigManager {
         typeof typeStatuses === 'object' &&
         'value' in typeStatuses
       ) {
-        return (typeStatuses as any).value || [];
+        return (typeStatuses as { value?: string[] }).value || [];
       }
       return [];
     }
@@ -277,7 +306,7 @@ export class WorkflowConfigManager {
       typeof config.statuses === 'object' &&
       'value' in config.statuses
     ) {
-      return (config.statuses as any).value || [];
+      return (config.statuses as { value?: string[] }).value || [];
     }
 
     return [];
@@ -301,7 +330,7 @@ export class WorkflowConfigManager {
         'value' in config.transitions[fromStatus]
       ) {
         // New format: { value: string[], type: string, description: string, required: boolean }
-        allTransitions = (config.transitions[fromStatus] as any).value || [];
+        allTransitions = (config.transitions[fromStatus] as { value?: string[] }).value || [];
       }
     }
 
@@ -327,7 +356,7 @@ export class WorkflowConfigManager {
         ) {
           // New format: { value: string[], type: string, description: string, required: boolean }
           roleTransitions =
-            (roleConfig.can_transition[fromStatus] as any).value || [];
+            (roleConfig.can_transition[fromStatus] as { value?: string[] }).value || [];
         }
       }
 
@@ -341,7 +370,7 @@ export class WorkflowConfigManager {
           'value' in roleConfig.can_transition['any']
         ) {
           anyTransitions =
-            (roleConfig.can_transition['any'] as any).value || [];
+            (roleConfig.can_transition['any'] as { value?: string[] }).value || [];
         }
         roleTransitions = [...roleTransitions, ...anyTransitions];
       }

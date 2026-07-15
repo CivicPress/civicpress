@@ -1,553 +1,371 @@
-# Module Integration Guide
+# CivicPress Module Integration Guide
 
-**Last Updated:** 2025-12-19  
-**Status:** Active
+**Status:** authoritative as of Phase 2d (2026-05-19 rewrite)
+**Companion contract spec:** [docs/specs/module-contract.md](specs/module-contract.md)
+**Worked example:** [`modules/schema-extensions/legal/`](../modules/schema-extensions/legal/)
+
+This guide is the walkthrough for writing a CivicPress module. The formal contract — every field, every shape, every constraint — lives in `docs/specs/module-contract.md`. Start here for the how; consult the spec for the what.
 
 ---
 
-## Overview
+## 1. Decide: module or schema-extension?
 
-This guide explains how modules integrate with the CivicPress core platform. It
-covers integration patterns, best practices, and examples for developing new
-modules.
+CivicPress has two module kinds. Pick one before you start.
 
-## Module Architecture
+| Question | If yes → | If no → |
+|---|---|---|
+| Does the contribution add **only** schema fragments to existing record types (no code, no routes)? | `kind: "schema-extension"`. Lives under `modules/schema-extensions/<name>/`. | continue ↓ |
+| Does it have route handlers, CLI commands, audit-channel consumers, or lifecycle hooks? | `kind: "module"`. Lives under `modules/<name>/`. | reconsider — maybe just a config change? |
 
-CivicPress follows a modular architecture where:
+**`schema-extension`** is the simpler shape. The legal extension is the canonical example (5 record types, ~210 LoC of JSON Schema, no code at all).
 
-- **Core Module** (`core/`): Provides foundation services (DI container,
-  database, auth, etc.)
-- **Modules** (`modules/`): Extend core functionality (API, CLI, UI, Storage,
-  etc.)
+**`module`** is the richer shape. It can contribute multiple capabilities; CivicCore wires the relevant entry-point functions into the right lifecycle slots.
 
-### Module Structure
+---
 
+## 2. Create the directory
+
+```bash
+# schema-extension
+mkdir -p modules/schema-extensions/<your-name>/schemas
+
+# full module
+mkdir -p modules/<your-name>/src
 ```
-modules/
-├── api/              # REST API module
-├── cli/              # CLI module (in root cli/)
-├── ui/               # Web UI module
-├── storage/          # Storage module
-└── legal-register/   # Legal register module
+
+Add the path to `pnpm-workspace.yaml` so pnpm treats it as a workspace package:
+
+```yaml
+packages:
+  - core
+  - modules/api
+  - modules/schema-extensions/<your-name>   # add this line
 ```
 
-## Module Integration Patterns
+---
 
-### Pattern 1: Direct Core Dependency
+## 3. Write `module.json` (the manifest)
 
-**Description**: Modules depend on `@civicpress/core` and use core services
-directly.
+Every module's root MUST contain `module.json`. The full field reference is in the contract spec §2; this section walks through writing one.
 
-**When to Use**:
+### Schema-extension example
 
-- Simple modules that need core types and utilities
-- Modules that don't need DI container integration
-- Standalone modules with minimal core interaction
+`modules/schema-extensions/legal/module.json`:
 
-**Example**:
-
-```typescript
-// modules/my-module/src/my-service.ts
-import { Logger, DatabaseService } from '@civicpress/core';
-import { CivicPressError } from '@civicpress/core';
-
-class MyModuleService {
-  constructor(
-    private logger: Logger,
-    private db: DatabaseService
-  ) {}
-
-  async doSomething() {
-    this.logger.info('Doing something...');
-    // Use database service
-    const result = await this.db.query('SELECT * FROM records');
-    return result;
+```json
+{
+  "$schema": "../../../core/src/modules/module.schema.json",
+  "name": "legal-register",
+  "version": "0.3.0",
+  "kind": "schema-extension",
+  "description": "Adds legal-specific metadata to bylaw, ordinance, policy, proclamation, and resolution.",
+  "license": "MIT",
+  "capabilities": {
+    "schemaExtensions": [
+      "bylaw",
+      "ordinance",
+      "policy",
+      "proclamation",
+      "resolution"
+    ]
   }
 }
 ```
 
-**Pros**:
+### Full-module example
 
-- Simple and straightforward
-- No DI container complexity
-- Easy to understand
+`modules/my-module/module.json`:
 
-**Cons**:
+```json
+{
+  "$schema": "../../core/src/modules/module.schema.json",
+  "name": "my-module",
+  "version": "0.1.0",
+  "kind": "module",
+  "description": "What this module does.",
+  "license": "MIT",
+  "capabilities": {
+    "routes": true,
+    "audit": true,
+    "lifecycle": true
+  },
+  "entry": "./dist/index.js",
+  "dependencies": []
+}
+```
 
-- Services must be passed manually
-- Harder to test (need to mock services)
-- No automatic dependency resolution
+### Naming tips
 
-### Pattern 2: Service Registration (Future Enhancement)
+- `name` is the **canonical identifier** — it appears in `config.yml`'s `modules:` list, in record-frontmatter `module:` fields, and in `ModuleResolver`'s cache. Pick it carefully; renaming later requires migrating existing records.
+- `name` SHOULD match the directory name. It MAY differ for migration cases (e.g. `legal-register` keeps its name even after moving to `modules/schema-extensions/legal/`); the contract spec §2 explains.
+- Use kebab-case. Single segment (`my-module`) or two-segment grouped (`schema-extensions/my-thing`).
 
-**Description**: Modules register services in the DI container.
+ModuleResolver validates `module.json` against `core/src/modules/module.schema.json` at load time. Invalid manifests throw `ModuleManifestInvalid` with the validation errors in `context.details`.
 
-**When to Use**:
+---
 
-- Modules that provide services to other modules
-- Modules that need automatic dependency resolution
-- Complex modules with multiple services
+## 4. Schema extension: declare your record types
 
-**Example** (Future Implementation):
+For `kind: "schema-extension"`, write a JSON Schema fragment at `<module-dir>/schemas/record-schema-extension.json`. The fragment is merged into the effective record schema via JSON Schema's `allOf` keyword.
 
-```typescript
-// modules/my-module/src/index.ts
-import { ServiceContainer, CivicPressConfig } from '@civicpress/core';
+### Pattern
 
-export interface MyModuleConfig {
-  // Module-specific configuration
+Use `if/then` to scope rules to specific record types:
+
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "your_field": {
+          "type": "string",
+          "description": "What this field means."
+        }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true,
+  "allOf": [
+    {
+      "if": {
+        "properties": { "type": { "enum": ["bylaw", "ordinance"] } }
+      },
+      "then": {
+        "properties": {
+          "metadata": {
+            "properties": {
+              "your_field": {
+                "description": "Recommended for legal documents."
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}
+```
+
+The fragment is automatically discovered + merged when `module.json` declares `capabilities.schemaExtensions` and the fragment file exists. No code required.
+
+See `modules/schema-extensions/legal/schemas/record-schema-extension.json` for a complete worked example (~210 LoC, 5 record types, audit fields, classification levels, approval chains).
+
+---
+
+## 5. Full module: register with CivicCore
+
+For `kind: "module"`, your `entry` file exports an object matching the `ModuleEntry` interface. Only export the functions for capabilities you declared `true` for.
+
+```ts
+import type {
+  Express,
+  Commander,
+  AuditChannel,
+  CivicCoreServices,
+} from '@civicpress/core';
+
+export async function init(services: CivicCoreServices): Promise<void> {
+  // One-time setup. Called once at CivicCore startup, before
+  // registerRoutes / registerAuditConsumers / registerCliCommands.
+  // Resolve services from the container as needed.
 }
 
-export function registerMyModuleServices(
-  container: ServiceContainer,
-  config: CivicPressConfig & { myModule?: MyModuleConfig }
-): void {
-  container.singleton('myModuleService', (c) => {
-    const logger = c.resolve<Logger>('logger');
-    const db = c.resolve<DatabaseService>('database');
-    return new MyModuleService(logger, db, config.myModule);
+export function registerRoutes(app: Express): void {
+  // Mount Express routes. Called after init().
+  app.get('/my-module/health', (_req, res) => res.json({ ok: true }));
+}
+
+export function registerAuditConsumers(channel: AuditChannel): void {
+  // Subscribe to audit events.
+  channel.subscribe(['record.created'], async (event) => {
+    // ...
   });
 }
 
-// In core initialization
-import { registerMyModuleServices } from '@civicpress/my-module';
-registerMyModuleServices(container, config);
-```
-
-**Pros**:
-
-- Automatic dependency resolution
-- Better testability (mock via container)
-- Consistent with core services
-
-**Cons**:
-
-- More complex setup
-- Requires DI container knowledge
-- Not yet implemented
-
-### Pattern 3: Independent Initialization (Current Storage Pattern)
-
-**Description**: Modules initialize services independently, typically
-per-request or on-demand.
-
-**When to Use**:
-
-- Modules that need per-request instances
-- Modules with heavy initialization
-- Modules that don't fit DI container pattern
-
-**Example** (Current Storage Module):
-
-```typescript
-// modules/api/src/routes/uuid-storage.ts
-import { CloudUuidStorageService } from '@civicpress/storage';
-import { StorageConfigManager } from '@civicpress/storage';
-
-async function initializeStorage(req: AuthenticatedRequest) {
-  const configManager = new StorageConfigManager();
-  const storageConfig = await configManager.loadConfig();
-
-  const storageService = new CloudUuidStorageService(
-    storageConfig,
-    req.civic.getDataDir()
-  );
-
-  await storageService.initialize();
-  return storageService;
-}
-
-router.post('/files', async (req, res) => {
-  const storageService = await initializeStorage(req);
-  // Use storage service
-  const result = await storageService.uploadFile({...});
-});
-```
-
-**Pros**:
-
-- Flexible initialization
-- Can handle per-request instances
-- Works well for heavy services
-
-**Cons**:
-
-- No automatic dependency resolution
-- Manual service management
-- Harder to test
-
-## Storage Module Integration (Current Implementation)
-
-The Storage module is a complete example of **Pattern 2 (Service Registration)**
-with lazy initialization.
-
-### Architecture
-
-```
-modules/storage/
-├── src/
-│   ├── cloud-uuid-storage-service.ts  # Main storage service
-│   ├── uuid-storage-service.ts         # Base storage service
-│   ├── storage-config-manager.ts       # Configuration management
-│   ├── credential-manager.ts           # Credential management
-│   └── types/
-│       └── storage.types.ts            # TypeScript types
-└── package.json
-```
-
-### Integration Points
-
-1. **Core Dependency**: Uses `@civicpress/core` for:
-   - `Logger` - Logging utilities
-   - `UnifiedCacheManager` - Cache integration
-   - `DatabaseService` - Database operations
-   - `CivicPressError` - Error types
-   - `ServiceContainer` - DI container for service registration
-
-2. **DI Container Registration**: Services registered during core
-   initialization:
-
-   ```typescript
-   // In core/src/civic-core-services.ts
-   if (storageModule?.registerStorageServices) {
-     storageModule.registerStorageServices(container, config);
-   }
-
-   // In modules/storage/src/storage-services.ts
-   export function registerStorageServices(
-     container: ServiceContainer,
-     config: CivicPressConfig
-   ): void {
-     // Register 'storageConfigManager' (singleton)
-     container.singleton('storageConfigManager', () => {
-       return new StorageConfigManager(systemDataDir);
-     });
-
-     // Register 'storage' (singleton, lazy initialization)
-     container.singleton('storage', (c) => {
-       const cacheManager = c.resolve<UnifiedCacheManager>('cacheManager');
-       const db = c.resolve<DatabaseService>('database');
-       const configManager = c.resolve<StorageConfigManager>('storageConfigManager');
-
-       const storageService = new CloudUuidStorageService(
-         configManager.getDefaultConfig(),
-         systemDataDir,
-         cacheManager
-       );
-       storageService.setDatabaseService(db);
-       return storageService; // Lazy init on first use
-     });
-   }
-   ```
-
-3. **API Integration**: Services accessed via DI container:
-
-   ```typescript
-   // modules/api/src/routes/uuid-storage.ts
-   async function getStorageService(req: AuthenticatedRequest) {
-     const civicPress = req.civicPress;
-     // Get from DI container (Pattern 2)
-     const storageService = civicPress.getService('storage');
-     // Lazy initialization on first use
-     await initializeStorageService(storageService);
-     return storageService;
-   }
-   ```
-
-4. **Configuration**: Uses `.system-data/storage.yml` for configuration via
-   `StorageConfigManager`
-
-5. **Database**: Uses core `DatabaseService` for file metadata tracking
-
-6. **Lazy Initialization**: Service is created synchronously but initialized
-   asynchronously on first use to handle async config loading
-
-### Current Implementation
-
-- ✅ **Registered in DI Container**: Services available via
-  `civicPress.getService('storage')`
-- ✅ **Unified Service Access**: Consistent with other core services
-- ✅ **Lazy Initialization**: Handles async config loading gracefully
-- ✅ **Optional Module**: Gracefully handles cases where storage module is not
-  available
-
-## Module Development Guidelines
-
-### 1. Use Core Types
-
-Always import types from `@civicpress/core`:
-
-```typescript
-import {
-  Logger,
-  DatabaseService,
-  CivicPressError,
-  CivicPressConfig,
-} from '@civicpress/core';
-```
-
-### 2. Use Core Errors
-
-Extend `CivicPressError` for module-specific errors:
-
-```typescript
-import { CivicPressError } from '@civicpress/core';
-
-export class MyModuleError extends CivicPressError {
-  code = 'MY_MODULE_ERROR';
-  statusCode = 500;
-
-  constructor(message: string, context?: Record<string, any>) {
-    super(message, context);
-  }
-}
-```
-
-### 3. Use Core Logging
-
-Use `Logger` from core for consistent logging:
-
-```typescript
-import { Logger } from '@civicpress/core';
-
-class MyService {
-  constructor(private logger: Logger) {}
-
-  async doSomething() {
-    this.logger.info('Doing something...', { context: 'value' });
-  }
-}
-```
-
-### 4. Follow Established Patterns
-
-- Use the same error handling patterns as core
-- Follow the same logging patterns
-- Use consistent naming conventions
-- Document module integration points
-
-### 5. Document Integration
-
-Document how your module integrates with core:
-
-- What core services it uses
-- How it's initialized
-- Configuration requirements
-- API endpoints (if applicable)
-- CLI commands (if applicable)
-
-## Module Registration (Future Enhancement)
-
-Future enhancement: Standardized module registration system.
-
-### Proposed Interface
-
-```typescript
-interface CivicPressModule {
-  name: string;
-  version: string;
-
-  /**
-   * Register module services in DI container
-   */
-  register(
-    container: ServiceContainer,
-    config: CivicPressConfig
-  ): void;
-
-  /**
-   * Initialize module (called after all services registered)
-   */
-  initialize(container: ServiceContainer): Promise<void>;
-
-  /**
-   * Shutdown module (called during platform shutdown)
-   */
-  shutdown(container: ServiceContainer): Promise<void>;
-}
-```
-
-### Example Implementation
-
-```typescript
-// modules/my-module/src/index.ts
-export class MyModule implements CivicPressModule {
-  name = 'my-module';
-  version = '1.0.0';
-
-  register(container: ServiceContainer, config: CivicPressConfig): void {
-    container.singleton('myModuleService', (c) => {
-      const logger = c.resolve<Logger>('logger');
-      return new MyModuleService(logger, config);
+export function registerCliCommands(program: Commander): void {
+  // Add CLI subcommands.
+  program
+    .command('my-module-thing')
+    .description('Do the module-specific thing')
+    .action(async () => {
+      // ...
     });
-  }
-
-  async initialize(container: ServiceContainer): Promise<void> {
-    const service = container.resolve<MyModuleService>('myModuleService');
-    await service.initialize();
-  }
-
-  async shutdown(container: ServiceContainer): Promise<void> {
-    const service = container.resolve<MyModuleService>('myModuleService');
-    await service.shutdown();
-  }
 }
 
-// In core initialization
-const modules = [
-  new MyModule(),
-  new StorageModule(),
-  // ... other modules
-];
-
-for (const module of modules) {
-  module.register(container, config);
+export async function shutdown(): Promise<void> {
+  // Tear-down. Called in REVERSE registration order at process shutdown.
 }
-
-await Promise.all(modules.map(m => m.initialize(container)));
 ```
 
-## Best Practices
-
-### 1. Keep Modules Independent
-
-- Modules should not depend on other modules
-- Use core as the shared foundation
-- Communicate via events/hooks when needed
-
-### 2. Use Core Abstractions
-
-- Use `Logger` instead of `console.log`
-- Use `CivicPressError` instead of generic `Error`
-- Use core types for consistency
-
-### 3. Handle Errors Gracefully
-
-- Always use `CivicPressError` hierarchy
-- Include correlation IDs for tracing
-- Provide meaningful error messages
-
-### 4. Document Dependencies
-
-- Clearly document what core services your module uses
-- Document configuration requirements
-- Document initialization requirements
-
-### 5. Test Integration Points
-
-- Test module initialization
-- Test error handling
-- Test service interactions
-- Test configuration loading
-
-## Examples
-
-### Example 1: Simple Module (Pattern 1)
-
-```typescript
-// modules/simple-module/src/simple-service.ts
-import { Logger } from '@civicpress/core';
-
-export class SimpleService {
-  constructor(private logger: Logger) {}
-
-  async process(data: any) {
-    this.logger.info('Processing data', { data });
-    // Process data
-    return { success: true };
-  }
-}
-
-// Usage in API
-import { SimpleService } from '@civicpress/simple-module';
-
-router.post('/process', async (req, res) => {
-  const logger = req.civic.getService<Logger>('logger');
-  const service = new SimpleService(logger);
-  const result = await service.process(req.body);
-  res.json(result);
-});
-```
-
-### Example 2: Module with Configuration (Pattern 3)
-
-```typescript
-// modules/config-module/src/config-service.ts
-import { Logger, CivicPressConfig } from '@civicpress/core';
-
-export interface MyModuleConfig {
-  apiKey: string;
-  endpoint: string;
-}
-
-export class ConfigService {
-  private config: MyModuleConfig;
-
-  constructor(
-    private logger: Logger,
-    config: CivicPressConfig & { myModule?: MyModuleConfig }
-  ) {
-    this.config = config.myModule || {
-      apiKey: process.env.MY_MODULE_API_KEY || '',
-      endpoint: process.env.MY_MODULE_ENDPOINT || '',
-    };
-  }
-
-  async initialize() {
-    if (!this.config.apiKey) {
-      throw new Error('MY_MODULE_API_KEY is required');
-    }
-    this.logger.info('Config service initialized');
-  }
-}
-
-// Usage
-const configService = new ConfigService(logger, config);
-await configService.initialize();
-```
-
-## Troubleshooting
-
-### Module Not Found
-
-**Problem**: `Cannot find module '@civicpress/my-module'`
-
-**Solution**:
-
-- Ensure module is in `modules/` directory
-- Check `package.json` name matches import
-- Run `pnpm install` to link workspace packages
-
-### Service Not Available
-
-**Problem**: `Service 'myService' not found in container`
-
-**Solution**:
-
-- Ensure service is registered in DI container
-- Check service key matches resolution key
-- Verify service registration order
-
-### Configuration Not Loading
-
-**Problem**: Module configuration not found
-
-**Solution**:
-
-- Check configuration file location
-- Verify configuration file format
-- Ensure configuration is loaded before module initialization
-
-## Related Documentation
-
-- [Architecture Overview](architecture.md) - Core architecture
-- [Dependency Injection Guide](dependency-injection-guide.md) - DI container
-  usage
-- [Error Handling](error-handling.md) - Error handling patterns
-- [Storage System](uuid-storage-system.md) - Storage module details
+CivicCore's order:
+1. `init` (all modules) — DI container fully built; module can resolve any service
+2. `registerRoutes` (all modules)
+3. `registerAuditConsumers` (all modules)
+4. `registerCliCommands` (all modules)
+5. ...running...
+6. `shutdown` (all modules, reverse load order)
 
 ---
 
-**Status**: Active  
-**Last Updated**: 2025-01-30  
-**Next Review**: After module registration system implementation
+## 6. Routes (if `capabilities.routes: true`)
+
+Modules contribute Express routers. Routes are mounted under `/api/<module-name>/` by convention (set by the API module's wiring, not by ModuleResolver).
+
+Route handlers MUST:
+- Use the API module's auth/permission middleware (re-exported from `@civicpress/api`).
+- Return errors via `coreError(...)` / `handleApiError(...)` (centralized output).
+- Never reach into `core/src/` internals — the only stable surface is `@civicpress/core`'s public exports.
+
+```ts
+import { authMiddleware, requirePermission } from '@civicpress/api';
+import { coreError } from '@civicpress/core';
+
+export function registerRoutes(app: Express): void {
+  const router = Router();
+  router.get(
+    '/',
+    authMiddleware,
+    requirePermission('my-module:read'),
+    async (req, res) => {
+      try {
+        // ...
+        res.json({ ok: true });
+      } catch (err) {
+        handleApiError(err, req, res);
+      }
+    }
+  );
+  app.use('/api/my-module', router);
+}
+```
+
+---
+
+## 7. Audit-channel consumption (if `capabilities.audit: true`)
+
+CivicCore emits structured audit events through `AuditChannel`. Modules subscribe to relevant events:
+
+```ts
+import type { AuditChannel, AuditEvent } from '@civicpress/core';
+
+export function registerAuditConsumers(channel: AuditChannel): void {
+  channel.subscribe(['record.created', 'record.updated'], async (event) => {
+    if (event.resourceType === 'bylaw') {
+      // do something module-specific
+    }
+  });
+}
+```
+
+Module-side consumers SHOULD NOT throw — failures must be caught and logged via the injected logger; otherwise an unhandled rejection in a consumer destabilizes the audit pipeline for all consumers.
+
+See `core/src/audit/audit-channel.ts` for the event-shape contract.
+
+---
+
+## 8. CLI commands (if `capabilities.cli: true`)
+
+Modules contribute subcommands under the `civic` CLI:
+
+```ts
+import type { Command } from 'commander';
+
+export function registerCliCommands(program: Command): void {
+  program
+    .command('my-module:do-thing <arg>')
+    .description('Module-specific action')
+    .option('--dry-run', 'Preview without making changes')
+    .action(async (arg, options) => {
+      // ...
+    });
+}
+```
+
+Use `module-name:command-name` namespacing for CLI commands — keeps the top-level `civic <command>` namespace tidy and signals provenance.
+
+---
+
+## 9. Testing your module
+
+### Schema-extension tests
+
+For schema-only contributions, the test surface is JSON Schema validation:
+
+```ts
+import { describe, it, expect } from 'vitest';
+import { RecordSchemaBuilder } from '@civicpress/core';
+
+describe('your schema-extension', () => {
+  it('merges into the bylaw schema', () => {
+    const schema = RecordSchemaBuilder.buildSchema('bylaw');
+    // Walk schema.allOf and assert your fragment is present
+    expect(schema.allOf?.some((f) => f.properties?.metadata?.properties?.your_field))
+      .toBe(true);
+  });
+
+  it('validates a record with your field', async () => {
+    const validator = RecordSchemaValidator.fromSchema('bylaw');
+    const result = await validator.validate({
+      type: 'bylaw',
+      metadata: { your_field: 'value' }
+    });
+    expect(result.valid).toBe(true);
+  });
+});
+```
+
+### Module tests
+
+For full modules, write characterization tests pinning the integration surface:
+- ModuleResolver discovers your manifest
+- `registerRoutes` mounts the expected endpoints (use supertest)
+- `registerAuditConsumers` reacts to expected events
+- `init`/`shutdown` complete without throwing
+
+See `tests/core/modules/discovery-characterization.test.ts` for the discovery test pattern (Phase 2d W1-T2). Adapt to your module's surface.
+
+---
+
+## 10. Common pitfalls
+
+| Pitfall | Why it bites | Fix |
+|---|---|---|
+| Reaching into `core/src/` internals | Internal paths change without notice; future core refactor breaks you. | Use only `@civicpress/core`'s public exports. |
+| Hardcoding sibling module names | Tight coupling; can't swap implementations. | Resolve via ModuleResolver or DI container. |
+| Bypassing ModuleResolver to find modules | `process.cwd()`-based traversal was the pre-2d antipattern. | Always go through `ModuleResolver.loadByName(...)`. |
+| Throwing from `registerAuditConsumers` callbacks | Crashes other consumers. | Catch, log via injected logger, swallow. |
+| Writing the schema fragment outside `<module-dir>/schemas/` | ModuleResolver only looks at the canonical path. | Place it at `<module-dir>/schemas/record-schema-extension.json`. |
+| Forgetting `capabilities.schemaExtensions` array | Fragment exists on disk but isn't merged. | Declare every applicable record type in the manifest. |
+| `kind: "module"` without `entry` field | Manifest validation fails fast. | Always set `entry` for full modules. |
+| Mismatched `name` and config | Module is loaded but config doesn't activate it (or vice-versa). | Verify `data/.civic/config.yml`'s `modules:` list matches `manifest.name`. |
+
+---
+
+## 11. Configuration — opt the module in
+
+ModuleResolver discovers manifests on disk, but a module is only **active** when its name appears in `data/.civic/config.yml`'s `modules:` array (or the legacy `.civicrc`'s `modules:` field as fallback):
+
+```yaml
+modules:
+  - legal-register      # manifest.name (not directory path)
+  - my-module
+```
+
+This split is deliberate: the filesystem is the catalog; the config is the activation list. The same module can be present on disk but disabled in config (and vice-versa).
+
+---
+
+## Reference
+
+- **Contract spec:** `docs/specs/module-contract.md` — the formal field reference and discovery semantics
+- **Worked example (schema-extension):** `modules/schema-extensions/legal/`
+- **ModuleResolver source:** `core/src/modules/module-resolver.ts`
+- **Manifest types:** `core/src/modules/module-manifest.ts`
+- **Manifest JSON Schema:** `core/src/modules/module.schema.json`
+- **Characterization tests:** `tests/core/modules/discovery-characterization.test.ts`
+
+For questions about the contract itself (rather than how to use it), open an issue. For questions about a specific module, check its own README or schema.

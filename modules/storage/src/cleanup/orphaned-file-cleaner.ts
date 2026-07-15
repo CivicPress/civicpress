@@ -1,20 +1,25 @@
 /**
  * Orphaned File Cleaner
  *
- * Identifies and cleans up orphaned files (in storage but not in DB, or vice versa)
+ * Cleans orphans from any source (failed uploads, partial deletes, etc.).
+ * Originally also compensated for `LifecycleManager.archiveFile`, which was
+ * a DB-only no-op (deleted in Phase 2c storage-003 closure). The cleaner
+ * remains because other orphan sources still exist.
  */
 
 import { Logger } from '@civicpress/core';
-import { OrphanedFileError } from '../errors/storage-errors.js';
-import type { StorageFile } from '../types/storage.types.js';
+import type {
+  StorageFile,
+  StorageProvider,
+  StorageDatabaseService,
+  StorageConfig,
+} from '../types/storage.types.js';
 import fs from 'fs-extra';
 import path from 'path';
-import {
-  S3Client,
-  ListObjectsV2Command,
-  DeleteObjectCommand,
-} from '@aws-sdk/client-s3';
-import { BlobServiceClient, ContainerClient } from '@azure/storage-blob';
+import { SIDECAR_SUFFIX } from '../cloud-uuid-storage/internals.js';
+import { loadAwsS3Sdk } from '../cloud-uuid-storage/sdk-loader.js';
+import type { S3Client } from '@aws-sdk/client-s3';
+import type { ContainerClient } from '@azure/storage-blob';
 
 export interface OrphanedFile {
   id?: string; // Database ID if exists
@@ -36,14 +41,14 @@ export interface CleanupResult {
  */
 export class OrphanedFileCleaner {
   private logger: Logger;
-  private databaseService: any;
+  private databaseService: StorageDatabaseService;
   private s3Client: S3Client | null = null;
   private azureContainerClient: ContainerClient | null = null;
-  private config: any;
+  private config: StorageConfig;
 
   constructor(
-    databaseService: any,
-    config: any,
+    databaseService: StorageDatabaseService,
+    config: StorageConfig,
     s3Client?: S3Client | null,
     azureContainerClient?: ContainerClient | null,
     logger?: Logger
@@ -72,6 +77,11 @@ export class OrphanedFileCleaner {
     const storageFiles = await this.listStorageFiles(provider);
     const storageFileMap = new Map<string, { path: string; size?: number }>();
     for (const file of storageFiles) {
+      // FA-STOR-004: sidecar manifests intentionally have no DB row — never
+      // treat them as orphans (that would delete the recovery metadata).
+      if (file.path.endsWith(SIDECAR_SUFFIX)) {
+        continue;
+      }
       storageFileMap.set(file.path, { path: file.path, size: file.size });
     }
 
@@ -208,7 +218,7 @@ export class OrphanedFileCleaner {
    * List files in local storage
    */
   private async listLocalFiles(
-    provider: any
+    provider: StorageProvider
   ): Promise<Array<{ path: string; size?: number }>> {
     const storagePath = provider.path || 'storage';
     const resolvedPath = path.isAbsolute(storagePath)
@@ -222,7 +232,6 @@ export class OrphanedFileCleaner {
 
       for (const entry of entries) {
         const fullPath = path.join(dir, entry.name);
-        const relativePath = path.relative(basePath, fullPath);
 
         if (entry.isDirectory()) {
           await scanDirectory(fullPath, basePath);
@@ -247,7 +256,7 @@ export class OrphanedFileCleaner {
    * List files in S3
    */
   private async listS3Files(
-    provider: any
+    provider: StorageProvider
   ): Promise<Array<{ path: string; size?: number }>> {
     if (!this.s3Client) {
       throw new Error('S3 client not initialized');
@@ -257,6 +266,7 @@ export class OrphanedFileCleaner {
     const prefix = provider.prefix || '';
     let continuationToken: string | undefined;
 
+    const { ListObjectsV2Command } = await loadAwsS3Sdk();
     do {
       const command = new ListObjectsV2Command({
         Bucket: provider.bucket,
@@ -287,7 +297,7 @@ export class OrphanedFileCleaner {
    * List files in Azure Blob Storage
    */
   private async listAzureFiles(
-    provider: any
+    provider: StorageProvider
   ): Promise<Array<{ path: string; size?: number }>> {
     if (!this.azureContainerClient) {
       throw new Error('Azure container client not initialized');
@@ -337,7 +347,7 @@ export class OrphanedFileCleaner {
   /**
    * Delete file from S3
    */
-  private async deleteFromS3(filePath: string, provider: any): Promise<void> {
+  private async deleteFromS3(filePath: string, provider: StorageProvider): Promise<void> {
     if (!this.s3Client) {
       throw new Error('S3 client not initialized');
     }
@@ -345,6 +355,7 @@ export class OrphanedFileCleaner {
     // Extract key from path (s3://bucket/key)
     const key = filePath.replace(`s3://${provider.bucket}/`, '');
 
+    const { DeleteObjectCommand } = await loadAwsS3Sdk();
     const command = new DeleteObjectCommand({
       Bucket: provider.bucket,
       Key: key,
@@ -358,7 +369,7 @@ export class OrphanedFileCleaner {
    */
   private async deleteFromAzure(
     filePath: string,
-    provider: any
+    provider: StorageProvider
   ): Promise<void> {
     if (!this.azureContainerClient) {
       throw new Error('Azure container client not initialized');

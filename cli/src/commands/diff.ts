@@ -306,7 +306,7 @@ async function getCommitChanges(
     if (diff.includes('R')) changes.push('renamed');
 
     return changes;
-  } catch (error) {
+  } catch {
     return [];
   }
 }
@@ -519,7 +519,7 @@ async function getFileContent(
   try {
     const content = await git.show([`${commit}:${filePath}`]);
     return content || null;
-  } catch (error) {
+  } catch {
     // File doesn't exist in this commit
     return null;
   }
@@ -542,7 +542,9 @@ async function getChangedFiles(
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function parseRecordMetadata(content: string): Record<string, any> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const metadata: Record<string, any> = {};
 
   // Extract frontmatter

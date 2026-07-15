@@ -28,6 +28,13 @@ build/
 *.d.ts
 *.d.ts.map
 
+# Exception: hand-written source declaration, NOT a generated artifact.
+# The Express.Request global augmentation is real source and MUST be tracked —
+# otherwise the repo cannot build from a clean checkout (a fresh `git worktree`
+# exposes this). The `*.d.ts` rule above is for generated declarations, which
+# live in the already-ignored dist/.
+!modules/api/src/types/express-augment.d.ts
+
 # TypeScript build cache
 *.tsbuildinfo
 
@@ -46,6 +53,14 @@ data/
 /storage/
 exports/backups/
 
+# Test-run storage artifacts (modules/storage/.test-storage/ etc).
+# Tests create local file fixtures here; the test-cleanup story is
+# tracked as a W2-T18 storage-decomposition follow-up.
+**/.test-storage/
+
+# Agent / IDE local state (per-machine; not for the repo).
+.claude/
+
 # pnpm
 # Note: pnpm-lock.yaml should be committed for reproducible builds
 .pnpm-store/
@@ -56,3 +71,6 @@ Icon?
 
 # backup exports
 *.zip
+
+# BroadcastBox live-e2e harness throwaway data
+/.e2e-live/

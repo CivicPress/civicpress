@@ -19,15 +19,15 @@ interface Props {
   disabled?: boolean;
 }
 
-const props = withDefaults(defineProps<Props>(), {
+withDefaults(defineProps<Props>(), {
   linkedRecords: () => [],
   linkedGeographyFiles: () => [],
   disabled: false,
 });
 
 const emit = defineEmits<{
-  'update:linkedRecords': [records: typeof props.linkedRecords];
-  'update:linkedGeographyFiles': [files: typeof props.linkedGeographyFiles];
+  'update:linkedRecords': [records: NonNullable<Props['linkedRecords']>];
+  'update:linkedGeographyFiles': [files: NonNullable<Props['linkedGeographyFiles']>];
 }>();
 
 const showRecordSelector = ref(false);

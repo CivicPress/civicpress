@@ -11,8 +11,6 @@ const props = defineProps<{
   };
 }>();
 
-const route = useRoute();
-
 // Determine error type
 const is404 = computed(() => props.error?.statusCode === 404);
 const is500 = computed(() => props.error?.statusCode === 500);

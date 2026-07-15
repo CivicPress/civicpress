@@ -102,7 +102,7 @@ export interface CacheConfig {
   /**
    * Cache strategy type
    */
-  strategy: 'memory' | 'file_watcher' | 'hybrid';
+  strategy: 'memory' | 'file_watcher';
 
   /**
    * Whether cache is enabled
@@ -143,24 +143,12 @@ export interface CacheConfig {
    * Enable file watching (for file_watcher strategy)
    */
   enableWatching?: boolean;
-
-  /**
-   * Cache warming configuration
-   */
-  warming?: {
-    enabled: boolean;
-    preloadOnStartup?: boolean;
-    scheduled?: {
-      enabled: boolean;
-      interval: number;
-      strategy?: () => Promise<Array<{ key: string; value: any }>>;
-    };
-  };
 }
 
 /**
  * Unified cache interface for all caching implementations
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export interface ICacheStrategy<T extends {} = any> {
   /**
    * Get value from cache

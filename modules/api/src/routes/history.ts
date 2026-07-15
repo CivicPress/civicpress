@@ -65,7 +65,7 @@ export function createHistoryRouter() {
           since,
           until,
         } = req.query;
-        const civicPress = (req as any).civicPress;
+        const civicPress = req.civicPress;
 
         if (!civicPress) {
           throw new Error('CivicPress not initialized');
@@ -78,7 +78,7 @@ export function createHistoryRouter() {
           author,
           since,
           until,
-          requestId: (req as any).requestId,
+          requestId: req.requestId,
         });
 
         // Get Git engine from CivicPress
@@ -95,7 +95,7 @@ export function createHistoryRouter() {
         if (record) {
           const recordPath = `${record}.md`;
           const recordStr = record as string;
-          history = history.filter((commit: any) => {
+          history = history.filter((commit) => {
             // Check if this commit affected the specified record
             return (
               commit.message.includes(recordStr) ||
@@ -108,7 +108,7 @@ export function createHistoryRouter() {
         // Filter by author if specified
         if (author) {
           history = history.filter(
-            (commit: any) =>
+            (commit) =>
               commit.author_name
                 ?.toLowerCase()
                 .includes((author as string).toLowerCase()) ||
@@ -123,7 +123,7 @@ export function createHistoryRouter() {
           const sinceDate = since ? new Date(since as string) : null;
           const untilDate = until ? new Date(until as string) : null;
 
-          history = history.filter((commit: any) => {
+          history = history.filter((commit) => {
             const commitDate = new Date(commit.date);
             if (sinceDate && commitDate < sinceDate) return false;
             if (untilDate && commitDate > untilDate) return false;
@@ -138,7 +138,7 @@ export function createHistoryRouter() {
         );
 
         // Transform commit data for API response
-        const transformedHistory = paginatedHistory.map((commit: any) => ({
+        const transformedHistory = paginatedHistory.map((commit) => ({
           hash: commit.hash,
           shortHash: commit.hash.substring(0, 8),
           message: commit.message,
@@ -168,7 +168,7 @@ export function createHistoryRouter() {
         logger.info('History retrieved successfully', {
           totalCommits: history.length,
           returnedCommits: transformedHistory.length,
-          requestId: (req as any).requestId,
+          requestId: req.requestId,
         });
 
         sendSuccess(response, req, res, {
@@ -227,7 +227,7 @@ export function createHistoryRouter() {
 
         const { record } = req.params;
         const { limit = '10', offset = '0', author, since, until } = req.query;
-        const civicPress = (req as any).civicPress;
+        const civicPress = req.civicPress;
 
         if (!civicPress) {
           throw new Error('CivicPress not initialized');
@@ -240,7 +240,7 @@ export function createHistoryRouter() {
           author,
           since,
           until,
-          requestId: (req as any).requestId,
+          requestId: req.requestId,
         });
 
         // Get Git engine from CivicPress
@@ -255,7 +255,7 @@ export function createHistoryRouter() {
 
         // Filter by specific record
         const recordPath = `${record}.md`;
-        history = history.filter((commit: any) => {
+        history = history.filter((commit) => {
           // Check if this commit affected the specified record
           return (
             commit.message.includes(record) ||
@@ -267,7 +267,7 @@ export function createHistoryRouter() {
         // Filter by author if specified
         if (author) {
           history = history.filter(
-            (commit: any) =>
+            (commit) =>
               commit.author_name
                 ?.toLowerCase()
                 .includes((author as string).toLowerCase()) ||
@@ -282,7 +282,7 @@ export function createHistoryRouter() {
           const sinceDate = since ? new Date(since as string) : null;
           const untilDate = until ? new Date(until as string) : null;
 
-          history = history.filter((commit: any) => {
+          history = history.filter((commit) => {
             const commitDate = new Date(commit.date);
             if (sinceDate && commitDate < sinceDate) return false;
             if (untilDate && commitDate > untilDate) return false;
@@ -297,7 +297,7 @@ export function createHistoryRouter() {
         );
 
         // Transform commit data for API response
-        const transformedHistory = paginatedHistory.map((commit: any) => ({
+        const transformedHistory = paginatedHistory.map((commit) => ({
           hash: commit.hash,
           shortHash: commit.hash.substring(0, 8),
           message: commit.message,
@@ -328,7 +328,7 @@ export function createHistoryRouter() {
           record,
           totalCommits: history.length,
           returnedCommits: transformedHistory.length,
-          requestId: (req as any).requestId,
+          requestId: req.requestId,
         });
 
         sendSuccess(response, req, res, {

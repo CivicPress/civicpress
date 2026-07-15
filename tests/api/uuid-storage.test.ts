@@ -191,6 +191,39 @@ describe('UUID Storage API', () => {
       expect(authenticatedResponse.status).toBe(200);
     });
 
+    it('FA-STOR-002: a download-only role cannot read a private folder', async () => {
+      // Upload a private-folder file as admin.
+      const privateFilePath = path.join(context.testDir, 'private-clerk.pdf');
+      await fs.writeFile(privateFilePath, 'confidential document body');
+      const up = await request(context.api.getApp())
+        .post('/api/v1/storage/files')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .attach('file', privateFilePath)
+        .field('folder', 'private');
+      expect(up.status).toBe(200);
+      const fileId = up.body.data.id;
+
+      // Clerk holds storage:download (and storage:manage) but NOT
+      // storage:read_private — the old gate let this through (private ≈
+      // authenticated). It must now be denied.
+      const clerkResp = await request(context.api.getApp())
+        .post('/api/v1/auth/simulated')
+        .send({ username: 'clerk', role: 'clerk' });
+      const clerkToken = clerkResp.body.data.session.token;
+
+      const denied = await request(context.api.getApp())
+        .get(`/api/v1/storage/files/${fileId}`)
+        .set('Authorization', `Bearer ${clerkToken}`);
+      expect(denied.status).toBe(403);
+      expect(denied.body.error.required).toBe('storage:read_private');
+
+      // Admin (holds storage:read_private) is still allowed.
+      const allowed = await request(context.api.getApp())
+        .get(`/api/v1/storage/files/${fileId}`)
+        .set('Authorization', `Bearer ${adminToken}`);
+      expect(allowed.status).toBe(200);
+    });
+
     it('should return 404 for non-existent file', async () => {
       const fakeUuid = '123e4567-e89b-12d3-a456-426614174000';
       const response = await request(context.api.getApp())
@@ -198,6 +231,93 @@ describe('UUID Storage API', () => {
         .set('Authorization', `Bearer ${adminToken}`);
 
       expect(response.status).toBe(404);
+    });
+
+    it('streams the full file with Accept-Ranges and the exact bytes', async () => {
+      const response = await request(context.api.getApp())
+        .get(`/api/v1/storage/files/${uploadedFileId}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .buffer(true)
+        .parse((res, cb) => {
+          const chunks: Buffer[] = [];
+          res.on('data', (c: Buffer) => chunks.push(c));
+          res.on('end', () => cb(null, Buffer.concat(chunks)));
+        });
+
+      expect(response.status).toBe(200);
+      expect(response.headers['accept-ranges']).toBe('bytes');
+      const original = await fs.readFile(testFilePath);
+      expect(Buffer.compare(response.body as Buffer, original)).toBe(0);
+    });
+
+    it('serves a byte range as 206 with Content-Range (video seek support)', async () => {
+      const original = await fs.readFile(testFilePath);
+      const response = await request(context.api.getApp())
+        .get(`/api/v1/storage/files/${uploadedFileId}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .set('Range', 'bytes=2-5')
+        .buffer(true)
+        .parse((res, cb) => {
+          const chunks: Buffer[] = [];
+          res.on('data', (c: Buffer) => chunks.push(c));
+          res.on('end', () => cb(null, Buffer.concat(chunks)));
+        });
+
+      expect(response.status).toBe(206);
+      expect(response.headers['content-range']).toBe(
+        `bytes 2-5/${original.length}`
+      );
+      expect(response.headers['content-length']).toBe('4');
+      expect(Buffer.compare(response.body as Buffer, original.subarray(2, 6))).toBe(
+        0
+      );
+    });
+
+    it('serves an open-ended range (bytes=N-) to the end of the file', async () => {
+      const original = await fs.readFile(testFilePath);
+      const response = await request(context.api.getApp())
+        .get(`/api/v1/storage/files/${uploadedFileId}`)
+        .set('Range', 'bytes=3-')
+        .buffer(true)
+        .parse((res, cb) => {
+          const chunks: Buffer[] = [];
+          res.on('data', (c: Buffer) => chunks.push(c));
+          res.on('end', () => cb(null, Buffer.concat(chunks)));
+        });
+
+      expect(response.status).toBe(206);
+      expect(response.headers['content-range']).toBe(
+        `bytes 3-${original.length - 1}/${original.length}`
+      );
+      expect(Buffer.compare(response.body as Buffer, original.subarray(3))).toBe(0);
+    });
+
+    it('rejects an unsatisfiable range with 416 + Content-Range */size', async () => {
+      const original = await fs.readFile(testFilePath);
+      const response = await request(context.api.getApp())
+        .get(`/api/v1/storage/files/${uploadedFileId}`)
+        .set('Range', `bytes=${original.length + 100}-`);
+
+      expect(response.status).toBe(416);
+      expect(response.headers['content-range']).toBe(
+        `bytes */${original.length}`
+      );
+    });
+
+    it('Range does NOT bypass the private-folder gate', async () => {
+      const privateFilePath = path.join(context.testDir, 'private-range.pdf');
+      await fs.writeFile(privateFilePath, 'confidential range test body');
+      const up = await request(context.api.getApp())
+        .post('/api/v1/storage/files')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .attach('file', privateFilePath)
+        .field('folder', 'private');
+      expect(up.status).toBe(200);
+
+      const denied = await request(context.api.getApp())
+        .get(`/api/v1/storage/files/${up.body.data.id}`)
+        .set('Range', 'bytes=0-10');
+      expect(denied.status).toBe(401);
     });
   });
 
@@ -291,6 +411,34 @@ describe('UUID Storage API', () => {
       expect(file).toHaveProperty('relative_path');
       expect(file).toHaveProperty('size');
       expect(file).toHaveProperty('mime_type');
+    });
+
+    it('FA-STOR-001: anonymous folder listing is rejected (no enumeration)', async () => {
+      // The old public-folder bypass let anyone enumerate every UUID in a
+      // public folder (recordings/transcripts) — the FA-BB-002 amplifier.
+      const anon = await request(context.api.getApp()).get(
+        '/api/v1/storage/folders/public/files'
+      );
+      expect(anon.status).toBe(401);
+    });
+
+    it('FA-STOR-001/002: a download-only role cannot enumerate a private folder', async () => {
+      const clerkResp = await request(context.api.getApp())
+        .post('/api/v1/auth/simulated')
+        .send({ username: 'clerk', role: 'clerk' });
+      const clerkToken = clerkResp.body.data.session.token;
+
+      // Private folder listing requires storage:read_private → clerk denied.
+      const denied = await request(context.api.getApp())
+        .get('/api/v1/storage/folders/private/files')
+        .set('Authorization', `Bearer ${clerkToken}`);
+      expect(denied.status).toBe(403);
+
+      // A public folder listing still works for a storage:download holder.
+      const ok = await request(context.api.getApp())
+        .get('/api/v1/storage/folders/public/files')
+        .set('Authorization', `Bearer ${clerkToken}`);
+      expect(ok.status).toBe(200);
     });
   });
 

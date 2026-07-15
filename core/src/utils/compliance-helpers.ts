@@ -7,10 +7,6 @@
  * @module utils/compliance-helpers
  */
 
-import { Logger } from './logger.js';
-
-const logger = new Logger();
-
 /**
  * ComplianceFieldHelpers - Utilities for compliance field validation
  */
@@ -151,7 +147,9 @@ export class ComplianceFieldHelpers {
       classification?: string;
       publicAccess?: boolean;
     } = {}
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ): Record<string, any> {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const defaults: Record<string, any> = {
       language: options.language || 'en',
       jurisdiction: options.jurisdiction || 'municipal',
@@ -179,6 +177,7 @@ export class ComplianceFieldHelpers {
    * @param metadata - The metadata object to validate
    * @returns Array of validation errors (empty if valid)
    */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   static validateComplianceMetadata(metadata: Record<string, any>): Array<{
     field: string;
     message: string;

@@ -1,0 +1,36 @@
+{
+  "name": "@civicpress/broadcast-protocol",
+  "version": "0.1.0",
+  "description": "Canonical wire protocol (JSON Schema) for the CivicPress ↔ BroadcastBox appliance contract. Single source of truth consumed by both repos.",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./schema": "./schema/broadcast-protocol.schema.json"
+  },
+  "files": ["dist", "schema"],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "vitest",
+    "test:run": "vitest run",
+    "gen:types": "json2ts -i schema/broadcast-protocol.schema.json -o src/types.gen.ts",
+    "lint": "eslint src/**/*.ts",
+    "clean": "rm -rf dist"
+  },
+  "license": "AGPL-3.0-or-later",
+  "dependencies": {
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.0",
+    "json-schema-to-typescript": "^15.0.0",
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.4"
+  }
+}

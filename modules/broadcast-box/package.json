@@ -1,0 +1,59 @@
+{
+  "name": "@civicpress/broadcast-box",
+  "version": "1.0.0",
+  "description": "CivicPress Broadcast Box Module - Remote control and monitoring of Broadcast Box devices",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.js"
+    },
+    "./broadcast-box-services": {
+      "types": "./dist/broadcast-box-services.d.ts",
+      "import": "./dist/broadcast-box-services.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest",
+    "test:run": "vitest run",
+    "lint": "eslint src/**/*.ts",
+    "clean": "rm -rf dist"
+  },
+  "keywords": [
+    "civicpress",
+    "broadcast-box",
+    "recording",
+    "devices",
+    "websocket"
+  ],
+  "author": "CivicPress Team",
+  "license": "MIT",
+  "dependencies": {
+    "@civicpress/broadcast-protocol": "workspace:*",
+    "@civicpress/core": "workspace:*",
+    "@civicpress/realtime": "workspace:*",
+    "@civicpress/transcription": "workspace:*",
+    "bcrypt": "^5.1.1",
+    "express": "^4.22.2",
+    "express-validator": "^7.3.2",
+    "multer": "^1.4.5-lts.1",
+    "uuid": "11.1.0"
+  },
+  "devDependencies": {
+    "@types/bcrypt": "^5.0.2",
+    "@types/express": "^4.17.25",
+    "@types/multer": "^1.4.11",
+    "@types/node": "^20.19.0",
+    "@types/uuid": "10.0.0",
+    "@typescript-eslint/eslint-plugin": "^8.36.0",
+    "@typescript-eslint/parser": "^8.36.0",
+    "eslint": "^9.30.1",
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.4"
+  },
+  "packageManager": "pnpm@10.12.4"
+}

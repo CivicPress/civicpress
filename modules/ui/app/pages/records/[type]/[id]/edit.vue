@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import type { CivicRecord } from '~/stores/records';
+import type { ApiResponse } from '~/utils/api-response';
+import type { RecordResponse } from '~/types/api-responses';
 import RecordForm from '~/components/RecordForm.vue';
 import FormSkeleton from '~/components/FormSkeleton.vue';
 
@@ -14,26 +16,25 @@ const route = useRoute();
 const type = route.params.type as string;
 const id = route.params.id as string;
 
-// Store
-const recordsStore = useRecordsStore();
-
 // Reactive state
 const record = ref<CivicRecord | null>(null);
 const loading = ref(false);
 const saving = ref(false);
 const error = ref('');
-const recordFormRef = ref<InstanceType<typeof RecordForm> | null>(null);
 const hasSavedChanges = ref(false); // Track if changes have been saved (indicates draft editing)
+
+// Collaborative editing (Phase 3) — opt-in via the realtimeEnabled runtime
+// config flag. RecordForm + MarkdownEditor still apply the content-loss guard,
+// so a record that can't round-trip stays single-user even when enabled.
+const collaborativeMode = computed(
+  () => useRuntimeConfig().public.realtimeEnabled === true
+);
 
 // Toast notifications
 const toast = useToast();
 
-// Get record type display name
-const { getRecordTypeLabel } = useRecordTypes();
-const recordTypeLabel = computed(() => getRecordTypeLabel(type));
-
 // Get type label helper
-const { getTypeLabel, getStatusLabel, getTypeIcon, getStatusIcon } =
+const { getTypeLabel } =
   useRecordUtils();
 
 // Fetch record data
@@ -45,28 +46,34 @@ const fetchRecord = async () => {
     // Add ?edit=true to get draft version if it exists (for authenticated users with edit permission)
     const response = (await useNuxtApp().$civicApi(
       `/api/v1/records/${id}?edit=true`
-    )) as any;
+    )) as ApiResponse<
+      RecordResponse & { created?: string; updated?: string }
+    >;
 
     if (response && response.success && response.data) {
       const apiRecord = response.data;
 
       // Transform API response to match CivicRecord interface
-      // Note: Drafts return markdownBody, published records return content
+      // Note: Drafts return markdownBody, published records return content.
+      // CivicRecord uses narrow literal-union enums for type/status; cast at
+      // the boundary since the API returns broad `string`.
       record.value = {
         id: apiRecord.id,
         title: apiRecord.title,
-        type: apiRecord.type, // This should be the updated type from draft if it exists
+        type: apiRecord.type as CivicRecord['type'],
         content: apiRecord.markdownBody || apiRecord.content || '',
-        status: apiRecord.status,
-        path: apiRecord.path,
-        author: apiRecord.author,
-        created_at: apiRecord.created || apiRecord.created_at,
-        updated_at: apiRecord.updated || apiRecord.updated_at,
-        geography: apiRecord.geography,
-        attachedFiles: apiRecord.attachedFiles || [],
-        linkedRecords: apiRecord.linkedRecords || [],
-        metadata: apiRecord.metadata || {},
-      };
+        status: (apiRecord.status || 'draft') as CivicRecord['status'],
+        path: apiRecord.path || '',
+        author: apiRecord.author || '',
+        created_at: apiRecord.created || apiRecord.created_at || '',
+        updated_at: apiRecord.updated || apiRecord.updated_at || '',
+        geography: apiRecord.geography as CivicRecord['geography'],
+        attachedFiles: (apiRecord.attachedFiles ||
+          []) as CivicRecord['attachedFiles'],
+        linkedRecords: (apiRecord.linkedRecords ||
+          []) as CivicRecord['linkedRecords'],
+        metadata: (apiRecord.metadata || {}) as CivicRecord['metadata'],
+      } as CivicRecord;
 
       // If the record is a draft (has isDraft flag or markdownBody), mark as having saved changes
       // This means we're editing a draft, so breadcrumbs should show "All Drafts"
@@ -76,8 +83,8 @@ const fetchRecord = async () => {
     } else {
       throw new Error(t('records.failedToLoadRecord'));
     }
-  } catch (err: any) {
-    const errorMessage = err.message || t('records.failedToLoadRecord');
+  } catch (err: unknown) {
+    const errorMessage = (err instanceof Error ? err.message : '') || t('records.failedToLoadRecord');
     error.value = errorMessage;
     toast.add({
       title: t('common.error'),
@@ -89,14 +96,8 @@ const fetchRecord = async () => {
   }
 };
 
-// Handle form submission (new RecordForm handles this internally via draft/publish)
-const handleSubmit = async (recordData: any) => {
-  // The new RecordForm handles draft updates and publishing internally
-  // This is kept for backward compatibility but may not be called
-  console.log('Form submitted:', recordData);
-};
-
 // Handle record saved - update local record state to reflect changes (e.g., type changes)
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const handleRecordSaved = (recordData: any) => {
   // Mark that changes have been saved (this indicates we're working with a draft)
   hasSavedChanges.value = true;
@@ -129,7 +130,7 @@ const handleDelete = async (recordId: string) => {
       {
         method: 'DELETE',
       }
-    )) as any;
+    )) as ApiResponse;
 
     if (response && response.success) {
       toast.add({
@@ -143,8 +144,8 @@ const handleDelete = async (recordId: string) => {
     } else {
       throw new Error(t('records.failedToDeleteRecord'));
     }
-  } catch (err: any) {
-    const errorMessage = err.message || t('records.failedToDeleteRecord');
+  } catch (err: unknown) {
+    const errorMessage = (err instanceof Error ? err.message : '') || t('records.failedToDeleteRecord');
     error.value = errorMessage;
     toast.add({
       title: t('common.error'),
@@ -274,6 +275,7 @@ const breadcrumbItems = computed(() => {
             :saving="saving"
             :error="error"
             :can-delete="canDeleteRecords"
+            :collaborative-mode="collaborativeMode"
             @delete="handleDelete"
             @saved="handleRecordSaved"
           />

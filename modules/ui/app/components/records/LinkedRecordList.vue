@@ -59,7 +59,7 @@
         <div class="space-y-2">
           <UFormField v-if="editable" :label="t('common.category')" size="xs">
             <USelectMenu
-              :model-value="linkedRecord.category as any"
+              :model-value="categoryFor(linkedRecord)"
               :items="getLinkCategoryOptions()"
               :placeholder="t('records.attachments.selectCategory')"
               @update:model-value="(value) => updateLinkCategory(index, value)"
@@ -108,7 +108,6 @@
 </template>
 
 <script setup lang="ts">
-import RecordLinkSelector from './RecordLinkSelector.vue';
 
 // Composables
 const { t } = useI18n();
@@ -122,7 +121,7 @@ interface LinkedRecord {
 }
 
 // Composables
-const { getLinkCategoryOptions, getLinkCategoryLabel, fetchLinkCategories } =
+const { getLinkCategoryOptions, fetchLinkCategories } =
   useLinkCategories();
 
 interface Props {
@@ -149,10 +148,6 @@ const tempLinkedRecords = ref<LinkedRecord[]>([]);
 const linkedRecords = computed(() => props.modelValue);
 
 // Methods
-const closeSelector = () => {
-  tempLinkedRecords.value = [];
-};
-
 const updateLinkDescription = (index: number, newDescription: string) => {
   const updatedRecords = [...linkedRecords.value];
   const record = updatedRecords[index];
@@ -168,19 +163,27 @@ const updateLinkDescription = (index: number, newDescription: string) => {
   }
 };
 
-const updateLinkCategory = (index: number, newCategory: any) => {
+type LinkCategoryOption = { label: string; value: string; description: string };
+
+const categoryFor = (linkedRecord: LinkedRecord): LinkCategoryOption | undefined => {
+  if (!linkedRecord.category) return undefined;
+  const options = getLinkCategoryOptions();
+  return options.find((o) => o.value === linkedRecord.category);
+};
+
+const updateLinkCategory = (
+  index: number,
+  newCategory: LinkCategoryOption | undefined
+) => {
   const updatedRecords = [...linkedRecords.value];
   const record = updatedRecords[index];
   if (record) {
-    // Handle both string and SelectMenuItem types
-    const categoryValue =
-      typeof newCategory === 'string' ? newCategory : newCategory?.value || '';
     updatedRecords[index] = {
       id: record.id,
       type: record.type,
       description: record.description,
       path: record.path,
-      category: categoryValue,
+      category: newCategory?.value,
     };
     emit('update:modelValue', updatedRecords);
   }

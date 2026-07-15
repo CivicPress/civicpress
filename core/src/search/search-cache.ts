@@ -12,6 +12,7 @@ export interface CachedSearchResult<T> {
   queryHash: string;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export class SearchCache<T = any> {
   private cache = new Map<string, CachedSearchResult<T>>();
   private readonly defaultTTL: number;
@@ -25,6 +26,7 @@ export class SearchCache<T = any> {
   /**
    * Generate cache key from query and options
    */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   generateKey(query: string, options: Record<string, any> = {}): string {
     const normalizedQuery = query.toLowerCase().trim();
     const optionsKey = JSON.stringify(
@@ -37,6 +39,7 @@ export class SearchCache<T = any> {
             }
             return acc;
           },
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           {} as Record<string, any>
         )
     );

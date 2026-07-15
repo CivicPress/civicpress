@@ -1,0 +1,13 @@
+{
+  "name": "@civicpress/schema-extensions-legal",
+  "version": "0.3.0",
+  "description": "Schema extension adding legal-specific metadata to bylaw, ordinance, policy, proclamation, and resolution record types.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": ["civicpress", "schema-extension", "legal"],
+  "author": "",
+  "license": "MIT",
+  "private": true
+}

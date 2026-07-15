@@ -39,10 +39,6 @@ describe('FilesystemDiagnosticChecker', () => {
 
   describe('autoFix', () => {
     it('should create missing directories', async () => {
-      // Use vi.mock for fs module
-      const mockMkdirSync = vi.fn();
-      const mockExistsSync = vi.fn().mockReturnValue(false);
-
       // We can't easily mock fs in ESM, so we'll test the logic differently
       // by checking that autoFix returns results
       const issue = {

@@ -193,6 +193,8 @@
     "enterTitle": "Enter record title",
     "enterDescription": "Enter description (optional)",
     "enterContent": "Enter content...",
+    "collaborativeUnavailableTitle": "Collaborative editing unavailable",
+    "collaborativeUnavailable": "This record contains formatting the collaborative editor can't preserve; editing in single-user mode.",
     "enterTags": "Enter tags (comma-separated)",
     "unpublishedChanges": "Unpublished changes",
     "sort": {
@@ -226,6 +228,15 @@
       "showing": "Showing {start} to {end} of {total} results",
       "perPage": "Per page"
     },
+    "transcript": {
+      "title": "Transcript",
+      "automated": "Automated",
+      "reviewed": "Reviewed",
+      "automatedNote": "AI-generated transcript — the recording remains authoritative.",
+      "loading": "Loading transcript…",
+      "empty": "The transcript is empty.",
+      "loadError": "Failed to load the transcript."
+    },
     "attachments": {
       "title": "File Attachments",
       "titleSingular": "File Attachment",
@@ -233,6 +244,8 @@
       "noAttachments": "No attachments",
       "noFilesAttachedTitle": "No files attached",
       "noFilesAttachedDesc": "This record doesn't have any files attached to it yet.",
+      "recordingProcessingTitle": "Recording is being processed",
+      "recordingProcessingDesc": "The session recording is being prepared for publication (closed-session portions are removed first). It will appear here once ready.",
       "linkFiles": "Link Files",
       "selectCategory": "Select category",
       "optionalDescription": "Optional description",

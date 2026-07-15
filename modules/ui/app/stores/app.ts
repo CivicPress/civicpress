@@ -23,7 +23,7 @@ export const useAppStore = defineStore('app', {
       notifications: [],
     };
 
-    if (process.client) {
+    if (import.meta.client) {
       try {
         const storedAppState = localStorage.getItem('civic_app_state');
 
@@ -59,7 +59,7 @@ export const useAppStore = defineStore('app', {
   actions: {
     // Private method to save app state to localStorage
     saveAppState() {
-      if (process.client) {
+      if (import.meta.client) {
         try {
           const stateToSave = {
             sidebarOpen: this.sidebarOpen,
@@ -99,7 +99,7 @@ export const useAppStore = defineStore('app', {
       this.saveAppState();
 
       // Apply theme to document
-      if (process.client) {
+      if (import.meta.client) {
         if (theme === 'dark') {
           document.documentElement.classList.add('dark');
         } else if (theme === 'light') {
@@ -142,7 +142,7 @@ export const useAppStore = defineStore('app', {
       this.theme = 'system';
       this.notifications = [];
 
-      if (process.client) {
+      if (import.meta.client) {
         localStorage.removeItem('civic_app_state');
       }
     },

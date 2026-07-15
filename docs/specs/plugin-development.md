@@ -2,7 +2,7 @@
 
 ---
 
-version: 1.0.0 status: stable created: '2025-07-04' updated: '2025-07-15'
+version: 0.3.x-scope status: planned created: '2025-07-04' updated: '2025-07-15'
 deprecated: false sunset_date: null additions:
 
 - comprehensive plugin development documentation

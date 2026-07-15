@@ -14,6 +14,7 @@ export function initializeLogger(): Logger {
 }
 
 export function getGlobalOptionsFromArgs(): GlobalOptions {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const args = (globalThis as any).process?.argv || [];
   const options: GlobalOptions = {};
 

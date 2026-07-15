@@ -1,5 +1,9 @@
 import express from 'express';
+import { HttpError } from './utils/http-error.js';
 import cors from 'cors';
+import helmet from 'helmet';
+import compression from 'compression';
+import { rateLimit } from 'express-rate-limit';
 import path from 'path';
 import fs from 'fs';
 import {
@@ -44,7 +48,7 @@ import configRouter from './routes/config.js';
 import systemRouter from './routes/system.js';
 import { createGeographyRouter } from './routes/geography.js';
 import { createCacheRouter } from './routes/cache.js';
-import { API_PREFIX, apiPath } from './constants.js';
+import { apiPath } from './constants.js';
 
 // Import middleware
 import {
@@ -59,14 +63,50 @@ import {
   requestContextMiddleware,
   createDatabaseContextMiddleware,
 } from './middleware/logging.js';
-import { authMiddleware, optionalAuth } from './middleware/auth.js';
+import {
+  authMiddleware,
+  optionalAuth,
+  requirePermission,
+} from './middleware/auth.js';
 import { csrfMiddleware } from './middleware/csrf.js';
+import {
+  startInProcessRealtime,
+  type RealtimeServerLike,
+} from './realtime-bootstrap.js';
+import type { RealtimeServer } from '@civicpress/realtime';
+import { startInProcessTranscription } from './transcription-bootstrap.js';
+import type { TranscriptionWorker } from '@civicpress/transcription';
+import {
+  startInProcessBroadcastBox,
+  type BroadcastBoxStartResult,
+} from './broadcast-box-bootstrap.js';
 
 export class CivicPressAPI {
   private app: express.Application;
   private civicPress: CivicPress | null = null;
   private port: number;
   private dataDir: string = '';
+  // In-process realtime server (hosted in the SAME process as the API, but
+  // listening on its own WS port). Null until start() wires it; null forever if
+  // realtime is disabled or fails to start. The records router reaches it via
+  // the narrow RealtimeServerLike contract for the snapshot endpoint.
+  private realtimeServer: RealtimeServer | null = null;
+  // True once the realtime WS server actually started listening. Used by the
+  // snapshot provider so a constructed-but-not-listening server (e.g. port in
+  // use) is treated as "not available" → graceful no-op snapshot.
+  private realtimeStarted: boolean = false;
+  // Test seam: lets tests inject a RealtimeServerLike stub WITHOUT starting the
+  // real WS server (start() is not called in the API test harness).
+  private realtimeServerOverride: RealtimeServerLike | null = null;
+  // In-process transcription worker (BroadcastBox W2), hosted in the SAME
+  // process as the API. Null until start() wires it; null forever if disabled /
+  // engine unavailable / failed. Stopped on shutdown.
+  private transcriptionWorker: TranscriptionWorker | null = null;
+  // In-process broadcast-box mount (BroadcastBox Phase 5): device/session/upload
+  // routes + services. Null until start() wires it; null forever if the module
+  // is not in config `modules:` / disabled / failed. Its stop() halts the
+  // enrollment-cleanup timer on shutdown.
+  private broadcastBox: BroadcastBoxStartResult | null = null;
 
   constructor(port: number = 3000) {
     this.port = port;
@@ -76,15 +116,22 @@ export class CivicPressAPI {
     this.app.use(express.json({ limit: '10mb' }));
     this.app.use(
       (
-        err: any,
+        err: Error,
         req: express.Request,
         res: express.Response,
         next: express.NextFunction
       ) => {
         if (err instanceof SyntaxError && 'body' in err) {
-          (err as any).statusCode = 400;
-          (err as any).message = 'Malformed JSON';
-          return errorHandler(err, req, res, next);
+          // Wrap the underlying SyntaxError in a typed HttpError so the
+          // error handler can read statusCode without `as any`.
+          return errorHandler(
+            new HttpError(400, 'Malformed JSON', 'MALFORMED_JSON', {
+              cause: err,
+            }),
+            req,
+            res,
+            next
+          );
         }
         next(err);
       }
@@ -94,10 +141,87 @@ export class CivicPressAPI {
   }
 
   private setupMiddleware(): void {
-    // CORS
+    // FA-API-006: helmet/rate-limit/compression were declared in package.json
+    // but never wired — no security headers and no throttle on the
+    // internet-exposed API.
+
+    // Behind a reverse proxy, per-IP limits need the real client IP.
+    if (process.env.TRUST_PROXY) {
+      this.app.set(
+        'trust proxy',
+        process.env.TRUST_PROXY === 'true' ? 1 : process.env.TRUST_PROXY
+      );
+    }
+
+    // Security headers. CORP must allow cross-origin: the UI runs on a
+    // different origin (dev :3030, prod its own host) and embeds API-served
+    // media (<video src="/api/v1/storage/files/…">) — helmet's same-origin
+    // default would break playback of the public recordings.
+    this.app.use(
+      helmet({
+        crossOriginResourcePolicy: { policy: 'cross-origin' },
+      })
+    );
+
+    // Rate limiting: a generous global ceiling plus a strict window on the
+    // credential surface (login/register/password — FA-API-007's cheap
+    // bcrypt-amplification + stuffing vector). Env-tunable; disabled under
+    // NODE_ENV=test so in-process suites (hundreds of requests) don't trip it.
+    const testEnv =
+      process.env.NODE_ENV === 'test' &&
+      process.env.RATE_LIMIT_ENFORCE !== 'true';
+    if (!testEnv && process.env.RATE_LIMIT_DISABLED !== 'true') {
+      this.app.use(
+        rateLimit({
+          windowMs: 15 * 60 * 1000,
+          limit: Number(process.env.RATE_LIMIT_MAX) || 1000,
+          standardHeaders: 'draft-7',
+          legacyHeaders: false,
+        })
+      );
+      this.app.use(
+        ['/api/v1/auth', '/api/v1/users/register'],
+        rateLimit({
+          windowMs: 15 * 60 * 1000,
+          limit: Number(process.env.RATE_LIMIT_AUTH_MAX) || 30,
+          standardHeaders: 'draft-7',
+          legacyHeaders: false,
+          message: {
+            success: false,
+            error: {
+              message: 'Too many authentication attempts — try again later',
+              code: 'RATE_LIMITED',
+            },
+          },
+        })
+      );
+    }
+
+    // Response compression (media/video types are non-compressible and pass
+    // through untouched, so Range/206 streaming is unaffected).
+    this.app.use(compression());
+
+    // CORS (FA-API-013): never ship wildcard-origin + credentials by default.
+    // Explicit CORS_ORIGIN (comma-separated) always wins. With none set we fail
+    // closed in production — deny cross-origin reads rather than reflect '*' —
+    // and default to the local Nuxt UI origin only in development/test.
+    const corsOriginEnv = process.env.CORS_ORIGIN?.trim();
+    const isDevOrTest =
+      process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test';
+    let corsOrigin: string[] | boolean;
+    if (corsOriginEnv) {
+      corsOrigin = corsOriginEnv.split(',').map((s) => s.trim());
+    } else if (isDevOrTest) {
+      corsOrigin = ['http://localhost:3000'];
+    } else {
+      corsOrigin = false; // production / unset NODE_ENV: no cross-origin allowlist
+      logger.warn(
+        'CORS_ORIGIN is not set — cross-origin requests are denied. Set CORS_ORIGIN (comma-separated) to allow browser clients.'
+      );
+    }
     this.app.use(
       cors({
-        origin: process.env.CORS_ORIGIN || '*',
+        origin: corsOrigin,
         credentials: true,
       })
     );
@@ -178,9 +302,10 @@ export class CivicPressAPI {
       await AuthConfigManager.getInstance().loadConfig();
       logger.info('Auth configuration loaded');
 
-      // Error handling middleware (must be last)
-      this.app.use(notFoundHandler);
-      this.app.use(errorHandler);
+      // NOTE: the 404 (notFoundHandler) + errorHandler are registered at the END
+      // of start(), AFTER the post-listen module mounts (realtime / transcription /
+      // broadcast-box). Registering them here (before those mounts) made the
+      // catch-all 404 shadow every late-added broadcast-box router.
 
       logger.info('CivicPress API initialized');
     } catch (error) {
@@ -215,7 +340,10 @@ export class CivicPressAPI {
 
     // Create service instances
     const recordsService = new RecordsService(this.civicPress);
-    const geographyManager = new GeographyManager(this.dataDir);
+    const geographyManager = new GeographyManager(
+      this.dataDir,
+      this.civicPress.getDatabaseService()
+    );
 
     // Health check (no auth required)
     this.app.use(apiPath('health'), healthRouter);
@@ -223,14 +351,22 @@ export class CivicPressAPI {
     // Documentation (no auth required)
     this.app.use(apiPath('docs'), docsRouter);
 
-    // Info endpoint (no auth required)
-    this.app.use(apiPath('info'), infoRouter);
+    // Info endpoint (no auth required; uses optional token validation
+    // via the injected civicPress — see api-001 fix in info.ts)
+    this.app.use(
+      apiPath('info'),
+      (req, _res, next) => {
+        req.civicPress = this.civicPress;
+        next();
+      },
+      infoRouter
+    );
 
     // Auth routes (no auth required) - these need CivicPress instance
     this.app.use(
       apiPath('auth'),
       (req, res, next) => {
-        (req as any).civicPress = this.civicPress;
+        req.civicPress = this.civicPress;
         next();
       },
       authRouter
@@ -247,45 +383,66 @@ export class CivicPressAPI {
     this.app.use(
       apiPath('users/auth'),
       (req, res, next) => {
-        (req as any).civicPress = this.civicPress;
+        req.civicPress = this.civicPress;
         next();
       },
       authenticationRouter
     );
 
     // Public routes that should be accessible to guests
-    // Records router handles auth internally, but CSRF applies to browser requests
+    // Records router handles auth internally, but CSRF applies to browser requests.
+    // The realtime server is passed as a LAZY provider: routes are wired here (in
+    // initialize()) but realtime starts later (in start()), so the snapshot route
+    // resolves it per-request via resolveRealtimeServer().
     this.app.use(
       apiPath('records'),
       csrfMiddleware(this.civicPress),
-      createRecordsRouter(recordsService)
+      createRecordsRouter(recordsService, () => this.resolveRealtimeServer())
     );
     this.app.use(
       apiPath('geography'),
       optionalAuth(this.civicPress),
       (req, _res, next) => {
-        (req as any).civicPress = this.civicPress;
+        req.civicPress = this.civicPress;
         next();
       },
-      createGeographyRouter(geographyManager)
+      createGeographyRouter(geographyManager, recordsService)
     );
     this.app.use(
       apiPath('search'),
       optionalAuth(this.civicPress),
       (req, _res, next) => {
-        (req as any).civicPress = this.civicPress;
+        req.civicPress = this.civicPress;
         next();
       },
       searchRouter
     );
-    this.app.use(apiPath('status'), createStatusRouter());
+    // Status routes (api-003 fix: inject civicPress; previously the
+    // mount had no injection, so every status endpoint threw 500
+    // outside of test fixtures.)
+    // FA-API-004: /status, /status/git, /status/records leak git file paths +
+    // commit messages/authors, draft/pending/rejected record ids & filenames,
+    // the .civic config listing, and process.memoryUsage()/NODE_ENV. These are
+    // admin DIAGNOSTICS, not a public surface — gate behind auth + system:admin
+    // (liveness lives at the unauthenticated /health).
+    this.app.use(
+      apiPath('status'),
+      (req, _res, next) => {
+        req.civicPress = this.civicPress;
+        next();
+      },
+      authMiddleware(this.civicPress),
+      requirePermission('system:admin'),
+      createStatusRouter()
+    );
 
-    // Cache metrics (requires auth)
+    // Cache metrics (operational diagnostics — admin only, FA-API-010)
     this.app.use(
       apiPath('cache'),
       authMiddleware(this.civicPress),
+      requirePermission('system:admin'),
       (req, _res, next) => {
-        (req as any).civicPress = this.civicPress;
+        req.civicPress = this.civicPress;
         next();
       },
       createCacheRouter(this.civicPress.getCacheManager())
@@ -295,16 +452,28 @@ export class CivicPressAPI {
       apiPath('diagnose'),
       authMiddleware(this.civicPress),
       (req, _res, next) => {
-        (req as any).civicPress = this.civicPress;
+        req.civicPress = this.civicPress;
         next();
       },
       createDiagnoseRouter()
     );
-    this.app.use(apiPath('validation'), createValidationRouter());
+    // Validation routes (api-002 fix: add authMiddleware + civicPress
+    // injection. Every route inside uses requirePermission('records:view')
+    // which needs req.user populated by authMiddleware. Previously the
+    // mount had neither, so all endpoints returned 401 in production.)
+    this.app.use(
+      apiPath('validation'),
+      authMiddleware(this.civicPress),
+      (req, _res, next) => {
+        req.civicPress = this.civicPress;
+        next();
+      },
+      createValidationRouter()
+    );
     this.app.use(
       apiPath('config'),
       (req, _res, next) => {
-        (req as any).civicPress = this.civicPress;
+        req.civicPress = this.civicPress;
         next();
       },
       // Config router has its own auth middleware, CSRF applies to browser requests
@@ -380,7 +549,7 @@ export class CivicPressAPI {
       optionalAuth(this.civicPress),
       createDatabaseContextMiddleware(this.civicPress, this.dataDir),
       (req, _res, next) => {
-        (req as any).civicPress = this.civicPress;
+        req.civicPress = this.civicPress;
         next();
       },
       uuidStorageRouter
@@ -406,7 +575,9 @@ export class CivicPressAPI {
   }
 
   async start(): Promise<void> {
-    return new Promise((resolve, reject) => {
+    // 1. Start the API HTTP listener (the only thing whose failure should reject
+    //    start() — a missing API port is fatal).
+    await new Promise<void>((resolve, reject) => {
       const server = this.app.listen(this.port, () => {
         logger.info(`CivicPress API server running on port ${this.port}`);
         resolve();
@@ -417,9 +588,179 @@ export class CivicPressAPI {
         reject(error);
       });
     });
+
+    // 2. Start the in-process realtime server (own WS port) AFTER core init +
+    //    HTTP listener. It is config-gated (RealtimeConfig.enabled, plus the
+    //    REALTIME_ENABLED env opt-out) and crash-safe: a realtime startup
+    //    failure (e.g. port in use) is logged and swallowed so it never takes
+    //    down the API. If it doesn't start, the snapshot endpoint degrades
+    //    gracefully (no in-memory room → snapshotCreated false).
+    await this.startRealtime();
+
+    // 3. Start the in-process transcription worker (BroadcastBox W2) AFTER core
+    //    init + HTTP listener. Config-gated (transcription.enabled + the
+    //    TRANSCRIPTION_ENABLED env opt-out) + engine-availability-gated, and
+    //    crash-safe: a failure here is logged and swallowed so it never takes
+    //    down the API (the A/V stays public regardless).
+    await this.startTranscription();
+
+    // 4. Mount the broadcast-box module (device/session/upload endpoints) AFTER
+    //    core init + HTTP listener. Config-gated (config `modules:` includes
+    //    `broadcast-box`, plus the BROADCAST_BOX_ENABLED env opt-out) and
+    //    crash-safe: a mount failure is logged and swallowed. Routers added
+    //    after listen() still serve subsequent requests.
+    await this.startBroadcastBox();
+
+    // 5. Error-handling middleware — registered LAST, after EVERY router
+    //    (including the post-listen broadcast-box mount) so the catch-all 404
+    //    never shadows a late-added route. Express matches middleware in
+    //    registration order, so these must come after startBroadcastBox().
+    this.app.use(notFoundHandler);
+    this.app.use(errorHandler);
+  }
+
+  /**
+   * Construct + start the in-process realtime server from the core services.
+   * Idempotent-ish: only starts when core is initialized and no server is set.
+   * Never throws — failures are logged and leave realtime unavailable.
+   */
+  private async startRealtime(): Promise<void> {
+    if (!this.civicPress) {
+      logger.warn('Cannot start realtime: CivicPress core not initialized');
+      return;
+    }
+    if (this.realtimeServer) {
+      return;
+    }
+
+    // Env opt-out: REALTIME_ENABLED=false hard-disables (skips construction).
+    // Anything else leaves the decision to RealtimeConfig.enabled (default ON).
+    const enabled = process.env.REALTIME_ENABLED !== 'false';
+
+    const { server, started } = await startInProcessRealtime(
+      this.civicPress,
+      logger,
+      enabled
+    );
+    this.realtimeServer = server;
+    this.realtimeStarted = started;
+  }
+
+  /**
+   * Start the in-process transcription worker from the core services. Reads the
+   * `transcription:` config block; honors a TRANSCRIPTION_ENABLED=false env
+   * opt-out. Never throws — failures leave the worker unstarted (A/V still public).
+   */
+  private async startTranscription(): Promise<void> {
+    if (!this.civicPress) {
+      logger.warn(
+        'Cannot start transcription: CivicPress core not initialized'
+      );
+      return;
+    }
+    if (this.transcriptionWorker) {
+      return;
+    }
+    const enabled = process.env.TRANSCRIPTION_ENABLED !== 'false';
+    const rawConfig = CentralConfigManager.getTranscriptionConfig();
+    const { worker } = await startInProcessTranscription(
+      this.civicPress,
+      rawConfig,
+      logger,
+      { enabled }
+    );
+    this.transcriptionWorker = worker;
+  }
+
+  /**
+   * Mount the broadcast-box module onto the API's Express app from the core
+   * services. Gated on the config `modules:` list (+ the BROADCAST_BOX_ENABLED
+   * env opt-out). Never throws — a mount failure leaves the device endpoints
+   * absent and the rest of the API unaffected.
+   */
+  private async startBroadcastBox(): Promise<void> {
+    if (!this.civicPress) {
+      logger.warn(
+        'Cannot mount broadcast-box: CivicPress core not initialized'
+      );
+      return;
+    }
+    if (this.broadcastBox) {
+      return;
+    }
+    const enabled = process.env.BROADCAST_BOX_ENABLED !== 'false';
+    this.broadcastBox = await startInProcessBroadcastBox(
+      this.civicPress,
+      this.app,
+      logger,
+      // Pass the in-process realtime server (started in step 2) so the device
+      // WS handler is wired; null/undefined if realtime is disabled → HTTP only.
+      { enabled, realtimeServer: this.realtimeServer ?? undefined }
+    );
+  }
+
+  /**
+   * Resolve the realtime server for the records router's snapshot route.
+   *
+   * Returns (in priority order): the test override, else the real in-process
+   * server IF it actually started listening, else null. A constructed-but-not-
+   * listening server (e.g. failed on a port clash) resolves to null so the
+   * endpoint reports a graceful no-op instead of touching a dead server.
+   */
+  private resolveRealtimeServer(): RealtimeServerLike | null {
+    if (this.realtimeServerOverride) {
+      return this.realtimeServerOverride;
+    }
+    if (this.realtimeServer && this.realtimeStarted) {
+      return this.realtimeServer;
+    }
+    return null;
+  }
+
+  /**
+   * Inject a RealtimeServerLike stub for tests (the API test harness calls
+   * initialize() but not start(), so the real WS server never runs). Passing
+   * null clears the override.
+   */
+  setRealtimeServerForTesting(server: RealtimeServerLike | null): void {
+    this.realtimeServerOverride = server;
   }
 
   async shutdown(): Promise<void> {
+    // Stop realtime first (close WS connections, flush final snapshots) so it
+    // can persist using core services before core's database closes. A realtime
+    // shutdown error must not block core shutdown.
+    if (this.realtimeServer) {
+      try {
+        await this.realtimeServer.shutdown();
+      } catch (error) {
+        logger.warn('Error shutting down realtime server:', error);
+      }
+      this.realtimeServer = null;
+      this.realtimeStarted = false;
+    }
+
+    // Stop the transcription worker's poll loop before core's database closes.
+    if (this.transcriptionWorker) {
+      try {
+        this.transcriptionWorker.stop();
+      } catch (error) {
+        logger.warn('Error stopping transcription worker:', error);
+      }
+      this.transcriptionWorker = null;
+    }
+
+    // Stop broadcast-box background work (the enrollment-cleanup timer) before
+    // core's database closes.
+    if (this.broadcastBox) {
+      try {
+        this.broadcastBox.stop();
+      } catch (error) {
+        logger.warn('Error stopping broadcast-box:', error);
+      }
+      this.broadcastBox = null;
+    }
+
     if (this.civicPress) {
       await this.civicPress.shutdown();
     }

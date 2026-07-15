@@ -4,6 +4,7 @@ import * as fs from 'fs';
 import { getLogger } from '../utils/logger.js';
 import yaml from 'js-yaml';
 import { AuthUser } from './auth-service.js';
+import { getDefaultRolesConfig } from './role-manager/default-config.js';
 
 const logger = getLogger();
 
@@ -522,12 +523,13 @@ export class RoleManager {
       throw error;
     }
 
-    // If role doesn't exist or has no permissions, fallback to public permissions
-    // No verbose fallback logs
-
-    if (!roleConfig || permissions.size === 0) {
+    // FA-API-009: only an UNKNOWN role falls back to public permissions
+    // (fail-safe for misconfigured references). A role that IS defined but was
+    // intentionally given no permissions (e.g. a locked-down 'suspended' role)
+    // must resolve to zero permissions, not silently inherit public read.
+    if (!roleConfig) {
       logger.warn(
-        `Role '${role}' not found or has no permissions, falling back to public role`
+        `Role '${role}' not found, falling back to public role`
       );
       try {
         const publicRole = config.roles['public'];
@@ -559,6 +561,10 @@ export class RoleManager {
         );
         throw error;
       }
+    } else if (permissions.size === 0) {
+      logger.debug(
+        `[RoleManager] Role '${role}' is defined with no permissions — granting none`
+      );
     }
 
     // Proceed to conversion without verbose debug
@@ -580,253 +586,6 @@ export class RoleManager {
   }
 
   private getDefaultConfig(): RolesConfig {
-    return {
-      default_role: 'public',
-      roles: {
-        admin: {
-          name: 'Administrator',
-          description: 'Full system access with all permissions',
-          permissions: [
-            'system:admin',
-            'records:create',
-            'records:edit',
-            'records:delete',
-            'records:view',
-            'records:archive',
-            'workflows:manage',
-            'templates:manage',
-            'hooks:manage',
-            'users:manage',
-            'system:configure',
-          ],
-          record_types: {
-            can_create: [
-              'bylaw',
-              'policy',
-              'resolution',
-              'proclamation',
-              'ordinance',
-            ],
-            can_edit: [
-              'bylaw',
-              'policy',
-              'resolution',
-              'proclamation',
-              'ordinance',
-            ],
-            can_delete: [
-              'bylaw',
-              'policy',
-              'resolution',
-              'proclamation',
-              'ordinance',
-            ],
-            can_view: [
-              'bylaw',
-              'policy',
-              'resolution',
-              'proclamation',
-              'ordinance',
-            ],
-          },
-          status_transitions: {
-            draft: ['proposed', 'archived'],
-            proposed: ['reviewed', 'archived'],
-            reviewed: ['approved', 'archived'],
-            approved: ['archived'],
-            any: ['archived'],
-          },
-        },
-        mayor: {
-          name: 'Mayor',
-          description: 'Executive authority with approval powers',
-          permissions: [
-            'records:create',
-            'records:edit',
-            'records:view',
-            'records:archive',
-            'workflows:approve',
-            'templates:view',
-          ],
-          record_types: {
-            can_create: ['bylaw', 'policy', 'resolution', 'proclamation'],
-            can_edit: ['bylaw', 'policy', 'resolution', 'proclamation'],
-            can_view: [
-              'bylaw',
-              'policy',
-              'resolution',
-              'proclamation',
-              'ordinance',
-            ],
-          },
-          status_transitions: {
-            reviewed: ['approved'],
-            approved: ['archived'],
-            any: ['archived'],
-          },
-        },
-        council: {
-          name: 'City Council',
-          description: 'Legislative body with voting and approval powers',
-          permissions: [
-            'records:create',
-            'records:edit',
-            'records:view',
-            'records:archive',
-            'workflows:vote',
-            'templates:view',
-          ],
-          record_types: {
-            can_create: ['bylaw', 'policy', 'resolution'],
-            can_edit: ['bylaw', 'policy', 'resolution'],
-            can_view: [
-              'bylaw',
-              'policy',
-              'resolution',
-              'proclamation',
-              'ordinance',
-            ],
-          },
-          status_transitions: {
-            proposed: ['reviewed'],
-            reviewed: ['approved'],
-            approved: ['archived'],
-            any: ['archived'],
-          },
-        },
-        clerk: {
-          name: 'City Clerk',
-          description: 'Administrative support with document management',
-          permissions: [
-            'records:create',
-            'records:edit',
-            'records:view',
-            'templates:view',
-          ],
-          record_types: {
-            can_create: ['bylaw', 'policy', 'resolution'],
-            can_edit: ['bylaw', 'policy', 'resolution'],
-            can_view: [
-              'bylaw',
-              'policy',
-              'resolution',
-              'proclamation',
-              'ordinance',
-            ],
-          },
-          status_transitions: {
-            draft: ['proposed'],
-          },
-        },
-        legal_dept: {
-          name: 'Legal Department',
-          description: 'Legal review and compliance',
-          permissions: [
-            'records:edit',
-            'records:view',
-            'workflows:review',
-            'templates:view',
-          ],
-          record_types: {
-            can_edit: ['bylaw', 'policy', 'resolution'],
-            can_view: [
-              'bylaw',
-              'policy',
-              'resolution',
-              'proclamation',
-              'ordinance',
-            ],
-          },
-          status_transitions: {
-            proposed: ['reviewed'],
-          },
-        },
-        public: {
-          name: 'Public',
-          description: 'Read-only access to published records',
-          permissions: ['records:view'],
-          record_types: {
-            can_view: [
-              'bylaw',
-              'policy',
-              'resolution',
-              'proclamation',
-              'ordinance',
-            ],
-          },
-          status_transitions: {},
-        },
-      },
-      permissions: {
-        'system:admin': {
-          description: 'Full system administration access',
-          level: 'system',
-        },
-        'system:configure': {
-          description: 'Configure system settings',
-          level: 'system',
-        },
-        'records:create': {
-          description: 'Create new records',
-          level: 'record',
-        },
-        'records:edit': {
-          description: 'Edit existing records',
-          level: 'record',
-        },
-        'records:delete': {
-          description: 'Delete records',
-          level: 'record',
-        },
-        'records:view': {
-          description: 'View records',
-          level: 'record',
-        },
-        'records:archive': {
-          description: 'Archive records',
-          level: 'record',
-        },
-        'workflows:manage': {
-          description: 'Manage workflow configurations',
-          level: 'workflow',
-        },
-        'workflows:approve': {
-          description: 'Approve workflow transitions',
-          level: 'workflow',
-        },
-        'workflows:vote': {
-          description: 'Vote on workflow transitions',
-          level: 'workflow',
-        },
-        'workflows:review': {
-          description: 'Review workflow transitions',
-          level: 'workflow',
-        },
-        'templates:manage': {
-          description: 'Manage templates',
-          level: 'template',
-        },
-        'templates:view': {
-          description: 'View templates',
-          level: 'template',
-        },
-        'hooks:manage': {
-          description: 'Manage hooks and automation',
-          level: 'hook',
-        },
-        'users:manage': {
-          description: 'Manage users and roles',
-          level: 'user',
-        },
-      },
-      role_hierarchy: {
-        admin: [],
-        mayor: ['council'],
-        council: ['clerk'],
-        clerk: ['legal_dept'],
-        legal_dept: ['public'],
-        public: [],
-      },
-    };
+    return getDefaultRolesConfig();
   }
 }

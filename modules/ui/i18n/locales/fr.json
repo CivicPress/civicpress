@@ -193,6 +193,8 @@
     "enterTitle": "Entrez le titre du document",
     "enterDescription": "Entrez la description (optionnel)",
     "enterContent": "Entrez le contenu...",
+    "collaborativeUnavailableTitle": "Édition collaborative indisponible",
+    "collaborativeUnavailable": "Cet enregistrement contient une mise en forme que l'éditeur collaboratif ne peut pas préserver ; édition en mode mono-utilisateur.",
     "enterTags": "Entrez les mots-clés (séparés par des virgules)",
     "unpublishedChanges": "Modifications non publiées",
     "sortBy": {
@@ -231,6 +233,8 @@
       "noAttachments": "Aucune pièce jointe",
       "noFilesAttachedTitle": "Aucun fichier attaché",
       "noFilesAttachedDesc": "Ce document n'a pas encore de fichiers attachés.",
+      "recordingProcessingTitle": "Enregistrement en cours de traitement",
+      "recordingProcessingDesc": "L'enregistrement de la séance est en préparation pour publication (les portions à huis clos sont d'abord retirées). Il apparaîtra ici une fois prêt.",
       "linkFiles": "Lier des fichiers",
       "selectCategory": "Sélectionner la catégorie",
       "optionalDescription": "Description optionnelle",

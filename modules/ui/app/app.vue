@@ -58,75 +58,35 @@ useHead({
   ],
 });
 
-// Analytics injection - fetch and inject after mount
+// Analytics injection - fetch and inject after mount.
+// FA-UI-001: config-supplied HTML is never materialized verbatim — inline
+// <script> bodies are refused, external scripts must be https/same-origin
+// with an attribute allowlist, and everything else passes DOMPurify. See
+// composables/useAnalyticsInjection.ts.
 onMounted(() => {
   setTimeout(() => {
     const api = useNuxtApp().$civicApi;
     if (!api) return;
 
     api('/api/v1/info')
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .then((res: any) => {
         if (!res?.success || !res?.analytics) return;
 
         const { inject_head, inject_body_start, inject_body_end } =
           res.analytics;
 
-        // Inject head
-        if (inject_head?.trim()) {
-          const div = document.createElement('div');
-          div.innerHTML = inject_head;
-          const scripts = div.querySelectorAll('script');
-          scripts.forEach((s) => {
-            const ns = document.createElement('script');
-            Array.from(s.attributes).forEach((a) =>
-              ns.setAttribute(a.name, a.value)
-            );
-            ns.textContent = s.textContent || '';
-            document.head.appendChild(ns);
-          });
-          Array.from(div.children)
-            .filter((c) => c.tagName !== 'SCRIPT')
-            .forEach((el) => {
-              document.head.appendChild(el.cloneNode(true));
-            });
-        }
-
-        // Inject body start
-        if (inject_body_start?.trim() && document.body) {
-          const div = document.createElement('div');
-          div.innerHTML = inject_body_start;
-          while (div.firstChild) {
-            const n = div.firstChild;
-            if (n.nodeName === 'SCRIPT') {
-              const s = document.createElement('script');
-              Array.from((n as HTMLScriptElement).attributes).forEach((a) =>
-                s.setAttribute(a.name, a.value)
-              );
-              s.textContent = (n as HTMLScriptElement).textContent || '';
-              document.body.insertBefore(s, document.body.firstChild);
-            } else {
-              document.body.insertBefore(n, document.body.firstChild);
-            }
-          }
-        }
-
-        // Inject body end
-        if (inject_body_end?.trim() && document.body) {
-          const div = document.createElement('div');
-          div.innerHTML = inject_body_end;
-          while (div.firstChild) {
-            const n = div.firstChild;
-            if (n.nodeName === 'SCRIPT') {
-              const s = document.createElement('script');
-              Array.from((n as HTMLScriptElement).attributes).forEach((a) =>
-                s.setAttribute(a.name, a.value)
-              );
-              s.textContent = (n as HTMLScriptElement).textContent || '';
-              document.body.appendChild(s);
-            } else {
-              document.body.appendChild(n);
-            }
-          }
+        injectAnalyticsFragment(inject_head, (node) =>
+          document.head.appendChild(node)
+        );
+        if (document.body) {
+          const anchor = document.body.firstChild;
+          injectAnalyticsFragment(inject_body_start, (node) =>
+            document.body.insertBefore(node, anchor)
+          );
+          injectAnalyticsFragment(inject_body_end, (node) =>
+            document.body.appendChild(node)
+          );
         }
       })
       .catch(() => {});
@@ -137,6 +97,57 @@ onMounted(() => {
 <template>
   <UApp>
     <NuxtLoadingIndicator />
+
+    <!--
+      ui-003 (partial fix) — CivicPress currently renders as a JS-only
+      SPA (ssr: false). Citizens without JavaScript get a blank shell.
+      This <noscript> fallback at least tells them what the site is
+      and how to read records directly. Full SSR / prerender for the
+      public read paths is planned for Phase 2d of the base refactor
+      (docs/plans/2026-05-17-base-refactor-master-plan.md).
+    -->
+    <noscript>
+      <div
+        style="
+          padding: 2rem;
+          max-width: 680px;
+          margin: 2rem auto;
+          font-family: system-ui, -apple-system, sans-serif;
+          line-height: 1.6;
+        "
+      >
+        <h1>CivicPress requires JavaScript</h1>
+        <p>
+          You're seeing this message because JavaScript is disabled or your
+          browser hasn't loaded it yet.
+        </p>
+        <p>
+          CivicPress stores civic records as plain Markdown so they remain
+          readable forever, with or without this web interface. In the
+          meantime:
+        </p>
+        <ul>
+          <li>
+            Records live as plain text in the project's
+            <code>data/records/</code> directory and can be read with any
+            text viewer.
+          </li>
+          <li>
+            Your municipality can provide raw record access via
+            <code>git</code>, file download, or printed export.
+          </li>
+          <li>
+            Track the no-JavaScript / server-rendered version on the
+            <a href="https://github.com/CivicPress/civicpress">project repository</a>.
+          </li>
+        </ul>
+        <p>
+          <strong>Public infrastructure must stay public.</strong> If you
+          can't reach civic records because of a software requirement,
+          that's a bug — please tell your municipality.
+        </p>
+      </div>
+    </noscript>
 
     <NuxtLayout>
       <NuxtPage />

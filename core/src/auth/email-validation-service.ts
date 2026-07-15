@@ -1,12 +1,39 @@
 import * as crypto from 'crypto';
 import { DatabaseService } from '../database/database-service.js';
+import type { SqlParam } from '../database/database-adapter.js';
+import type { UserRow } from '../database/types/row-types.js';
 import { Logger } from '../utils/logger.js';
 import { NotificationService } from '../notifications/notification-service.js';
 import { NotificationConfig } from '../notifications/notification-config.js';
 import { coreError, coreDebug } from '../utils/core-output.js';
 import { SecretsManager } from '../security/secrets.js';
+import { AuditChannel } from '../audit/audit-channel.js';
+import { registerEmailChannelOn } from './email-validation-service/email-channel-setup.js';
 
 const logger = new Logger();
+
+/**
+ * Parse a datetime value returned by SQLite into a UTC-anchored Date.
+ *
+ * SQLite's `datetime()` and `CURRENT_TIMESTAMP` produce strings of the
+ * form "YYYY-MM-DD HH:MM:SS" with no timezone marker; passing them to
+ * `new Date(...)` makes JS interpret them as *local* time, which silently
+ * shifts comparisons by the host's UTC offset and produces clock-skew
+ * bugs (e.g. an "expired 1 hour ago" row appearing to expire in the
+ * future on a host that runs in UTC-4). ISO 8601 strings (with the `T`
+ * separator or a trailing `Z`) are already unambiguous and pass through
+ * unchanged.
+ */
+function parseSqliteDatetime(value: Date | string): Date {
+  if (value instanceof Date) return value;
+  if (typeof value !== 'string') return new Date(value);
+  // Already ISO or has explicit timezone — let Date parse as-is.
+  if (value.includes('T') || /[Zz]|[+-]\d{2}:?\d{2}$/.test(value)) {
+    return new Date(value);
+  }
+  // SQLite "YYYY-MM-DD HH:MM:SS" → anchor to UTC.
+  return new Date(value.replace(' ', 'T') + 'Z');
+}
 
 export interface EmailVerificationToken {
   id: number;
@@ -36,9 +63,11 @@ export class EmailValidationService {
   private tokenExpiryHours: number = 24; // 24 hours for email verification
   private notificationService: NotificationService;
   private secretsManager?: SecretsManager;
+  private auditChannel?: AuditChannel;
 
-  constructor(db: DatabaseService) {
+  constructor(db: DatabaseService, auditChannel?: AuditChannel) {
     this.db = db;
+    this.auditChannel = auditChannel;
     // Initialize notification service
     const notificationConfig = new NotificationConfig();
     this.notificationService = new NotificationService(notificationConfig);
@@ -48,12 +77,44 @@ export class EmailValidationService {
   }
 
   /**
+   * Write an email-validation audit entry through the unified AuditChannel
+   * if available, otherwise fall back to the legacy direct db call.
+   *
+   * Phase 2c.5 (T4) — same pattern as AuthService.writeAudit.
+   */
+  private async writeAudit(event: {
+    userId: number | undefined;
+    action: string;
+    resourceType: string;
+    resourceId?: string;
+    details?: string;
+  }): Promise<void> {
+    if (this.auditChannel) {
+      await this.auditChannel.record({
+        action: event.action,
+        resourceType: event.resourceType,
+        resourceId: event.resourceId,
+        userId: event.userId,
+        source: 'core',
+        outcome: 'success',
+        message: event.details,
+      });
+      return;
+    }
+    await this.db.logAuditEvent({
+      userId: event.userId,
+      action: event.action,
+      resourceType: event.resourceType,
+      resourceId: event.resourceId,
+      details: event.details,
+    });
+  }
+
+  /**
    * Initialize secrets manager for token signing
    */
   initializeSecrets(secretsManager: SecretsManager): void {
     this.secretsManager = secretsManager;
-    // Also initialize secrets in notification service used by email validation
-    this.notificationService.initializeSecrets(secretsManager);
   }
 
   /**
@@ -100,95 +161,16 @@ export class EmailValidationService {
   }
 
   /**
-   * Register email channel with notification service
+   * Register email channel with notification service.
+   *
+   * Delegates to the extracted `registerEmailChannelOn` helper which builds
+   * a canonical {@link EmailChannel} and wraps it in a
+   * `NotificationChannel`-shaped adapter that translates the notification
+   * system's `ChannelRequest` envelope into the canonical channel's
+   * `EmailMessage` envelope.
    */
   private registerEmailChannel(): void {
-    try {
-      // Create notification config to get email configuration
-      const notificationConfig = new NotificationConfig();
-      const emailConfig = notificationConfig.getChannelConfig('email');
-
-      if (!emailConfig || !emailConfig.enabled) {
-        logger.warn('Email channel not enabled in configuration');
-        return;
-      }
-
-      // Create a simple email channel implementation
-      const emailChannel = {
-        getName() {
-          return 'email';
-        },
-        isEnabled() {
-          return true;
-        },
-        async send(request: any) {
-          const nodemailer = await import('nodemailer');
-
-          // Normalize the configuration (handle metadata format)
-          const normalizeValue = (obj: any) =>
-            obj && typeof obj === 'object' && 'value' in obj ? obj.value : obj;
-
-          const smtpConfig = normalizeValue(emailConfig.smtp || emailConfig);
-          const host = normalizeValue(smtpConfig.host);
-          const port = normalizeValue(smtpConfig.port);
-          const secure = normalizeValue(smtpConfig.secure);
-          const auth = {
-            user: normalizeValue(smtpConfig.auth?.user),
-            pass: normalizeValue(smtpConfig.auth?.pass),
-          };
-          const from = normalizeValue(smtpConfig.from);
-          const tls = normalizeValue(smtpConfig.tls);
-
-          // Extract rejectUnauthorized from TLS config
-          const rejectUnauthorized =
-            tls && tls.rejectUnauthorized
-              ? normalizeValue(tls.rejectUnauthorized)
-              : false;
-
-          const tlsConfig = {
-            rejectUnauthorized, // Use the extracted value
-            // Don't spread the original tls config as it contains metadata format
-          };
-
-          const transporter = nodemailer.default.createTransport({
-            host,
-            port,
-            secure,
-            auth,
-            tls: tlsConfig,
-            debug: true,
-            logger: true,
-          });
-
-          // Test connection
-
-          await transporter.verify();
-
-          const mailOptions = {
-            from,
-            to: request.to,
-            subject:
-              request.content?.subject || 'Verify your CivicPress account',
-            text: request.content?.text || request.content?.body,
-            html: request.content?.html,
-          };
-
-          const info = await transporter.sendMail(mailOptions);
-
-          return {
-            success: true,
-            messageId: info.messageId || `smtp_${Date.now()}`,
-          };
-        },
-      };
-
-      // Register the channel
-      this.notificationService.registerChannel('email', emailChannel as any);
-
-      logger.info('Email channel registered successfully');
-    } catch (error) {
-      logger.error('Error registering email channel:', error);
-    }
+    registerEmailChannelOn(this.notificationService, logger);
   }
 
   /**
@@ -218,14 +200,14 @@ export class EmailValidationService {
   async isEmailInUse(email: string, excludeUserId?: number): Promise<boolean> {
     try {
       let query = 'SELECT COUNT(*) as count FROM users WHERE email = ?';
-      const params: any[] = [email];
+      const params: SqlParam[] = [email];
 
       if (excludeUserId) {
         query += ' AND id != ?';
         params.push(excludeUserId);
       }
 
-      const result = await this.db.query(query, params);
+      const result = await this.db.query<{ count: number }>(query, params);
       return result[0].count > 0;
     } catch (error) {
       logger.error('Error checking email uniqueness:', error);
@@ -345,8 +327,11 @@ export class EmailValidationService {
         .update(tokenToHash)
         .digest('hex');
 
+      // Fetch by token hash only — defensively re-check expiry in code so the
+      // result is the same regardless of clock skew, SQLite datetime
+      // semantics, or future schema changes that drop the expires_at filter.
       const result = await this.db.query(
-        'SELECT * FROM email_verifications WHERE token = ? AND expires_at > datetime("now")',
+        'SELECT * FROM email_verifications WHERE token = ?',
         [tokenHash]
       );
 
@@ -355,8 +340,29 @@ export class EmailValidationService {
       }
 
       const verification = result[0] as EmailVerificationToken;
-      verification.expires_at = new Date(verification.expires_at);
-      verification.created_at = new Date(verification.created_at);
+      // SQLite datetime() functions return strings like "2026-05-19 12:27:42"
+      // (no timezone marker); without normalization, new Date() interprets
+      // them as local time, which silently shifts comparisons by the host's
+      // UTC offset. Anchor un-marked strings to UTC before constructing the
+      // Date so expiry checks are timezone-stable.
+      verification.expires_at = parseSqliteDatetime(verification.expires_at);
+      verification.created_at = parseSqliteDatetime(verification.created_at);
+
+      // Reject expired tokens; opportunistically purge the stale row.
+      if (verification.expires_at.getTime() <= Date.now()) {
+        try {
+          await this.db.execute(
+            'DELETE FROM email_verifications WHERE id = ?',
+            [verification.id]
+          );
+        } catch (cleanupError) {
+          logger.warn(
+            'Failed to purge expired verification token:',
+            cleanupError
+          );
+        }
+        return null;
+      }
 
       return verification;
     } catch (error) {
@@ -491,8 +497,8 @@ export class EmailValidationService {
         verification.id,
       ]);
 
-      // Log the successful email change
-      await this.db.logAuditEvent({
+      // Log the successful email change (routed through unified AuditChannel)
+      await this.writeAudit({
         userId: verification.user_id,
         action: 'email_changed',
         resourceType: 'user_management',
@@ -549,7 +555,7 @@ export class EmailValidationService {
   async cleanupExpiredTokens(): Promise<number> {
     try {
       // Check if email_verifications table exists
-      const tableCheck = await this.db.query(
+      const tableCheck = await this.db.query<{ name: string }>(
         "SELECT name FROM sqlite_master WHERE type='table' AND name='email_verifications'"
       );
 
@@ -569,7 +575,7 @@ export class EmailValidationService {
         'UPDATE users SET pending_email = NULL, pending_email_token = NULL, pending_email_expires = NULL WHERE datetime(pending_email_expires) <= datetime("now")'
       );
 
-      const deletedCount = (result as any).changes || 0;
+      const deletedCount = result.changes || 0;
 
       if (deletedCount > 0) {
         logger.info(
@@ -601,10 +607,11 @@ export class EmailValidationService {
     expiresAt: Date | null;
   }> {
     try {
-      const result = await this.db.query(
-        'SELECT pending_email, pending_email_expires FROM users WHERE id = ?',
-        [userId]
-      );
+      const result = await this.db.query<
+        Pick<UserRow, 'pending_email' | 'pending_email_expires'>
+      >('SELECT pending_email, pending_email_expires FROM users WHERE id = ?', [
+        userId,
+      ]);
 
       if (result.length === 0) {
         return { pendingEmail: null, expiresAt: null };
@@ -726,9 +733,12 @@ export class EmailValidationService {
         [verification.user_id]
       );
 
-      // Clean up verification token
-      await this.db.execute('DELETE FROM email_verifications WHERE token = ?', [
-        token,
+      // Consume the verification token. FA-CORE-012: the `token` column stores
+      // a SHA-256 hash, not the raw/signed token, so a DELETE ... WHERE token =
+      // <raw token> matched nothing and the single-use guarantee was broken.
+      // Delete by primary key from the row verifyToken already resolved.
+      await this.db.execute('DELETE FROM email_verifications WHERE id = ?', [
+        verification.id,
       ]);
 
       logger.info(

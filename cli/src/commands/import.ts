@@ -14,7 +14,6 @@ import { AuthUtils } from '../utils/auth-utils.js';
 import {
   cliSuccess,
   cliError,
-  cliInfo,
   cliWarn,
   cliStartOperation,
 } from '../utils/cli-output.js';
@@ -41,6 +40,7 @@ interface ImportRecord {
   updated?: string;
   author: string;
   content?: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   metadata?: Record<string, any>;
 }
 
@@ -276,10 +276,12 @@ function parseJSONImport(
 
     // Handle different JSON structures
     if (Array.isArray(data)) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return data.map((record: Record<string, any>) =>
         normalizeImportRecord(record, options)
       );
     } else if (data.records && Array.isArray(data.records)) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return data.records.map((record: Record<string, any>) =>
         normalizeImportRecord(record, options)
       );
@@ -309,6 +311,7 @@ function parseCSVImport(
 
   for (let i = 1; i < lines.length; i++) {
     const values = parseCSVLine(lines[i]);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const record: Record<string, any> = {};
 
     headers.forEach((header, index) => {
@@ -365,6 +368,7 @@ function parseMarkdownImport(
 }
 
 function normalizeImportRecord(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   record: Record<string, any>,
   options: ImportOptions
 ): ImportRecord {

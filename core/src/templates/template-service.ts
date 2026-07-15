@@ -18,7 +18,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import matter from 'gray-matter';
 import yaml from 'yaml';
-import { TemplateEngine, type Template } from '../utils/template-engine.js';
+import { TemplateEngine } from '../utils/template-engine.js';
 import { TemplateCacheAdapter } from './template-cache-adapter.js';
 import { TemplateValidator } from './template-validator.js';
 import { Logger } from '../utils/logger.js';
@@ -284,7 +284,7 @@ export class TemplateService implements ITemplateService {
     }
 
     // Build frontmatter
-    const frontmatter: any = {
+    const frontmatter: Record<string, unknown> = {
       template: templateId,
       type: data.type,
     };
@@ -442,6 +442,7 @@ export class TemplateService implements ITemplateService {
    */
   async previewTemplate(
     id: TemplateId,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     variables: Record<string, any>
   ): Promise<TemplatePreviewResponse> {
     // Get template

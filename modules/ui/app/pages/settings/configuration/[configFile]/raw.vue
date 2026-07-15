@@ -77,6 +77,8 @@
 
 <script setup lang="ts">
 import SystemFooter from '~/components/SystemFooter.vue';
+import type { ApiResponse } from '~/utils/api-response';
+import { errorMessage } from '~/utils/errors';
 
 definePageMeta({
   requiresAuth: true,
@@ -130,7 +132,7 @@ const load = async () => {
   try {
     const res = (await useNuxtApp().$civicApi(
       `/api/v1/config/raw/${configFile.value}`
-    )) as any;
+    )) as ApiResponse;
     if (typeof res === 'string') {
       yaml.value = res;
       original.value = res;
@@ -140,8 +142,8 @@ const load = async () => {
     } else {
       throw new Error('Unexpected response');
     }
-  } catch (e: any) {
-    error.value = e.message || 'Failed to load raw YAML';
+  } catch (e: unknown) {
+    error.value = errorMessage(e, 'Failed to load raw YAML');
   } finally {
     loading.value = false;
   }
@@ -155,7 +157,7 @@ const save = async () => {
     await useNuxtApp().$civicApi(`/api/v1/config/raw/${configFile.value}`, {
       method: 'PUT',
       body: yaml.value,
-      headers: { 'Content-Type': 'text/yaml' } as any,
+      headers: { 'Content-Type': 'text/yaml' },
     });
     original.value = yaml.value;
     useToast().add({
@@ -163,8 +165,8 @@ const save = async () => {
       description: 'Configuration saved',
       color: 'primary',
     });
-  } catch (e: any) {
-    error.value = e.message || 'Failed to save YAML';
+  } catch (e: unknown) {
+    error.value = errorMessage(e, 'Failed to save YAML');
   } finally {
     saving.value = false;
   }
@@ -178,8 +180,8 @@ const resetToDefaults = async () => {
       method: 'POST',
     });
     await load();
-  } catch (e: any) {
-    error.value = e.message || 'Failed to reset to defaults';
+  } catch (e: unknown) {
+    error.value = errorMessage(e, 'Failed to reset to defaults');
   } finally {
     resetting.value = false;
   }
@@ -196,9 +198,9 @@ const validate = async () => {
       {
         method: 'POST',
         body: yaml.value,
-        headers: { 'Content-Type': 'text/yaml' } as any,
+        headers: { 'Content-Type': 'text/yaml' },
       }
-    )) as any;
+    )) as ApiResponse<{ valid: boolean; errors: string[] }>;
     validation.value = res?.data || null;
     if (validation.value) {
       const isValid = !!validation.value.valid;
@@ -219,14 +221,18 @@ const validate = async () => {
         color: 'error',
       });
     }
-  } catch (e: any) {
-    error.value = e.message || 'Failed to validate configuration';
-    // Extract validation errors from response if available
-    if (e?.data?.data?.errors && Array.isArray(e.data.data.errors)) {
-      validation.value = e.data.data;
+  } catch (e: unknown) {
+    error.value = errorMessage(e, 'Failed to validate configuration');
+    // Extract validation errors from response if available. The api-error
+    // body sits under `.data.data.errors` (api-side `data` wraps validation
+    // result, ofetch's `.data` wraps the response body).
+    const apiData = (e as { data?: { data?: { errors?: unknown[] } } })?.data
+      ?.data;
+    if (apiData?.errors && Array.isArray(apiData.errors)) {
+      validation.value = apiData as { valid: boolean; errors: string[] };
       useToast().add({
         title: 'Validation failed',
-        description: e.data.data.errors[0] || error.value,
+        description: String(apiData.errors[0] || error.value),
         color: 'error',
       });
     } else {

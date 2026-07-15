@@ -6,7 +6,24 @@
 
 import { ResourceMetrics } from './types.js';
 import { Logger } from '../utils/logger.js';
-import * as os from 'os';
+
+/**
+ * Thrown when ResourceMonitor.checkLimits() detects that a diagnostic
+ * check exceeded the configured memory or CPU-time budget. Replaces the
+ * prior `(error as any).code = 'RESOURCE_LIMIT_EXCEEDED'; (error as any).resource = 'memory'`
+ * mutation idiom (Phase 2d W3-T3).
+ */
+export class ResourceLimitError extends Error {
+  readonly code = 'RESOURCE_LIMIT_EXCEEDED' as const;
+  constructor(
+    message: string,
+    readonly resource: 'memory' | 'cpu'
+  ) {
+    super(message);
+    this.name = 'ResourceLimitError';
+    Object.setPrototypeOf(this, ResourceLimitError.prototype);
+  }
+}
 
 export interface ResourceMonitorOptions {
   maxMemory?: number; // MB
@@ -87,22 +104,18 @@ export class ResourceMonitor {
 
     // Check memory limit
     if (metrics.memory.heapUsed > this.maxMemory) {
-      const error = new Error(
-        `Memory limit exceeded: ${Math.round(metrics.memory.heapUsed / 1024 / 1024)}MB > ${Math.round(this.maxMemory / 1024 / 1024)}MB`
+      throw new ResourceLimitError(
+        `Memory limit exceeded: ${Math.round(metrics.memory.heapUsed / 1024 / 1024)}MB > ${Math.round(this.maxMemory / 1024 / 1024)}MB`,
+        'memory'
       );
-      (error as any).code = 'RESOURCE_LIMIT_EXCEEDED';
-      (error as any).resource = 'memory';
-      throw error;
     }
 
     // Check CPU time limit
     if (duration > this.maxCpuTime) {
-      const error = new Error(
-        `CPU time limit exceeded: ${duration}ms > ${this.maxCpuTime}ms`
+      throw new ResourceLimitError(
+        `CPU time limit exceeded: ${duration}ms > ${this.maxCpuTime}ms`,
+        'cpu'
       );
-      (error as any).code = 'RESOURCE_LIMIT_EXCEEDED';
-      (error as any).resource = 'cpu';
-      throw error;
     }
   }
 
@@ -136,7 +149,7 @@ export class ResourceMonitor {
    * Calculate CPU usage percentage (simplified)
    * In a real implementation, this would track actual CPU time vs wall time
    */
-  private calculateCpuUsage(duration: number): number {
+  private calculateCpuUsage(_duration: number): number {
     // This is a simplified calculation
     // Real CPU usage tracking would require process.cpuUsage() and more complex logic
     // For now, return a placeholder

@@ -458,7 +458,7 @@ const formatTime = (date: Date) => {
 const refreshDiagnostics = async () => {
   try {
     await runAll();
-  } catch (err) {
+  } catch {
     // Error is handled by composable
   }
 };
@@ -500,7 +500,7 @@ const handleAutoFix = async () => {
   try {
     await autoFix(fixableIssues);
     // Report will be refreshed automatically
-  } catch (err) {
+  } catch {
     // Error is handled by composable
   }
 };

@@ -29,7 +29,7 @@ const SENSITIVE_PATTERNS = [
 /**
  * Redact sensitive data from an object
  */
-export function redactSensitiveData(data: any): any {
+export function redactSensitiveData(data: unknown): unknown {
   if (data === null || data === undefined) {
     return data;
   }
@@ -43,7 +43,7 @@ export function redactSensitiveData(data: any): any {
   }
 
   if (typeof data === 'object') {
-    const redacted: any = {};
+    const redacted: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(data)) {
       if (isSensitiveKey(key)) {
         redacted[key] = '[REDACTED]';
@@ -120,12 +120,17 @@ export function sanitizeComponentResult(
 export function sanitizeCheckResult(result: CheckResult): CheckResult {
   return {
     ...result,
-    details: result.details ? redactSensitiveData(result.details) : undefined,
+    // redactSensitiveData preserves the input's structural shape (object→object,
+    // array→array, primitive→primitive); narrow back to DiagnosticDetails since
+    // the sanitizer's `unknown` signature can't express "same shape, redacted".
+    details: result.details
+      ? (redactSensitiveData(result.details) as typeof result.details)
+      : undefined,
     error: result.error
       ? {
           ...result.error,
           details: result.error.details
-            ? redactSensitiveData(result.error.details)
+            ? (redactSensitiveData(result.error.details) as typeof result.error.details)
             : undefined,
           stack: undefined, // Never include stack traces in sanitized output
         }
@@ -139,13 +144,15 @@ export function sanitizeCheckResult(result: CheckResult): CheckResult {
 export function sanitizeIssue(issue: DiagnosticIssue): DiagnosticIssue {
   return {
     ...issue,
-    details: issue.details ? redactSensitiveData(issue.details) : undefined,
+    details: issue.details
+      ? (redactSensitiveData(issue.details) as typeof issue.details)
+      : undefined,
   };
 }
 
 /**
  * Sanitize parameters for audit logging
  */
-export function sanitizeParams(params: any): any {
+export function sanitizeParams(params: unknown): unknown {
   return redactSensitiveData(params);
 }

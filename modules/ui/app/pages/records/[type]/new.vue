@@ -1,14 +1,11 @@
 <script setup lang="ts">
-import type { CivicRecord } from '~/stores/records';
+import type { ApiResponse } from '~/utils/api-response';
 import SystemFooter from '~/components/SystemFooter.vue';
 
 const { t } = useI18n();
 // Route parameters
 const route = useRoute();
 const type = route.params.type as string;
-
-// Store
-const recordsStore = useRecordsStore();
 
 // Reactive state
 const saving = ref(false);
@@ -22,6 +19,7 @@ const { getRecordTypeLabel } = useRecordTypes();
 const recordTypeLabel = computed(() => getRecordTypeLabel(type));
 
 // Handle form submission
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const handleSubmit = async (recordData: any) => {
   saving.value = true;
   error.value = '';
@@ -31,7 +29,7 @@ const handleSubmit = async (recordData: any) => {
     const response = (await useNuxtApp().$civicApi('/api/v1/records', {
       method: 'POST',
       body: recordData,
-    })) as any;
+    })) as ApiResponse<{ id: string }>;
 
     if (response && response.success) {
       toast.add({
@@ -47,8 +45,8 @@ const handleSubmit = async (recordData: any) => {
     } else {
       throw new Error('Failed to create record');
     }
-  } catch (err: any) {
-    const errorMessage = err.message || t('records.failedToCreateRecord');
+  } catch (err: unknown) {
+    const errorMessage = (err instanceof Error ? err.message : '') || t('records.failedToCreateRecord');
     error.value = errorMessage;
     toast.add({
       title: t('common.error'),

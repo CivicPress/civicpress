@@ -364,6 +364,7 @@
 
 <script setup lang="ts">
 import type { SecurityInfo } from '~/composables/useSecurity';
+import { errorMessage } from '~/utils/errors';
 
 interface Props {
   userId: number;
@@ -376,7 +377,6 @@ interface Props {
 const props = defineProps<Props>();
 
 // Composables
-const { $civicApi } = useNuxtApp();
 const toast = useToast();
 const { t } = useI18n();
 const {
@@ -459,7 +459,7 @@ const fetchSecurityInfo = async () => {
       // Fallback to fetching full security info
       securityInfo.value = await getSecurityInfo(props.userId);
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Failed to fetch security info:', error);
     toast.add({
       title: t('common.error'),
@@ -501,25 +501,26 @@ const handlePasswordChange = async () => {
       });
       resetPasswordForm();
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Password change failed:', error);
 
-    // Handle specific error cases
-    if (error.message?.includes('current password')) {
+    // Handle specific error cases — narrow the message once.
+    const msg = errorMessage(error, '');
+    if (msg.includes('current password')) {
       passwordErrors.value.currentPassword = t(
         'settings.security.currentPasswordIncorrect'
       );
-    } else if (error.message?.includes('external provider')) {
+    } else if (msg.includes('external provider')) {
       toast.add({
         title: t('settings.security.cannotChangePassword'),
-        description: error.message,
+        description: msg,
         color: 'primary',
       });
     } else {
       toast.add({
         title: t('settings.security.passwordChangeFailed'),
         description:
-          error.message || t('settings.security.failedToChangePassword'),
+          msg || t('settings.security.failedToChangePassword'),
         color: 'error',
       });
     }
@@ -546,16 +547,17 @@ const handleEmailChange = async () => {
       resetEmailForm();
       await fetchSecurityInfo(); // Refresh to show pending change
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Email change request failed:', error);
 
-    if (error.message?.includes('already in use')) {
+    const msg = errorMessage(error, '');
+    if (msg.includes('already in use')) {
       emailErrors.value.newEmail = t('settings.security.emailAlreadyInUse');
     } else {
       toast.add({
         title: t('settings.security.emailChangeFailed'),
         description:
-          error.message || t('settings.security.failedToRequestEmailChange'),
+          msg || t('settings.security.failedToRequestEmailChange'),
         color: 'error',
       });
     }
@@ -577,12 +579,12 @@ const cancelEmailChange = async () => {
       });
       await fetchSecurityInfo(); // Refresh to hide pending change
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Cancel email change failed:', error);
     toast.add({
       title: t('settings.security.cancelFailed'),
       description:
-        error.message || t('settings.security.failedToCancelEmailChange'),
+        errorMessage(error) || t('settings.security.failedToCancelEmailChange'),
       color: 'error',
     });
   } finally {
@@ -602,12 +604,12 @@ const handleSendEmailVerification = async () => {
         color: 'primary',
       });
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Send email verification failed:', error);
     toast.add({
       title: t('settings.security.failedToSendVerificationEmail'),
       description:
-        error.message ||
+        errorMessage(error) ||
         t('settings.security.failedToSendVerificationEmailDesc'),
       color: 'error',
     });

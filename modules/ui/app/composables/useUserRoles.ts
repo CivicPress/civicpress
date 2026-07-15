@@ -1,4 +1,6 @@
 import type { Role } from '~/types/user';
+import { extractErrorMessage, type ApiResponse } from '~/utils/api-response';
+import type { NuxtUiColor } from '~/types/nuxt-ui-bridge';
 
 export const useUserRoles = () => {
   const { $civicApi } = useNuxtApp();
@@ -14,10 +16,18 @@ export const useUserRoles = () => {
       loading.value = true;
       error.value = '';
 
-      const response = (await $civicApi('/api/v1/config/roles')) as any;
+      // Roles endpoint has two response shapes; both surface a `roles` field
+       // (either Role[] or Record<string, RoleSpec>). Keep the payload loose
+       // and narrow per-shape inside the handler.
+       const response = (await $civicApi(
+         '/api/v1/config/roles'
+       )) as ApiResponse<{ roles?: unknown }>;
 
       if (response.success) {
-        const data = response.data;
+        // Loosen to a plain record for the per-shape narrowing below.
+        const data = response.data as
+          | { roles?: unknown }
+          | undefined;
 
         // Handle legacy format: { data: { roles: Role[] } }
         if (Array.isArray(data?.roles)) {
@@ -33,9 +43,11 @@ export const useUserRoles = () => {
           typeof data.roles === 'object' &&
           !Array.isArray(data.roles)
         ) {
+          const rolesMap = data.roles as Record<string, Record<string, unknown> | undefined>;
           const result: Role[] = [];
-          for (const key of Object.keys(data.roles)) {
-            const r = data.roles[key] || {};
+          for (const key of Object.keys(rolesMap)) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const r = (rolesMap[key] || {}) as Record<string, any>;
             const name = r?.name?.value ?? r?.name ?? key;
             const description = r?.description?.value ?? r?.description ?? '';
             const permissions = Array.isArray(r?.permissions)
@@ -70,11 +82,11 @@ export const useUserRoles = () => {
         error.value = 'Unexpected roles format from API';
         roles.value = [];
       } else {
-        error.value = response.error || 'Failed to fetch roles';
+        error.value = extractErrorMessage(response) || 'Failed to fetch roles';
         console.error('Failed to fetch roles:', response.error);
       }
-    } catch (err: any) {
-      error.value = err.message || 'Failed to fetch roles';
+    } catch (err: unknown) {
+      error.value = (err instanceof Error ? err.message : '') || 'Failed to fetch roles';
       console.error('Error fetching roles:', err);
     } finally {
       loading.value = false;
@@ -94,8 +106,8 @@ export const useUserRoles = () => {
   };
 
   // Get role color for badges
-  const getRoleColor = (roleKey: string): string => {
-    const colorMap: Record<string, string> = {
+  const getRoleColor = (roleKey: string): NuxtUiColor => {
+    const colorMap: Record<string, NuxtUiColor> = {
       admin: 'error',
       clerk: 'primary',
       public: 'neutral',
@@ -145,6 +157,7 @@ export const useUserRoles = () => {
   // Get available status transitions for a role
   const getStatusTransitions = (roleKey: string): string[] => {
     const role = getRoleByKey(roleKey);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return (role as any)?.status_transitions || [];
   };
 

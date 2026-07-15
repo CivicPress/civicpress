@@ -16,6 +16,29 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { CentralConfigManager } from '../config/central-config.js';
 import { Logger } from '../utils/logger.js';
+import { ModuleResolver } from '../modules/module-resolver.js';
+
+/**
+ * Loose JSON Schema shape — captures the fields this builder reads and
+ * mutates. Mirrors the local type in `record-schema-validator.ts`.
+ */
+interface JsonSchemaObject {
+  $id?: string;
+  $ref?: string;
+  type?: string | string[];
+  properties?: Record<string, JsonSchemaObject>;
+  allOf?: JsonSchemaObject[];
+  anyOf?: JsonSchemaObject[];
+  oneOf?: JsonSchemaObject[];
+  items?: JsonSchemaObject | JsonSchemaObject[];
+  enum?: unknown[];
+  required?: string[];
+  if?: JsonSchemaObject;
+  then?: JsonSchemaObject;
+  else?: JsonSchemaObject;
+  additionalProperties?: boolean | JsonSchemaObject;
+  [key: string]: unknown;
+}
 
 const logger = new Logger();
 
@@ -25,15 +48,69 @@ const __dirname = dirname(__filename);
 /**
  * Schema cache to avoid rebuilding schemas on every validation
  */
-const schemaCache = new Map<string, any>();
+const schemaCache = new Map<string, JsonSchemaObject>();
 
 /**
  * Registered plugin schemas (registered at runtime)
  */
 const pluginSchemas = new Map<
   string,
-  { schema: any; appliesTo: (recordType: string) => boolean }
+  { schema: JsonSchemaObject; appliesTo: (recordType: string) => boolean }
 >();
+
+/**
+ * Injected ModuleResolver for filesystem-based module discovery.
+ * Set by civic-core-services.ts at startup (Phase 2d W1-T2). When unset,
+ * mergeModuleExtensions falls back to a process.cwd()-based default for
+ * backward compatibility during the migration; production code paths
+ * always set this.
+ */
+let injectedModuleResolver: ModuleResolver | null = null;
+
+export function setModuleResolver(resolver: ModuleResolver): void {
+  injectedModuleResolver = resolver;
+  // Invalidate schema cache so subsequent builds pick up the new resolver.
+  schemaCache.clear();
+}
+
+function getModuleResolver(): ModuleResolver {
+  if (injectedModuleResolver) {
+    return injectedModuleResolver;
+  }
+  // Fallback for direct test invocations / pre-init contexts. Same shape as
+  // the pre-W1-T2 behavior (look under cwd/modules) but routed through the
+  // resolver abstraction.
+  return new ModuleResolver(join(process.cwd(), 'modules'));
+}
+
+/**
+ * Top-level frontmatter field names a record type gains from ENABLED module
+ * schema extensions — the same modules (`CentralConfigManager.getModules()`) and
+ * fragments that `mergeModuleExtensions` validates against. The record serializer
+ * (`RecordParser.buildFrontmatter`) uses this so extension fields round-trip as
+ * top-level YAML instead of nesting under `metadata:`. Graceful: returns an empty
+ * set if no resolver/config/fragment is available (then serialization is unchanged).
+ */
+export function getSchemaExtensionFieldNames(recordType: string): Set<string> {
+  const names = new Set<string>();
+  try {
+    const modules = CentralConfigManager.getModules();
+    const resolver = getModuleResolver();
+    for (const moduleName of modules) {
+      const loaded = resolver.loadByName(moduleName);
+      if (!loaded?.schemaPath) continue;
+      const types = loaded.manifest.capabilities.schemaExtensions ?? [];
+      if (!types.includes(recordType)) continue;
+      const fragment = JSON.parse(readFileSync(loaded.schemaPath, 'utf-8'));
+      for (const key of Object.keys(fragment?.properties ?? {})) {
+        names.add(key);
+      }
+    }
+  } catch {
+    // No resolver/config/fragment → no extension fields; serialize as before.
+  }
+  return names;
+}
 
 /**
  * RecordSchemaBuilder - Builds dynamic JSON schemas for record validation
@@ -42,7 +119,7 @@ export class RecordSchemaBuilder {
   /**
    * Get the base schema from file
    */
-  private static getBaseSchema(): any {
+  private static getBaseSchema(): JsonSchemaObject {
     const schemaPath = join(__dirname, '../schemas/record-base-schema.json');
     try {
       const schemaContent = readFileSync(schemaPath, 'utf-8');
@@ -69,12 +146,13 @@ export class RecordSchemaBuilder {
       includeTypeExtensions?: boolean;
       includePluginExtensions?: boolean;
     } = {}
-  ): any {
+  ): JsonSchemaObject {
     const cacheKey = `${recordType || 'base'}-${JSON.stringify(options)}`;
 
     // Check cache first
-    if (schemaCache.has(cacheKey)) {
-      return schemaCache.get(cacheKey);
+    const cached = schemaCache.get(cacheKey);
+    if (cached) {
+      return cached;
     }
 
     try {
@@ -112,7 +190,7 @@ export class RecordSchemaBuilder {
   /**
    * Inject dynamic enum values for type and status from config
    */
-  private static injectDynamicEnums(schema: any): void {
+  private static injectDynamicEnums(schema: JsonSchemaObject): void {
     try {
       // Inject valid record types
       const recordTypes = CentralConfigManager.getRecordTypesConfig();
@@ -141,7 +219,7 @@ export class RecordSchemaBuilder {
   /**
    * Merge type-specific schema extension (geography, session)
    */
-  private static mergeTypeExtension(schema: any, recordType: string): void {
+  private static mergeTypeExtension(schema: JsonSchemaObject, recordType: string): void {
     const typeSchemaPath = join(
       __dirname,
       '../schemas/record-type-schemas',
@@ -160,7 +238,7 @@ export class RecordSchemaBuilder {
         if: { properties: { type: { const: recordType } } },
         then: typeSchema,
       });
-    } catch (error) {
+    } catch {
       // Type-specific schema doesn't exist, that's okay
       logger.debug(
         `No type-specific schema found for ${recordType}, using base schema only`
@@ -169,11 +247,19 @@ export class RecordSchemaBuilder {
   }
 
   /**
-   * Merge module schema extensions (e.g., legal-register)
+   * Merge module schema extensions.
+   *
+   * Discovery is routed through `ModuleResolver` (Phase 2d W1-T2). A module
+   * opts a record type into its schema fragment by declaring the type in
+   * `capabilities.schemaExtensions` in its `module.json` manifest;
+   * `shouldApplyModuleSchema` reads it, so extending a new type (e.g.
+   * `session` for broadcast-box) needs no core change. Phase 2d W1-T3
+   * removed the former hardcoded `moduleName === 'legal-register'` check.
    */
-  private static mergeModuleExtensions(schema: any, recordType?: string): void {
+  private static mergeModuleExtensions(schema: JsonSchemaObject, recordType?: string): void {
     try {
       const modules = CentralConfigManager.getModules();
+      const resolver = getModuleResolver();
 
       for (const moduleName of modules) {
         // Check if this record type should use this module's schema
@@ -184,26 +270,24 @@ export class RecordSchemaBuilder {
           continue;
         }
 
-        const moduleSchemaPath = join(
-          process.cwd(),
-          'modules',
-          moduleName,
-          'schemas',
-          'record-schema-extension.json'
-        );
+        const loaded = resolver.loadByName(moduleName);
+        if (!loaded || !loaded.schemaPath) {
+          logger.debug(`No schema extension found for module ${moduleName}`);
+          continue;
+        }
 
         try {
-          const moduleSchemaContent = readFileSync(moduleSchemaPath, 'utf-8');
+          const moduleSchemaContent = readFileSync(loaded.schemaPath, 'utf-8');
           const moduleSchema = JSON.parse(moduleSchemaContent);
 
-          // Merge using allOf pattern
           if (!schema.allOf) {
             schema.allOf = [];
           }
           schema.allOf.push(moduleSchema);
         } catch (error) {
-          // Module schema doesn't exist, that's okay
-          logger.debug(`No schema extension found for module ${moduleName}`);
+          logger.debug(
+            `Failed to read schema extension for module ${moduleName}: ${error}`
+          );
         }
       }
     } catch (error) {
@@ -212,27 +296,23 @@ export class RecordSchemaBuilder {
   }
 
   /**
-   * Determine if a module schema should be applied to a record type
+   * Determine if a module schema should be applied to a record type.
    *
-   * For example, legal-register applies to bylaw, ordinance, policy, etc.
+   * Reads `capabilities.schemaExtensions` from the module's manifest
+   * (loaded via ModuleResolver). The prior hardcoded
+   * `moduleName === 'legal-register'` check was replaced by this
+   * manifest-driven lookup in Phase 2d W1-T3 (closes legal-register-002).
+   * Future modules opt into record types by declaring them in their
+   * `module.json` — no core code changes required.
    */
   private static shouldApplyModuleSchema(
     moduleName: string,
     recordType: string
   ): boolean {
-    // legal-register applies to legal document types
-    if (moduleName === 'legal-register') {
-      return [
-        'bylaw',
-        'ordinance',
-        'policy',
-        'proclamation',
-        'resolution',
-      ].includes(recordType);
-    }
-
-    // Add other module logic here as needed
-    return false;
+    const loaded = getModuleResolver().loadByName(moduleName);
+    if (!loaded) return false;
+    const types = loaded.manifest.capabilities.schemaExtensions ?? [];
+    return types.includes(recordType);
   }
 
   /**
@@ -245,7 +325,7 @@ export class RecordSchemaBuilder {
   /**
    * Merge plugin schema extensions (registered at runtime)
    */
-  private static mergePluginExtensions(schema: any, recordType?: string): void {
+  private static mergePluginExtensions(schema: JsonSchemaObject, recordType?: string): void {
     for (const [pluginName, pluginSchema] of pluginSchemas.entries()) {
       // Check if this plugin schema applies to this record type
       if (recordType && !pluginSchema.appliesTo(recordType)) {
@@ -273,7 +353,7 @@ export class RecordSchemaBuilder {
    */
   static registerPluginSchema(
     pluginName: string,
-    schema: any,
+    schema: JsonSchemaObject,
     appliesTo: (recordType: string) => boolean
   ): void {
     pluginSchemas.set(pluginName, { schema, appliesTo });

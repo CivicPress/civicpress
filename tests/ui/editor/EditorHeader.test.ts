@@ -10,6 +10,17 @@ vi.mock('~/composables/useI18n', () => ({
   }),
 }));
 
+// EditorHeader.vue uses useTypedI18n(), which wraps the real vue-i18n useI18n()
+// and throws ("Need to install with app.use") outside a configured app. Mock it
+// at the composable boundary so the component renders with passthrough t.
+vi.mock('~/composables/useTypedI18n', () => ({
+  useTypedI18n: () => ({
+    t: (key: string) => key,
+    tPlural: (key: string) => key,
+    locale: { value: 'en' },
+  }),
+}));
+
 vi.mock('~/composables/useRecordStatuses', () => ({
   useRecordStatuses: () => ({
     recordStatusOptions: () => [

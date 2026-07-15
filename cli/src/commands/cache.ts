@@ -159,6 +159,7 @@ export function registerCacheCommand(cli: CAC): void {
         const cacheManager = civicPress.getCacheManager();
         const globalStats = await cacheManager.getGlobalStats();
 
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const health: Record<string, any> = {};
         let overallHealthy = true;
 

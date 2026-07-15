@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { CivicRecord } from '~/stores/records';
+import type { ApiResponse } from '~/utils/api-response';
 import EditorHeader from './editor/EditorHeader.vue';
 import MarkdownEditor from './editor/MarkdownEditor.vue';
 import EditorToolbar from './editor/EditorToolbar.vue';
@@ -7,39 +8,12 @@ import PreviewPanel from './editor/PreviewPanel.vue';
 import RecordSidebar from './editor/RecordSidebar.vue';
 import { useAutosave } from '~/composables/useAutosave';
 import { useRecordLock } from '~/composables/useRecordLock';
-
-// Types
-interface RecordFormData {
-  title: string;
-  type: string;
-  markdownBody: string;
-  status: string; // Legal status (stored in YAML + DB)
-  workflowState?: string; // Internal editorial status (DB-only, never in YAML)
-  tags: string[];
-  description: string;
-  geography?: any;
-  attachedFiles?: Array<{
-    id: string;
-    path: string;
-    original_name: string;
-    description?: string;
-    category?: string;
-  }>;
-  linkedRecords?: Array<{
-    id: string;
-    type: string;
-    description: string;
-  }>;
-  linkedGeographyFiles?: Array<{
-    id: string;
-    name: string;
-    description?: string;
-  }>;
-  metadata: {
-    tags: string[];
-    description: string;
-  };
-}
+import {
+  extractTitleFromMarkdown,
+  stripFirstLineFromMarkdown,
+  prependTitleToMarkdown,
+} from '~/composables/recordMarkdown';
+import { useRecordEditorActions } from '~/composables/useRecordEditorActions';
 
 // Props
 interface Props {
@@ -50,6 +24,13 @@ interface Props {
   canDelete?: boolean;
   recordType?: string | null;
   hideBasicFields?: boolean;
+  /**
+   * Opt-in to the TipTap+Yjs collaborative editor for the record body. The
+   * editor only switches to collaborative mode when this is true, a recordId
+   * is present, AND the content round-trips losslessly through the editor
+   * schema (the content-loss guard lives in MarkdownEditor). Default off.
+   */
+  collaborativeMode?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -60,22 +41,21 @@ const props = withDefaults(defineProps<Props>(), {
   canDelete: false,
   recordType: null,
   hideBasicFields: false,
+  collaborativeMode: false,
 });
 
 // Emits
 const emit = defineEmits<{
-  submit: [recordData: RecordFormData];
   delete: [recordId: string];
-  saved: [recordData: any];
+  saved: [recordData: Record<string, unknown>];
 }>();
 
 // Composables
 const { t } = useI18n();
-const { getRecordTypeOptions, getRecordTypeLabel, fetchRecordTypes } =
+const { getRecordTypeOptions, fetchRecordTypes } =
   useRecordTypes();
-const { recordStatusOptions, getRecordStatusLabel, fetchRecordStatuses } =
+const { fetchRecordStatuses } =
   useRecordStatuses();
-const { getTemplateOptions, getTemplateById, processTemplate } = useTemplates();
 const toast = useToast();
 const $civicApi = useNuxtApp().$civicApi;
 const authStore = useAuthStore();
@@ -90,7 +70,9 @@ const form = reactive({
   workflowState: 'draft', // Internal editorial status (DB-only, never in YAML)
   tags: [] as string[],
   description: '',
-  geography: undefined as any,
+  geography: undefined as
+    | { srid?: number; zone_ref?: string; bbox?: number[]; center?: { lon: number; lat: number } }
+    | undefined,
   attachedFiles: [] as Array<{
     id: string;
     path: string;
@@ -116,12 +98,12 @@ const form = reactive({
 
 // UI State
 const showPreview = ref(
-  process.client
+  import.meta.client
     ? localStorage.getItem('editor-preview-visible') === 'true'
     : false
 );
 const previewWidth = ref(
-  process.client
+  import.meta.client
     ? parseInt(localStorage.getItem('editor-preview-width') || '50', 10)
     : 50
 );
@@ -132,11 +114,11 @@ const hasUnpublishedChanges = ref(false); // Track if there's an unpublished dra
 const showSidebar = ref(false);
 
 // Responsive state
-const windowWidth = ref(process.client ? window.innerWidth : 1920);
+const windowWidth = ref(import.meta.client ? window.innerWidth : 1920);
 const isMobile = computed(() => windowWidth.value <= 768);
 
 // Watch window resize
-if (process.client) {
+if (import.meta.client) {
   const updateWidth = () => {
     windowWidth.value = window.innerWidth;
   };
@@ -151,6 +133,7 @@ const autosaveStatus = ref<'idle' | 'saving' | 'saved' | 'error'>('idle');
 const lastSaved = ref<Date | null>(null);
 
 // Lock state
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const lockInfo = ref<any>(null);
 const isLocked = computed(() => lockInfo.value?.locked || false);
 const lockedBy = computed(() => lockInfo.value?.lockedBy || null);
@@ -160,43 +143,10 @@ const recordAuthor = ref<string>('');
 const recordCreatedAt = ref<string>('');
 const recordUpdatedAt = ref<string>('');
 
-// Helper functions for title/content separation
-const extractTitleFromMarkdown = (content: string): string | null => {
-  if (!content) return null;
-  const lines = content.split('\n');
-  const firstLine = lines[0]?.trim();
-  // Check if first line is an H1 heading (# Title)
-  if (firstLine?.startsWith('# ')) {
-    return firstLine.substring(2).trim();
-  }
-  return null;
-};
-
-const stripFirstLineFromMarkdown = (content: string): string => {
-  if (!content) return '';
-  const lines = content.split('\n');
-  const firstLine = lines[0]?.trim();
-  // If first line is an H1, remove it and any following blank lines
-  if (firstLine?.startsWith('# ')) {
-    // Remove first line and any immediately following blank lines
-    let startIndex = 1;
-    while (startIndex < lines.length && lines[startIndex]?.trim() === '') {
-      startIndex++;
-    }
-    return lines.slice(startIndex).join('\n');
-  }
-  return content;
-};
-
-const prependTitleToMarkdown = (title: string, content: string): string => {
-  const titleLine = `# ${title}`;
-  // If content is empty, just return title
-  if (!content.trim()) {
-    return titleLine;
-  }
-  // Ensure there's a blank line between title and content
-  return `${titleLine}\n\n${content}`;
-};
+// Template refs (declared early so action handlers can close over them)
+const editorRef = ref<InstanceType<typeof MarkdownEditor> | null>(null);
+const editorContainerRef = ref<HTMLDivElement | null>(null);
+const sidebarRef = ref<InstanceType<typeof RecordSidebar> | null>(null);
 
 // Computed property for preview content (includes title as H1)
 const previewContent = computed(() => {
@@ -248,7 +198,7 @@ const fetchAllowedTransitions = async () => {
   try {
     const response = (await $civicApi(
       `/api/v1/records/${props.record.id}/transitions`
-    )) as any;
+    )) as ApiResponse;
 
     if (response?.success && response?.data?.transitions) {
       allowedTransitions.value = response.data.transitions;
@@ -268,7 +218,7 @@ onMounted(async () => {
     try {
       const response = (await $civicApi(
         `/api/v1/records/${props.record.id}?edit=true`
-      )) as any;
+      )) as ApiResponse;
 
       if (response?.success && response?.data) {
         const data = response.data;
@@ -318,34 +268,48 @@ onMounted(async () => {
       console.error('Failed to load record:', err);
       // Fallback to props.record if API fails
       if (props.record) {
-        form.id = props.record.id;
-        form.type = props.record.type;
-        form.status = props.record.status; // Legal status (stored in YAML + DB)
+        // CivicRecord doesn't model workflowState / geography / attachedFiles /
+        // linkedRecords / linkedGeographyFiles directly; the record is a loose
+        // server payload here. Narrow once via a structural type.
+        const r = props.record as typeof props.record & {
+          workflowState?: string;
+          geography?: typeof form.geography;
+          attachedFiles?: typeof form.attachedFiles;
+          linkedRecords?: typeof form.linkedRecords;
+          linkedGeographyFiles?: typeof form.linkedGeographyFiles;
+        };
+        form.id = r.id;
+        form.type = r.type;
+        form.status = r.status; // Legal status (stored in YAML + DB)
         // Initialize workflowState from props, default to 'draft' only if not provided
         form.workflowState =
-          (props.record as any).workflowState !== undefined &&
-          (props.record as any).workflowState !== null
-            ? (props.record as any).workflowState
+          r.workflowState !== undefined && r.workflowState !== null
+            ? r.workflowState
             : 'draft'; // Internal editorial status (DB-only, never in YAML)
 
         // Extract title from markdown content if first line is H1, otherwise use props.record.title
-        const rawContent = props.record.content || '';
+        const rawContent = r.content || '';
         const extractedTitle = extractTitleFromMarkdown(rawContent);
-        form.title = extractedTitle || props.record.title || '';
+        form.title = extractedTitle || r.title || '';
         form.markdownBody = extractedTitle
           ? stripFirstLineFromMarkdown(rawContent)
           : rawContent;
-        form.description = (props.record.metadata as any)?.description || '';
-        form.tags = props.record.metadata?.tags || [];
-        form.geography = (props.record as any).geography;
-        form.attachedFiles = (props.record as any).attachedFiles || [];
-        form.linkedRecords = (props.record as any).linkedRecords || [];
-        form.linkedGeographyFiles =
-          (props.record as any).linkedGeographyFiles || [];
-        const metadata = props.record.metadata || {};
+        form.description =
+          (typeof r.metadata?.description === 'string'
+            ? r.metadata.description
+            : '') || '';
+        form.tags = r.metadata?.tags || [];
+        form.geography = r.geography;
+        form.attachedFiles = r.attachedFiles || [];
+        form.linkedRecords = r.linkedRecords || [];
+        form.linkedGeographyFiles = r.linkedGeographyFiles || [];
+        const metadata = r.metadata || {};
         form.metadata = {
           tags: metadata.tags || [],
-          description: (metadata as any).description || '',
+          description:
+            (typeof metadata.description === 'string'
+              ? metadata.description
+              : '') || '',
         };
 
         // Store metadata for YAML display
@@ -389,6 +353,11 @@ onMounted(async () => {
 const autosave = useAutosave(form, {
   debounceMs: 2000,
   enabled: props.isEditing,
+  // In collaborative mode the realtime server owns periodic Markdown writeback,
+  // so per-change client autosave is disabled (it would race PUTs across
+  // collaborators). The client save shifts to a defense-in-depth backstop
+  // fired on editor blur (handleEditorBlur) and on explicit save. (spec §5.4)
+  collaborativeMode: props.collaborativeMode,
   onSave: async (data) => {
     if (!props.isEditing || !form.id) return;
 
@@ -439,6 +408,16 @@ const startAutosave = () => {
   autosave.start();
 };
 
+// Editor blur → immediate save flush. In collaborative mode this is the
+// primary client-side backstop (the change-driven autosave watcher is off);
+// in single-user mode it is an extra flush alongside the debounced watcher.
+// Only meaningful for an existing editable draft (matches autosave gating).
+const handleEditorBlur = () => {
+  if (props.isEditing && form.id && isDraft.value) {
+    autosave.saveOnBlur();
+  }
+};
+
 // Watch isDraft and automatically start/stop autosave when draft status changes
 watch(
   () => isDraft.value,
@@ -456,538 +435,40 @@ watch(
   { immediate: false } // Don't run on initial mount (handled in onMounted)
 );
 
-// Save draft manually
-const handleSaveDraft = async () => {
-  if (!form.title || !form.type) {
-    toast.add({
-      title: 'Validation error',
-      description: 'Title and type are required',
-      color: 'error',
-    });
-    return;
-  }
-
-  try {
-    if (props.isEditing && form.id) {
-      // Update existing draft
-      await $civicApi(`/api/v1/records/${form.id}/draft`, {
-        method: 'PUT',
-        body: {
-          title: form.title,
-          type: form.type,
-          status: form.status, // Legal status (stored in YAML + DB)
-          workflowState: form.workflowState, // Internal editorial status (DB-only, never in YAML)
-          markdownBody: prependTitleToMarkdown(form.title, form.markdownBody),
-          metadata: {
-            ...form.metadata,
-            tags: form.tags,
-            description: form.description,
-          },
-          geography: form.geography,
-          attachedFiles: form.attachedFiles,
-          linkedRecords: form.linkedRecords,
-          linkedGeographyFiles: form.linkedGeographyFiles,
-        },
-      });
-    } else {
-      // Create new draft
-      const response = (await $civicApi('/api/v1/records', {
-        method: 'POST',
-        body: {
-          title: form.title,
-          type: form.type,
-          status: form.status, // Legal status (stored in YAML + DB)
-          workflowState: form.workflowState, // Internal editorial status (DB-only, never in YAML)
-          content: prependTitleToMarkdown(form.title, form.markdownBody),
-          metadata: {
-            ...form.metadata,
-            tags: form.tags,
-            description: form.description,
-          },
-          geography: form.geography,
-          attachedFiles: form.attachedFiles,
-          linkedRecords: form.linkedRecords,
-          linkedGeographyFiles: form.linkedGeographyFiles,
-        },
-      })) as any;
-
-      if (response?.success && response?.data) {
-        form.id = response.data.id;
-        isDraft.value = true;
-
-        // Start autosave now that draft exists (before navigation)
-        if (props.isEditing) {
-          startAutosave();
-        }
-
-        toast.add({
-          title: 'Draft saved',
-          description: 'Your changes have been saved',
-          color: 'primary',
-        });
-
-        // Navigate to the record edit page after first save
-        navigateTo(`/records/${form.type}/${form.id}/edit`);
-        return; // Exit early after navigation
-      }
-    }
-
-    toast.add({
-      title: 'Draft saved',
-      description: 'Your changes have been saved',
-      color: 'primary',
-    });
-
-    autosaveStatus.value = 'saved';
-    lastSaved.value = new Date();
-
-    // If type was changed, update the form to reflect the saved type
-    // This ensures the UI stays in sync with the saved data
-    if (props.isEditing && form.id) {
-      try {
-        // Temporarily stop autosave to prevent triggering on refresh updates
-        autosave.stop();
-
-        // Use ?edit=true to fetch the draft version (not the published version)
-        const refreshResponse = (await $civicApi(
-          `/api/v1/records/${form.id}?edit=true`
-        )) as any;
-        if (refreshResponse?.success && refreshResponse?.data) {
-          const data = refreshResponse.data;
-          // Store current workflowState before updating (to preserve if API doesn't return it)
-          const currentWorkflowState = form.workflowState;
-
-          // Update isDraft based on response (record might have been published externally)
-          isDraft.value = data.isDraft || false;
-          // Update hasUnpublishedChanges flag
-          hasUnpublishedChanges.value = data.hasUnpublishedChanges || false;
-
-          // Update form with the latest data from the server
-          form.type = data.type;
-          form.status = data.status; // Legal status (stored in YAML + DB)
-          // Preserve workflowState if API returns a valid value, otherwise keep current form value
-          // This prevents resetting to 'draft' if the API returns null/undefined
-          if (
-            data.workflowState !== undefined &&
-            data.workflowState !== null &&
-            data.workflowState !== ''
-          ) {
-            form.workflowState = data.workflowState; // Internal editorial status (DB-only, never in YAML)
-          } else {
-            // If API doesn't return workflowState, keep the current form.workflowState value (don't reset)
-            form.workflowState = currentWorkflowState;
-          }
-          // Extract title from markdown content if first line is H1, otherwise use data.title
-          const rawContent = data.markdownBody || data.content || '';
-          const extractedTitle = extractTitleFromMarkdown(rawContent);
-          form.title = extractedTitle || data.title || '';
-          form.markdownBody = extractedTitle
-            ? stripFirstLineFromMarkdown(rawContent)
-            : rawContent;
-
-          // Update metadata for YAML display
-          recordAuthor.value =
-            data.author || data.created_by || authStore.user?.username || '';
-          recordUpdatedAt.value =
-            data.updated_at ||
-            data.last_draft_saved_at ||
-            new Date().toISOString();
-
-          // Emit saved event with updated record data for parent components (e.g., to update breadcrumbs)
-          emit('saved', data);
-        }
-
-        // Restart autosave after refresh is complete
-        // Only restart if it's still a draft (might have been published externally)
-        if (props.isEditing && form.id && isDraft.value) {
-          autosave.start();
-        }
-      } catch (err) {
-        console.error('Failed to refresh record after save:', err);
-        // Non-critical error, don't show to user
-        // Restart autosave even on error, but only if it's still a draft
-        if (props.isEditing && form.id && isDraft.value) {
-          autosave.start();
-        }
-      }
-    }
-
-    // Refresh YAML in sidebar if it's loaded
-    if (
-      sidebarRef.value &&
-      typeof sidebarRef.value.refreshYaml === 'function'
-    ) {
-      sidebarRef.value.refreshYaml();
-    }
-  } catch (err: any) {
-    toast.add({
-      title: 'Save failed',
-      description: err.message || 'Failed to save draft',
-      color: 'error',
-    });
-    autosaveStatus.value = 'error';
-  }
-};
-
-// Publish draft
-const handlePublish = async (targetStatus?: string) => {
-  if (!form.id) {
-    toast.add({
-      title: 'Error',
-      description: 'Record ID is required',
-      color: 'error',
-    });
-    return;
-  }
-
-  try {
-    const response = (await $civicApi(`/api/v1/records/${form.id}/publish`, {
-      method: 'POST',
-      body: {
-        status: targetStatus || form.status,
-      },
-    })) as any;
-
-    if (response?.success) {
-      toast.add({
-        title: 'Record published',
-        description: 'The record has been published successfully',
-        color: 'primary',
-      });
-
-      // Note: User can navigate via the toast or manually
-
-      isDraft.value = false;
-
-      // Stop autosave after publishing (no longer a draft)
-      autosave.stop();
-
-      // Navigate to view page
-      navigateTo(`/records/${form.type}/${form.id}`);
-    }
-  } catch (err: any) {
-    toast.add({
-      title: 'Publish failed',
-      description: err.message || 'Failed to publish record',
-      color: 'error',
-    });
-  }
-};
-
-// Handle delete
-const handleDelete = () => {
-  if (props.record?.id) {
-    emit('delete', props.record.id);
-  }
-};
-
-// Handle delete unpublished changes (delete draft)
-const handleDeleteUnpublishedChanges = async () => {
-  if (!form.id) return;
-
-  try {
-    const response = (await $civicApi(`/api/v1/records/${form.id}/draft`, {
-      method: 'DELETE',
-    })) as any;
-
-    if (response?.success) {
-      toast.add({
-        title: t('records.editor.unpublishedChangesDeleted'),
-        description: t('records.editor.unpublishedChangesDeletedDescription'),
-        color: 'primary',
-      });
-
-      // Navigate to drafts list page - the draft has been deleted from record_drafts table
-      // and will no longer appear in the drafts list
-      navigateTo('/records/drafts');
-    }
-  } catch (err: any) {
-    const errorMessage =
-      err.message || t('records.editor.failedToDeleteUnpublishedChanges');
-    toast.add({
-      title: t('common.error'),
-      description: errorMessage,
-      color: 'error',
-    });
-  }
-};
-
-// Handle unpublish (revert to draft)
-const handleUnpublish = async () => {
-  if (!form.id) return;
-
-  try {
-    const response = (await $civicApi(`/api/v1/records/${form.id}/status`, {
-      method: 'POST',
-      body: {
-        status: 'draft',
-      },
-    })) as any;
-
-    if (response?.success) {
-      toast.add({
-        title: 'Record unpublished',
-        description: 'The record has been reverted to draft status',
-        color: 'primary',
-      });
-
-      form.status = 'draft';
-      isDraft.value = true;
-
-      // Start autosave after unpublishing (now it's a draft)
-      if (props.isEditing && form.id) {
-        startAutosave();
-      }
-
-      // Refresh record data
-      if (props.isEditing && form.id) {
-        try {
-          const refreshResponse = (await $civicApi(
-            `/api/v1/records/${form.id}?edit=true`
-          )) as any;
-          if (refreshResponse?.success && refreshResponse?.data) {
-            const data = refreshResponse.data;
-            form.status = data.status;
-            emit('saved', data);
-          }
-        } catch (err) {
-          console.error('Failed to refresh record after unpublish:', err);
-        }
-      }
-    }
-  } catch (err: any) {
-    toast.add({
-      title: 'Unpublish failed',
-      description: err.message || 'Failed to unpublish record',
-      color: 'error',
-    });
-  }
-};
-
-// Handle archive
-const handleArchive = async () => {
-  if (!form.id) return;
-
-  try {
-    const response = (await $civicApi(`/api/v1/records/${form.id}`, {
-      method: 'PUT',
-      body: {
-        status: 'archived',
-      },
-    })) as any;
-
-    if (response?.success) {
-      toast.add({
-        title: 'Record archived',
-        description: 'The record has been archived',
-        color: 'primary',
-      });
-
-      form.status = 'archived';
-
-      // Refresh record data
-      if (props.isEditing && form.id) {
-        try {
-          const refreshResponse = (await $civicApi(
-            `/api/v1/records/${form.id}`
-          )) as any;
-          if (refreshResponse?.success && refreshResponse?.data) {
-            const data = refreshResponse.data;
-            form.status = data.status;
-            emit('saved', data);
-          }
-        } catch (err) {
-          console.error('Failed to refresh record after archive:', err);
-        }
-      }
-    }
-  } catch (err: any) {
-    toast.add({
-      title: 'Archive failed',
-      description: err.message || 'Failed to archive record',
-      color: 'error',
-    });
-  }
-};
-
-// Handle view history
-const handleViewHistory = () => {
-  if (form.id) {
-    navigateTo(`/records/${form.type}/${form.id}/history`);
-  }
-};
-
-// Handle duplicate
-const handleDuplicate = async () => {
-  if (!form.id) return;
-
-  try {
-    // Fetch the current record
-    const response = (await $civicApi(`/api/v1/records/${form.id}`)) as any;
-
-    if (response?.success && response?.data) {
-      const record = response.data;
-
-      // Extract content without title if it exists in markdown
-      const rawContent = record.markdownBody || record.content || '';
-      const contentWithoutTitle = extractTitleFromMarkdown(rawContent)
-        ? stripFirstLineFromMarkdown(rawContent)
-        : rawContent;
-      const newTitle = `${record.title} (Copy)`;
-
-      // Create a new record with duplicated data
-      const duplicateResponse = (await $civicApi('/api/v1/records', {
-        method: 'POST',
-        body: {
-          title: newTitle,
-          type: record.type,
-          status: 'draft',
-          content: prependTitleToMarkdown(newTitle, contentWithoutTitle),
-          metadata: {
-            ...record.metadata,
-            tags: record.tags || [],
-            description: record.description || '',
-          },
-          geography: record.geography,
-          attachedFiles: record.attachedFiles || [],
-          linkedRecords: record.linkedRecords || [],
-          linkedGeographyFiles: record.linkedGeographyFiles || [],
-        },
-      })) as any;
-
-      if (duplicateResponse?.success && duplicateResponse?.data) {
-        toast.add({
-          title: 'Record duplicated',
-          description: 'A new draft has been created',
-          color: 'primary',
-        });
-
-        // Navigate to the new record
-        navigateTo(
-          `/records/${duplicateResponse.data.type}/${duplicateResponse.data.id}/edit`
-        );
-      }
-    }
-  } catch (err: any) {
-    toast.add({
-      title: 'Duplicate failed',
-      description: err.message || 'Failed to duplicate record',
-      color: 'error',
-    });
-  }
-};
-
-// Handle export
-const handleExport = async () => {
-  if (!form.id) return;
-
-  try {
-    const response = (await $civicApi(`/api/v1/records/${form.id}/export`, {
-      method: 'GET',
-    })) as any;
-
-    if (response?.success && response?.data?.markdown) {
-      // Create a blob and download
-      const blob = new Blob([response.data.markdown], {
-        type: 'text/markdown',
-      });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${form.title || 'record'}.md`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-
-      toast.add({
-        title: 'Record exported',
-        description: 'The record has been exported as Markdown',
-        color: 'primary',
-      });
-    }
-  } catch (err: any) {
-    // Fallback: construct markdown manually if API doesn't support export
-    try {
-      const fullResponse = (await $civicApi(
-        `/api/v1/records/${form.id}/frontmatter`
-      )) as any;
-      const frontmatter = fullResponse || '';
-      const markdown = `---\n${frontmatter}\n---\n\n${form.markdownBody}`;
-
-      const blob = new Blob([markdown], { type: 'text/markdown' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${form.title || 'record'}.md`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-
-      toast.add({
-        title: 'Record exported',
-        description: 'The record has been exported as Markdown',
-        color: 'primary',
-      });
-    } catch (fallbackErr: any) {
-      toast.add({
-        title: 'Export failed',
-        description: fallbackErr.message || 'Failed to export record',
-        color: 'error',
-      });
-    }
-  }
-};
-
-// Toolbar actions
-const handleToolbarAction = (action: string, ...args: any[]) => {
-  if (!editorRef.value) return;
-
-  switch (action) {
-    case 'bold':
-      editorRef.value.executeBold();
-      break;
-    case 'italic':
-      editorRef.value.executeItalic();
-      break;
-    case 'underline':
-      // Markdown doesn't support underline, use bold instead
-      editorRef.value.executeBold();
-      break;
-    case 'code':
-      editorRef.value.executeCode();
-      break;
-    case 'heading':
-      if (args[0] && typeof args[0] === 'number') {
-        editorRef.value.executeHeading(args[0] as 1 | 2 | 3);
-      }
-      break;
-    case 'bulletList':
-      editorRef.value.executeBulletList();
-      break;
-    case 'numberedList':
-      editorRef.value.executeNumberedList();
-      break;
-    case 'blockquote':
-      editorRef.value.executeBlockquote();
-      break;
-    case 'horizontalRule':
-      editorRef.value.executeHorizontalRule();
-      break;
-    case 'link':
-      editorRef.value.executeLink();
-      break;
-    case 'image':
-      editorRef.value.executeImage();
-      break;
-  }
-};
+// Action handlers (extracted to composable in Phase 2d for ui-008)
+const {
+  handleSaveDraft,
+  handlePublish,
+  handleDelete,
+  handleDeleteUnpublishedChanges,
+  handleUnpublish,
+  handleArchive,
+  handleViewHistory,
+  handleDuplicate,
+  handleExport,
+  handleToolbarAction,
+} = useRecordEditorActions({
+  form,
+  props,
+  emit,
+  allowedTransitions,
+  isDraft,
+  hasUnpublishedChanges,
+  autosave,
+  lockComposable: () => lockComposable, // capture-time getter — lockComposable is reassignable
+  autosaveStatus,
+  lastSaved,
+  recordAuthor,
+  recordUpdatedAt,
+  editorRef,
+  sidebarRef,
+  startAutosave,
+});
 
 // Preview toggle
 const togglePreview = () => {
   showPreview.value = !showPreview.value;
-  if (process.client) {
+  if (import.meta.client) {
     localStorage.setItem('editor-preview-visible', String(showPreview.value));
   }
 };
@@ -1008,7 +489,7 @@ const handleResize = (e: MouseEvent) => {
   const clampedWidth = Math.max(20, Math.min(80, newWidth));
 
   previewWidth.value = clampedWidth;
-  if (process.client) {
+  if (import.meta.client) {
     localStorage.setItem('editor-preview-width', String(clampedWidth));
   }
 };
@@ -1018,24 +499,19 @@ const stopResize = () => {
 };
 
 onMounted(() => {
-  if (process.client) {
+  if (import.meta.client) {
     document.addEventListener('mousemove', handleResize);
     document.addEventListener('mouseup', stopResize);
   }
 });
 
 onUnmounted(() => {
-  if (process.client) {
+  if (import.meta.client) {
     document.removeEventListener('mousemove', handleResize);
     document.removeEventListener('mouseup', stopResize);
   }
   autosave.stop();
 });
-
-// Refs
-const editorRef = ref<InstanceType<typeof MarkdownEditor> | null>(null);
-const editorContainerRef = ref<HTMLDivElement | null>(null);
-const sidebarRef = ref<InstanceType<typeof RecordSidebar> | null>(null);
 
 // Handle template loading
 const handleLoadTemplate = async (templateId: string, content: string) => {
@@ -1197,8 +673,11 @@ defineExpose({
               ref="editorRef"
               v-model="form.markdownBody"
               :disabled="saving || isLocked"
+              :collaborative-mode="collaborativeMode"
+              :record-id="form.id"
               placeholder="Start writing your record content..."
               class="h-full"
+              @blur="handleEditorBlur"
             />
           </div>
         </div>
@@ -1262,8 +741,8 @@ defineExpose({
           :status="form.status"
           :workflow-state="form.workflowState"
           :author="recordAuthor || authStore.user?.username || ''"
-          :created_at="recordCreatedAt"
-          :updated_at="recordUpdatedAt"
+          :created-at="recordCreatedAt"
+          :updated-at="recordUpdatedAt"
           :tags="form.tags"
           :attached-files="form.attachedFiles"
           :linked-records="form.linkedRecords"

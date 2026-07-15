@@ -56,6 +56,7 @@ async function initializeStorageServices(
   const config = await configManager.loadConfig();
 
   // Get cache manager from CivicPress instance if available
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const cacheManager = (civic as any).getCacheManager?.();
   const storageService = new CloudUuidStorageService(
     config,
@@ -64,6 +65,7 @@ async function initializeStorageServices(
   );
 
   // Get database service from CivicPress instance
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const databaseService = (civic as any).getDatabaseService();
   if (!databaseService) {
     throw new Error('Database service not available');
@@ -118,24 +120,25 @@ export default function setupStorageCommand(cli: CAC) {
         await civic.initialize();
 
         // Require authentication
-        const { user } = await AuthUtils.requireAuthWithCivic(
+        await AuthUtils.requireAuthWithCivic(
           options.token,
           globalOptions.json
         );
 
         // Initialize storage services
-        const { storageService, configManager } =
+        const { storageService: _storageService, configManager } =
           await initializeStorageServices(civic, dataDir);
 
         if (options.update) {
           // Update configuration
           const currentConfig = await configManager.loadConfig();
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const updateData: any = { ...currentConfig };
 
           if (options.backend) {
             try {
               updateData.backend = JSON.parse(options.backend);
-            } catch (error) {
+            } catch {
               cliError(
                 'Invalid backend JSON format',
                 'INVALID_JSON',
@@ -149,7 +152,7 @@ export default function setupStorageCommand(cli: CAC) {
           if (options.folders) {
             try {
               updateData.folders = JSON.parse(options.folders);
-            } catch (error) {
+            } catch {
               cliError(
                 'Invalid folders JSON format',
                 'INVALID_JSON',
@@ -163,7 +166,7 @@ export default function setupStorageCommand(cli: CAC) {
           if (options.metadata) {
             try {
               updateData.metadata = JSON.parse(options.metadata);
-            } catch (error) {
+            } catch {
               cliError(
                 'Invalid metadata JSON format',
                 'INVALID_JSON',
@@ -201,6 +204,7 @@ export default function setupStorageCommand(cli: CAC) {
           shutdownCalled = true;
         }
         process.exit(0);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } catch (error: any) {
         cliError(
           'Error managing storage configuration',
@@ -214,7 +218,7 @@ export default function setupStorageCommand(cli: CAC) {
         if (civic && !shutdownCalled) {
           try {
             await civic.shutdown();
-          } catch (shutdownError) {
+          } catch {
             // Ignore shutdown errors
           }
         }
@@ -354,6 +358,7 @@ export default function setupStorageCommand(cli: CAC) {
           );
           process.exit(1);
         }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } catch (error: any) {
         cliError(
           'Error uploading file',
@@ -367,7 +372,7 @@ export default function setupStorageCommand(cli: CAC) {
         if (civic && !shutdownCalled) {
           try {
             await civic.shutdown();
-          } catch (shutdownError) {
+          } catch {
             // Ignore shutdown errors
           }
         }
@@ -428,7 +433,7 @@ export default function setupStorageCommand(cli: CAC) {
         await civic.initialize();
 
         // Require authentication
-        const { user } = await AuthUtils.requireAuthWithCivic(
+        await AuthUtils.requireAuthWithCivic(
           options.token,
           globalOptions.json
         );
@@ -508,6 +513,7 @@ export default function setupStorageCommand(cli: CAC) {
           shutdownCalled = true;
         }
         process.exit(0);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } catch (error: any) {
         cliError(
           'Error listing files',
@@ -521,7 +527,7 @@ export default function setupStorageCommand(cli: CAC) {
         if (civic && !shutdownCalled) {
           try {
             await civic.shutdown();
-          } catch (shutdownError) {
+          } catch {
             // Ignore shutdown errors
           }
         }
@@ -580,7 +586,7 @@ export default function setupStorageCommand(cli: CAC) {
         await civic.initialize();
 
         // Require authentication
-        const { user } = await AuthUtils.requireAuthWithCivic(
+        await AuthUtils.requireAuthWithCivic(
           options.token,
           globalOptions.json
         );
@@ -645,6 +651,7 @@ export default function setupStorageCommand(cli: CAC) {
           shutdownCalled = true;
         }
         process.exit(0);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } catch (error: any) {
         cliError(
           'Error downloading file',
@@ -658,7 +665,7 @@ export default function setupStorageCommand(cli: CAC) {
         if (civic && !shutdownCalled) {
           try {
             await civic.shutdown();
-          } catch (shutdownError) {
+          } catch {
             // Ignore shutdown errors
           }
         }
@@ -773,6 +780,7 @@ export default function setupStorageCommand(cli: CAC) {
           );
           process.exit(1);
         }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } catch (error: any) {
         cliError(
           'Error deleting file',
@@ -786,7 +794,7 @@ export default function setupStorageCommand(cli: CAC) {
         if (civic && !shutdownCalled) {
           try {
             await civic.shutdown();
-          } catch (shutdownError) {
+          } catch {
             // Ignore shutdown errors
           }
         }
@@ -852,7 +860,7 @@ export default function setupStorageCommand(cli: CAC) {
         await civic.initialize();
 
         // Require authentication
-        const { user } = await AuthUtils.requireAuthWithCivic(
+        await AuthUtils.requireAuthWithCivic(
           options.token,
           globalOptions.json
         );
@@ -911,6 +919,7 @@ export default function setupStorageCommand(cli: CAC) {
           shutdownCalled = true;
         }
         process.exit(0);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } catch (error: any) {
         cliError(
           'Error adding storage folder',
@@ -924,7 +933,7 @@ export default function setupStorageCommand(cli: CAC) {
         if (civic && !shutdownCalled) {
           try {
             await civic.shutdown();
-          } catch (shutdownError) {
+          } catch {
             // Ignore shutdown errors
           }
         }
@@ -988,7 +997,7 @@ export default function setupStorageCommand(cli: CAC) {
         await civic.initialize();
 
         // Require authentication
-        const { user } = await AuthUtils.requireAuthWithCivic(
+        await AuthUtils.requireAuthWithCivic(
           options.token,
           globalOptions.json
         );
@@ -1049,6 +1058,7 @@ export default function setupStorageCommand(cli: CAC) {
           shutdownCalled = true;
         }
         process.exit(0);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } catch (error: any) {
         cliError(
           'Error updating storage folder',
@@ -1062,7 +1072,7 @@ export default function setupStorageCommand(cli: CAC) {
         if (civic && !shutdownCalled) {
           try {
             await civic.shutdown();
-          } catch (shutdownError) {
+          } catch {
             // Ignore shutdown errors
           }
         }
@@ -1119,7 +1129,7 @@ export default function setupStorageCommand(cli: CAC) {
         await civic.initialize();
 
         // Require authentication
-        const { user } = await AuthUtils.requireAuthWithCivic(
+        await AuthUtils.requireAuthWithCivic(
           options.token,
           globalOptions.json
         );
@@ -1165,6 +1175,7 @@ export default function setupStorageCommand(cli: CAC) {
           shutdownCalled = true;
         }
         process.exit(0);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } catch (error: any) {
         cliError(
           'Error removing storage folder',
@@ -1178,7 +1189,7 @@ export default function setupStorageCommand(cli: CAC) {
         if (civic && !shutdownCalled) {
           try {
             await civic.shutdown();
-          } catch (shutdownError) {
+          } catch {
             // Ignore shutdown errors
           }
         }
@@ -1236,7 +1247,7 @@ export default function setupStorageCommand(cli: CAC) {
         await civic.initialize();
 
         // Require authentication
-        const { user } = await AuthUtils.requireAuthWithCivic(
+        await AuthUtils.requireAuthWithCivic(
           options.token,
           globalOptions.json
         );
@@ -1292,6 +1303,7 @@ export default function setupStorageCommand(cli: CAC) {
           shutdownCalled = true;
         }
         process.exit(0);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } catch (error: any) {
         cliError(
           'Error getting file information',
@@ -1305,7 +1317,7 @@ export default function setupStorageCommand(cli: CAC) {
         if (civic && !shutdownCalled) {
           try {
             await civic.shutdown();
-          } catch (shutdownError) {
+          } catch {
             // Ignore shutdown errors
           }
         }

@@ -12,7 +12,6 @@ import {
 import {
   cliSuccess,
   cliError,
-  cliInfo,
   cliWarn,
   cliStartOperation,
 } from '../utils/cli-output.js';
@@ -43,6 +42,7 @@ interface SearchResult {
     value: string;
     context?: string;
   }[];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   metadata: Record<string, any>;
 }
 
@@ -333,7 +333,9 @@ async function searchRecords(
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function parseRecordMetadata(content: string): Record<string, any> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const metadata: Record<string, any> = {};
 
   // Extract frontmatter

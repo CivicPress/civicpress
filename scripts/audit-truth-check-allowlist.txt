@@ -1,0 +1,67 @@
+# Files where overclaim patterns are EXPECTED (historical record, audit
+# reports describing the overclaim, changelog of past releases, etc.).
+# One path or directory per line. Trailing slash means "everything under".
+# Lines starting with # or blank are ignored.
+
+# Audit reports themselves quote the overclaims they flag.
+docs/audits/
+
+# Refactor plans reference the overclaim language they're closing.
+docs/plans/2026-05-16-civicpress-audit-plan.md
+docs/plans/2026-05-17-civicpress-audit-synthesis-plan.md
+docs/plans/2026-05-17-base-refactor-master-plan.md
+docs/plans/2026-05-17-base-refactor-phase-2a-bleed-stop.md
+docs/plans/2026-05-17-base-refactor-phase-2b-truth-restoration.md
+docs/plans/2026-05-18-base-refactor-phase-2c-foundation-cleanup.md
+docs/plans/2026-05-19-base-refactor-phase-2c.5-followups.md
+docs/plans/2026-05-19-base-refactor-phase-2d-structural-hardening.md
+docs/plans/finding-tracking-convention.md
+
+# Specs that legitimately declare their own stability — the truth-check
+# pattern targets FALSE stability claims in legal-register-style overclaim
+# specs; a spec that introduces and freezes a contract at v1.0.0 is a
+# valid claim about itself. Reviewer must verify each entry is honestly
+# stable (matches the code it claims to govern) before adding.
+docs/specs/module-contract.md
+
+# Historical changelog records past versions' marketing language.
+CHANGELOG.md
+docs/CHANGELOG.md
+
+# Agent-internal context (AI assistant memory, similar to .claude/).
+# Not user-facing. Periodic review owner is the maintainer who uses
+# those tools.
+agent/
+
+# Generated / vendor / build trees.
+node_modules/
+.git/
+.pnpm-store/
+core/dist/
+modules/api/dist/
+modules/ui/.nuxt/
+modules/ui/.output/
+modules/storage/dist/
+modules/serve/dist/
+modules/notifications/dist/
+modules/legal-register/dist/
+modules/realtime/dist/
+modules/broadcast-box/dist/
+cli/dist/
+
+# This script + its allow-list + the CI workflow + the Makefile target
+# naturally mention the patterns (the Makefile `help` target lists them as
+# examples of what the gate scans for).
+scripts/audit-truth-check.sh
+scripts/audit-truth-check-allowlist.txt
+.github/workflows/truth-check.yml
+Makefile
+
+# Phase 2c (2026-05-19) cleared the PHASE 2C TODO block:
+# - architecture-comprehensive-analysis.md deleted (redundant with
+#   the canonical docs/architecture.md; git log preserves it).
+# - file-attachment-system.md, schema-validation-refinement-analysis
+#   .md, specs/storage.md, todo.md: overclaim phrasing demoted to
+#   honest v0.2.x language.
+# - specs/sort-api-spec-analysis.md moved to audits/ (analyses
+#   don't belong in specs/).

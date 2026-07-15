@@ -7,7 +7,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import matter from 'gray-matter';
-import type { TemplateValidation, Template } from '../utils/template-engine.js';
+import type { Template } from '../utils/template-engine.js';
 import type { ValidationResult, TemplateId } from './types.js';
 import { parseTemplateId } from './types.js';
 
@@ -188,7 +188,7 @@ export class TemplateValidator {
   validateFrontmatter(content: string): {
     valid: boolean;
     errors: string[];
-    frontmatter?: any;
+    frontmatter?: Record<string, unknown>;
   } {
     const errors: string[] = [];
 

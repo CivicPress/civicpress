@@ -1,4 +1,3 @@
-import * as crypto from 'crypto';
 import { DatabaseService } from '../database/database-service.js';
 import { Logger } from '../utils/logger.js';
 import { OAuthProviderManager } from './oauth-provider.js';
@@ -8,8 +7,13 @@ import {
   EmailChangeRequest,
   EmailValidationResult,
 } from './email-validation-service.js';
-import { coreDebug } from '../utils/core-output.js';
 import { SecretsManager } from '../security/secrets.js';
+import { AuditChannel } from '../audit/audit-channel.js';
+import { UserOps } from './auth-service/user-ops.js';
+import { ApiKeyOps } from './auth-service/api-key-ops.js';
+import { SessionOps } from './auth-service/session-ops.js';
+import { OAuthOps } from './auth-service/oauth-ops.js';
+import { PasswordOps } from './auth-service/password-ops.js';
 
 const logger = new Logger();
 
@@ -44,18 +48,146 @@ export interface Session {
   user: AuthUser;
 }
 
+/**
+ * AuthService — orchestrator that delegates user/session/api-key/oauth/password
+ * operations to focused collaborators under `./auth-service/`.
+ *
+ * Phase 2d W2-T7 (refactor 2026-05): the original 1,354 LoC class was broken
+ * into 5 collaborators + a shared `crypto` helpers module. This file remains
+ * the only surface other packages import; every public method preserves its
+ * exact signature, so consumers do not need to change.
+ */
 export class AuthService {
   private db: DatabaseService;
   private oauthManager: OAuthProviderManager;
   private roleManager: RoleManager;
   private emailValidationService: EmailValidationService;
   private secretsManager?: SecretsManager;
+  private auditChannel?: AuditChannel;
 
-  constructor(db: DatabaseService, dataDir: string) {
+  // Collaborators (instantiated in constructor with bound deps).
+  private userOps: UserOps;
+  private apiKeyOps: ApiKeyOps;
+  private sessionOps: SessionOps;
+  private oauthOps: OAuthOps;
+  private passwordOps: PasswordOps;
+
+  constructor(
+    db: DatabaseService,
+    dataDir: string,
+    auditChannel?: AuditChannel
+  ) {
     this.db = db;
     this.oauthManager = new OAuthProviderManager();
     this.roleManager = new RoleManager(dataDir);
-    this.emailValidationService = new EmailValidationService(db);
+    this.emailValidationService = new EmailValidationService(db, auditChannel);
+    this.auditChannel = auditChannel;
+
+    // Shared deps used by every collaborator.
+    const writeAudit = this.writeAudit.bind(this);
+    const logAuthEvent = this.logAuthEvent.bind(this);
+    const getSecretsManager = () => this.secretsManager;
+    const getDefaultRole = () => this.getDefaultRole();
+    const isValidRole = (role: string) => this.isValidRole(role);
+    const canSetPassword = (user: AuthUser) => this.canSetPassword(user);
+    const getUserAuthProvider = (user: AuthUser) =>
+      this.getUserAuthProvider(user);
+
+    this.userOps = new UserOps({
+      db,
+      logger,
+      writeAudit,
+      getDefaultRole,
+      canSetPassword,
+      getUserAuthProvider,
+      logAuthEvent,
+    });
+
+    this.apiKeyOps = new ApiKeyOps({
+      db,
+      logger,
+      writeAudit,
+      getSecretsManager,
+    });
+
+    this.sessionOps = new SessionOps({
+      db,
+      logger,
+      writeAudit,
+      getSecretsManager,
+    });
+
+    // Bind the now-extracted user/session methods so collaborators that depend
+    // on them (oauth, password) can keep their original cross-method calls.
+    const createSession = (userId: number, expiresInHours?: number) =>
+      this.sessionOps.createSession(userId, expiresInHours);
+    const getUserByUsername = (username: string) =>
+      this.userOps.getUserByUsername(username);
+    const createUser = (userData: Parameters<UserOps['createUser']>[0]) =>
+      this.userOps.createUser(userData);
+    const updateUser = (
+      userId: number,
+      userData: Parameters<UserOps['updateUser']>[1]
+    ) => this.userOps.updateUser(userId, userData);
+
+    this.oauthOps = new OAuthOps({
+      db,
+      logger,
+      oauthManager: this.oauthManager,
+      writeAudit,
+      logAuthEvent,
+      getUserByUsername,
+      createUser,
+      updateUser,
+      createSession,
+      getDefaultRole,
+      isValidRole,
+    });
+
+    this.passwordOps = new PasswordOps({
+      db,
+      logger,
+      writeAudit,
+      emailValidationService: this.emailValidationService,
+      logAuthEvent,
+      createSession,
+      canSetPassword,
+      getUserAuthProvider,
+    });
+  }
+
+  /**
+   * Write an auth audit entry through the unified AuditChannel if available,
+   * otherwise fall back to the legacy direct db.logAuditEvent call.
+   *
+   * Phase 2c.5 (T4) — closes the 2 remaining direct callers flagged in
+   * the Phase 2c closure report's §"Surfaced, not fixed".
+   */
+  private async writeAudit(event: {
+    userId: number | undefined;
+    action: string;
+    details?: string;
+    ipAddress?: string;
+  }): Promise<void> {
+    if (this.auditChannel) {
+      await this.auditChannel.record({
+        action: event.action,
+        resourceType: 'auth',
+        userId: event.userId,
+        source: 'core',
+        outcome: 'success',
+        message: event.details,
+        details: event.ipAddress ? { ipAddress: event.ipAddress } : undefined,
+      });
+      return;
+    }
+    await this.db.logAuditEvent({
+      userId: event.userId,
+      action: event.action,
+      resourceType: 'auth',
+      details: event.details,
+      ipAddress: event.ipAddress,
+    });
   }
 
   /**
@@ -152,559 +284,121 @@ export class AuthService {
     await this.roleManager.reloadConfig();
   }
 
-  // API Key Authentication
+  // ===============================
+  // API KEY AUTHENTICATION (delegated to ApiKeyOps)
+  // ===============================
+
   async createApiKey(
-    userId: number,
-    name: string,
-    expiresAt?: Date
-  ): Promise<{ key: string; apiKey: ApiKey }> {
-    // Generate random key
-    const key = this.generateSecureToken();
-
-    // Sign key if secrets manager available
-    let finalKey = key;
-    if (this.secretsManager) {
-      const signingKey = this.secretsManager.getApiKeySigningKey();
-      const signature = this.secretsManager.sign(key, signingKey);
-      finalKey = `${key}.${signature}`;
-    }
-
-    // Hash for database storage (always use raw key)
-    const keyHash = this.hashToken(key);
-
-    await this.db.createApiKey(userId, keyHash, name, expiresAt);
-    const apiKeyData = await this.db.getApiKeyByHash(keyHash);
-
-    if (!apiKeyData) {
-      throw new Error('Failed to create API key');
-    }
-
-    const apiKey: ApiKey = {
-      id: apiKeyData.id,
-      keyHash: apiKeyData.key_hash,
-      userId: apiKeyData.user_id,
-      name: apiKeyData.name, // This is the API key's name from the api_keys table
-      expiresAt: apiKeyData.expires_at
-        ? new Date(apiKeyData.expires_at)
-        : undefined,
-      user: {
-        id: apiKeyData.user_id,
-        username: apiKeyData.username,
-        role: apiKeyData.role,
-        email: apiKeyData.email,
-        name: apiKeyData.user_name, // This should be the user's name
-        avatar_url: apiKeyData.avatar_url,
-      },
-    };
-
-    return { key: finalKey, apiKey };
+    ...args: Parameters<ApiKeyOps['createApiKey']>
+  ): ReturnType<ApiKeyOps['createApiKey']> {
+    return this.apiKeyOps.createApiKey(...args);
   }
 
-  async validateApiKey(key: string): Promise<AuthUser | null> {
-    try {
-      let keyToHash = key;
-
-      // If key is signed, verify and extract raw key
-      if (this.secretsManager && key.includes('.')) {
-        const parts = key.split('.');
-        if (parts.length === 2) {
-          const [rawKey, signature] = parts;
-          const signingKey = this.secretsManager.getApiKeySigningKey();
-
-          if (this.secretsManager.verify(rawKey, signature, signingKey)) {
-            keyToHash = rawKey;
-          } else {
-            // Invalid signature
-            return null;
-          }
-        }
-      }
-
-      // Hash and lookup in database
-      const keyHash = this.hashToken(keyToHash);
-      const apiKey = await this.db.getApiKeyByHash(keyHash);
-
-      if (!apiKey) {
-        return null;
-      }
-
-      // Check if API key is expired
-      if (apiKey.expires_at && new Date(apiKey.expires_at) < new Date()) {
-        await this.db.deleteApiKey(apiKey.id);
-        return null;
-      }
-
-      return {
-        id: apiKey.user_id,
-        username: apiKey.username,
-        role: apiKey.role,
-        email: apiKey.email,
-        name: apiKey.name,
-        avatar_url: apiKey.avatar_url,
-      };
-    } catch (error) {
-      logger.error('API key validation failed:', error);
-      return null;
-    }
+  async validateApiKey(
+    ...args: Parameters<ApiKeyOps['validateApiKey']>
+  ): ReturnType<ApiKeyOps['validateApiKey']> {
+    return this.apiKeyOps.validateApiKey(...args);
   }
 
-  async deleteApiKey(keyId: number): Promise<void> {
-    await this.db.deleteApiKey(keyId);
+  async deleteApiKey(
+    ...args: Parameters<ApiKeyOps['deleteApiKey']>
+  ): ReturnType<ApiKeyOps['deleteApiKey']> {
+    return this.apiKeyOps.deleteApiKey(...args);
   }
 
-  // Session Management
+  // ===============================
+  // SESSION MANAGEMENT (delegated to SessionOps)
+  // ===============================
+
   async createSession(
-    userId: number,
-    expiresInHours: number = 24
-  ): Promise<{ token: string; session: Session }> {
-    // Generate random token
-    const token = this.generateSecureToken();
-
-    // Sign token if secrets manager available
-    let finalToken = token;
-    if (this.secretsManager) {
-      const signingKey = this.secretsManager.getSessionSigningKey();
-      const signature = this.secretsManager.sign(token, signingKey);
-      finalToken = `${token}.${signature}`;
-    }
-
-    // Hash for database storage (always use raw token for hashing)
-    const tokenHash = this.hashToken(token);
-    const expiresAt = new Date(Date.now() + expiresInHours * 60 * 60 * 1000);
-
-    await this.db.createSession(userId, tokenHash, expiresAt);
-    const sessionData = await this.db.getSessionByToken(tokenHash);
-
-    if (!sessionData) {
-      throw new Error('Failed to create session');
-    }
-
-    const session: Session = {
-      id: sessionData.id,
-      tokenHash: sessionData.token_hash,
-      userId: sessionData.user_id,
-      expiresAt: new Date(sessionData.expires_at),
-      user: {
-        id: sessionData.user_id,
-        username: sessionData.username,
-        role: sessionData.role,
-        email: sessionData.email,
-        name: sessionData.name,
-        avatar_url: sessionData.avatar_url,
-      },
-    };
-
-    return { token: finalToken, session };
+    ...args: Parameters<SessionOps['createSession']>
+  ): ReturnType<SessionOps['createSession']> {
+    return this.sessionOps.createSession(...args);
   }
 
-  async validateSession(token: string): Promise<AuthUser | null> {
-    try {
-      let tokenToHash = token;
-
-      // If token is signed, verify and extract raw token
-      if (this.secretsManager && token.includes('.')) {
-        const parts = token.split('.');
-        if (parts.length === 2) {
-          const [rawToken, signature] = parts;
-          const signingKey = this.secretsManager.getSessionSigningKey();
-
-          if (this.secretsManager.verify(rawToken, signature, signingKey)) {
-            tokenToHash = rawToken;
-          } else {
-            // Invalid signature
-            return null;
-          }
-        }
-      }
-
-      // Hash and lookup in database (using raw token)
-      const tokenHash = this.hashToken(tokenToHash);
-      const session = await this.db.getSessionByToken(tokenHash);
-
-      if (!session) {
-        return null;
-      }
-
-      // Get full user data including email_verified
-      const user = await this.db.getUserById(session.user_id);
-      if (!user) {
-        return null;
-      }
-
-      return {
-        id: user.id,
-        username: user.username,
-        role: user.role,
-        email: user.email,
-        name: user.name,
-        avatar_url: user.avatar_url,
-        email_verified: user.email_verified,
-      };
-    } catch (error) {
-      logger.error('Session validation failed:', error);
-      return null;
-    }
+  async validateSession(
+    ...args: Parameters<SessionOps['validateSession']>
+  ): ReturnType<SessionOps['validateSession']> {
+    return this.sessionOps.validateSession(...args);
   }
 
-  async deleteSession(sessionId: number): Promise<void> {
-    await this.db.deleteSession(sessionId);
+  async deleteSession(
+    ...args: Parameters<SessionOps['deleteSession']>
+  ): ReturnType<SessionOps['deleteSession']> {
+    return this.sessionOps.deleteSession(...args);
   }
 
   async cleanupExpiredSessions(): Promise<void> {
-    await this.db.cleanupExpiredSessions();
+    return this.sessionOps.cleanupExpiredSessions();
   }
 
-  // User Management
-  async createUser(userData: {
-    username: string;
-    role?: string;
-    email?: string;
-    name?: string;
-    avatar_url?: string;
-    auth_provider?: string;
-    email_verified?: boolean;
-  }): Promise<AuthUser> {
-    // Set default role if not provided
-    const role = userData.role || (await this.getDefaultRole());
+  // ===============================
+  // USER MANAGEMENT (delegated to UserOps)
+  // ===============================
 
-    const userId = await this.db.createUser({
-      ...userData,
-      role,
-      auth_provider: userData.auth_provider || 'password', // Ensure auth_provider is passed
-    });
-    const user = await this.db.getUserById(userId);
-
-    if (!user) {
-      throw new Error('Failed to create user');
-    }
-
-    return {
-      id: user.id,
-      username: user.username,
-      role: user.role,
-      email: user.email,
-      name: user.name,
-      avatar_url: user.avatar_url,
-      auth_provider: user.auth_provider,
-      email_verified: user.email_verified,
-    };
+  async createUser(
+    ...args: Parameters<UserOps['createUser']>
+  ): ReturnType<UserOps['createUser']> {
+    return this.userOps.createUser(...args);
   }
 
-  async getUserByUsername(username: string): Promise<AuthUser | null> {
-    try {
-      const user = await this.db.getUserByUsername(username);
-      if (!user) {
-        return null;
-      }
-
-      return {
-        id: user.id,
-        username: user.username,
-        role: user.role,
-        email: user.email,
-        name: user.name,
-        avatar_url: user.avatar_url,
-        created_at: user.created_at ? new Date(user.created_at) : undefined,
-        updated_at: user.updated_at ? new Date(user.updated_at) : undefined,
-      };
-    } catch (error) {
-      logger.error('Failed to get user by username:', error);
-      return null;
-    }
+  async getUserByUsername(
+    ...args: Parameters<UserOps['getUserByUsername']>
+  ): ReturnType<UserOps['getUserByUsername']> {
+    return this.userOps.getUserByUsername(...args);
   }
 
-  async getUserById(id: number): Promise<AuthUser | null> {
-    try {
-      const user = await this.db.getUserById(id);
-      if (!user) {
-        return null;
-      }
-
-      return {
-        id: user.id,
-        username: user.username,
-        role: user.role,
-        email: user.email,
-        name: user.name,
-        avatar_url: user.avatar_url,
-        created_at: user.created_at ? new Date(user.created_at) : undefined,
-        updated_at: user.updated_at ? new Date(user.updated_at) : undefined,
-      };
-    } catch (error) {
-      logger.error('Failed to get user by ID:', error);
-      return null;
-    }
+  async getUserById(
+    ...args: Parameters<UserOps['getUserById']>
+  ): ReturnType<UserOps['getUserById']> {
+    return this.userOps.getUserById(...args);
   }
 
   /**
    * List all users
    */
   async listUsers(): Promise<AuthUser[]> {
-    try {
-      const result = await this.db.listUsers();
-      return result.users.map((user: any) => ({
-        id: user.id,
-        username: user.username,
-        role: user.role,
-        email: user.email,
-        name: user.name,
-        avatar_url: user.avatar_url,
-        created_at: user.created_at ? new Date(user.created_at) : undefined,
-        updated_at: user.updated_at ? new Date(user.updated_at) : undefined,
-      }));
-    } catch (error) {
-      logger.error('Failed to list users:', error);
-      return [];
-    }
+    return this.userOps.listUsers();
   }
 
   /**
    * Create user with password hash
    */
-  async createUserWithPassword(userData: {
-    username: string;
-    role?: string;
-    email?: string;
-    name?: string;
-    avatar_url?: string;
-    passwordHash?: string;
-    auth_provider?: string;
-    email_verified?: boolean;
-  }): Promise<AuthUser> {
-    coreDebug('AuthService.createUserWithPassword called', userData, {
-      operation: 'auth:createUserWithPassword',
-    });
-
-    // Set default role if not provided
-    const role = userData.role || (await this.getDefaultRole());
-    coreDebug(
-      'Using role',
-      { role },
-      { operation: 'auth:createUserWithPassword' }
-    );
-
-    coreDebug('Calling this.db.createUserWithPassword', undefined, {
-      operation: 'auth:createUserWithPassword',
-    });
-    const userId = await this.db.createUserWithPassword({
-      ...userData,
-      role,
-    });
-    coreDebug(
-      'Got userId',
-      { userId },
-      { operation: 'auth:createUserWithPassword' }
-    );
-
-    coreDebug(
-      'Calling this.db.getUserById',
-      { userId },
-      {
-        operation: 'auth:createUserWithPassword',
-      }
-    );
-    const user = await this.db.getUserById(userId);
-    coreDebug(
-      'Got user',
-      { userId, userExists: !!user, username: user ? user.username : null },
-      { operation: 'auth:createUserWithPassword' }
-    );
-
-    if (!user) {
-      coreDebug('User is null, throwing error', undefined, {
-        operation: 'auth:createUserWithPassword',
-      });
-      throw new Error('Failed to create user');
-    }
-
-    coreDebug(
-      'Returning user',
-      { username: user.username },
-      {
-        operation: 'auth:createUserWithPassword',
-      }
-    );
-    return {
-      id: user.id,
-      username: user.username,
-      role: user.role,
-      email: user.email,
-      name: user.name,
-      avatar_url: user.avatar_url,
-      created_at: user.created_at ? new Date(user.created_at) : undefined,
-      updated_at: user.updated_at ? new Date(user.updated_at) : undefined,
-    };
+  async createUserWithPassword(
+    ...args: Parameters<UserOps['createUserWithPassword']>
+  ): ReturnType<UserOps['createUserWithPassword']> {
+    return this.userOps.createUserWithPassword(...args);
   }
 
   /**
    * Update user information
    */
   async updateUser(
-    userId: number,
-    userData: {
-      email?: string;
-      name?: string;
-      role?: string;
-      passwordHash?: string;
-      avatar_url?: string;
-    }
-  ): Promise<{ success: boolean; message?: string; user?: AuthUser }> {
-    try {
-      // Get current user to check authentication provider
-      const currentUser = await this.db.getUserById(userId);
-      if (!currentUser) {
-        throw new Error('User not found');
-      }
-
-      // Create AuthUser object for guard checks
-      const authUser: AuthUser = {
-        id: currentUser.id,
-        username: currentUser.username,
-        role: currentUser.role,
-        email: currentUser.email,
-        name: currentUser.name,
-        avatar_url: currentUser.avatar_url,
-        auth_provider: currentUser.auth_provider,
-        email_verified: currentUser.email_verified,
-        pending_email: currentUser.pending_email,
-        created_at: currentUser.created_at
-          ? new Date(currentUser.created_at)
-          : undefined,
-        updated_at: currentUser.updated_at
-          ? new Date(currentUser.updated_at)
-          : undefined,
-      };
-
-      // SECURITY GUARD: Prevent external auth users from setting passwords
-      if (userData.passwordHash && !this.canSetPassword(authUser)) {
-        const provider = this.getUserAuthProvider(authUser);
-        throw new Error(
-          `Users authenticated via ${provider} cannot set passwords. Password management is handled by the external authentication.`
-        );
-      }
-
-      const updated = await this.db.updateUser(userId, userData);
-      if (!updated) {
-        throw new Error('Failed to update user');
-      }
-
-      // Get updated user data
-      const user = await this.db.getUserById(userId);
-      if (!user) {
-        throw new Error('User not found after update');
-      }
-
-      // Log security-relevant changes
-      if (userData.passwordHash) {
-        await this.logAuthEvent(
-          userId,
-          'password_changed',
-          `Password updated for user ${user.username}`
-        );
-      }
-
-      return {
-        success: true,
-        message: 'User updated successfully',
-        user: {
-          id: user.id,
-          username: user.username,
-          role: user.role,
-          email: user.email,
-          name: user.name,
-          avatar_url: user.avatar_url,
-          auth_provider: user.auth_provider,
-          email_verified: user.email_verified,
-          pending_email: user.pending_email,
-          created_at: user.created_at ? new Date(user.created_at) : undefined,
-          updated_at: user.updated_at ? new Date(user.updated_at) : undefined,
-        },
-      };
-    } catch (error) {
-      logger.error('Failed to update user:', error);
-      return {
-        success: false,
-        message:
-          error instanceof Error ? error.message : 'Failed to update user',
-      };
-    }
+    ...args: Parameters<UserOps['updateUser']>
+  ): ReturnType<UserOps['updateUser']> {
+    return this.userOps.updateUser(...args);
   }
 
   /**
    * Delete user
    */
-  async deleteUser(userId: number): Promise<boolean> {
-    try {
-      const user = await this.db.getUserById(userId);
-      if (!user) {
-        throw new Error('User not found');
-      }
-      await this.db.deleteUser(userId);
-      return true;
-    } catch (error) {
-      logger.error('Failed to delete user:', error);
-      throw error;
-    }
+  async deleteUser(
+    ...args: Parameters<UserOps['deleteUser']>
+  ): ReturnType<UserOps['deleteUser']> {
+    return this.userOps.deleteUser(...args);
   }
+
+  // ===============================
+  // PASSWORD AUTHENTICATION (delegated to PasswordOps)
+  // ===============================
 
   /**
    * Authenticate with username and password
    */
   async authenticateWithPassword(
-    username: string,
-    password: string
-  ): Promise<{ token: string; user: AuthUser; expiresAt: Date }> {
-    try {
-      // Get user with password hash
-      const user = await this.db.getUserWithPassword(username);
-      if (!user) {
-        throw new Error('Invalid username or password');
-      }
-
-      // Verify password
-      const bcrypt = await import('bcrypt');
-      const isValid = await bcrypt.compare(password, user.password_hash);
-      if (!isValid) {
-        throw new Error('Invalid username or password');
-      }
-
-      // Create session
-      const { token: sessionToken, session } = await this.createSession(
-        user.id
-      );
-
-      // Log authentication event
-      await this.logAuthEvent(
-        user.id,
-        'password_login',
-        `Password login for user ${user.username}`,
-        'password'
-      );
-
-      return {
-        token: sessionToken,
-        user: {
-          id: user.id,
-          username: user.username,
-          role: user.role,
-          email: user.email,
-          name: user.name,
-          avatar_url: user.avatar_url,
-        },
-        expiresAt: session.expiresAt,
-      };
-    } catch (error) {
-      logger.error('Password authentication failed:', error);
-      throw new Error('Invalid username or password');
-    }
-  }
-
-  private generateSecureToken(): string {
-    return crypto.randomBytes(32).toString('hex');
-  }
-
-  private hashToken(token: string): string {
-    return crypto.createHash('sha256').update(token).digest('hex');
+    ...args: Parameters<PasswordOps['authenticateWithPassword']>
+  ): ReturnType<PasswordOps['authenticateWithPassword']> {
+    return this.passwordOps.authenticateWithPassword(...args);
   }
 
   async logAuthEvent(
@@ -714,251 +408,51 @@ export class AuthService {
     ipAddress?: string
   ): Promise<void> {
     try {
-      await this.db.logAuditEvent({
-        userId,
-        action,
-        resourceType: 'auth',
-        details,
-        ipAddress,
-      });
+      await this.writeAudit({ userId, action, details, ipAddress });
     } catch (error) {
       logger.error('Failed to log auth event:', error);
     }
   }
 
+  // ===============================
+  // OAUTH AUTHENTICATION (delegated to OAuthOps)
+  // ===============================
+
   async authenticateWithGitHub(
-    token: string
-  ): Promise<{ token: string; user: AuthUser; expiresAt: Date }> {
-    try {
-      const githubUser = await this.oauthManager.validateToken('github', token);
-
-      // Check if user exists, create if not
-      let user = await this.getUserByUsername(githubUser.username);
-      if (!user) {
-        const defaultRole = await this.getDefaultRole();
-        user = await this.createUser({
-          username: githubUser.username,
-          role: defaultRole,
-          email: githubUser.email,
-          name: githubUser.name,
-          avatar_url: githubUser.avatar_url,
-        });
-      }
-
-      // Create session
-      const { token: sessionToken, session } = await this.createSession(
-        user.id
-      );
-
-      // Log authentication event
-      await this.logAuthEvent(
-        user.id,
-        'github_login',
-        `GitHub login for user ${user.username}`,
-        'github'
-      );
-
-      return {
-        token: sessionToken,
-        user,
-        expiresAt: session.expiresAt,
-      };
-    } catch (error) {
-      logger.error('GitHub authentication failed:', error);
-      throw new Error('GitHub authentication failed');
-    }
+    ...args: Parameters<OAuthOps['authenticateWithGitHub']>
+  ): ReturnType<OAuthOps['authenticateWithGitHub']> {
+    return this.oauthOps.authenticateWithGitHub(...args);
   }
 
   async authenticateWithOAuth(
-    provider: string,
-    token: string,
-    oauthUserData?: any
-  ): Promise<{
-    success: boolean;
-    token: string;
-    user: AuthUser;
-    expiresAt: Date;
-  }> {
-    try {
-      let oauthUser: any;
-
-      // In test mode, use provided data instead of validating token
-      if (process.env.NODE_ENV === 'test' && oauthUserData) {
-        oauthUser = oauthUserData;
-      } else {
-        oauthUser = await this.oauthManager.validateToken(provider, token);
-      }
-
-      // Check if user exists, create if not
-      let user = await this.getUserByUsername(oauthUser.username);
-      if (!user) {
-        const defaultRole = await this.getDefaultRole();
-        user = await this.createUser({
-          username: oauthUser.username,
-          role: defaultRole,
-          email: oauthUser.email,
-          name: oauthUser.name,
-          avatar_url: oauthUser.avatar_url,
-          auth_provider: provider, // Set the authentication provider
-          email_verified: true, // OAuth emails are considered verified
-        });
-      } else {
-        // Update existing user's information on re-authentication
-        const updateData: any = {
-          auth_provider: provider,
-          email_verified: true,
-        };
-
-        // Update fields that might have changed
-        if (oauthUser.email && oauthUser.email !== user.email) {
-          updateData.email = oauthUser.email;
-        }
-        if (oauthUser.name && oauthUser.name !== user.name) {
-          updateData.name = oauthUser.name;
-        }
-        if (oauthUser.avatar_url && oauthUser.avatar_url !== user.avatar_url) {
-          updateData.avatar_url = oauthUser.avatar_url;
-        }
-
-        await this.db.updateUser(user.id, updateData);
-
-        // Refresh user data
-        const updatedUser = await this.db.getUserById(user.id);
-        if (updatedUser) {
-          user = updatedUser;
-        }
-      }
-
-      // Ensure user is not null
-      if (!user) {
-        throw new Error('Failed to create or retrieve user');
-      }
-
-      // Create session
-      const { token: sessionToken, session } = await this.createSession(
-        user.id
-      );
-
-      // Log authentication event
-      await this.logAuthEvent(
-        user.id,
-        `${provider}_login`,
-        `${provider} login for user ${user.username}`,
-        provider
-      );
-
-      return {
-        success: true,
-        token: sessionToken,
-        user,
-        expiresAt: session.expiresAt,
-      };
-    } catch (error) {
-      logger.error(`${provider} authentication failed:`, error);
-      throw new Error(`${provider} authentication failed`);
-    }
+    ...args: Parameters<OAuthOps['authenticateWithOAuth']>
+  ): ReturnType<OAuthOps['authenticateWithOAuth']> {
+    return this.oauthOps.authenticateWithOAuth(...args);
   }
 
   /**
    * Get available OAuth providers
    */
   getAvailableOAuthProviders(): string[] {
-    return this.oauthManager.getAvailableProviders();
+    return this.oauthOps.getAvailableOAuthProviders();
   }
 
   /**
    * Create a simulated user account for testing/development
    */
-  async createSimulatedUser(userData: {
-    username: string;
-    role: string;
-    email?: string;
-    name?: string;
-    avatar_url?: string;
-  }): Promise<AuthUser> {
-    // Check if user already exists
-    const existingUser = await this.getUserByUsername(userData.username);
-    if (existingUser) {
-      // Update existing user's role if it's different
-      if (existingUser.role !== userData.role) {
-        logger.info(
-          `Updating existing user ${userData.username} role from ${existingUser.role} to ${userData.role}`
-        );
-        const updateResult = await this.updateUser(existingUser.id, {
-          role: userData.role,
-        });
-        if (!updateResult.success || !updateResult.user) {
-          throw new Error(`Failed to update user ${userData.username} role`);
-        }
-        return updateResult.user;
-      }
-      return existingUser;
-    }
-
-    // Validate role
-    if (!(await this.isValidRole(userData.role))) {
-      throw new Error(`Invalid role: ${userData.role}`);
-    }
-
-    // Create user
-    const user = await this.createUser({
-      username: userData.username,
-      role: userData.role,
-      email: userData.email,
-      name: userData.name,
-      avatar_url: userData.avatar_url,
-    });
-
-    // Log the creation
-    await this.logAuthEvent(
-      user.id,
-      'simulated_user_created',
-      `Simulated user created: ${user.username} with role ${user.role}`,
-      'simulated'
-    );
-
-    return user;
+  async createSimulatedUser(
+    ...args: Parameters<OAuthOps['createSimulatedUser']>
+  ): ReturnType<OAuthOps['createSimulatedUser']> {
+    return this.oauthOps.createSimulatedUser(...args);
   }
 
   /**
    * Authenticate with simulated account (for development/testing)
    */
   async authenticateWithSimulatedAccount(
-    username: string,
-    role: string = 'public'
-  ): Promise<{ token: string; user: AuthUser; expiresAt: Date }> {
-    try {
-      // Create or get simulated user
-      const user = await this.createSimulatedUser({
-        username,
-        role,
-        name: username,
-        email: `${username}@simulated.local`,
-        avatar_url: `https://avatars.githubusercontent.com/u/${Math.floor(Math.random() * 1000000)}?v=4`,
-      });
-
-      // Create session
-      const { token: sessionToken, session } = await this.createSession(
-        user.id
-      );
-
-      // Log authentication event
-      await this.logAuthEvent(
-        user.id,
-        'simulated_login',
-        `Simulated login for user ${user.username}`,
-        'simulated'
-      );
-
-      return {
-        token: sessionToken,
-        user,
-        expiresAt: session.expiresAt,
-      };
-    } catch (error) {
-      logger.error('Simulated authentication failed:', error);
-      throw new Error('Simulated authentication failed');
-    }
+    ...args: Parameters<OAuthOps['authenticateWithSimulatedAccount']>
+  ): ReturnType<OAuthOps['authenticateWithSimulatedAccount']> {
+    return this.oauthOps.authenticateWithSimulatedAccount(...args);
   }
 
   async logout(): Promise<void> {
@@ -1085,7 +579,11 @@ export class AuthService {
   /**
    * Check if user can set a password (only for password-auth users)
    */
-  canSetPassword(user: AuthUser): boolean {
+  // canSetPassword/getUserAuthProvider only inspect `auth_provider`; widened
+  // to a structural type so callers holding a UserRow (whose created_at is a
+  // string, not a Date as AuthUser declares) don't need a full row → AuthUser
+  // mapping just to ask "is this an external-auth user?".
+  canSetPassword(user: Pick<AuthUser, 'auth_provider'> | null | undefined): boolean {
     if (!user) return false; // Handle null user gracefully
     // Only allow password setting for password auth users or legacy users (no auth_provider)
     return user.auth_provider === 'password' || !user.auth_provider;
@@ -1094,7 +592,9 @@ export class AuthService {
   /**
    * Get user's authentication provider
    */
-  getUserAuthProvider(user: AuthUser): string {
+  getUserAuthProvider(
+    user: Pick<AuthUser, 'auth_provider'> | null | undefined
+  ): string {
     if (!user) return 'unknown'; // Handle null user gracefully
     return user.auth_provider || 'password'; // Default to password for legacy users
   }
@@ -1109,211 +609,42 @@ export class AuthService {
   }
 
   // ===============================
-  // SECURE PASSWORD MANAGEMENT
+  // SECURE PASSWORD MANAGEMENT (delegated to PasswordOps)
   // ===============================
 
   /**
    * Change user password with security guards
    */
   async changePassword(
-    userId: number,
-    newPassword: string,
-    currentPassword?: string
-  ): Promise<{ success: boolean; message: string }> {
-    try {
-      // Get current user to check authentication provider
-      const currentUser = await this.db.getUserById(userId);
-      if (!currentUser) {
-        throw new Error('User not found');
-      }
-
-      // Create AuthUser object for guard checks
-      const authUser: AuthUser = {
-        id: currentUser.id,
-        username: currentUser.username,
-        role: currentUser.role,
-        email: currentUser.email,
-        name: currentUser.name,
-        avatar_url: currentUser.avatar_url,
-        auth_provider: currentUser.auth_provider,
-        email_verified: currentUser.email_verified,
-        pending_email: currentUser.pending_email,
-        created_at: currentUser.created_at
-          ? new Date(currentUser.created_at)
-          : undefined,
-        updated_at: currentUser.updated_at
-          ? new Date(currentUser.updated_at)
-          : undefined,
-      };
-
-      // SECURITY GUARD: Prevent external auth users from setting passwords
-      if (!this.canSetPassword(authUser)) {
-        const provider = this.getUserAuthProvider(authUser);
-        return {
-          success: false,
-          message: `Users authenticated via ${provider} cannot change passwords. Password management is handled by the external authentication.`,
-        };
-      }
-
-      // Verify current password if provided (for password changes by the user themselves)
-      if (currentPassword) {
-        const userWithPassword = await this.db.getUserWithPassword(
-          currentUser.username
-        );
-        if (userWithPassword && userWithPassword.password_hash) {
-          const bcrypt = await import('bcrypt');
-          const isCurrentPasswordValid = await bcrypt.compare(
-            currentPassword,
-            userWithPassword.password_hash
-          );
-          if (!isCurrentPasswordValid) {
-            return {
-              success: false,
-              message: 'Current password is incorrect',
-            };
-          }
-        }
-      }
-
-      // Hash new password
-      const bcrypt = await import('bcrypt');
-      const passwordHash = await bcrypt.hash(newPassword, 12);
-
-      // Update password
-      const updated = await this.db.updateUser(userId, { passwordHash });
-      if (!updated) {
-        return {
-          success: false,
-          message: 'Failed to update password',
-        };
-      }
-
-      // Log security event
-      await this.logAuthEvent(
-        userId,
-        'password_changed',
-        `Password changed for user ${currentUser.username}`
-      );
-
-      logger.info(
-        `Password changed for user ${currentUser.username} (ID: ${userId})`
-      );
-
-      return {
-        success: true,
-        message: 'Password successfully changed',
-      };
-    } catch (error) {
-      logger.error('Password change failed:', error);
-      throw new Error('Failed to change password');
-    }
+    ...args: Parameters<PasswordOps['changePassword']>
+  ): ReturnType<PasswordOps['changePassword']> {
+    return this.passwordOps.changePassword(...args);
   }
 
   /**
    * Set password for user (admin function) with security guards
    */
   async setUserPassword(
-    userId: number,
-    newPassword: string,
-    adminUserId: number
-  ): Promise<{ success: boolean; message: string }> {
-    try {
-      // Get target user to check authentication provider
-      const targetUser = await this.db.getUserById(userId);
-      if (!targetUser) {
-        throw new Error('User not found');
-      }
-
-      // Create AuthUser object for guard checks
-      const authUser: AuthUser = {
-        id: targetUser.id,
-        username: targetUser.username,
-        role: targetUser.role,
-        email: targetUser.email,
-        name: targetUser.name,
-        avatar_url: targetUser.avatar_url,
-        auth_provider: targetUser.auth_provider,
-        email_verified: targetUser.email_verified,
-        pending_email: targetUser.pending_email,
-        created_at: targetUser.created_at
-          ? new Date(targetUser.created_at)
-          : undefined,
-        updated_at: targetUser.updated_at
-          ? new Date(targetUser.updated_at)
-          : undefined,
-      };
-
-      // SECURITY GUARD: Prevent external auth users from having passwords set
-      if (!this.canSetPassword(authUser)) {
-        const provider = this.getUserAuthProvider(authUser);
-        return {
-          success: false,
-          message: `Cannot set password for users authenticated via ${provider}. Password management is handled by the external authentication.`,
-        };
-      }
-
-      // Hash new password
-      const bcrypt = await import('bcrypt');
-      const passwordHash = await bcrypt.hash(newPassword, 12);
-
-      // Update password
-      const updated = await this.db.updateUser(userId, { passwordHash });
-      if (!updated) {
-        return {
-          success: false,
-          message: 'Failed to set password',
-        };
-      }
-
-      // Log security event
-      await this.logAuthEvent(
-        adminUserId,
-        'admin_password_set',
-        `Password set for user ${targetUser.username} by admin`
-      );
-
-      logger.info(
-        `Password set for user ${targetUser.username} (ID: ${userId}) by admin (ID: ${adminUserId})`
-      );
-
-      return {
-        success: true,
-        message: 'Password set successfully',
-      };
-    } catch (error) {
-      logger.error('Password set failed:', error);
-      throw new Error('Failed to set password');
-    }
+    ...args: Parameters<PasswordOps['setUserPassword']>
+  ): ReturnType<PasswordOps['setUserPassword']> {
+    return this.passwordOps.setUserPassword(...args);
   }
 
   /**
    * Send email verification for current email address
    */
-  async sendEmailVerification(userId: number): Promise<{
-    success: boolean;
-    message: string;
-    requiresVerification?: boolean;
-  }> {
-    try {
-      return await this.emailValidationService.sendEmailVerification(userId);
-    } catch (error) {
-      logger.error('Failed to send email verification:', error);
-      throw new Error('Failed to send email verification');
-    }
+  async sendEmailVerification(
+    ...args: Parameters<PasswordOps['sendEmailVerification']>
+  ): ReturnType<PasswordOps['sendEmailVerification']> {
+    return this.passwordOps.sendEmailVerification(...args);
   }
 
   /**
    * Verify current email address with token
    */
-  async verifyCurrentEmail(token: string): Promise<{
-    success: boolean;
-    message: string;
-  }> {
-    try {
-      return await this.emailValidationService.verifyCurrentEmail(token);
-    } catch (error) {
-      logger.error('Failed to verify current email:', error);
-      throw new Error('Failed to verify current email');
-    }
+  async verifyCurrentEmail(
+    ...args: Parameters<PasswordOps['verifyCurrentEmail']>
+  ): ReturnType<PasswordOps['verifyCurrentEmail']> {
+    return this.passwordOps.verifyCurrentEmail(...args);
   }
 }

@@ -2,13 +2,10 @@
 import type { NavigationMenuItem } from '@nuxt/ui';
 import { useAppStore } from '~/stores/app';
 
-const route = useRoute();
 const toast = useToast();
 const appStore = useAppStore();
 const authStore = useAuthStore(); // ⬅️ add this
 const { t } = useI18n();
-
-const collapsed = ref(true);
 
 const links = computed<NavigationMenuItem[][]>(() => {
   const primary: NavigationMenuItem[] = [
@@ -58,7 +55,7 @@ const links = computed<NavigationMenuItem[][]>(() => {
 
 onMounted(async () => {
   // Open sidebar by default on desktop screens, keep closed on mobile
-  if (process.client && window.innerWidth >= 768) {
+  if (import.meta.client && window.innerWidth >= 768) {
     appStore.setSidebarOpen(true);
   }
 

@@ -29,7 +29,7 @@ export class RecordNotFoundError extends NotFoundError {
 export class RecordValidationError extends ValidationError {
   override code = 'RECORD_VALIDATION_ERROR';
 
-  constructor(message: string, details: any) {
+  constructor(message: string, details: unknown) {
     super(message, details);
   }
 }
@@ -65,7 +65,7 @@ export class TemplateExistsError extends ConflictError {
 export class TemplateValidationError extends ValidationError {
   override code = 'TEMPLATE_VALIDATION_ERROR';
 
-  constructor(message: string, details: any) {
+  constructor(message: string, details: unknown) {
     super(message, details);
   }
 }
@@ -73,7 +73,7 @@ export class TemplateValidationError extends ValidationError {
 export class TemplateInvalidError extends ValidationError {
   override code = 'TEMPLATE_INVALID';
 
-  constructor(message: string, details?: any) {
+  constructor(message: string, details?: unknown) {
     super(message, details);
   }
 }
@@ -104,7 +104,7 @@ export class GeographyNotFoundError extends NotFoundError {
 export class GeographyValidationError extends ValidationError {
   override code = 'GEOGRAPHY_VALIDATION_ERROR';
 
-  constructor(message: string, validationResult?: any) {
+  constructor(message: string, validationResult?: unknown) {
     super(message, validationResult);
   }
 }
@@ -158,10 +158,10 @@ export class GitError extends CivicPressError {
   code = 'GIT_ERROR';
   statusCode = 500;
 
-  constructor(message: string, operation?: string, details?: any) {
+  constructor(message: string, operation?: string, details?: unknown) {
     super(message, {
       operation,
-      ...(details && { details }),
+      ...(details && typeof details === 'object' && details !== null ? { details } : {}),
     });
   }
 }
@@ -188,10 +188,10 @@ export class WorkflowError extends CivicPressError {
   code = 'WORKFLOW_ERROR';
   statusCode = 400;
 
-  constructor(message: string, workflowId?: string, details?: any) {
+  constructor(message: string, workflowId?: string, details?: unknown) {
     super(message, {
       ...(workflowId && { workflowId }),
-      ...(details && { details }),
+      ...(details && typeof details === 'object' && details !== null ? { details } : {}),
     });
   }
 }
@@ -204,5 +204,34 @@ export class WorkflowTransitionError extends ValidationError {
       currentStatus,
       targetStatus,
     });
+  }
+}
+
+/**
+ * Module System Errors (introduced 2026-05-19, Phase 2d W1-T2)
+ *
+ * Raised by ModuleResolver during manifest discovery and validation.
+ * See docs/specs/module-contract.md for the manifest contract.
+ */
+
+export class ModuleManifestInvalid extends ValidationError {
+  override code = 'MODULE_MANIFEST_INVALID';
+
+  constructor(message: string, manifestPath?: string, validationErrors?: unknown) {
+    super(message, {
+      ...(manifestPath && { manifestPath }),
+      ...(validationErrors !== undefined && validationErrors !== null
+        ? { validationErrors }
+        : {}),
+    });
+  }
+}
+
+export class ModuleDependencyCycle extends CivicPressError {
+  code = 'MODULE_DEPENDENCY_CYCLE';
+  statusCode = 500;
+
+  constructor(message: string, cycle?: string[]) {
+    super(message, cycle ? { cycle } : undefined);
   }
 }

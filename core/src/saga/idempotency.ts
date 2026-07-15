@@ -2,27 +2,52 @@
  * Idempotency Mechanism
  *
  * Ensures saga operations are idempotent and safe to retry.
+ *
+ * FA-CORE-008: keys must be stable across retries of the same operation.
+ * Caller-provided keys are scoped per saga type + user (so one client's key
+ * can never surface another user's cached result); auto-derived keys hash the
+ * stable operation content (user, target resource, request payload) instead
+ * of the per-call start timestamp, so double-submits and real retries map to
+ * the same key. Auto keys use a short dedup window (`autoKeyTtl`) because two
+ * *intentional* identical operations minutes apart are legitimate; explicit
+ * keys keep the long TTL because the caller has declared retry semantics.
  */
 
+import { createHash } from 'crypto';
 import { SagaStateStore } from './saga-state-store.js';
 import { SagaContext, SagaExecutionResult } from './types.js';
+import { SagaDuplicateError } from './errors.js';
 import { coreDebug, coreInfo } from '../utils/core-output.js';
+
+/**
+ * An in-flight ('executing') state row older than this is considered
+ * abandoned (crashed process, missed status update) and no longer blocks a
+ * retry. Slightly above the executor's default saga timeout (300 s).
+ */
+const IN_FLIGHT_STALENESS_MS = 6 * 60 * 1000;
 
 /**
  * Idempotency manager for saga operations
  */
 export class IdempotencyManager {
   private stateStore: SagaStateStore;
-  private ttl: number; // Time to live in milliseconds (default: 24 hours)
+  private ttl: number; // TTL for caller-provided keys (default: 24 hours)
+  private autoKeyTtl: number; // Dedup window for auto-derived keys
 
-  constructor(stateStore: SagaStateStore, ttl: number = 24 * 60 * 60 * 1000) {
+  constructor(
+    stateStore: SagaStateStore,
+    ttl: number = 24 * 60 * 60 * 1000,
+    autoKeyTtl: number = 5 * 60 * 1000
+  ) {
     this.stateStore = stateStore;
     this.ttl = ttl;
+    this.autoKeyTtl = autoKeyTtl;
   }
 
   /**
    * Check if operation is idempotent (already executed)
-   * Returns cached result if found
+   * Returns cached result if found.
+   * Throws SagaDuplicateError if the same operation is currently in flight.
    */
   async checkIdempotency<TResult>(
     idempotencyKey: string | undefined,
@@ -40,14 +65,17 @@ export class IdempotencyManager {
     }
 
     // Check if result is still valid (not expired)
+    const ttl = idempotencyKey.startsWith('saga:auto:')
+      ? this.autoKeyTtl
+      : this.ttl;
     const age = Date.now() - existingState.startedAt.getTime();
-    if (age > this.ttl) {
+    if (age > ttl) {
       coreDebug(
         `Idempotency key expired: ${idempotencyKey}`,
         {
           idempotencyKey,
           age,
-          ttl: this.ttl,
+          ttl,
         },
         { operation: 'saga:idempotency:check' }
       );
@@ -84,53 +112,64 @@ export class IdempotencyManager {
       };
     }
 
-    // If saga is still executing, return null to allow retry (or wait)
-    // If saga failed, return null to allow retry
+    // FA-CORE-008: the same operation is currently in flight — reject the
+    // double-submit instead of running it a second time. A stale 'executing'
+    // row (crashed process) stops blocking after IN_FLIGHT_STALENESS_MS.
+    if (
+      (existingState.status === 'executing' ||
+        existingState.status === 'pending') &&
+      age <= IN_FLIGHT_STALENESS_MS
+    ) {
+      throw new SagaDuplicateError(idempotencyKey, existingState.id);
+    }
+
+    // Failed / compensated / abandoned → allow retry
     return null;
   }
 
   /**
-   * Generate idempotency key from context
+   * Generate idempotency key from context.
+   *
+   * Already-normalized keys (saga:key:/saga:auto: prefix) pass through
+   * unchanged so re-entrant executions don't double-wrap them.
    */
   static generateIdempotencyKey(
     sagaType: string,
     context: SagaContext
   ): string {
-    // Use correlation ID if provided, otherwise generate from context
+    const userId = context.user?.id ?? 'anonymous';
+
     if (context.idempotencyKey) {
-      return context.idempotencyKey;
+      if (
+        context.idempotencyKey.startsWith('saga:key:') ||
+        context.idempotencyKey.startsWith('saga:auto:')
+      ) {
+        return context.idempotencyKey;
+      }
+      // Scope caller-provided keys so they can never collide across users
+      // or saga types.
+      return `saga:key:${sagaType}:${userId}:${context.idempotencyKey}`;
     }
 
-    // Generate from saga type and key context fields
-    const keyParts = [
-      sagaType,
-      context.user?.id || 'anonymous',
-      context.startedAt.toISOString(),
-    ];
-
-    // Add any unique identifiers from metadata
-    if (context.metadata?.recordId) {
-      keyParts.push(context.metadata.recordId);
-    }
-    if (context.metadata?.draftId) {
-      keyParts.push(context.metadata.draftId);
-    }
-
-    // Hash the key parts (simple hash for now)
-    const keyString = keyParts.join(':');
-    return `saga:${sagaType}:${this.simpleHash(keyString)}`;
-  }
-
-  /**
-   * Simple hash function for idempotency keys
-   */
-  private static simpleHash(str: string): string {
-    let hash = 0;
-    for (let i = 0; i < str.length; i++) {
-      const char = str.charCodeAt(i);
-      hash = (hash << 5) - hash + char;
-      hash = hash & hash; // Convert to 32-bit integer
-    }
-    return Math.abs(hash).toString(36);
+    // Derive from the stable operation content. Deliberately excludes
+    // startedAt/correlationId (unique per call — the FA-CORE-008 bug) and
+    // metadata (which may carry generated ids). context.recordId is only set
+    // when it identifies the operation target (update/archive, or a
+    // caller-chosen create id).
+    const ctx = context as SagaContext & {
+      recordId?: string;
+      request?: unknown;
+    };
+    const stable = {
+      user: userId,
+      recordId: ctx.recordId ?? null,
+      draftId: (context.metadata?.draftId as string | undefined) ?? null,
+      request: ctx.request ?? null,
+    };
+    const digest = createHash('sha256')
+      .update(JSON.stringify(stable))
+      .digest('hex')
+      .slice(0, 32);
+    return `saga:auto:${sagaType}:${digest}`;
   }
 }

@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import type { User } from '~/types/user';
+import { extractErrorMessage, type ApiResponse } from '~/utils/api-response';
+import type { AuthUserResponse } from '~/types/api-responses';
 import SystemFooter from '~/components/SystemFooter.vue';
 
 // Page metadata
@@ -60,22 +62,23 @@ const fetchUser = async () => {
   try {
     const response = (await useNuxtApp().$civicApi(
       `/api/v1/users/${username}`
-    )) as any;
+    )) as ApiResponse<{ user: AuthUserResponse }>;
 
     if (response.success) {
-      user.value = response.data.user;
+      user.value = response.data.user as unknown as User;
     } else {
-      error.value = response.message || t('settings.users.failedToFetchUser');
+      error.value = extractErrorMessage(response) || t('settings.users.failedToFetchUser');
     }
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('Error fetching user:', err);
-    error.value = err.message || t('settings.users.failedToFetchUser');
+    error.value = (err instanceof Error ? err.message : '') || t('settings.users.failedToFetchUser');
   } finally {
     loading.value = false;
   }
 };
 
 // Handle form submission
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const handleSubmit = async (userData: any) => {
   saving.value = true;
   formError.value = null;
@@ -87,11 +90,11 @@ const handleSubmit = async (userData: any) => {
         method: 'PUT',
         body: userData,
       }
-    )) as any;
+    )) as ApiResponse<{ user: AuthUserResponse }>;
 
     if (response.success) {
       // Update local user data
-      user.value = response.data.user;
+      user.value = response.data.user as unknown as User;
 
       // Show success message
       useToast().add({
@@ -101,11 +104,11 @@ const handleSubmit = async (userData: any) => {
       });
     } else {
       formError.value =
-        response.message || t('settings.users.failedToUpdateUser');
+        extractErrorMessage(response) || t('settings.users.failedToUpdateUser');
     }
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('Error updating user:', err);
-    formError.value = err.message || t('settings.users.failedToUpdateUser');
+    formError.value = (err instanceof Error ? err.message : '') || t('settings.users.failedToUpdateUser');
   } finally {
     saving.value = false;
   }
@@ -121,7 +124,7 @@ const handleDelete = async () => {
       {
         method: 'DELETE',
       }
-    )) as any;
+    )) as ApiResponse<{ user: AuthUserResponse }>;
 
     if (response.success) {
       // Show success message
@@ -135,11 +138,11 @@ const handleDelete = async () => {
       await navigateTo('/settings/users');
     } else {
       formError.value =
-        response.message || t('settings.users.failedToDeleteUser');
+        extractErrorMessage(response) || t('settings.users.failedToDeleteUser');
     }
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('Error deleting user:', err);
-    formError.value = err.message || t('settings.users.failedToDeleteUser');
+    formError.value = (err instanceof Error ? err.message : '') || t('settings.users.failedToDeleteUser');
   } finally {
     saving.value = false;
   }

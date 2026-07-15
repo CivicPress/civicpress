@@ -5,12 +5,17 @@
  */
 
 import { DatabaseService } from '../database/database-service.js';
+import { SqlRow } from '../database/database-adapter.js';
 import { ResourceLock } from './types.js';
 import { SagaLockError } from './errors.js';
 import { coreDebug, coreError, coreWarn } from '../utils/core-output.js';
-import { Logger } from '../utils/logger.js';
 
-const logger = new Logger();
+interface SagaResourceLockRow extends SqlRow {
+  resource_key: string;
+  saga_id: string;
+  acquired_at: string;
+  expires_at: string;
+}
 
 /**
  * Resource lock manager for saga concurrency control
@@ -64,7 +69,7 @@ export class ResourceLockManager {
         timeout,
         expiresAt,
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Check if lock already exists
       const existingLock = await this.getLock(resourceKey);
 
@@ -143,15 +148,39 @@ export class ResourceLockManager {
   }
 
   /**
+   * Release EVERY lock held by a saga (FA-CORE-001 recovery). A crashed
+   * process leaves its in-flight saga's resource locks orphaned; recovery
+   * frees them so the record is not permanently locked. Returns the count
+   * released.
+   */
+  async releaseAllForSaga(sagaId: string): Promise<number> {
+    try {
+      const result = await this.db
+        .getAdapter()
+        .execute('DELETE FROM saga_resource_locks WHERE saga_id = ?', [sagaId]);
+      return (result as { changes?: number } | undefined)?.changes ?? 0;
+    } catch (error) {
+      coreError(
+        `Failed to release locks for saga: ${sagaId}`,
+        'SAGA_LOCK_RELEASE_ALL_ERROR',
+        { sagaId, error: error instanceof Error ? error.message : String(error) },
+        { operation: 'saga:lock:release-all' }
+      );
+      return 0;
+    }
+  }
+
+  /**
    * Get current lock on a resource
    */
   async getLock(resourceKey: string): Promise<ResourceLock | null> {
     try {
       const rows = await this.db
         .getAdapter()
-        .query('SELECT * FROM saga_resource_locks WHERE resource_key = ?', [
-          resourceKey,
-        ]);
+        .query<SagaResourceLockRow>(
+          'SELECT * FROM saga_resource_locks WHERE resource_key = ?',
+          [resourceKey]
+        );
 
       if (rows.length === 0) {
         return null;
@@ -192,7 +221,7 @@ export class ResourceLockManager {
           new Date().toISOString(),
         ]);
 
-      const deletedCount = (result as any).changes || 0;
+      const deletedCount = result.changes || 0;
 
       if (deletedCount > 0) {
         coreDebug(

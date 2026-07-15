@@ -5,7 +5,7 @@ interface Props {
   collapsed?: boolean;
 }
 
-const props = withDefaults(defineProps<Props>(), {
+withDefaults(defineProps<Props>(), {
   collapsed: false,
 });
 
@@ -15,7 +15,7 @@ const { locale, locales, setLocale, t } = useI18n();
 
 // Load saved locale from localStorage on mount
 onMounted(async () => {
-  if (process.client) {
+  if (import.meta.client) {
     const savedLocale = localStorage.getItem('i18n_locale');
     if (savedLocale && (savedLocale === 'en' || savedLocale === 'fr')) {
       await setLocale(savedLocale);
@@ -25,7 +25,7 @@ onMounted(async () => {
 
 // Watch for locale changes and persist to localStorage
 watch(locale, (newLocale) => {
-  if (process.client) {
+  if (import.meta.client) {
     localStorage.setItem('i18n_locale', newLocale);
   }
 });
@@ -104,14 +104,17 @@ const items = computed<DropdownMenuItem[][]>(() => {
     {
       label: t('common.language'),
       icon: 'i-lucide-languages',
-      children: (locales.value as any[]).map((loc: any) => ({
+      children: (locales.value as Array<{ name: string; code: string }>).map((loc) => ({
         label: loc.name,
         icon: loc.code === 'en' ? 'i-lucide-languages' : 'i-lucide-languages',
         type: 'checkbox',
         checked: locale.value === loc.code,
         async onSelect(e: Event) {
           e.preventDefault();
-          await setLocale(loc.code);
+          // setLocale is typed against the configured Locale literal union;
+          // loc.code originates from the same i18n locales list, so the cast
+          // is safe at the type-narrowing boundary.
+          await setLocale(loc.code as typeof locale.value);
         },
       })),
     },
@@ -164,11 +167,5 @@ const items = computed<DropdownMenuItem[][]>(() => {
       }"
     />
 
-    <!-- <template #chip-leading="{ item }">
-            <span :style="{
-                '--chip-light': `var(--color-${(item as any).chip}-500)`,
-                '--chip-dark': `var(--color-${(item as any).chip}-400)`
-            }" class="ms-0.5 size-2 rounded-full bg-(--chip-light) dark:bg-(--chip-dark)" />
-        </template> -->
   </UDropdownMenu>
 </template>

@@ -180,6 +180,41 @@ describe('DiagnosticService', () => {
       });
     });
 
+    it('should sanitize sensitive fields out of the returned report', async () => {
+      // Surfaced finding #1 from lint-followups: sanitizeDiagnosticReport
+      // is now wired into runAll(). Verify that a sensitive value in a
+      // checker's check-result.details survives as redacted on the way
+      // out. The sanitizer's own tests cover redaction patterns
+      // exhaustively (__tests__/sanitizer.test.ts); this test only
+      // confirms the integration is wired.
+      class SensitiveChecker extends BaseDiagnosticChecker {
+        name = 'sensitive-check';
+        component = 'sensitive-component';
+
+        async check(): Promise<CheckResult> {
+          return this.createWarningResult('Found suspicious config', {
+            api_key: 'sk-live-PRIVATE-DO-NOT-LEAK',
+            normal_field: 'public-value',
+          });
+        }
+      }
+
+      service.registerChecker(new SensitiveChecker());
+      const report = await service.runAll({ components: ['sensitive-component'] });
+
+      const component = report.components.find(
+        (c) => c.component === 'sensitive-component'
+      );
+      expect(component).toBeDefined();
+      const checkDetails = component!.checks[0]?.details as
+        | Record<string, unknown>
+        | undefined;
+      expect(checkDetails).toBeDefined();
+      expect(checkDetails!.api_key).toBe('[REDACTED]');
+      // Non-sensitive fields pass through unchanged
+      expect(checkDetails!.normal_field).toBe('public-value');
+    });
+
     it('should audit log the run', async () => {
       const checker = new TestChecker();
       service.registerChecker(checker);
@@ -207,6 +242,50 @@ describe('DiagnosticService', () => {
       const results = await service.autoFix(issues);
 
       expect(results).toEqual([]);
+    });
+
+    // FA-CORE-014: a dryRun request must NOT invoke any checker's autoFix
+    // (which mutates the DB via VACUUM/DDL) — it only previews.
+    it('does not invoke checker autoFix when dryRun is set (FA-CORE-014)', async () => {
+      const autoFixSpy = vi.fn().mockResolvedValue([
+        {
+          issueId: 'x',
+          success: true,
+          message: 'applied',
+          rollbackAvailable: false,
+          duration: 1,
+        },
+      ]);
+
+      class FixableChecker extends BaseDiagnosticChecker {
+        name = 'fixable-check';
+        component = 'fixable-component';
+        async check(): Promise<CheckResult> {
+          return this.createSuccessResult('ok');
+        }
+        autoFix = autoFixSpy;
+      }
+
+      service.registerChecker(new FixableChecker());
+      const issues: any[] = [
+        {
+          id: 'issue-1',
+          severity: 'high',
+          component: 'fixable-component',
+          check: 'fixable-check',
+          message: 'needs fixing',
+          autoFixable: true,
+          fix: { description: 'add missing column', requiresConfirmation: true },
+        },
+      ];
+
+      const results = await service.autoFix(issues, { dryRun: true });
+
+      expect(autoFixSpy).not.toHaveBeenCalled();
+      expect(results).toHaveLength(1);
+      expect(results[0].success).toBe(true);
+      expect(results[0].message).toContain('[dry-run]');
+      expect(results[0].message).toContain('add missing column');
     });
   });
 

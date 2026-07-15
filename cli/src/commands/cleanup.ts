@@ -15,17 +15,62 @@ import { readFileSync, existsSync, rmSync, mkdirSync } from 'fs';
 import { join, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
+import { parse as parseYaml } from 'yaml';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
+const normalizeChallenge = (value: string): string =>
+  value.trim().toLowerCase().replace(/[^a-z]/g, '');
+
+/**
+ * FA-CLI-002: derive the deletion challenge from the configured ORGANIZATION,
+ * not from the CLI's own package.json name (which is the constant "civicpress"
+ * for every install — no protection at all). Falls back to the package name
+ * only when no org config is present.
+ */
+const resolveOrgChallengeName = (projectRoot: string): string => {
+  const orgConfigPath = join(projectRoot, 'data', '.civic', 'org-config.yml');
+  try {
+    if (existsSync(orgConfigPath)) {
+      const parsed = parseYaml(readFileSync(orgConfigPath, 'utf-8')) as
+        | Record<string, any>
+        | undefined;
+      // FA-CLI-002 (re-audit): prefer the ORG's own name field (`name.value`)
+      // over `_metadata.name`, which is just the config file's descriptive
+      // label (e.g. 'Test Org') — the challenge should be the organization's
+      // real name so it is specific to this install.
+      const raw =
+        parsed?.name?.value ??
+        (typeof parsed?.name === 'string' ? parsed.name : undefined) ??
+        parsed?._metadata?.name;
+      const normalized = raw ? normalizeChallenge(String(raw)) : '';
+      if (normalized) return normalized;
+    }
+  } catch {
+    // fall through to the package-name fallback
+  }
+  try {
+    const packageJson = JSON.parse(
+      readFileSync(join(projectRoot, 'package.json'), 'utf-8')
+    );
+    return normalizeChallenge(packageJson.name || 'CivicPress');
+  } catch {
+    return 'civicpress';
+  }
+};
+
 export const cleanupCommand = (cli: CAC) => {
   cli
     .command('cleanup', 'Remove all data and reset to clean default state')
-    .option('--force', 'Skip confirmation prompts')
-
+    .option('--force', 'Skip the interactive confirmation prompts')
+    .option(
+      '--yes-i-know',
+      'Required with --force: acknowledge that this irreversibly deletes all data'
+    )
     .option('--json', 'Output in JSON format')
     .option('--silent', 'Suppress output')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .action(async (options: any) => {
       // Initialize CLI output with global options
       const globalOpts = getGlobalOptionsFromArgs();
@@ -73,22 +118,24 @@ export const cleanupCommand = (cli: CAC) => {
         let confirmed = false;
 
         if (options.force) {
+          // FA-CLI-002: --force alone must NOT wipe a municipality's records.
+          // Require an explicit second flag so a stray --force (CI, shell
+          // history, fat-finger) can't irreversibly delete everything.
+          if (!options.yesIKnow) {
+            cliError(
+              '--force requires --yes-i-know to confirm irreversible deletion of all CivicPress data. ' +
+                'Re-run with both flags, or omit --force to be prompted.',
+              'FORCE_REQUIRES_CONFIRMATION',
+              undefined,
+              'cleanup'
+            );
+            process.exit(1);
+          }
           confirmed = true;
         } else {
-          // Load package.json to get project name
-          const packageJsonPath = join(projectRoot, 'package.json');
-          let projectName = 'CivicPress';
-
-          try {
-            const packageJson = JSON.parse(
-              readFileSync(packageJsonPath, 'utf-8')
-            );
-            projectName = packageJson.name || 'CivicPress';
-          } catch {
-            // Use default if package.json can't be read
-          }
-
-          const expectedCity = projectName.toLowerCase().replace(/[^a-z]/g, '');
+          // FA-CLI-002: challenge on the configured ORGANIZATION name, not the
+          // constant CLI package name.
+          const expectedCity = resolveOrgChallengeName(projectRoot);
 
           if (!globalOpts.silent) {
             logger.warn(

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { CivicRecord } from '~/stores/records';
+import type { ApiResponse } from '~/utils/api-response';
 import { getFieldValue as normalizeValue } from '~/utils/config';
 import SystemFooter from '~/components/SystemFooter.vue';
 
@@ -7,6 +8,7 @@ import SystemFooter from '~/components/SystemFooter.vue';
 const authStore = useAuthStore();
 
 // Composables
+const router = useRouter();
 const { $civicApi } = useNuxtApp();
 const { formatDate } = useRecordUtils();
 const runtimeConfig = useRuntimeConfig();
@@ -14,7 +16,6 @@ const { t } = useI18n();
 
 // Search suggestions composable
 const {
-  suggestions,
   words: suggestionWords,
   titles: suggestionTitles,
   isLoading: suggestionsLoading,
@@ -23,6 +24,7 @@ const {
 } = useSearchSuggestions();
 
 // Reactive state
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const organizationInfo = ref<any>(null);
 const recentRecords = ref<CivicRecord[]>([]);
 const loading = ref(true);
@@ -144,11 +146,11 @@ const handleClickOutside = (event: Event) => {
 // Fetch organization info (public endpoint)
 const fetchOrganizationInfo = async () => {
   try {
-    const response = (await $civicApi('/api/v1/info')) as any;
+    const response = (await $civicApi('/api/v1/info')) as ApiResponse;
     if (response.success) {
       organizationInfo.value = response.organization;
     }
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('Error fetching organization info:', err);
     // Non-critical, so no error UI
   }
@@ -157,11 +159,14 @@ const fetchOrganizationInfo = async () => {
 // Fetch recent records (public)
 const fetchRecentRecords = async () => {
   try {
-    const response = (await $civicApi('/api/v1/records?limit=5')) as any;
+    const response = (await $civicApi(
+      '/api/v1/records?limit=5'
+    )) as ApiResponse<{ records?: unknown[] }>;
     if (response.success) {
-      recentRecords.value = response.data.records || [];
+      recentRecords.value = (response.data.records ||
+        []) as unknown as CivicRecord[];
     }
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('Error fetching recent records:', err);
     // Non-critical, so no error UI
   }
@@ -175,8 +180,8 @@ const loadDashboardData = async () => {
   try {
     await fetchOrganizationInfo();
     await fetchRecentRecords();
-  } catch (err: any) {
-    error.value = err.message || t('home.failedToLoad');
+  } catch (err: unknown) {
+    error.value = (err instanceof Error ? err.message : '') || t('home.failedToLoad');
     console.error('Error loading dashboard data:', err);
   } finally {
     loading.value = false;
@@ -192,9 +197,6 @@ const navigateToCreate = () => {
 };
 const navigateToLogin = () => {
   navigateTo('/auth/login');
-};
-const navigateToSettings = () => {
-  navigateTo('/settings');
 };
 const navigateToProfile = () => {
   navigateTo('/settings/profile');
@@ -464,7 +466,7 @@ watch(isAuthenticated, (newValue) => {
               <button
                 type="button"
                 class="flex items-center justify-center gap-2 py-3 rounded-lg border border-gray-200 hover:border-gray-300 hover:bg-gray-50 dark:border-gray-700 dark:hover:border-gray-600 dark:hover:bg-gray-800 transition-colors"
-                @click="navigateTo('/geography')"
+                @click="router.push('/geography')"
               >
                 <UIcon name="i-lucide-map" class="w-5 h-5 text-blue-600" />
                 <span>{{ t('home.geography') }}</span>
@@ -496,7 +498,7 @@ watch(isAuthenticated, (newValue) => {
               v-for="record in recentRecords"
               :key="record.id"
               class="hover:shadow-md transition-shadow cursor-pointer"
-              @click="navigateTo(`/records/${record.type}/${record.id}`)"
+              @click="router.push(`/records/${record.type}/${record.id}`)"
             >
               <div class="flex items-start space-x-4">
                 <UIcon

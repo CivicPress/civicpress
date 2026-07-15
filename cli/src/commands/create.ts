@@ -10,7 +10,6 @@ import {
 import * as fs from 'fs';
 import * as path from 'path';
 import {
-  initializeLogger,
   getGlobalOptionsFromArgs,
   initializeCliOutput,
 } from '../utils/global-options.js';
@@ -19,7 +18,6 @@ import matter from 'gray-matter';
 import {
   cliSuccess,
   cliError,
-  cliInfo,
   cliWarn,
   cliStartOperation,
 } from '../utils/cli-output.js';
@@ -40,6 +38,7 @@ export const createCommand = (cli: CAC) => {
     .option('-r, --role <role>', 'Role for the action (clerk, council, etc.)')
     .option('--json', 'Output as JSON')
     .option('--silent', 'Suppress output')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .action(async (type: string, title: string, options: any) => {
       // Initialize CLI output with global options
       const globalOptions = getGlobalOptionsFromArgs();
@@ -52,6 +51,7 @@ export const createCommand = (cli: CAC) => {
         options.token,
         globalOptions.json
       );
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const coreMod: any = await import('@civicpress/core');
       const audit = new coreMod.AuditLogger();
       // Get data directory from civic instance
@@ -73,8 +73,10 @@ export const createCommand = (cli: CAC) => {
       }
 
       try {
-        // Validate record type (includes new types)
-        const validTypes = [
+        // FA-CLI-004: validate against the config-driven record types (so
+        // config-defined custom types are accepted) rather than a hardcoded
+        // whitelist. Fall back to the built-in defaults if config is unreadable.
+        const FALLBACK_TYPES = [
           'bylaw',
           'policy',
           'proposal',
@@ -84,6 +86,15 @@ export const createCommand = (cli: CAC) => {
           'geography',
           'session',
         ];
+        let validTypes = FALLBACK_TYPES;
+        try {
+          const configTypes = coreMod.CentralConfigManager.getRecordTypeKeys();
+          if (Array.isArray(configTypes) && configTypes.length > 0) {
+            validTypes = configTypes;
+          }
+        } catch {
+          // config not readable — fall back to the built-in defaults
+        }
         if (!validTypes.includes(type)) {
           cliError(
             `Invalid record type: ${type}`,

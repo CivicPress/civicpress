@@ -8,7 +8,6 @@ import {
   CircuitBreakerState,
   CircuitBreakerStats,
   DiagnosticError,
-  DiagnosticErrorCategory,
 } from './types.js';
 import { Logger } from '../utils/logger.js';
 
@@ -125,7 +124,7 @@ export class DiagnosticCircuitBreaker {
       // Record success
       this.recordSuccess(checkName);
       return result;
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Record failure
       this.recordFailure(checkName);
       throw error;
@@ -223,7 +222,7 @@ export class DiagnosticCircuitBreaker {
   /**
    * Get success count (stored separately, not in failures map)
    */
-  private getSuccessCount(checkName: string): number {
+  private getSuccessCount(_checkName: string): number {
     // For simplicity, we'll track this separately if needed
     // For now, return 0 as we're primarily tracking failures
     return 0;

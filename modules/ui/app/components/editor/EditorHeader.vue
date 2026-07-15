@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import { useRecordStatuses } from '~/composables/useRecordStatuses';
-import { useRecordUtils } from '~/composables/useRecordUtils';
+import { useTypedI18n } from '~/composables/useTypedI18n';
 
-const { t } = useI18n();
+const { t, tPlural } = useTypedI18n();
 
 interface Props {
   title: string;
@@ -41,8 +41,7 @@ const emit = defineEmits<{
   export: [];
 }>();
 
-const { getRecordStatusLabel, recordStatusOptions } = useRecordStatuses();
-const { getStatusConfig } = useRecordUtils();
+const { recordStatusOptions } = useRecordStatuses();
 
 // Modal states
 const showPublishModal = ref(false);
@@ -52,14 +51,21 @@ const showArchiveModal = ref(false);
 const showDeleteModal = ref(false);
 const selectedPublishStatus = ref<string | null>(null);
 
-const statusConfig = computed(() => {
-  return getStatusConfig(props.status);
-});
-
 // Get available status transitions
+interface StatusOption {
+  label: string;
+  value: string;
+  icon?: string;
+}
+interface DropdownItem {
+  label: string;
+  icon?: string;
+  onClick?: () => void;
+}
+
 const availableTransitions = computed(() => {
-  const options = recordStatusOptions();
-  return options.filter((option: any) =>
+  const options = recordStatusOptions() as StatusOption[];
+  return options.filter((option) =>
     props.allowedTransitions.includes(option.value)
   );
 });
@@ -77,8 +83,8 @@ const isArchived = computed(() => {
 
 // Build dropdown menu items (grouped by sections)
 const dropdownItems = computed(() => {
-  const sections: any[][] = [];
-  const firstSection: any[] = [];
+  const sections: DropdownItem[][] = [];
+  const firstSection: DropdownItem[] = [];
 
   // Show "Save and Publish" option in dropdown
   // Publishing should always be available if user is editing (not dependent on workflow transitions)
@@ -115,7 +121,7 @@ const dropdownItems = computed(() => {
   }
 
   // Status transitions section
-  const transitionsSection: any[] = [];
+  const transitionsSection: DropdownItem[] = [];
 
   // Status transitions based on current state
   if (isPublished.value) {
@@ -144,7 +150,7 @@ const dropdownItems = computed(() => {
   }
 
   // Other status transitions
-  const otherTransitions = availableTransitions.value.filter((option: any) => {
+  const otherTransitions = availableTransitions.value.filter((option) => {
     const status = option.value.toLowerCase();
     // Exclude draft (handled by unpublish), published/active/approved (handled by publish), archived (handled separately)
     return !['draft', 'published', 'active', 'approved', 'archived'].includes(
@@ -152,7 +158,7 @@ const dropdownItems = computed(() => {
     );
   });
 
-  otherTransitions.forEach((option: any) => {
+  otherTransitions.forEach((option) => {
     transitionsSection.push({
       label: t('records.editor.changeStatusTo', { status: option.label }),
       icon: option.icon || 'i-lucide-circle',
@@ -172,10 +178,10 @@ const dropdownItems = computed(() => {
 
 // More menu items (grouped by sections)
 const moreMenuItems = computed(() => {
-  const sections: any[][] = [];
+  const sections: DropdownItem[][] = [];
 
   if (props.isEditing) {
-    const toolsSection: any[] = [];
+    const toolsSection: DropdownItem[] = [];
 
     toolsSection.push({
       label: t('records.editor.viewHistory'),
@@ -211,11 +217,6 @@ const moreMenuItems = computed(() => {
 
   return sections;
 });
-
-const handlePublish = () => {
-  selectedPublishStatus.value = props.status;
-  showPublishModal.value = true;
-};
 
 const confirmPublish = () => {
   emit('publish', selectedPublishStatus.value || undefined);
@@ -283,7 +284,9 @@ const formatTime = (date: Date) => {
   if (minutes < 1) return t('records.editor.justNow');
   if (minutes === 1) return t('records.editor.oneMinuteAgo');
   if (minutes < 60)
-    return (t as any)('records.editor.minutesAgo', minutes, { count: minutes });
+    // vue-i18n's `t()` has multiple overloads but TS picks the simplest;
+    // cast to access the (key, count, named-params) overload for pluralization.
+    return tPlural('records.editor.minutesAgo', minutes);
   return date.toLocaleTimeString();
 };
 </script>

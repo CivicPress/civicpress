@@ -176,6 +176,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
+import type { ApiResponse } from '~/utils/api-response';
 import SystemFooter from '~/components/SystemFooter.vue';
 import { useAuthStore } from '@/stores/auth';
 import FileBrowser from '~/components/storage/FileBrowser.vue';
@@ -200,6 +201,7 @@ const storageStats = ref({
 });
 const refreshing = ref(false);
 const showUploadModal = ref(false);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const folderConfigs = ref<Record<string, any>>({});
 const loadingFolders = ref(false);
 
@@ -289,7 +291,7 @@ const getFolderLabelFromName = (name: string): string => {
   return labelMap[name] || name.charAt(0).toUpperCase() + name.slice(1);
 };
 
-const getFolderIconColor = (folderName: string): string => {
+const getFolderIconColor = (_folderName: string): string => {
   return 'text-blue-500';
 };
 
@@ -318,7 +320,7 @@ const refreshFolderFiles = async () => {
       description: t('settings.storage.storageInformationRefreshed'),
       color: 'primary',
     });
-  } catch (error) {
+  } catch {
     toast.add({
       title: t('common.error'),
       description: t('settings.storage.failedToRefresh'),
@@ -329,6 +331,7 @@ const refreshFolderFiles = async () => {
   }
 };
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const handleUploadComplete = (uploadedFiles: any[]) => {
   toast.add({
     title: t('settings.storage.uploadComplete'),
@@ -353,7 +356,9 @@ const loadStorageConfig = async () => {
     loadingFolders.value = true;
     const response = (await useNuxtApp().$civicApi(
       '/api/v1/storage/config'
-    )) as any;
+    )) as ApiResponse<{
+      config?: { folders?: Record<string, unknown> };
+    }>;
 
     if (response.success && response.data?.config?.folders) {
       folderConfigs.value = response.data.config.folders;
@@ -378,14 +383,11 @@ const loadStorageStats = async () => {
       if (folder.enabled) {
         const response = (await useNuxtApp().$civicApi(
           `/api/v1/storage/folders/${folder.name}/files`
-        )) as any;
+        )) as ApiResponse<{ files: Array<{ size: number }> }>;
 
         if (response.success) {
           const files = response.data.files;
-          const totalSize = files.reduce(
-            (sum: number, file: any) => sum + file.size,
-            0
-          );
+          const totalSize = files.reduce((sum, file) => sum + file.size, 0);
 
           storageStats.value.folderStats[folder.name] = {
             fileCount: files.length,

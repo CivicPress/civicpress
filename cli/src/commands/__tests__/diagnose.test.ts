@@ -13,7 +13,7 @@ describe('Diagnose CLI Command', () => {
   let cli: any;
   let testDataDir: string;
   let originalExit: typeof process.exit;
-  let exitCode: number | null = null;
+  let _exitCode: number | null = null;
 
   beforeEach(() => {
     // Create temporary test directory
@@ -29,9 +29,9 @@ describe('Diagnose CLI Command', () => {
 
     // Mock process.exit
     originalExit = process.exit;
-    exitCode = null;
+    _exitCode = null;
     process.exit = vi.fn((code?: number) => {
-      exitCode = code ?? 0;
+      _exitCode = code ?? 0;
       throw new Error(`process.exit(${code})`);
     }) as any;
 
@@ -41,6 +41,11 @@ describe('Diagnose CLI Command', () => {
   });
 
   afterEach(() => {
+    // Registration-only tests must not trigger process.exit (catches a
+    // regression where command registration accidentally executes an
+    // action). Surfaced finding #4 from lint-followups.
+    expect(process.exit).not.toHaveBeenCalled();
+
     // Restore process.exit
     process.exit = originalExit;
 

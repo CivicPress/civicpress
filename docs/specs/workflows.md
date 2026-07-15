@@ -1,12 +1,13 @@
 # CivicPress Workflows Specification
 
-version: 2.0.0  
-status: stable  
-created: 2025-07-03  
-updated: 2025-12-15  
-deprecated: false  
-sunset_date: null  
-breaking_changes: []  
+version: 0.2.x
+status: partial
+created: 2025-07-03
+updated: 2026-05-17
+deprecated: false
+sunset_date: null
+breaking_changes: []
+
 additions:
 
 - Session recorder integration workflow triggers

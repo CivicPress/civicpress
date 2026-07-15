@@ -1,12 +1,9 @@
 import { Request, Response } from 'express';
 import {
   Logger,
-  CivicPressError,
   isCivicPressError,
-  getErrorCode,
-  getStatusCode,
-  getCorrelationId,
 } from '@civicpress/core';
+import { HttpError } from './http-error.js';
 
 export interface LogContext {
   requestId?: string;
@@ -14,10 +11,10 @@ export interface LogContext {
   userRole?: string;
   method?: string;
   path?: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
-export interface SuccessResponse<T = any> {
+export interface SuccessResponse<T = unknown> {
   success: true;
   data: T;
   message?: string;
@@ -25,7 +22,7 @@ export interface SuccessResponse<T = any> {
     total?: number;
     page?: number;
     limit?: number;
-    [key: string]: any;
+    [key: string]: unknown;
   };
 }
 
@@ -34,7 +31,7 @@ export interface ErrorResponse {
   error: {
     message: string;
     code?: string;
-    details?: any;
+    details?: unknown;
   };
 }
 
@@ -60,9 +57,9 @@ export class ApiLogger {
       path: req.path,
       ip: req.ip || req.connection.remoteAddress || 'unknown',
       userAgent: req.get('User-Agent') || 'unknown',
-      userId: (req as any).user?.id,
-      userRole: (req as any).user?.role,
-      requestId: (req as any).requestId,
+      userId: req.user?.id,
+      userRole: req.user?.role,
+      requestId: req.requestId,
       ...context,
     };
 
@@ -73,7 +70,7 @@ export class ApiLogger {
   logResponse(req: Request, res: Response, context: LogContext = {}): void {
     const responseContext = {
       statusCode: res.statusCode,
-      requestId: (req as any).requestId,
+      requestId: req.requestId,
       method: req.method,
       path: req.path,
       ...context,
@@ -86,9 +83,9 @@ export class ApiLogger {
   logSuccess(operation: string, req: Request, context: LogContext = {}): void {
     const successContext = {
       operation,
-      requestId: (req as any).requestId,
-      userId: (req as any).user?.id,
-      userRole: (req as any).user?.role,
+      requestId: req.requestId,
+      userId: req.user?.id,
+      userRole: req.user?.role,
       ...context,
     };
 
@@ -99,9 +96,9 @@ export class ApiLogger {
   logWarning(message: string, req: Request, context: LogContext = {}): void {
     const warningContext = {
       message,
-      requestId: (req as any).requestId,
-      userId: (req as any).user?.id,
-      userRole: (req as any).user?.role,
+      requestId: req.requestId,
+      userId: req.user?.id,
+      userRole: req.user?.role,
       ...context,
     };
 
@@ -111,7 +108,7 @@ export class ApiLogger {
   // Log error with full context
   logError(
     operation: string,
-    error: Error | any,
+    error: unknown,
     req: Request,
     context: LogContext = {}
   ): void {
@@ -126,10 +123,14 @@ export class ApiLogger {
       errorMessage = error.message;
       errorCode = error.code;
       correlationId = error.correlationId;
-    } else {
+    } else if (error instanceof Error) {
       errorName = error.name || 'UnknownError';
       errorMessage = error.message || 'Unknown error';
-      errorCode = error.code;
+      errorCode = (error as Error & { code?: string }).code;
+    } else {
+      errorName = 'UnknownError';
+      errorMessage = typeof error === 'string' ? error : 'Unknown error';
+      errorCode = undefined;
     }
 
     const errorContext = {
@@ -138,12 +139,12 @@ export class ApiLogger {
         name: errorName,
         message: errorMessage,
         code: errorCode,
-        stack: error.stack,
+        stack: error instanceof Error ? error.stack : undefined,
         ...(correlationId && { correlationId }),
       },
-      requestId: (req as any).requestId,
-      userId: (req as any).user?.id,
-      userRole: (req as any).user?.role,
+      requestId: req.requestId,
+      userId: req.user?.id,
+      userRole: req.user?.role,
       method: req.method,
       path: req.path,
       ...context,
@@ -155,16 +156,16 @@ export class ApiLogger {
   // Log validation errors
   logValidationError(
     operation: string,
-    errors: any[],
+    errors: unknown[],
     req: Request,
     context: LogContext = {}
   ): void {
     const validationContext = {
       operation,
       validationErrors: errors,
-      requestId: (req as any).requestId,
-      userId: (req as any).user?.id,
-      userRole: (req as any).user?.role,
+      requestId: req.requestId,
+      userId: req.user?.id,
+      userRole: req.user?.role,
       ...context,
     };
 
@@ -179,9 +180,9 @@ export class ApiLogger {
   ): void {
     const dbContext = {
       operation,
-      requestId: (req as any).requestId,
-      userId: (req as any).user?.id,
-      userRole: (req as any).user?.role,
+      requestId: req.requestId,
+      userId: req.user?.id,
+      userRole: req.user?.role,
       ...context,
     };
 
@@ -198,9 +199,9 @@ export class ApiLogger {
     const authContext = {
       event,
       success,
-      requestId: (req as any).requestId,
-      userId: (req as any).user?.id,
-      userRole: (req as any).user?.role,
+      requestId: req.requestId,
+      userId: req.user?.id,
+      userRole: req.user?.role,
       ip: req.ip || req.connection.remoteAddress || 'unknown',
       userAgent: req.get('User-Agent') || 'unknown',
       ...context,
@@ -223,9 +224,9 @@ export class ApiLogger {
     const perfContext = {
       operation,
       duration,
-      requestId: (req as any).requestId,
-      userId: (req as any).user?.id,
-      userRole: (req as any).user?.role,
+      requestId: req.requestId,
+      userId: req.user?.id,
+      userRole: req.user?.role,
       ...context,
     };
 
@@ -237,10 +238,22 @@ export class ApiLogger {
 
   // Create standardized error response
   createErrorResponse(
-    error: Error | any,
+    error: unknown,
     req: Request,
     defaultMessage: string = 'Operation failed'
-  ): { statusCode: number; success: false; error: any } {
+  ): {
+    statusCode: number;
+    success: false;
+    error: {
+      message: string;
+      code?: string;
+      statusCode?: number;
+      details?: unknown;
+      operation?: string;
+      timestamp?: string;
+      correlationId?: string;
+    };
+  } {
     // Prioritize CivicPressError
     if (isCivicPressError(error)) {
       const outputDetails = error.getOutputDetails();
@@ -250,20 +263,40 @@ export class ApiLogger {
         error: {
           message: outputDetails.message,
           code: outputDetails.code,
-          ...(outputDetails.details && { details: outputDetails.details }),
+          ...(outputDetails.details !== undefined && outputDetails.details !== null
+            ? { details: outputDetails.details }
+            : {}),
           correlationId: error.correlationId,
         },
       };
     }
 
-    // Fallback to ApiError or generic Error
-    if (error instanceof Error && 'statusCode' in error) {
+    // Typed HttpError path (post Phase 2d W3-T2).
+    if (error instanceof HttpError) {
       return {
-        statusCode: (error as any).statusCode || 500,
+        statusCode: error.statusCode,
         success: false,
         error: {
           message: error.message,
-          code: (error as any).code || 'API_ERROR',
+          code: error.code ?? 'API_ERROR',
+          ...(error.details && { details: error.details }),
+        },
+      };
+    }
+
+    // Fallback for legacy errors that carry `statusCode` as a runtime
+    // property without being a typed HttpError (e.g. third-party libs).
+    if (error instanceof Error && 'statusCode' in error) {
+      const legacy = error as Error & {
+        statusCode?: number;
+        code?: string;
+      };
+      return {
+        statusCode: legacy.statusCode ?? 500,
+        success: false,
+        error: {
+          message: error.message,
+          code: legacy.code ?? 'API_ERROR',
         },
       };
     }
@@ -281,7 +314,7 @@ export class ApiLogger {
   // Handle errors with logging and response
   handleError(
     operation: string,
-    error: Error | any,
+    error: unknown,
     req: Request,
     res: Response,
     defaultMessage: string = 'Operation failed'
@@ -295,7 +328,7 @@ export class ApiLogger {
   // Handle validation errors
   handleValidationError(
     operation: string,
-    errors: any[],
+    errors: unknown[],
     req: Request,
     res: Response
   ): void {
@@ -370,7 +403,7 @@ export function logApiSuccess(
 
 export function logApiError(
   operation: string,
-  error: Error | any,
+  error: unknown,
   req: Request,
   context?: LogContext
 ): void {
@@ -379,7 +412,7 @@ export function logApiError(
 
 export function handleApiError(
   operation: string,
-  error: Error | any,
+  error: unknown,
   req: Request,
   res: Response,
   defaultMessage?: string
@@ -389,7 +422,7 @@ export function handleApiError(
 
 export function handleValidationError(
   operation: string,
-  errors: any[],
+  errors: unknown[],
   req: Request,
   res: Response
 ): void {

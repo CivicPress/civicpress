@@ -4,7 +4,7 @@
  * Tests the complete saga flow for updating published records.
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { CivicPress, CivicPressConfig } from '../../civic-core.js';
 import { UpdateRecordSaga } from '../update-record-saga.js';
 import {
@@ -112,13 +112,13 @@ describe('UpdateRecordSaga Integration', () => {
     if (civic) {
       try {
         await civic.shutdown();
-      } catch (error) {
+      } catch {
         // Ignore shutdown errors
       }
     }
     try {
       await fs.rm(testDir, { recursive: true, force: true });
-    } catch (error) {
+    } catch {
       // Ignore cleanup errors
     }
   });
@@ -286,6 +286,50 @@ describe('UpdateRecordSaga Integration', () => {
       expect(validation.valid).toBe(false);
       expect(validation.errors).toBeDefined();
       expect(validation.errors?.some((e) => e.includes('recordId'))).toBe(true);
+    });
+  });
+
+  describe('Compensation of added fields (FA-CORE-009)', () => {
+    it('reverts attachedFiles/geography/linkedRecords that the failed update ADDED', async () => {
+      // Original record (from beforeEach) has none of these fields set.
+      const before = await db.getRecord(existingRecordId);
+      expect(before?.attached_files ?? null).toBeNull();
+      expect(before?.geography ?? null).toBeNull();
+      expect(before?.linked_records ?? null).toBeNull();
+
+      const git = civic.getGitEngine();
+      // Fail at CommitToGit so steps 1–2 must compensate.
+      git.commit = vi.fn().mockRejectedValue(new Error('injected git failure'));
+
+      const saga = new UpdateRecordSaga(
+        db,
+        recordManager,
+        git,
+        civic.getHookSystem(),
+        civic.getIndexingService(),
+        testDir
+      );
+
+      const context = {
+        correlationId: `test-comp-added-${Date.now()}`,
+        startedAt: new Date(),
+        recordId: existingRecordId,
+        request: {
+          attachedFiles: [{ path: 'files/evidence.pdf', name: 'evidence.pdf' }],
+          geography: { district: 'D1' },
+          linkedRecords: [{ id: 'rec-linked-1', type: 'bylaw' }],
+        },
+        user: testUser,
+        metadata: { recordId: existingRecordId },
+      } as any;
+
+      await expect(sagaExecutor.execute(saga, context)).rejects.toThrow();
+
+      // Compensation must have reset the ADDED fields, not skipped them.
+      const after = await db.getRecord(existingRecordId);
+      expect(after?.attached_files ?? null).toBeNull();
+      expect(after?.geography ?? null).toBeNull();
+      expect(after?.linked_records ?? null).toBeNull();
     });
   });
 });

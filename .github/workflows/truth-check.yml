@@ -1,0 +1,38 @@
+name: audit-truth-check
+
+# Phase 2c Task 16: CI integration of the audit-truth-check gate.
+#
+# The gate (see `scripts/audit-truth-check.sh` + Makefile target) scans
+# the working tree for documented overclaim patterns ("production-ready",
+# "100% Functional", "Top 0.1%", "stable v1.0", "All goals completed",
+# etc.) and exits non-zero if any are found outside the allow-list.
+#
+# Phase 2b built the script + Makefile target as a manual gate. This
+# workflow makes it recurring so future PRs can't silently regress
+# the structural-dishonesty patterns the 2026-05 audit named.
+#
+# The job runs on PRs touching docs/ or the gate scripts (where
+# overclaim language tends to enter), and on every push to main/dev
+# (the integration branches the refactor merges through).
+
+on:
+  pull_request:
+    paths:
+      - 'docs/**'
+      - 'scripts/audit-truth-check.sh'
+      - 'scripts/audit-truth-check-allowlist.txt'
+      - '.github/workflows/truth-check.yml'
+      - 'Makefile'
+  push:
+    branches:
+      - main
+      - dev
+
+jobs:
+  truth-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Run audit-truth-check
+        run: make audit-truth-check

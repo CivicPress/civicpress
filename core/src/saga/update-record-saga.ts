@@ -139,7 +139,7 @@ class UpdateInRecordsStep extends BaseSagaStep<
       }
 
       // Prepare database updates
-      const dbUpdates: any = {};
+      const dbUpdates: Record<string, unknown> = {};
       if (request.title !== undefined) dbUpdates.title = request.title;
       if (request.content !== undefined) dbUpdates.content = request.content;
       if (request.status !== undefined) dbUpdates.status = request.status;
@@ -187,7 +187,7 @@ class UpdateInRecordsStep extends BaseSagaStep<
     if (context.originalRecord && result) {
       try {
         const original = context.originalRecord;
-        const dbUpdates: any = {
+        const dbUpdates: Record<string, unknown> = {
           title: original.title,
           content: original.content,
           status: original.status,
@@ -199,20 +199,21 @@ class UpdateInRecordsStep extends BaseSagaStep<
           }),
         };
 
-        if (original.geography) {
-          dbUpdates.geography = JSON.stringify(original.geography);
-        }
-        if (original.attachedFiles) {
-          dbUpdates.attached_files = JSON.stringify(original.attachedFiles);
-        }
-        if (original.linkedRecords) {
-          dbUpdates.linked_records = JSON.stringify(original.linkedRecords);
-        }
-        if (original.linkedGeographyFiles) {
-          dbUpdates.linked_geography_files = JSON.stringify(
-            original.linkedGeographyFiles
-          );
-        }
+        // FA-CORE-009: always revert these columns. Guarding on the original
+        // value being non-empty left values ADDED by the failed update in
+        // place; an originally-absent field must be reset to NULL.
+        dbUpdates.geography = original.geography
+          ? JSON.stringify(original.geography)
+          : null;
+        dbUpdates.attached_files = original.attachedFiles
+          ? JSON.stringify(original.attachedFiles)
+          : null;
+        dbUpdates.linked_records = original.linkedRecords
+          ? JSON.stringify(original.linkedRecords)
+          : null;
+        dbUpdates.linked_geography_files = original.linkedGeographyFiles
+          ? JSON.stringify(original.linkedGeographyFiles)
+          : null;
         if (original.path) {
           dbUpdates.path = original.path;
         }
@@ -370,7 +371,9 @@ class UpdateFileStep extends BaseSagaStep<UpdateRecordContext, string> {
     return RecordParser.serializeToMarkdown(record);
   }
 
-  private normalizeFrontmatterForValidation(frontmatter: any): any {
+  private normalizeFrontmatterForValidation(
+    frontmatter: Record<string, unknown>
+  ): Record<string, unknown> {
     const normalized = { ...frontmatter };
     if (normalized.created && normalized.created instanceof Date) {
       normalized.created = normalized.created.toISOString();
@@ -428,7 +431,7 @@ class QueueReIndexingStep extends BaseSagaStep<UpdateRecordContext, void> {
   isCompensatable = false; // Derived state
   timeout = 5000; // 5 seconds
 
-  constructor(private indexingService: IndexingService) {
+  constructor(private indexingService: IndexingService | null) {
     super(5000);
   }
 
@@ -436,6 +439,13 @@ class QueueReIndexingStep extends BaseSagaStep<UpdateRecordContext, void> {
     this.logStep('start', context);
 
     if (!context.updatedRecord) {
+      return;
+    }
+
+    // Indexing is fire-and-forget derived state; skip cleanly when no
+    // indexing service is wired (callers may legitimately run without one).
+    if (!this.indexingService) {
+      this.logStep('complete', context);
       return;
     }
 
@@ -512,6 +522,7 @@ class EmitHooksStep extends BaseSagaStep<UpdateRecordContext, RecordData> {
 export class UpdateRecordSaga implements Saga<UpdateRecordContext, RecordData> {
   name = 'UpdateRecord';
   version = '1.0.0';
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   steps: SagaStep<UpdateRecordContext, any>[];
 
   constructor(
@@ -519,7 +530,7 @@ export class UpdateRecordSaga implements Saga<UpdateRecordContext, RecordData> {
     recordManager: RecordManager,
     git: GitEngine,
     hooks: HookSystem,
-    indexingService: IndexingService,
+    indexingService: IndexingService | null,
     dataDir: string
   ) {
     this.steps = [

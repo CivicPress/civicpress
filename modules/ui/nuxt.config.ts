@@ -1,6 +1,7 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
-  // SSR mode - works better with Nuxt UI Pro
+  // SPA mode — historically chosen against Nuxt UI v3 + Pro v3; revisit for v4 + SSR
+  // when public-read prerender lands (ui-003).
   ssr: false,
 
   // Development server configuration
@@ -10,23 +11,41 @@ export default defineNuxtConfig({
   },
 
   // Modules
-  modules: ['@nuxt/ui-pro', '@pinia/nuxt', '@nuxtjs/i18n'],
-  css: ['~/assets/css/main.css'],
-  ui: {
-    // Minimal theme configuration to prevent useHead issues
-    theme: {
-      colors: ['primary', 'error'],
+  modules: ['@nuxt/ui', '@pinia/nuxt', '@nuxtjs/i18n', '@nuxt/eslint'],
+
+  // ESLint module configuration
+  // standalone: true (default) — generates full Vue + TypeScript config stack
+  // so withNuxt() can accept our overrides cleanly on top
+  eslint: {
+    config: {
+      standalone: true,
     },
   },
+  css: ['~/assets/css/main.css'],
 
   // Runtime configuration
   runtimeConfig: {
     public: {
-      // API base URL
-      civicApiUrl: process.env.API_BASE_URL || 'http://localhost:3000',
+      // API base URL. CIVIC_API_CLIENT_BASE lets the browser client use a
+      // relative base ('') so requests ride the same origin and hit the
+      // Nitro devProxy below (no CORS, works from any host/tunnel); unset,
+      // it falls back to API_BASE_URL then the local default as before.
+      civicApiUrl:
+        process.env.CIVIC_API_CLIENT_BASE ??
+        process.env.API_BASE_URL ??
+        'http://localhost:3000',
       // App configuration
       appName: 'CivicPress',
       appVersion: '0.1.3',
+      // Realtime collaborative editing (Phase 3). The WebSocket origin of the
+      // in-process realtime server (it listens on its own port, default 3001).
+      // useRealtimeEditor appends `/realtime/records/<recordId>`.
+      realtimeWsUrl:
+        process.env.NUXT_PUBLIC_REALTIME_WS_URL || 'ws://localhost:3001',
+      // Feature flag — gates the collaborative editor path on the record edit
+      // page. Off by default so editing does not require a running realtime
+      // server; set NUXT_PUBLIC_REALTIME_ENABLED=true to opt in.
+      realtimeEnabled: process.env.NUXT_PUBLIC_REALTIME_ENABLED === 'true',
     },
   },
 

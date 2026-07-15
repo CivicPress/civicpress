@@ -16,17 +16,19 @@ import {
   DiagnosticStatus,
   CheckResult,
 } from './types.js';
+import { errorMessage, errorStack, errorCode } from '../utils/error-narrow.js';
 import { DatabaseService } from '../database/database-service.js';
 import { SearchService } from '../search/search-service.js';
 import { CentralConfigManager } from '../config/central-config.js';
 import { Logger } from '../utils/logger.js';
 import { AuditLogger } from '../audit/audit-logger.js';
 import { DiagnosticCircuitBreaker } from './circuit-breaker.js';
+import type { CircuitBreakerStats } from './types.js';
 import { ResourceMonitor } from './resource-monitor.js';
 import { DiagnosticCacheAdapter } from './diagnostic-cache-adapter.js';
 import { CheckExecutor } from './check-executor.js';
-import { sanitizeDiagnosticReport } from './utils/sanitizer.js';
 import { UnifiedCacheManager } from '../cache/unified-cache-manager.js';
+import { sanitizeDiagnosticReport } from './utils/sanitizer.js';
 import * as crypto from 'crypto';
 
 export interface DiagnosticServiceOptions {
@@ -201,15 +203,19 @@ export class DiagnosticService {
         operation: 'diagnose:run_all',
       });
 
-      return report;
-    } catch (error: any) {
+      // Sanitize sensitive data (passwords, tokens, credentials) out of
+      // the diagnostic report before it leaves this service. The
+      // sanitizer was imported but never wired prior to surfaced
+      // finding #1 from lint-followups.
+      return sanitizeDiagnosticReport(report);
+    } catch (error: unknown) {
       const duration = Date.now() - startTime;
 
       this.logger.error('Diagnostic run failed', {
         runId,
         duration,
-        error: error.message,
-        stack: error.stack,
+        error: errorMessage(error),
+        stack: errorStack(error),
         operation: 'diagnose:run_all',
       });
 
@@ -221,10 +227,10 @@ export class DiagnosticService {
           action: 'diagnose:run_all',
           target: { type: 'system' },
           outcome: 'failure',
-          message: `Diagnostic run failed: ${error.message}`,
+          message: `Diagnostic run failed: ${errorMessage(error)}`,
           metadata: {
             runId,
-            error: error.message,
+            error: errorMessage(error),
             duration,
           },
         });
@@ -303,6 +309,22 @@ export class DiagnosticService {
   ): Promise<FixResult[]> {
     const results: FixResult[] = [];
 
+    // FA-CORE-014: honor dryRun at the single choke point. A "preview" request
+    // must never call a checker's autoFix (which mutates the DB via VACUUM/DDL)
+    // nor invalidate caches — return simulated results describing what WOULD run.
+    if (options?.dryRun) {
+      for (const issue of issues) {
+        results.push({
+          issueId: issue.id,
+          success: true,
+          message: `[dry-run] Would apply: ${issue.fix?.description ?? issue.message}`,
+          rollbackAvailable: false,
+          duration: 0,
+        });
+      }
+      return results;
+    }
+
     // Group issues by component
     const issuesByComponent = new Map<string, DiagnosticIssue[]>();
     for (const issue of issues) {
@@ -321,20 +343,29 @@ export class DiagnosticService {
           try {
             const fixResults = await checker.autoFix(componentIssues, options);
             results.push(...fixResults);
-          } catch (error: any) {
+          } catch (error: unknown) {
             this.logger.error(
               `Auto-fix failed for ${component}:${checker.name}`,
               {
-                error: error.message,
+                error: errorMessage(error),
               }
             );
             results.push({
               issueId: componentIssues[0]?.id || 'unknown',
               success: false,
-              message: `Auto-fix failed: ${error.message}`,
+              message: `Auto-fix failed: ${errorMessage(error)}`,
               rollbackAvailable: false,
               duration: 0,
-              error: error,
+              error: {
+                category: 'unknown',
+                severity: 'medium',
+                actionable: false,
+                recoverable: true,
+                retryable: false,
+                message: errorMessage(error),
+                code: errorCode(error),
+                stack: errorStack(error),
+              },
             });
           }
         }
@@ -427,25 +458,9 @@ export class DiagnosticService {
     const issues: DiagnosticIssue[] = [];
 
     for (const check of checks) {
-      // First, extract issues from check.details.issues (created by checkers)
+      // Extract issues from check.details.issues (created by checkers)
       if (check.details && Array.isArray(check.details.issues)) {
         issues.push(...check.details.issues);
-      }
-
-      // Also check if the overall check result has issues in its details
-      // (some checkers store issues in the overall result's details.issues)
-      if (
-        check.details &&
-        Array.isArray(check.details.issues) &&
-        check.details.issues.length > 0
-      ) {
-        // Already handled above
-      } else if (
-        check.details &&
-        Array.isArray((check.details as any).issues)
-      ) {
-        // Fallback: check if details itself has an issues array
-        issues.push(...(check.details as any).issues);
       }
 
       // If no issues in details but check failed, create a generic issue
@@ -501,7 +516,7 @@ export class DiagnosticService {
   /**
    * Get circuit breaker statistics
    */
-  getCircuitBreakerStats(checkName?: string): any {
+  getCircuitBreakerStats(checkName?: string): CircuitBreakerStats | Record<string, never> {
     if (checkName) {
       return this.circuitBreaker.getStats(checkName);
     }
@@ -512,7 +527,7 @@ export class DiagnosticService {
   /**
    * Get cache statistics
    */
-  async getCacheStats(): Promise<any> {
+  async getCacheStats(): Promise<{ size: number; maxSize: number; keys: string[] }> {
     return await this.cache.getStats();
   }
 }

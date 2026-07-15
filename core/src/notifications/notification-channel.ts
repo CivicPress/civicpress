@@ -8,6 +8,7 @@ export interface NotificationContent {
 export interface ChannelRequest {
   to: string;
   content: NotificationContent;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   data: Record<string, any>;
   priority: 'low' | 'normal' | 'high' | 'urgent';
 }
@@ -21,7 +22,9 @@ export interface ChannelResponse {
 export interface ChannelConfig {
   enabled: boolean;
   provider?: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   credentials: Record<string, any>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   settings: Record<string, any>;
 }
 

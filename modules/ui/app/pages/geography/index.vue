@@ -160,7 +160,7 @@
                       class="w-5 h-5 text-blue-500"
                     />
                     <UBadge
-                      :color="getCategoryColor(file.category) as any"
+                      :color="getCategoryColor(file.category)"
                       variant="soft"
                       size="sm"
                     >
@@ -217,9 +217,9 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
+import { extractErrorMessage, type ApiResponse } from '~/utils/api-response';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '~/stores/auth';
-import { useToast } from '#imports';
 import { useDebounceFn } from '@vueuse/core';
 import type {
   GeographyFile,
@@ -231,7 +231,6 @@ import SystemFooter from '~/components/SystemFooter.vue';
 // Composables
 const router = useRouter();
 const authStore = useAuthStore();
-const toast = useToast();
 const { t } = useI18n();
 
 // Breadcrumbs
@@ -254,10 +253,6 @@ const totalPages = ref(1);
 // Computed properties
 const canCreateGeography = computed(() => {
   return authStore.isLoggedIn && authStore.hasPermission('geography:create');
-});
-
-const canEditGeography = computed(() => {
-  return authStore.user?.role === 'admin' || authStore.user?.role === 'clerk';
 });
 
 const categoryOptions = computed(() => [
@@ -325,14 +320,14 @@ const loadGeographyFiles = async () => {
 
     const response = (await useNuxtApp().$civicApi(
       `/api/v1/geography?${params}`
-    )) as any;
+    )) as ApiResponse<{ files: GeographyFile[]; total: number }>;
 
     if (response.success) {
       geographyFiles.value = response.data.files;
       totalFiles.value = response.data.total;
       totalPages.value = Math.ceil(totalFiles.value / 12);
     } else {
-      throw new Error(response.error || 'Failed to load geography files');
+      throw new Error(extractErrorMessage(response) || 'Failed to load geography files');
     }
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Unknown error occurred';
@@ -367,10 +362,6 @@ const navigateToFile = (id: string) => {
   router.push(`/geography/${id}`);
 };
 
-const navigateToEdit = (id: string) => {
-  router.push(`/geography/${id}/edit`);
-};
-
 const getFileTypeIcon = (type: GeographyFileType): string => {
   const icons: Record<GeographyFileType, string> = {
     geojson: 'i-lucide-map',
@@ -381,43 +372,33 @@ const getFileTypeIcon = (type: GeographyFileType): string => {
   return icons[type] || 'i-lucide-file';
 };
 
-const getCategoryColor = (category: GeographyCategory): string => {
-  const colors: Record<GeographyCategory, string> = {
-    zone: 'blue',
-    boundary: 'green',
-    district: 'purple',
-    facility: 'orange',
-    route: 'red',
+type UiBadgeColor = 'error' | 'primary' | 'neutral';
+const getCategoryColor = (category: GeographyCategory): UiBadgeColor => {
+  // Nuxt UI's strict color enum doesn't include the original semantic names
+  // (blue/green/purple/orange/red); the badge palette maps them to the
+  // available set, with error reserved for routes and primary for everything
+  // navigable.
+  const colors: Record<GeographyCategory, UiBadgeColor> = {
+    zone: 'primary',
+    boundary: 'primary',
+    district: 'primary',
+    facility: 'primary',
+    route: 'error',
   };
-  return colors[category] || 'gray';
+  return colors[category] || 'neutral';
 };
 
 const formatDate = (dateString: string): string => {
   return new Date(dateString).toLocaleDateString();
 };
 
-const formatBounds = (bounds: any): string => {
+const formatBounds = (bounds: {
+  minLon: number;
+  minLat: number;
+  maxLon: number;
+  maxLat: number;
+}): string => {
   return `${bounds.minLon.toFixed(4)}, ${bounds.minLat.toFixed(4)} ${t('geography.boundsTo')} ${bounds.maxLon.toFixed(4)}, ${bounds.maxLat.toFixed(4)}`;
-};
-
-const getFileMenuItems = (file: GeographyFile) => {
-  const items = [
-    {
-      label: t('common.view'),
-      icon: 'i-lucide-eye',
-      onClick: () => navigateToFile(file.id),
-    },
-  ];
-
-  if (canEditGeography.value) {
-    items.push({
-      label: t('common.edit'),
-      icon: 'i-lucide-edit',
-      onClick: () => navigateToEdit(file.id),
-    });
-  }
-
-  return items;
 };
 
 // Lifecycle

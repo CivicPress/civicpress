@@ -5,6 +5,7 @@
  */
 
 import { BaseDiagnosticChecker } from '../base-checker.js';
+import { errorMessage, errorStack } from '../../utils/error-narrow.js';
 import { Logger } from '../../utils/logger.js';
 import {
   CheckResult,
@@ -15,6 +16,29 @@ import {
 } from '../types.js';
 import * as os from 'os';
 import * as process from 'process';
+
+/** Shape of details produced by checkMemoryUsage(). All numeric fields are
+ *  preformatted strings (toFixed). */
+interface MemoryDetails {
+  usagePercent?: string;
+  totalGB?: string;
+  usedGB?: string;
+  freeGB?: string;
+  processRssGB?: string;
+  heapUsagePercent?: string;
+  heapUsedMB?: string;
+  heapTotalMB?: string;
+}
+
+/** Shape of details produced by checkCPUUsage(). */
+interface CpuDetails {
+  cpuCount?: number;
+  load1Min?: string;
+  load5Min?: string;
+  load15Min?: string;
+  loadPercent1Min?: string;
+  loadPercent5Min?: string;
+}
 
 export class SystemDiagnosticChecker extends BaseDiagnosticChecker {
   name = 'system';
@@ -28,7 +52,7 @@ export class SystemDiagnosticChecker extends BaseDiagnosticChecker {
   /**
    * Run all system diagnostic checks
    */
-  async check(options?: DiagnosticOptions): Promise<CheckResult> {
+  async check(_options?: DiagnosticOptions): Promise<CheckResult> {
     const checks: CheckResult[] = [];
     const issues: DiagnosticIssue[] = [];
 
@@ -60,7 +84,7 @@ export class SystemDiagnosticChecker extends BaseDiagnosticChecker {
       const memoryCheck = await this.checkMemoryUsage();
       checks.push(memoryCheck);
       if (memoryCheck.status === 'error' || memoryCheck.status === 'warning') {
-        const details = memoryCheck.details as any;
+        const details = memoryCheck.details as MemoryDetails | undefined;
         const usagePercent = details?.usagePercent || 'unknown';
         const totalGB = details?.totalGB || 'unknown';
         const usedGB = details?.usedGB || 'unknown';
@@ -142,7 +166,7 @@ export class SystemDiagnosticChecker extends BaseDiagnosticChecker {
       const cpuCheck = await this.checkCPUUsage();
       checks.push(cpuCheck);
       if (cpuCheck.status === 'warning') {
-        const details = cpuCheck.details as any;
+        const details = cpuCheck.details as CpuDetails | undefined;
         const cpuCount = details?.cpuCount || 'unknown';
         const load1Min = details?.load1Min || 'unknown';
         const load5Min = details?.load5Min || 'unknown';
@@ -274,10 +298,10 @@ export class SystemDiagnosticChecker extends BaseDiagnosticChecker {
         checks,
         issues: [],
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       this.logger.error('System diagnostic check failed', {
-        error: error.message,
-        stack: error.stack,
+        error: errorMessage(error),
+        stack: errorStack(error),
       });
       return this.createErrorResult('System diagnostic check failed', error, {
         checks,
@@ -322,9 +346,9 @@ export class SystemDiagnosticChecker extends BaseDiagnosticChecker {
         version: nodeVersion,
         major: majorVersion,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       return this.createWarningResult('Failed to check Node.js version', {
-        error: error.message,
+        error: errorMessage(error),
       });
     }
   }
@@ -367,7 +391,6 @@ export class SystemDiagnosticChecker extends BaseDiagnosticChecker {
       // Calculate free memory threshold based on total RAM
       // For large systems (>=32GB), use 10% of total RAM as threshold
       // For smaller systems, use fixed thresholds
-      const freeMemoryPercent = (freeGB / totalGB) * 100;
       const lowWarningFreeThreshold =
         totalGB >= 32 ? totalGB * 0.1 : totalGB >= 16 ? 2 : 0.5;
       const warningFreeThreshold = totalGB >= 32 ? totalGB * 0.1 : 1;
@@ -493,9 +516,9 @@ export class SystemDiagnosticChecker extends BaseDiagnosticChecker {
         processRssGB: processRssGB.toFixed(2),
         heapUsagePercent: heapUsagePercent.toFixed(1) + '%',
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       return this.createWarningResult('Failed to check memory usage', {
-        error: error.message,
+        error: errorMessage(error),
       });
     }
   }
@@ -579,9 +602,9 @@ export class SystemDiagnosticChecker extends BaseDiagnosticChecker {
         load5Min: load5Min.toFixed(2),
         load15Min: load15Min.toFixed(2),
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       return this.createWarningResult('Failed to check CPU usage', {
-        error: error.message,
+        error: errorMessage(error),
       });
     }
   }
@@ -615,9 +638,9 @@ export class SystemDiagnosticChecker extends BaseDiagnosticChecker {
       return this.createSuccessResult('Process limits are healthy', {
         maxRssMB: maxRssMB.toFixed(2),
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       return this.createWarningResult('Failed to check process limits', {
-        error: error.message,
+        error: errorMessage(error),
       });
     }
   }
@@ -650,9 +673,9 @@ export class SystemDiagnosticChecker extends BaseDiagnosticChecker {
         osType,
         osRelease,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       return this.createWarningResult('Failed to check platform', {
-        error: error.message,
+        error: errorMessage(error),
       });
     }
   }
@@ -662,7 +685,7 @@ export class SystemDiagnosticChecker extends BaseDiagnosticChecker {
    */
   async autoFix(
     issues: DiagnosticIssue[],
-    options?: FixOptions
+    _options?: FixOptions
   ): Promise<FixResult[]> {
     const results: FixResult[] = [];
 

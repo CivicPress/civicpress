@@ -4,21 +4,24 @@
  * Error classes for saga pattern operations.
  */
 
-import { CivicPressError, InternalError } from '../errors/index.js';
+import { CivicPressError } from '../errors/index.js';
+import type { SagaContext } from './types.js';
 
 /**
  * Saga step execution error
  * Thrown when a saga step fails during execution
  */
-export class SagaStepError extends CivicPressError {
+export class SagaStepError<
+  TContext extends SagaContext = SagaContext,
+> extends CivicPressError {
   code = 'SAGA_STEP_ERROR';
   statusCode = 500;
 
   constructor(
     public step: string,
-    public context: any,
+    public sagaContext: TContext,
     public originalError: Error,
-    public additionalContext?: Record<string, any>
+    public additionalContext?: Record<string, unknown>
   ) {
     super(`Saga step '${step}' failed: ${originalError.message}`, {
       step,
@@ -33,15 +36,17 @@ export class SagaStepError extends CivicPressError {
  * Saga compensation error
  * Thrown when compensation fails
  */
-export class SagaCompensationError extends CivicPressError {
+export class SagaCompensationError<
+  TContext extends SagaContext = SagaContext,
+> extends CivicPressError {
   code = 'SAGA_COMPENSATION_ERROR';
   statusCode = 500;
 
   constructor(
     public step: string,
-    public context: any,
+    public sagaContext: TContext,
     public originalError: Error,
-    public additionalContext?: Record<string, any>
+    public additionalContext?: Record<string, unknown>
   ) {
     super(
       `Saga compensation failed for step '${step}': ${originalError.message}`,
@@ -59,13 +64,15 @@ export class SagaCompensationError extends CivicPressError {
  * Uncompensatable failure error
  * Thrown when a step fails and cannot be compensated
  */
-export class UncompensatableFailureError extends CivicPressError {
+export class UncompensatableFailureError<
+  TContext extends SagaContext = SagaContext,
+> extends CivicPressError {
   code = 'UNCOMPENSATABLE_FAILURE';
   statusCode = 500;
 
   constructor(
     public step: string,
-    public context: any,
+    public sagaContext: TContext,
     public reason?: string
   ) {
     super(
@@ -82,13 +89,15 @@ export class UncompensatableFailureError extends CivicPressError {
  * Saga context error
  * Thrown when saga context is invalid
  */
-export class SagaContextError extends CivicPressError {
+export class SagaContextError<
+  TContext extends SagaContext = SagaContext,
+> extends CivicPressError {
   code = 'SAGA_CONTEXT_ERROR';
   statusCode = 400;
 
   constructor(
     public sagaName: string,
-    public context: any,
+    public sagaContext: TContext,
     public validationErrors: string[]
   ) {
     super(
@@ -126,6 +135,29 @@ export class SagaTimeoutError extends CivicPressError {
 }
 
 /**
+ * Saga duplicate error
+ * Thrown when an operation with the same idempotency key is already in flight
+ * (FA-CORE-008 double-submit protection).
+ */
+export class SagaDuplicateError extends CivicPressError {
+  code = 'SAGA_DUPLICATE_OPERATION';
+  statusCode = 409;
+
+  constructor(
+    public idempotencyKey: string,
+    public inFlightSagaId: string
+  ) {
+    super(
+      `An identical operation is already in progress (saga ${inFlightSagaId})`,
+      {
+        idempotencyKey,
+        inFlightSagaId,
+      }
+    );
+  }
+}
+
+/**
  * Saga lock error
  * Thrown when resource lock cannot be acquired
  */
@@ -140,27 +172,6 @@ export class SagaLockError extends CivicPressError {
     super(`Failed to acquire lock on resource '${resourceKey}': ${reason}`, {
       resourceKey,
       reason,
-    });
-  }
-}
-
-/**
- * Saga recovery error
- * Thrown when saga recovery fails
- */
-export class SagaRecoveryError extends InternalError {
-  code = 'SAGA_RECOVERY_ERROR';
-  statusCode = 500;
-
-  constructor(
-    public sagaId: string,
-    public reason: string,
-    context?: Record<string, any>
-  ) {
-    super(`Failed to recover saga '${sagaId}': ${reason}`, {
-      sagaId,
-      reason,
-      ...context,
     });
   }
 }

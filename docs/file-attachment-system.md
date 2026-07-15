@@ -418,6 +418,10 @@ const categoryOptions = Object.entries(types.data.types).map(
 
 ---
 
-**The File Attachment System is production-ready and provides a complete
-solution for linking files to civic records with security, organization, and
-ease of use.**
+**The File Attachment System ships in v0.2.x as the working path for linking
+files to civic records. The audit findings for storage (storage-001 quota
+enforcement, storage-002 public-folder listing — both closed in Phase 2a;
+storage-003 archiveFile + storage-009 uuid-storage-service — closed in
+Phase 2c Task 5) cover the underlying storage layer. Further hardening
+(streaming completeness, per-record attachment limits, attachment-side audit)
+is post-v0.3.x scope.**

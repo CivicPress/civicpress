@@ -1,11 +1,24 @@
 import { Request, Response, NextFunction } from 'express';
-import { CivicPress, AuthUser, Logger, userCan } from '@civicpress/core';
+import {
+  CivicPress,
+  AuthUser,
+  Logger,
+  userCan,
+  isSimulatedAuthEnabled,
+} from '@civicpress/core';
 
 const logger = new Logger();
 
+/**
+ * Legacy local Request augmentation. The same fields are now in the global
+ * `Express.Request` via `types/express-augment.d.ts`; this interface is
+ * preserved as an alias-only re-export for backward compatibility with the
+ * ~20 route files that still import it. New code should use `Request`
+ * directly. The `null` variant on `civicPress` matches the global augment.
+ */
 export interface AuthenticatedRequest extends Request {
   user?: AuthUser;
-  civicPress?: CivicPress;
+  civicPress?: CivicPress | null;
 }
 
 export function authMiddleware(civicPress: CivicPress) {
@@ -15,8 +28,17 @@ export function authMiddleware(civicPress: CivicPress) {
     next: NextFunction
   ) => {
     try {
-      // BYPASS_AUTH: Inject mock user for testing
-      if (process.env.BYPASS_AUTH === 'true' && req.headers['x-mock-user']) {
+      // BYPASS_AUTH: inject a mock user for testing. FA-API-002: this trusts
+      // the X-Mock-User header verbatim (role included), so it is a full
+      // auth+authz bypass. It is now gated by the SAME fail-closed policy as
+      // simulated auth (isSimulatedAuthEnabled) — allowed only under
+      // NODE_ENV=test, or development with CIVIC_ALLOW_SIMULATED_AUTH=true;
+      // inert everywhere else even if BYPASS_AUTH leaks into the environment.
+      if (
+        process.env.BYPASS_AUTH === 'true' &&
+        req.headers['x-mock-user'] &&
+        isSimulatedAuthEnabled()
+      ) {
         try {
           req.user = JSON.parse(req.headers['x-mock-user'] as string);
           req.civicPress = civicPress;
@@ -101,13 +123,25 @@ export function authMiddleware(civicPress: CivicPress) {
       req.user = user;
       req.civicPress = civicPress;
 
-      // Log authentication event
-      await authService.logAuthEvent(
-        user.id,
-        'api_access',
-        `Access to ${req.method} ${req.path}`,
-        req.ip
-      );
+      // FA-API-015: the per-request api_access audit row was written
+      // synchronously on the hot path (DB INSERT + JSONL append per request)
+      // and grows unbounded. Fire-and-forget so it never blocks the response
+      // (logAuthEvent already swallows its own errors), and let operators who
+      // don't need per-request access rows opt out. Auth-boundary events
+      // (login/logout/api-key create/revoke) are logged elsewhere and keep
+      // their guarantees regardless of this flag.
+      if (process.env.CIVIC_DISABLE_API_ACCESS_LOG !== 'true') {
+        void authService
+          .logAuthEvent(
+            user.id,
+            'api_access',
+            `Access to ${req.method} ${req.path}`,
+            req.ip
+          )
+          .catch((err) =>
+            logger.error('Failed to log api_access audit event:', err)
+          );
+      }
 
       next();
     } catch (error) {
@@ -275,9 +309,9 @@ export function requireStoragePermission(
       // Use our comprehensive userCan() system with context
       const hasPermission = await userCan(
         req.user,
-        `storage:${action}` as any,
+        `storage:${action}`,
         {
-          action: action as any,
+          action: action as 'create' | 'edit' | 'delete' | 'view',
         }
       );
 

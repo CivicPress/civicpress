@@ -90,7 +90,7 @@ describe('Database Integration', () => {
         userId,
         'hashed_key_123',
         'Test API Key',
-        new Date('2025-12-31')
+        new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)
       );
 
       expect(keyId).toBeGreaterThan(0);
@@ -121,7 +121,7 @@ describe('Database Integration', () => {
       const sessionId = await dbService.createSession(
         userId,
         'hashed_token_123',
-        new Date('2025-12-31')
+        new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)
       );
 
       expect(sessionId).toBeGreaterThan(0);
@@ -150,14 +150,14 @@ describe('Database Integration', () => {
       await dbService.createSession(
         userId,
         'expired_token',
-        new Date('2020-01-01') // Expired date
+        new Date(Date.now() - 24 * 60 * 60 * 1000) // Expired date
       );
 
       // Create valid session
       await dbService.createSession(
         userId,
         'valid_token',
-        new Date('2025-12-31') // Valid date
+        new Date(Date.now() + 365 * 24 * 60 * 60 * 1000) // Valid date
       );
 
       // Cleanup expired sessions

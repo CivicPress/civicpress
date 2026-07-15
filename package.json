@@ -3,7 +3,7 @@
   "version": "0.2.0",
   "description": "CivicPress project",
   "type": "module",
-  "packageManager": "pnpm@8.15.0",
+  "packageManager": "pnpm@9.15.9",
   "scripts": {
     "dev": "concurrently \"pnpm run dev:api\" \"pnpm run dev:ui\"",
     "dev:api": "cd modules/api && pnpm run dev",
@@ -29,6 +29,7 @@
     "start:api": "cd modules/api && pnpm run start",
     "start:ui": "cd modules/ui && PORT=3030 pnpm run preview",
     "start:serve": "cd modules/serve && pnpm run start",
+    "lint": "pnpm -r --filter @civicpress/core --filter @civicpress/cli --filter @civicpress/api --filter @civicpress/ui --filter @civicpress/storage exec eslint .",
     "format": "prettier --write \"**/*.{md,json,js,ts,jsx,tsx}\"",
     "format:check": "prettier --check \"**/*.{md,json,js,ts,jsx,tsx}\"",
     "registry:check": "node scripts/registry-check.mjs",
@@ -39,6 +40,8 @@
     "spec:list": "node scripts/spec-list.mjs",
     "spec:check": "pnpm run spec:validate && pnpm run spec:check-deps",
     "spec:all": "pnpm run spec:format && pnpm run spec:validate && pnpm run spec:check-deps && pnpm run spec:list",
+    "audit:imports": "node scripts/audit-package-imports.mjs",
+    "licenses:gen": "node scripts/generate-licenses-md.mjs",
     "test": "vitest run && vitest run --config vitest.config.ui.mjs",
     "test:ui": "vitest --ui",
     "test:run": "vitest run",
@@ -58,20 +61,32 @@
   },
   "license": "MIT",
   "devDependencies": {
+    "@types/bcrypt": "5.0.2",
     "@types/nodemailer": "6.4.17",
+    "@vitejs/plugin-vue": "6.0.3",
     "@vitest/coverage-v8": "3.2.4",
     "@vitest/ui": "3.2.4",
+    "@vue/test-utils": "2.4.6",
+    "bcrypt": "6.0.0",
     "change-case": "5.4.4",
     "concurrently": "^8.2.2",
     "cross-env": "10.0.0",
-    "husky": "^8.0.0",
-    "js-yaml": "4.1.0",
+    "express": "^4.22.2",
+    "fs-extra": "^11.3.5",
+    "gray-matter": "^4.0.3",
+    "husky": "^8.0.3",
+    "js-yaml": "4.3.0",
     "lint-staged": "16.1.5",
     "markdownlint-cli": "^0.37.0",
     "openai": "5.15.0",
-    "plop": "4.0.1",
-    "prettier": "^3.0.0",
+    "pinia": "^3.0.4",
+    "plop": "4.0.5",
+    "prettier": "^3.8.3",
+    "simple-git": "^3.36.0",
+    "supertest": "6.3.4",
     "vitest": "3.2.4",
+    "vue": "^3.5.34",
+    "ws": "^8.18.0",
     "yaml": "2.8.1"
   },
   "lint-staged": {
@@ -87,6 +102,6 @@
     ]
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "3.879.0"
+    "@aws-sdk/client-s3": "3.1048.0"
   }
 }

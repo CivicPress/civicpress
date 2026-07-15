@@ -5,14 +5,12 @@
  */
 
 import type {
-  DiagnosticChecker,
   CheckResult,
   DiagnosticIssue,
 } from '../types.js';
 import { BaseDiagnosticChecker } from '../base-checker.js';
 import { UnifiedCacheManager } from '../../cache/unified-cache-manager.js';
 import { Logger } from '../../utils/logger.js';
-import * as crypto from 'crypto';
 
 export interface CacheHealthCheckerOptions {
   cacheManager: UnifiedCacheManager;
@@ -163,7 +161,8 @@ export class CacheHealthChecker extends BaseDiagnosticChecker {
           globalHitRate: stats.global.totalHitRate,
           globalSize: stats.global.totalSize,
           globalMemoryUsage: stats.global.totalMemoryUsage,
-          issues: issues.length,
+          issueCount: issues.length,
+          issues,
         },
       };
     } catch (error) {

@@ -1,3 +1,5 @@
+import type { ApiResponse } from '~/utils/api-response';
+
 export const useAttachmentTypes = () => {
   const attachmentTypes = ref<
     Array<{ label: string; value: string; description: string }>
@@ -7,9 +9,10 @@ export const useAttachmentTypes = () => {
     try {
       const response = (await useNuxtApp().$civicApi(
         '/api/v1/config/attachment-types'
-      )) as any;
+      )) as ApiResponse;
       if (response.success && response.data.types) {
         attachmentTypes.value = Object.entries(response.data.types).map(
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           ([key, type]: [string, any]) => ({
             label: key.charAt(0).toUpperCase() + key.slice(1),
             value: type.value,

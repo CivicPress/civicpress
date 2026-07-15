@@ -13,7 +13,6 @@ import {
   ConflictError,
   InternalError,
   TemplateNotFoundError,
-  RecordValidationError,
 } from '@civicpress/core';
 
 describe('categorizeError', () => {

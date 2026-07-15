@@ -3,7 +3,6 @@ import { existsSync } from 'fs';
 import { join } from 'path';
 import yaml from 'yaml';
 import {
-  coreSuccess,
   coreError,
   coreInfo,
   coreWarn,
@@ -11,12 +10,20 @@ import {
   coreStartOperation,
 } from '../utils/core-output.js';
 
+/**
+ * Hook payload type. Hooks are polymorphic by design — each event type
+ * carries a different shape — so `unknown` here forces handlers to
+ * narrow before accessing fields. Use `HookData<T>` with a generic if a
+ * specific hook contract is known.
+ */
+export type HookData = unknown;
+
 export interface HookContext {
   timestamp: Date;
   user?: string;
   session?: string;
-  metadata?: Record<string, any>;
-  record?: any;
+  metadata?: Record<string, unknown>;
+  record?: unknown;
   action?: string;
 }
 
@@ -40,7 +47,7 @@ export interface HookSettings {
 }
 
 export type HookHandler = (
-  _data: any,
+  _data: HookData,
   _context: HookContext
 ) => Promise<void> | void;
 
@@ -52,7 +59,7 @@ export type HookHandler = (
  */
 export class HookSystem {
   private listeners: Map<string, HookHandler[]>;
-  private hooks: Map<string, any>;
+  private hooks: Map<string, HookDefinition>;
   private config: HookConfig | null;
   private configPath: string;
   private logPath: string;
@@ -245,7 +252,7 @@ export class HookSystem {
    */
   async emit(
     name: string,
-    data: any,
+    data: HookData,
     context?: Partial<HookContext>
   ): Promise<void> {
     const fullContext: HookContext = {
@@ -335,7 +342,7 @@ export class HookSystem {
    */
   private async executeWorkflows(
     hookName: string,
-    data: any,
+    data: HookData,
     context: HookContext
   ): Promise<void> {
     const hookConfig = this.config?.hooks[hookName];
@@ -391,8 +398,8 @@ export class HookSystem {
    */
   private async executeWorkflow(
     workflowName: string,
-    data: any,
-    context: HookContext
+    data: HookData,
+    _context: HookContext
   ): Promise<void> {
     coreDebug(`Executing workflow: ${workflowName}`, {
       operation: 'workflow execution',
@@ -414,7 +421,7 @@ export class HookSystem {
   private async logHook(
     type: string,
     name: string,
-    data: any,
+    data: HookData,
     context: HookContext
   ): Promise<void> {
     if (!this.logPath) return;
@@ -488,53 +495,66 @@ export class HookSystem {
   }
 
   // Default hook handlers
-  private onInitialized(_data: any, _context: HookContext): void {
+  private onInitialized(_data: HookData, _context: HookContext): void {
     coreInfo('CivicPress initialized', { operation: 'hook handling' });
   }
 
-  private onRecordCreated(_data: any, _context: HookContext): void {
+  private onRecordCreated(_data: HookData, _context: HookContext): void {
     coreInfo('Record created', {
       operation: 'hook handling',
-      recordId: _data?.id,
+      recordId: readHookField(_data, 'id'),
     });
   }
 
-  private onRecordUpdated(_data: any, _context: HookContext): void {
+  private onRecordUpdated(_data: HookData, _context: HookContext): void {
     coreInfo('Record updated', {
       operation: 'hook handling',
-      recordId: _data?.id,
+      recordId: readHookField(_data, 'id'),
     });
   }
 
-  private onRecordCommitted(_data: any, _context: HookContext): void {
+  private onRecordCommitted(_data: HookData, _context: HookContext): void {
     coreInfo('Record committed', {
       operation: 'hook handling',
-      recordId: _data?.id,
+      recordId: readHookField(_data, 'id'),
     });
   }
 
-  private onStatusChanged(_data: any, _context: HookContext): void {
+  private onStatusChanged(_data: HookData, _context: HookContext): void {
     coreInfo('Status changed', {
       operation: 'hook handling',
-      recordId: _data?.id,
-      oldStatus: _data?.oldStatus,
-      newStatus: _data?.newStatus,
+      recordId: readHookField(_data, 'id'),
+      oldStatus: readHookField(_data, 'oldStatus'),
+      newStatus: readHookField(_data, 'newStatus'),
     });
   }
 
-  private onValidationFailed(_data: any, _context: HookContext): void {
+  private onValidationFailed(_data: HookData, _context: HookContext): void {
     coreWarn('Validation failed', {
       operation: 'hook handling',
-      recordId: _data?.id,
-      errors: _data?.errors,
+      recordId: readHookField(_data, 'id'),
+      errors: readHookField(_data, 'errors'),
     });
   }
 
-  private onDemoDataLoaded(_data: any, _context: HookContext): void {
+  private onDemoDataLoaded(_data: HookData, _context: HookContext): void {
     coreInfo('Demo data loaded', {
       operation: 'hook handling',
-      demoCity: _data?.demoCity,
-      recordCount: _data?.recordCount,
+      demoCity: readHookField(_data, 'demoCity'),
+      recordCount: readHookField(_data, 'recordCount'),
     });
   }
+}
+
+/**
+ * Read a single field off a `HookData` (unknown) payload. Returns
+ * `undefined` if `data` is not an object or the field is missing.
+ * Used by the default hook handlers above so they can log payload
+ * details without re-introducing `as any` access.
+ */
+function readHookField(data: HookData, field: string): unknown {
+  if (data && typeof data === 'object' && field in data) {
+    return (data as Record<string, unknown>)[field];
+  }
+  return undefined;
 }

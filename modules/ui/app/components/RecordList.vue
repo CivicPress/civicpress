@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import type { CivicRecord } from '~/stores/records';
-import { useVirtualList } from '@vueuse/core';
 import { useRecordsStore } from '~/stores/records';
 import { useAuthStore } from '~/stores/auth';
 
@@ -13,7 +12,8 @@ interface Props {
     statuses?: string[];
   };
   searchQuery?: string;
-  breadcrumbsRef?: Ref<HTMLElement | undefined>;
+  /** HTMLElement (Vue auto-unwraps the parent's Ref<HTMLElement>). */
+  breadcrumbsRef?: HTMLElement;
   isSearching?: boolean; // True when user is typing or search is in progress
   currentPage?: number; // Current page number (from parent)
   pageSize?: number; // Records per page
@@ -51,9 +51,6 @@ const {
 
 // i18n
 const { t } = useI18n();
-
-// Reactive data
-const loading = ref(false);
 
 // Computed properties for better reactivity
 const displayRecords = computed(() => {
@@ -133,17 +130,6 @@ const navigateToRecord = (record: CivicRecord) => {
   navigateTo(`/records/${record.type}/${record.id}`);
 };
 
-// Pagination helpers
-const scrollToTop = () => {
-  // Scroll to the breadcrumbs instead of the very top
-  if (props.breadcrumbsRef?.value) {
-    props.breadcrumbsRef.value.scrollIntoView({
-      behavior: 'smooth',
-      block: 'start',
-    });
-  }
-};
-
 // Get pagination info from store
 const totalPages = computed(() => recordsStore.totalPages);
 const totalCount = computed(() => recordsStore.totalCount);
@@ -171,6 +157,7 @@ const handlePageChange = (newPage: number) => {
   }
 };
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const handlePageSizeChange = (value: any) => {
   // USelectMenu passes SelectMenuItem, but with simple number options it may be the number directly
   // Extract number value - handle both direct number and SelectMenuItem object
@@ -224,6 +211,7 @@ const handlePageSizeChange = (value: any) => {
           <UCard
             v-for="record in processedRecords"
             :key="record.id"
+            data-test="record-row"
             :ui="{ body: 'p-0' }"
             class="hover:shadow-md transition-shadow cursor-pointer"
             @click="navigateToRecord(record)"
@@ -272,6 +260,7 @@ const handlePageSizeChange = (value: any) => {
                           authStore.hasPermission('records:edit') &&
                           record.hasUnpublishedChanges
                         "
+                        data-test="unpublished-indicator"
                         size="xs"
                         color="error"
                         variant="soft"
@@ -379,6 +368,7 @@ const handlePageSizeChange = (value: any) => {
       <!-- Show no results when not loading and no records -->
       <div
         v-else-if="displayRecords.length === 0 && !shouldShowLoading"
+        data-test="empty-state"
         class="py-16"
       >
         <div

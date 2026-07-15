@@ -1,8 +1,24 @@
 import { Router } from 'express';
 import { CentralConfigManager } from '@civicpress/core';
-import { CivicPress } from '@civicpress/core';
+import type { AuthUser } from '@civicpress/core';
 
 const router = Router();
+
+type CentralConfig = ReturnType<typeof CentralConfigManager.getConfig>;
+type DbConfig = ReturnType<typeof CentralConfigManager.getDatabaseConfig>;
+
+interface InfoResponse {
+  success: boolean;
+  organization: ReturnType<typeof CentralConfigManager.getOrgConfig>;
+  analytics: {
+    inject_head: string;
+    inject_body_start: string;
+    inject_body_end: string;
+  } | null;
+  system?: CentralConfig & { dataDir?: string; database?: DbConfig };
+  user?: AuthUser;
+  note?: string;
+}
 
 router.get('/', async (req, res) => {
   try {
@@ -10,10 +26,10 @@ router.get('/', async (req, res) => {
     const token = authHeader?.replace('Bearer ', '');
 
     let isAdmin = false;
-    let userInfo: any = null;
-    let systemConfig: any = null;
+    let userInfo: AuthUser | null = null;
+    let systemConfig: CentralConfig | undefined;
     let dataDir: string | undefined = undefined;
-    let dbConfig: any = undefined;
+    let dbConfig: DbConfig | undefined = undefined;
 
     // Get organization config
     const orgConfig = CentralConfigManager.getOrgConfig();
@@ -21,28 +37,23 @@ router.get('/', async (req, res) => {
     // Get analytics config (public, no auth needed)
     const analyticsConfig = CentralConfigManager.getAnalyticsConfig();
 
-    // Validate token if provided
+    // Validate token if provided. Use the shared CivicPress instance
+    // injected by the mount middleware (api-001 fix). Previously this
+    // block created a fresh CivicPress per request — a trivial DoS
+    // amplifier on an unauthenticated endpoint.
     if (token) {
       try {
-        const dataDir = CentralConfigManager.getDataDir();
-        const dbConfig = CentralConfigManager.getDatabaseConfig();
-
-        const civic = new CivicPress({
-          dataDir,
-          database: dbConfig,
-          logger: { json: true },
-        });
-        await civic.initialize();
-
-        const authService = civic.getAuthService();
-        const user = await authService.validateSession(token);
-
-        if (user) {
-          userInfo = user;
-          isAdmin = user.role === 'admin';
+        const civic = req.civicPress;
+        if (civic) {
+          const authService = civic.getAuthService();
+          const user = await authService.validateSession(token);
+          if (user) {
+            userInfo = user;
+            isAdmin = user.role === 'admin';
+          }
         }
-
-        await civic.shutdown();
+        // If civic is not on the request, the core isn't initialised
+        // (or the mount didn't inject); treat as unauthenticated.
       } catch {
         // Invalid token, treat as not admin
         isAdmin = false;
@@ -58,7 +69,7 @@ router.get('/', async (req, res) => {
     }
 
     // Build response
-    const response: any = {
+    const response: InfoResponse = {
       success: true,
       organization: orgConfig,
       analytics: analyticsConfig.enabled
@@ -70,13 +81,13 @@ router.get('/', async (req, res) => {
         : null,
     };
 
-    if (isAdmin) {
+    if (isAdmin && systemConfig) {
       response.system = {
         ...systemConfig,
         dataDir,
         database: dbConfig,
       };
-      response.user = userInfo;
+      if (userInfo) response.user = userInfo;
     } else if (token) {
       response.note = 'System config is only visible to admin users.';
       if (userInfo) response.user = userInfo;

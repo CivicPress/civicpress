@@ -17,7 +17,6 @@ import {
 import {
   cliSuccess,
   cliError,
-  cliInfo,
   cliWarn,
   cliStartOperation,
 } from '../utils/cli-output.js';
@@ -27,6 +26,7 @@ export const viewCommand = (cli: CAC) => {
     .command('view <record>', 'View a specific civic record')
     .option('--token <token>', 'Session token for authentication')
     .option('-r, --raw', 'Show raw markdown content')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .action(async (recordName: string, options: any) => {
       // Initialize CLI output with global options
       const globalOptions = getGlobalOptionsFromArgs();
@@ -59,9 +59,6 @@ export const viewCommand = (cli: CAC) => {
 
       try {
         logger.info(`📖 Viewing record: ${recordName}`);
-
-        // Check if we should output JSON
-        const shouldOutputJson = globalOptions.json;
 
         if (!dataDir) {
           throw new Error('Data directory not found. Run "civic init" first.');
@@ -148,6 +145,7 @@ export const viewCommand = (cli: CAC) => {
         logger.info('\n📋 Metadata:');
         logger.debug('─'.repeat(40));
 
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const statusColors: Record<string, any> = {
           draft: chalk.yellow,
           proposed: chalk.blue,
@@ -201,6 +199,8 @@ export const viewCommand = (cli: CAC) => {
       } catch (error) {
         logger.error('❌ Failed to view record:', error);
         process.exit(1);
+      } finally {
+        endOperation();
       }
     });
 };

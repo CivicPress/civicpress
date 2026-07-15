@@ -2,7 +2,10 @@ import { describe, test, expect, beforeEach, afterEach } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { SecretsManager } from '@civicpress/core';
+import {
+  SecretsManager,
+  isSecretAutoGenerationAllowed,
+} from '@civicpress/core';
 
 describe('SecretsManager', () => {
   let tempDir: string;
@@ -21,6 +24,34 @@ describe('SecretsManager', () => {
     }
     (SecretsManager as any).instance = undefined;
     delete process.env.CIVICPRESS_SECRET;
+  });
+
+  // FA-CORE-002: auto-generating the root secret is a dev/test convenience.
+  // In production (or an unset NODE_ENV) it must be an explicit opt-in, else a
+  // silent disk-only secret is minted that is lost on restart.
+  describe('isSecretAutoGenerationAllowed (FA-CORE-002)', () => {
+    test('allows dev and test', () => {
+      expect(isSecretAutoGenerationAllowed({ NODE_ENV: 'test' })).toBe(true);
+      expect(isSecretAutoGenerationAllowed({ NODE_ENV: 'development' })).toBe(
+        true
+      );
+    });
+
+    test('denies production and unset without the explicit opt-in', () => {
+      expect(isSecretAutoGenerationAllowed({ NODE_ENV: 'production' })).toBe(
+        false
+      );
+      expect(isSecretAutoGenerationAllowed({})).toBe(false);
+    });
+
+    test('allows production only with CIVICPRESS_ALLOW_GENERATED_SECRET=true', () => {
+      expect(
+        isSecretAutoGenerationAllowed({
+          NODE_ENV: 'production',
+          CIVICPRESS_ALLOW_GENERATED_SECRET: 'true',
+        })
+      ).toBe(true);
+    });
   });
 
   test('should initialize with environment variable', async () => {

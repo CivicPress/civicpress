@@ -164,7 +164,7 @@
                                         )
                                       "
                                       @update:model-value="
-                                        (val: any) =>
+                                        (val: unknown) =>
                                           updateNestedFieldValue(
                                             `${String(key)}.${String(nestedKey)}.${String(idx)}`,
                                             val
@@ -209,7 +209,7 @@
                                         )
                                       "
                                       @update:model-value="
-                                        (val: any) =>
+                                        (val: unknown) =>
                                           updateNestedFieldValue(
                                             `${String(key)}.${String(nestedKey)}.${String(subKey)}`,
                                             val
@@ -256,6 +256,8 @@
 
 <script setup lang="ts">
 import SystemFooter from '~/components/SystemFooter.vue';
+import { extractErrorMessage, type ApiResponse } from '~/utils/api-response';
+import { errorMessage } from '~/utils/errors';
 import {
   getFieldValue as normalizeValue,
   isMetadataField,
@@ -282,8 +284,11 @@ const canManageConfiguration = computed(() =>
 // Configuration state
 const loading = ref(true);
 const error = ref<string | null>(null);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const configMetadata = ref<any>(null);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const originalConfig = ref<any>(null);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const config = ref<any>({});
 
 // Computed properties
@@ -328,7 +333,7 @@ const loadConfiguration = async () => {
     // Load configuration metadata first
     const metadataResponse = (await useNuxtApp().$civicApi(
       `/api/v1/config/metadata/${configFile.value}`
-    )) as any;
+    )) as ApiResponse;
     if (metadataResponse.success && metadataResponse.data) {
       configMetadata.value = metadataResponse.data;
     } else {
@@ -338,32 +343,33 @@ const loadConfiguration = async () => {
     // Load configuration data
     const response = (await useNuxtApp().$civicApi(
       `/api/v1/config/${configFile.value}`
-    )) as any;
+    )) as ApiResponse;
     if (response.success && response.data) {
       originalConfig.value = JSON.parse(JSON.stringify(response.data));
       config.value = JSON.parse(JSON.stringify(response.data));
     } else {
       throw new Error(
-        response.message || `Failed to load ${configFile.value} configuration`
+        extractErrorMessage(response) || `Failed to load ${configFile.value} configuration`
       );
     }
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error(`Failed to load ${configFile.value} configuration:`, err);
-    error.value = err.message || 'Failed to load configuration';
+    error.value = errorMessage(err, 'Failed to load configuration');
   } finally {
     loading.value = false;
   }
 };
 
 // Helper functions
-const isNestedObject = (field: any) => {
+const isNestedObject = (field: unknown) => {
+  if (typeof field !== 'object' || field === null || Array.isArray(field)) {
+    return false;
+  }
+  const f = field as Record<string, unknown>;
   return (
-    typeof field === 'object' &&
-    field !== null &&
-    !Array.isArray(field) &&
-    (field as any).value === undefined &&
-    Object.keys(field).some(
-      (key) => key !== '_metadata' && typeof (field as any)[key] === 'object'
+    f.value === undefined &&
+    Object.keys(f).some(
+      (key) => key !== '_metadata' && typeof f[key] === 'object'
     )
   );
 };
@@ -383,10 +389,16 @@ const getTopLevelValue = (key: string) => {
   return normalizeValue(metaField);
 };
 
+// Returns dynamic config values bound to Nuxt UI inputs (UInput, USelect,
+// USwitch, ...) each expecting a different `AcceptableValue`; `unknown`
+// would force a per-binding cast for no real safety win — same pattern as
+// ConfigurationField.vue's `value` prop.
+ 
 const getNestedValue = (
   sectionKey: string,
   nestedKey: string,
   subKey: string
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): any => {
   const cfg = config.value?.[sectionKey]?.[nestedKey]?.[subKey];
   if (cfg !== undefined) return normalizeValue(cfg);
@@ -403,13 +415,13 @@ const getSecondLevelValue = (sectionKey: string, nestedKey: string) => {
 };
 
 // Update field value (store as scalar in config)
-const updateFieldValue = (key: string, value: any) => {
+const updateFieldValue = (key: string, value: unknown) => {
   config.value[key] = value;
   hasChanges.value = true;
 };
 
 // Update nested field value
-const updateNestedFieldValue = (fullKey: string, value: any) => {
+const updateNestedFieldValue = (fullKey: string, value: unknown) => {
   const parts = fullKey.split('.');
   if (parts.length !== 3) return;
 
@@ -429,7 +441,7 @@ const updateNestedFieldValue = (fullKey: string, value: any) => {
 };
 
 // Update second-level metadata field (e.g., social.twitter)
-const updateSecondLevelFieldValue = (fullKey: string, value: any) => {
+const updateSecondLevelFieldValue = (fullKey: string, value: unknown) => {
   const parts = fullKey.split('.');
   if (parts.length !== 2) return;
   const [sectionKey, nestedKey] = parts;
@@ -447,7 +459,7 @@ const validateConfiguration = async (): Promise<boolean> => {
       {
         method: 'POST',
       }
-    )) as any;
+    )) as ApiResponse<{ valid: boolean; errors?: string[] }>;
 
     if (response.success && response.data) {
       const isValid = response.data.valid === true;
@@ -483,7 +495,7 @@ const saveConfiguration = async () => {
         method: 'PUT',
         body: config.value,
       }
-    )) as any;
+    )) as ApiResponse;
 
     if (response.success) {
       // Mark as saved
@@ -499,13 +511,13 @@ const saveConfiguration = async () => {
         color: 'primary',
       });
     } else {
-      throw new Error(response.message || 'Failed to save configuration');
+      throw new Error(extractErrorMessage(response) || 'Failed to save configuration');
     }
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('Failed to save configuration:', err);
     useToast().add({
       title: 'Error',
-      description: `Failed to save ${configTitle.value} configuration: ${err.message}`,
+      description: `Failed to save ${configTitle.value} configuration: ${errorMessage(err)}`,
       color: 'error',
     });
   } finally {

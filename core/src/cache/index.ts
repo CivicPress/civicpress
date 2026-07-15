@@ -27,7 +27,3 @@ export { FileWatcherCache } from './strategies/file-watcher-cache.js';
 
 // Manager
 export { UnifiedCacheManager } from './unified-cache-manager.js';
-
-// Warming
-export { CacheWarmer } from './warming/cache-warmer.js';
-export type { WarmingStrategy, WarmingConfig } from './warming/cache-warmer.js';

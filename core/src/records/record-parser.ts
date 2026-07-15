@@ -16,6 +16,7 @@ import { stringify } from 'yaml';
 import { RecordData } from './record-manager.js';
 import { Logger } from '../utils/logger.js';
 import { RecordSchemaValidator } from './record-schema-validator.js';
+import { getSchemaExtensionFieldNames } from './record-schema-builder.js';
 import { RecordValidationError } from '../errors/domain-errors.js';
 import { ValidationError } from '../errors/index.js';
 
@@ -63,16 +64,49 @@ interface FrontmatterData {
     imported_by?: string;
   };
 
-  // Type-specific fields
-  geography_data?: any;
+  // Commit Linkage (populated during export/archive)
+  commit_ref?: string;
+  commit_signature?: string;
+
+  // Relationships (alternative naming used by some callers)
+  linkedRecords?: Array<{
+    id: string;
+    type: string;
+    description: string;
+    path?: string;
+    category?: string;
+  }>;
+  linkedGeographyFiles?: Array<{
+    id: string;
+    name: string;
+    description?: string;
+  }>;
+  attachedFiles?: Array<{
+    id: string;
+    path: string;
+    original_name: string;
+    description?: string;
+    category?:
+      | string
+      | {
+          label: string;
+          value: string;
+          description: string;
+        };
+  }>;
+
+  // Type-specific fields (polymorphic — `unknown` forces consumers to
+  // narrow before use; the shapes vary per record type and are
+  // declared in the per-type schemas under `core/src/schemas/`).
+  geography_data?: unknown;
   category?: string;
   session_type?: 'regular' | 'emergency' | 'special';
   date?: string;
   duration?: number;
   location?: string;
-  attendees?: any[];
-  topics?: any[];
-  media?: any;
+  attendees?: unknown[];
+  topics?: unknown[];
+  media?: unknown;
 
   // Relationships
   linked_records?: Array<{
@@ -104,7 +138,7 @@ interface FrontmatterData {
   }>;
 
   // Metadata (catch-all for other fields)
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 /**
@@ -212,7 +246,7 @@ export class RecordParser {
           ...(normalized.location && { location: normalized.location }),
           ...(normalized.attendees && { attendees: normalized.attendees }),
           ...(normalized.topics && { topics: normalized.topics }),
-          ...(normalized.media && { media: normalized.media }),
+          ...(normalized.media ? { media: normalized.media } : {}),
           // Include any other custom metadata fields
           ...Object.entries(normalized)
             .filter(
@@ -295,7 +329,7 @@ ${record.content || ''}`;
    * @returns Frontmatter data object ready for schema validation or serialization
    */
   static buildFrontmatter(record: RecordData): FrontmatterData {
-    const frontmatter: any = {
+    const frontmatter: Partial<FrontmatterData> = {
       // Core Identification (Required)
       id: record.id,
       title: record.title,
@@ -328,7 +362,7 @@ ${record.content || ''}`;
         source.imported_at =
           typeof importedAt === 'string'
             ? importedAt
-            : new Date(importedAt as any).toISOString();
+            : new Date(importedAt as string | number | Date).toISOString();
       }
       frontmatter.source = source;
     }
@@ -374,7 +408,9 @@ ${record.content || ''}`;
         frontmatter.date =
           typeof record.metadata.date === 'string'
             ? record.metadata.date
-            : new Date(record.metadata.date as any).toISOString();
+            : new Date(
+                record.metadata.date as string | number | Date
+              ).toISOString();
       }
       if (record.metadata.duration) {
         frontmatter.duration = record.metadata.duration;
@@ -416,32 +452,47 @@ ${record.content || ''}`;
     // Carry over any additional metadata passthrough fields
     if (record.metadata) {
       const {
-        tags,
-        module,
-        slug,
-        version,
-        priority,
-        department,
-        category,
-        session_type,
-        date,
-        duration,
-        location,
-        attendees,
-        topics,
-        media,
+        tags: _tags,
+        module: _module,
+        slug: _slug,
+        version: _version,
+        priority: _priority,
+        department: _department,
+        category: _category,
+        session_type: _session_type,
+        date: _date,
+        duration: _duration,
+        location: _location,
+        attendees: _attendees,
+        topics: _topics,
+        media: _media,
         ...rest
       } = record.metadata;
 
-      if (Object.keys(rest).length > 0) {
+      // Fields a module schema-extension contributes to this record type are
+      // written to TOP-LEVEL frontmatter (so they round-trip + validate against
+      // the extension), not nested under `metadata:`. Everything else stays a
+      // metadata passthrough. (No-op unless an extension module is enabled.)
+      const extensionFields = getSchemaExtensionFieldNames(record.type);
+      const fm = frontmatter as Record<string, unknown>;
+      const nested: Record<string, unknown> = {};
+      for (const [key, value] of Object.entries(rest)) {
+        if (extensionFields.has(key)) {
+          fm[key] = value;
+        } else {
+          nested[key] = value;
+        }
+      }
+
+      if (Object.keys(nested).length > 0) {
         frontmatter.metadata = {
           ...(frontmatter.metadata || {}),
-          ...rest,
+          ...nested,
         };
       }
     }
 
-    return frontmatter;
+    return frontmatter as FrontmatterData;
   }
 
   /**
@@ -451,7 +502,17 @@ ${record.content || ''}`;
    * @param frontmatter - Raw frontmatter object (may be old format)
    * @returns Normalized frontmatter in new format
    */
-  private static normalizeFormat(frontmatter: any): FrontmatterData {
+  private static normalizeFormat(
+    frontmatter: Record<string, unknown>
+  ): FrontmatterData {
+    // `normalized` stays loose because the migration idiom below reassigns
+    // fields by name without per-shape narrowing (`normalized.created =
+    // normalized.created_at`, `instanceof Date` checks on the same slot,
+    // `linkedRecords → linked_records` renames). The function boundaries
+    // are typed (in: Record<string, unknown>; out: FrontmatterData via final
+    // cast); only this local scratch object is loose. Typing each branch
+    // would mean ~15 ternary-style guards — deferred as a future polish.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const normalized: any = { ...frontmatter };
 
     // Normalize author field - ensure it's a string
@@ -507,10 +568,10 @@ ${record.content || ''}`;
       normalized.geography_data = normalized.geography;
     }
 
-    return this.normalizeDateValues(normalized);
+    return this.normalizeDateValues(normalized) as FrontmatterData;
   }
 
-  private static normalizeDateValues(value: any): any {
+  private static normalizeDateValues(value: unknown): unknown {
     if (value === null || value === undefined) {
       return value;
     }
@@ -524,7 +585,7 @@ ${record.content || ''}`;
     }
 
     if (typeof value === 'object') {
-      const result: Record<string, any> = {};
+      const result: Record<string, unknown> = {};
       for (const [key, nestedValue] of Object.entries(value)) {
         result[key] = this.normalizeDateValues(nestedValue);
       }
@@ -542,7 +603,7 @@ ${record.content || ''}`;
    * @throws Error if required fields are missing
    */
   private static validateRequiredFields(
-    frontmatter: any,
+    frontmatter: Record<string, unknown>,
     filePath?: string
   ): void {
     const required = [
@@ -702,7 +763,7 @@ ${record.content || ''}`;
    * @param value - Field value
    * @returns Formatted YAML line
    */
-  private static formatYamlField(key: string, value: any): string {
+  private static formatYamlField(key: string, value: unknown): string {
     // Use YAML library to properly format the value
     // This handles arrays, objects, strings, numbers, booleans correctly
     try {

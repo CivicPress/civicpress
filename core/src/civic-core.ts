@@ -1,4 +1,3 @@
-import * as path from 'path';
 import { ConfigDiscovery } from './config/config-discovery.js';
 import { WorkflowEngine } from './workflows/workflow-engine.js';
 import { GitEngine } from './git/git-engine.js';
@@ -9,7 +8,6 @@ import { RecordManager } from './records/record-manager.js';
 import { TemplateEngine } from './utils/template-engine.js';
 import { IndexingService } from './indexing/indexing-service.js';
 import { Logger } from './utils/logger.js';
-import { coreOutput } from './utils/core-output.js';
 import {
   NotificationService,
   NotificationConfig,
@@ -17,10 +15,7 @@ import {
 import { UnifiedCacheManager } from './cache/unified-cache-manager.js';
 import { Geography } from './types/geography.js';
 import { ServiceContainer } from './di/container.js';
-import {
-  registerCivicPressServices,
-  completeServiceInitialization,
-} from './civic-core-services.js';
+import { registerCivicPressServices } from './civic-core-services.js';
 import { SecretsManager } from './security/secrets.js';
 
 export interface CivicPressConfig {
@@ -61,6 +56,7 @@ export interface CreateRecordRequest {
   title: string;
   type: string;
   content?: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   metadata?: Record<string, any>;
   status?: string; // Legal status (stored in YAML + DB)
   workflowState?: string; // Internal editorial status (DB-only, never in YAML)
@@ -119,6 +115,7 @@ export interface UpdateRecordRequest {
   skipFileGeneration?: boolean; // Skip file generation/updates
   skipAudit?: boolean; // Skip audit logging (for sync operations)
   skipHooks?: boolean; // Skip hook emissions (for sync operations)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   metadata?: Record<string, any>;
   geography?: Geography;
   attachedFiles?: Array<{
@@ -225,10 +222,29 @@ export class CivicPress {
       await db.initialize();
       this.logger.info('Database initialized');
 
+      // FA-CORE-001: recover sagas orphaned by a prior crash BEFORE any new
+      // work starts — release their held resource locks and surface any
+      // SQLite/git divergence. Non-fatal: a recovery failure must not block
+      // boot.
+      try {
+        const { SagaStateStore } = await import('./saga/saga-state-store.js');
+        const { ResourceLockManager } = await import('./saga/resource-lock.js');
+        const { SagaRecoveryService } = await import('./saga/saga-recovery.js');
+        const recovery = new SagaRecoveryService(
+          new SagaStateStore(db),
+          new ResourceLockManager(db)
+        );
+        const summary = await recovery.recover();
+        if (summary.scanned > 0) {
+          this.logger.warn('Saga crash-recovery ran at startup', summary);
+        }
+      } catch (error) {
+        this.logger.warn('Saga crash-recovery skipped (non-fatal):', error);
+      }
+
       // Complete service initialization (cache registration, etc.)
-      const { completeServiceInitialization } = await import(
-        './civic-core-services.js'
-      );
+      const { completeServiceInitialization } =
+        await import('./civic-core-services.js');
       await completeServiceInitialization(this.container, this);
 
       // Initialize other services
@@ -271,6 +287,16 @@ export class CivicPress {
       this.logger.error('Error during shutdown:', error);
       throw error;
     }
+  }
+
+  /**
+   * The DI container. Exposed so the API layer can mount optional modules whose
+   * registration hooks are container-based (e.g. broadcast-box's
+   * `registerBroadcastBoxServices`), mirroring how core itself wires the storage
+   * module. Prefer the typed `get*Service()` accessors for core services.
+   */
+  getContainer(): ServiceContainer {
+    return this.container;
   }
 
   // Database and Auth services
@@ -378,6 +404,7 @@ export class CivicPress {
    * @param key - Service key (string or class constructor)
    * @returns Service instance
    */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   getService<T>(key: string | any): T {
     return this.container.resolve<T>(key);
   }

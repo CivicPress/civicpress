@@ -6,7 +6,6 @@
 
 import { Logger } from '@civicpress/core';
 import type { StorageConfig } from '../types/storage.types.js';
-import { ProviderUnavailableError } from '../errors/storage-errors.js';
 
 export interface HealthCheckResult {
   provider: string;
@@ -14,6 +13,7 @@ export interface HealthCheckResult {
   latency?: number; // milliseconds
   error?: string;
   timestamp: Date;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   details?: Record<string, any>;
 }
 
@@ -219,11 +219,14 @@ export class StorageHealthChecker {
    * Stop health checks
    */
   stopHealthChecks(): void {
+    const providers = Array.from(this.checkIntervals.keys());
     for (const interval of this.checkIntervals.values()) {
       clearInterval(interval);
     }
     this.checkIntervals.clear();
-    this.logger.debug('Stopped health checks for storage providers');
+    this.logger.debug('Stopped health checks for storage providers', {
+      providers,
+    });
   }
 
   /**

@@ -26,7 +26,8 @@ export class RetryManager {
     this.logger = logger;
 
     // Get retry config from storage config or use defaults
-    const storageConfig = (config as any)?.global || {};
+    const storageConfig: Partial<NonNullable<StorageConfig['global']>> =
+      config?.global ?? {};
     this.defaultConfig = {
       maxAttempts: storageConfig.retry_attempts || 3,
       initialDelay: storageConfig.retry_initial_delay || 1000, // 1 second
@@ -154,23 +155,24 @@ export class RetryManager {
       }
     }
 
-    // Check error message for common retryable patterns
+    // Check error message for common retryable patterns. Patterns are compared
+    // case-insensitively (both sides lowercased) — the prior implementation
+    // lowercased only the message, leaving the UPPERCASE Node error codes
+    // unmatchable (e.g., 'econnreset'.includes('ECONNRESET') is false).
     const errorMessage = error instanceof Error ? error.message : String(error);
     const retryablePatterns = [
       'timeout',
+      'timed out',
       'network',
       'connection',
-      'ECONNRESET',
-      'ETIMEDOUT',
-      'ENOTFOUND',
-      'ECONNREFUSED',
+      'econnreset',
+      'etimedout',
+      'enotfound',
+      'econnrefused',
     ];
 
-    if (
-      retryablePatterns.some((pattern) =>
-        errorMessage.toLowerCase().includes(pattern)
-      )
-    ) {
+    const lcMessage = errorMessage.toLowerCase();
+    if (retryablePatterns.some((pattern) => lcMessage.includes(pattern))) {
       return true;
     }
 

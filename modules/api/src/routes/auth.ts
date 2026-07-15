@@ -1,5 +1,10 @@
 import { Router } from 'express';
-import { CivicPress, CsrfProtection } from '@civicpress/core';
+import { HttpError } from '../utils/http-error.js';
+import {
+  CivicPress,
+  CsrfProtection,
+  isSimulatedAuthEnabled,
+} from '@civicpress/core';
 import {
   sendSuccess,
   handleApiError,
@@ -14,7 +19,7 @@ const router = Router();
  * This endpoint is accessible without authentication for initial page load
  */
 router.get('/csrf-token', (req, res) => {
-  const civicPress = (req as any).civicPress as CivicPress;
+  const civicPress = req.civicPress as CivicPress;
   const secretsManager = civicPress.getSecretsManager();
   const csrfProtection = new CsrfProtection(secretsManager);
 
@@ -44,17 +49,14 @@ router.post('/login', async (req, res) => {
     }
 
     // Get CivicPress instance from request
-    const civicPress = (req as any).civicPress as CivicPress;
+    const civicPress = req.civicPress as CivicPress;
     const authService = civicPress.getAuthService();
 
     // Check if provider is supported
     const availableProviders = authService.getAvailableOAuthProviders();
     if (!availableProviders.includes(provider)) {
-      const error = new Error(`OAuth provider '${provider}' is not supported`);
-      (error as any).statusCode = 400;
-      (error as any).code = 'UNSUPPORTED_PROVIDER';
-      (error as any).details = { availableProviders };
-      return handleApiError('login', error, req, res);
+      const error = new HttpError(400, `OAuth provider '${provider}' is not supported`, 'UNSUPPORTED_PROVIDER', { details: { availableProviders } });
+    return handleApiError('login', error, req, res);
     }
 
     // Authenticate with OAuth provider
@@ -100,7 +102,7 @@ router.post('/password', async (req, res) => {
     }
 
     // Get CivicPress instance from request
-    const civicPress = (req as any).civicPress as CivicPress;
+    const civicPress = req.civicPress as CivicPress;
     const authService = civicPress.getAuthService();
 
     // Authenticate with password
@@ -143,7 +145,7 @@ router.get('/providers', async (req, res) => {
 
   try {
     // Get CivicPress instance from request
-    const civicPress = (req as any).civicPress as CivicPress;
+    const civicPress = req.civicPress as CivicPress;
     const authService = civicPress.getAuthService();
 
     const providers = authService.getAvailableOAuthProviders();
@@ -165,25 +167,21 @@ router.get('/me', async (req, res) => {
     const authHeader = req.headers.authorization;
 
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      const error = new Error('Authorization header required');
-      (error as any).statusCode = 401;
-      (error as any).code = 'MISSING_AUTH';
+      const error = new HttpError(401, 'Authorization header required', 'MISSING_AUTH');
       return handleApiError('get_me', error, req, res);
     }
 
     const token = authHeader.substring(7); // Remove 'Bearer ' prefix
 
     // Get CivicPress instance from request
-    const civicPress = (req as any).civicPress as CivicPress;
+    const civicPress = req.civicPress as CivicPress;
     const authService = civicPress.getAuthService();
 
     // Validate session (async)
     const user = await authService.validateSession(token);
 
     if (!user) {
-      const error = new Error('Invalid or expired token');
-      (error as any).statusCode = 401;
-      (error as any).code = 'INVALID_TOKEN';
+      const error = new HttpError(401, 'Invalid or expired token', 'INVALID_TOKEN');
       return handleApiError('get_me', error, req, res);
     }
 
@@ -222,9 +220,7 @@ router.post('/logout', async (req, res) => {
     const authHeader = req.headers.authorization;
 
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      const error = new Error('Authorization header required');
-      (error as any).statusCode = 401;
-      (error as any).code = 'MISSING_AUTH';
+      const error = new HttpError(401, 'Authorization header required', 'MISSING_AUTH');
       return handleApiError('logout', error, req, res);
     }
 
@@ -245,11 +241,13 @@ router.post('/logout', async (req, res) => {
  * Authenticate with simulated account (for development/testing)
  */
 router.post('/simulated', async (req, res) => {
-  if (process.env.NODE_ENV === 'production') {
+  // FA-API-001: fail closed. Only enabled in an explicit dev/test environment
+  // (see isSimulatedAuthEnabled); an unset NODE_ENV is treated as production.
+  if (!isSimulatedAuthEnabled()) {
     return res.status(403).json({
       success: false,
       error: {
-        message: 'Simulated accounts are disabled in production',
+        message: 'Simulated accounts are disabled in this environment',
         code: 'SIMULATED_AUTH_DISABLED',
       },
     });
@@ -260,12 +258,9 @@ router.post('/simulated', async (req, res) => {
     const { username, role = 'public' } = req.body;
 
     if (!username) {
-      const error = new Error('Username is required');
-      (error as any).statusCode = 400;
-      (error as any).code = 'MISSING_USERNAME';
+      const error = new HttpError(400, 'Username is required', 'MISSING_USERNAME');
       return handleApiError(
-        'simulated_login',
-        error,
+        'simulated_login', error,
         req,
         res,
         'Username is required'
@@ -273,20 +268,17 @@ router.post('/simulated', async (req, res) => {
     }
 
     // Get CivicPress instance from request
-    const civicPress = (req as any).civicPress as CivicPress;
+    const civicPress = req.civicPress as CivicPress;
     const authService = civicPress.getAuthService();
 
     // Validate role
     const isValidRole = await authService.isValidRole(role);
     if (!isValidRole) {
-      const error = new Error(`Invalid role: ${role}`);
-      (error as any).statusCode = 400;
-      (error as any).code = 'INVALID_ROLE';
-      (error as any).details = {
+      const error = new HttpError(400, `Invalid role: ${role}`, 'INVALID_ROLE', { details: {
         role,
         availableRoles: await authService.getAvailableRoles(),
-      };
-      return handleApiError('simulated_login', error, req, res);
+      } });
+    return handleApiError('simulated_login', error, req, res);
     }
 
     // Authenticate with simulated account

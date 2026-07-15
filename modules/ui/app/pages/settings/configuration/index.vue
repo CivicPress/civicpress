@@ -174,6 +174,7 @@
 
 <script setup lang="ts">
 import SystemFooter from '~/components/SystemFooter.vue';
+import { extractErrorMessage, type ApiResponse } from '~/utils/api-response';
 definePageMeta({
   requiresAuth: true,
   layout: 'default',
@@ -204,6 +205,7 @@ const breadcrumbItems = [
 ];
 
 // Dynamic configuration list
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const configurations = ref<any[]>([]);
 const loading = ref(false);
 const error = ref('');
@@ -214,14 +216,14 @@ const fetchConfigurations = async () => {
   try {
     const response = (await useNuxtApp().$civicApi(
       '/api/v1/config/list'
-    )) as any;
+    )) as ApiResponse<unknown[]>;
     if (response.success) {
       configurations.value = response.data || [];
     } else {
-      error.value = response.message || 'Failed to load configurations';
+      error.value = extractErrorMessage(response) || 'Failed to load configurations';
     }
-  } catch (err: any) {
-    error.value = err.message || 'Failed to load configurations';
+  } catch (err: unknown) {
+    error.value = (err instanceof Error ? err.message : '') || 'Failed to load configurations';
   } finally {
     loading.value = false;
   }
@@ -233,6 +235,7 @@ onMounted(() => {
 
 // Configuration validation
 const validating = ref(false);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const validationResults = ref<any[]>([]);
 
 const validateConfiguration = async () => {
@@ -242,11 +245,12 @@ const validateConfiguration = async () => {
   try {
     const response = (await useNuxtApp().$civicApi(
       '/api/v1/config/validate/all'
-    )) as any;
+    )) as ApiResponse;
 
     if (response.success && response.data) {
       // response.data is an object keyed by type → { valid, errors[] }
       const entries = Object.entries(response.data || {});
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const items = entries.map(([type, result]: any) => ({
         status: result?.valid ? 'success' : 'error',
         title: `${type}`,
@@ -258,6 +262,7 @@ const validateConfiguration = async () => {
       }));
       validationResults.value = items;
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const allValid = items.every((i: any) => i.status === 'success');
       useToast().add({
         title: allValid ? 'All configurations valid' : 'Validation completed',

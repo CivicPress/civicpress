@@ -300,7 +300,7 @@ describe('Security Guards', () => {
       expect(result.success).toBe(true);
       expect(result.user).toBeDefined();
       expect(result.user?.auth_provider).toBe('github');
-      expect(result.user?.email_verified).toBe(1); // OAuth emails are pre-verified (SQLite boolean)
+      expect(result.user?.email_verified).toBe(true); // OAuth emails are pre-verified
       expect(authService.canSetPassword(result.user!)).toBe(false);
       expect(authService.isExternalAuthUser(result.user!)).toBe(true);
     });

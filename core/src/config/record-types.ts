@@ -65,6 +65,13 @@ export const DEFAULT_RECORD_TYPES: RecordTypesConfig = {
     source: 'core',
     priority: 7,
   },
+  meeting: {
+    label: 'Meetings',
+    description:
+      'Scheduled civic meetings; a meeting owns its session recording(s)',
+    source: 'core',
+    priority: 8,
+  },
 };
 
 /**

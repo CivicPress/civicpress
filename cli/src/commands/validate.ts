@@ -1,13 +1,10 @@
 import { CAC } from 'cac';
-import { readFile, readdir } from 'fs/promises';
+import { readFile } from 'fs/promises';
 import { join, extname, dirname, resolve } from 'path';
 import { loadConfig } from '@civicpress/core';
-import chalk from 'chalk';
 import * as fs from 'fs';
 import { glob } from 'glob';
-import * as yaml from 'yaml';
 import {
-  initializeLogger,
   getGlobalOptionsFromArgs,
   initializeCliOutput,
 } from '../utils/global-options.js';
@@ -20,7 +17,6 @@ import {
   cliStartOperation,
 } from '../utils/cli-output.js';
 import {
-  Logger,
   TemplateEngine,
   RecordValidator,
   RecordParser,
@@ -60,6 +56,7 @@ export function registerValidateCommand(cli: CAC) {
     .option('-f, --fix', 'Attempt to auto-fix validation issues')
     .option('-s, --strict', 'Treat warnings as errors')
     .option('--format <format>', 'Output format', { default: 'human' })
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .action(async (record: string, options: any) => {
       // Initialize CLI output with global options
       const globalOptions = getGlobalOptionsFromArgs();
@@ -132,6 +129,7 @@ export function registerValidateCommand(cli: CAC) {
     });
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function validateAllRecords(dataDir: string, options: any) {
   const recordsDir = join(dataDir, 'records');
 
@@ -172,6 +170,7 @@ async function validateAllRecords(dataDir: string, options: any) {
 async function validateSingleRecord(
   dataDir: string,
   recordPath: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   options: any
 ) {
   const resolvedRecord = resolveRecordReference(dataDir, recordPath);
@@ -226,6 +225,7 @@ async function validateSingleRecord(
 async function validateRecord(
   dataDir: string,
   recordPath: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   options: any,
   absoluteOverride?: string
 ): Promise<ValidationResult> {
@@ -284,16 +284,17 @@ async function validateRecord(
   const recordType = record.type || parsedPathInfo.type;
 
   // Try to load the template using the template engine
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let template: any | null = null;
   try {
     // First try to load the specific template if specified in metadata
     const templateName = record.metadata?.template || 'default';
     template = await templateEngine.loadTemplate(recordType, templateName);
-  } catch (error) {
+  } catch {
     // Fall back to default template
     try {
       template = await templateEngine.loadTemplate(recordType, 'default');
-    } catch (fallbackError) {
+    } catch {
       // No template found, will do basic validation
     }
   }
@@ -388,7 +389,7 @@ async function validateRecord(
           message: String(warning),
         });
       }
-    } catch (templateError) {
+    } catch {
       // Template validation failed, skip it
     }
   }
@@ -426,223 +427,14 @@ async function validateRecord(
   };
 }
 
-async function loadTemplate(
-  dataDir: string,
-  recordType: string
-): Promise<any | null> {
-  try {
-    const templateEngine = new TemplateEngine(dataDir);
-    const template = await templateEngine.loadTemplate(recordType, 'default');
-
-    if (!template) {
-      return null;
-    }
-
-    return {
-      name: template.name,
-      type: template.type,
-      description: '',
-      metadata: template.validation || {},
-      content: template.content,
-      validation: {
-        required: template.validation?.required_fields || [],
-        optional: [],
-        formats: {},
-        content: {
-          minLength: template.validation?.sections?.find(
-            (s) => s.name === 'content'
-          )?.min_length,
-          maxLength: undefined,
-          sections: template.validation?.sections?.map((s) => s.name) || [],
-        },
-      },
-    };
-  } catch (error) {
-    return null;
-  }
-}
-
-function validateMetadata(
-  metadata: Record<string, any>,
-  template: any,
-  errors: ValidationError[],
-  warnings: ValidationWarning[],
-  suggestions: string[]
-) {
-  // Check required fields
-  for (const field of template.validation.required) {
-    if (!metadata[field] || metadata[field] === '') {
-      errors.push({
-        field,
-        message: `Required field '${field}' is missing or empty`,
-        severity: 'error',
-      });
-    }
-  }
-
-  // Check optional fields
-  for (const field of template.validation.optional) {
-    if (!metadata[field]) {
-      warnings.push({
-        field,
-        message: `Optional field '${field}' is missing`,
-        suggestion: `Consider adding a ${field}`,
-      });
-    }
-  }
-
-  // Check field formats
-  if (template.validation.formats) {
-    for (const [field, format] of Object.entries(template.validation.formats)) {
-      const value = (metadata as any)[field];
-      if (value !== undefined && value !== null) {
-        validateFieldFormat(
-          String(value),
-          String(format),
-          field,
-          errors,
-          warnings
-        );
-      }
-    }
-  }
-
-  // Check status values
-  if (metadata.status) {
-    const validStatuses = [
-      'draft',
-      'proposed',
-      'approved',
-      'active',
-      'archived',
-      'rejected',
-    ];
-    if (!validStatuses.includes(metadata.status)) {
-      errors.push({
-        field: 'status',
-        message: `Invalid status '${metadata.status}'. Valid statuses: ${validStatuses.join(', ')}`,
-        severity: 'error',
-      });
-    }
-  }
-
-  // Check dates
-  if (metadata.created) {
-    if (!isValidDate(metadata.created)) {
-      errors.push({
-        field: 'created',
-        message: 'Invalid created date format',
-        severity: 'error',
-      });
-    }
-  }
-
-  if (metadata.updated) {
-    if (!isValidDate(metadata.updated)) {
-      errors.push({
-        field: 'updated',
-        message: 'Invalid updated date format',
-        severity: 'error',
-      });
-    }
-  }
-}
-
-function validateContent(
-  content: string,
-  template: any,
-  errors: ValidationError[],
-  warnings: ValidationWarning[],
-  suggestions: string[]
-) {
-  if (!template.validation.content) return;
-
-  const contentRules = template.validation.content;
-
-  // Check content length
-  if (contentRules.minLength && content.length < contentRules.minLength) {
-    errors.push({
-      field: 'content',
-      message: `Content is too short (${content.length} chars, minimum ${contentRules.minLength})`,
-      severity: 'error',
-    });
-  }
-
-  if (contentRules.maxLength && content.length > contentRules.maxLength) {
-    warnings.push({
-      field: 'content',
-      message: `Content is very long (${content.length} chars, maximum ${contentRules.maxLength})`,
-      suggestion: 'Consider breaking into smaller sections',
-    });
-  }
-
-  // Check for required sections
-  if (contentRules.sections) {
-    for (const section of contentRules.sections) {
-      const sectionRegex = new RegExp(
-        `^##\\s*${section.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`,
-        'm'
-      );
-      if (!sectionRegex.test(content)) {
-        warnings.push({
-          field: 'content',
-          message: `Missing recommended section: ${section}`,
-          suggestion: `Add a "## ${section}" section`,
-        });
-      }
-    }
-  }
-
-  // Check for empty sections
-  const sectionMatches = content.match(/^##\s+(.+)$/gm);
-  if (sectionMatches) {
-    for (const match of sectionMatches) {
-      const sectionName = match.replace(/^##\s+/, '');
-      const sectionContent = extractSectionContent(content, sectionName);
-      if (sectionContent && sectionContent.trim() === '') {
-        warnings.push({
-          field: 'content',
-          message: `Section "${sectionName}" is empty`,
-          suggestion: 'Add content to this section or remove it',
-        });
-      }
-    }
-  }
-}
-
-function validateBasicMetadata(
-  metadata: Record<string, any>,
-  errors: ValidationError[],
-  warnings: ValidationWarning[]
-) {
-  const basicRequired = ['title', 'type', 'status'];
-
-  for (const field of basicRequired) {
-    if (!metadata[field] || metadata[field] === '') {
-      errors.push({
-        field,
-        message: `Required field '${field}' is missing`,
-        severity: 'error',
-      });
-    }
-  }
-
-  if (!metadata.author) {
-    warnings.push({
-      field: 'author',
-      message: 'Author field is missing',
-      suggestion: 'Add an author field',
-    });
-  }
-}
-
 function validateCommonIssues(
   title: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   metadata: Record<string, any>,
   content: string,
   errors: ValidationError[],
   warnings: ValidationWarning[],
-  suggestions: string[]
+  _suggestions: string[]
 ) {
   // Check for placeholder content (exclude markdown links)
   const linkRegex = /\[[^\]]+\]\([^)]+\)/g;
@@ -754,76 +546,9 @@ function validateMarkdownLinks(
   }
 }
 
-function validateFieldFormat(
-  value: any,
-  format: string,
-  field: string,
-  errors: ValidationError[],
-  warnings: ValidationWarning[]
-) {
-  switch (format) {
-    case 'email':
-      if (!isValidEmail(String(value))) {
-        errors.push({
-          field,
-          message: 'Invalid email format',
-          severity: 'error',
-        });
-      }
-      break;
-    case 'date':
-      if (!isValidDate(String(value))) {
-        errors.push({
-          field,
-          message: 'Invalid date format',
-          severity: 'error',
-        });
-      }
-      break;
-    case 'url':
-      if (!isValidUrl(String(value))) {
-        warnings.push({
-          field,
-          message: 'Invalid URL format',
-          suggestion: 'Use a valid URL format (e.g., https://example.com)',
-        });
-      }
-      break;
-  }
-}
 
-function isValidEmail(email: string): boolean {
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return emailRegex.test(email);
-}
-
-function isValidDate(date: string): boolean {
-  const dateObj = new Date(date);
-  return !isNaN(dateObj.getTime());
-}
-
-function isValidUrl(url: string): boolean {
-  try {
-    new URL(url);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-function extractSectionContent(
-  content: string,
-  sectionName: string
-): string | null {
-  const sectionRegex = new RegExp(
-    `^##\\s*${sectionName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\n([\\s\\S]*?)(?=^##|$)`,
-    'm'
-  );
-  const match = content.match(sectionRegex);
-  return match ? match[1] : null;
-}
-
-function displayValidationResults(results: ValidationResult[], options: any) {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function displayValidationResults(results: ValidationResult[], _options: any) {
   const totalRecords = results.length;
   const validRecords = results.filter((r) => r.isValid).length;
   const invalidRecords = totalRecords - validRecords;

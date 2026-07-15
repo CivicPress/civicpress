@@ -4,7 +4,7 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { DiagnosticCache } from '../cache.js';
-import { ComponentResult, DiagnosticReport } from '../types.js';
+import { ComponentResult } from '../types.js';
 import { Logger } from '../../utils/logger.js';
 
 describe('DiagnosticCache', () => {

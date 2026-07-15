@@ -13,7 +13,6 @@ import {
   DEFAULT_RECORD_STATUSES,
   validateRecordStatusConfig,
   mergeRecordStatuses,
-  getRecordStatusesWithMetadata,
 } from './record-statuses.js';
 
 export interface AnalyticsConfig {
@@ -109,7 +108,9 @@ export interface CentralConfig {
       url: string;
     };
   };
-  auth?: any; // Auth configuration from .civicrc
+  // Auth configuration from .civicrc; consumed by AuthConfigManager which
+  // narrows via its own `AuthConfig` schema, so loose-typed here.
+  auth?: Record<string, unknown>;
   version?: string;
   created?: string;
 }
@@ -262,7 +263,10 @@ export class CentralConfigManager {
       'record_statuses_config',
     ];
     for (const key of deprecated) {
-      if ((mergedConfig as any)[key] && process.env.NODE_ENV !== 'test') {
+      if (
+        (mergedConfig as Record<string, unknown>)[key] &&
+        process.env.NODE_ENV !== 'test'
+      ) {
         this.logger.warn(
           `Deprecated: '${String(
             key
@@ -289,6 +293,14 @@ export class CentralConfigManager {
   /**
    * Load YAML if it exists; otherwise return null
    */
+  /**
+   * Parses a YAML config file and returns its content. Returns `null` if
+   * the file doesn't exist or fails to parse. The return type is loose
+   * (`any`) because callers consume metadata-format YAML
+   * (`{ field: { value: X, ... } }` and bare-value variants) whose shape
+   * is not statically knowable here — each caller narrows what it needs.
+   */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private static loadYamlIfExists(filePath: string): any | null {
     try {
       if (fs.existsSync(filePath)) {
@@ -421,6 +433,26 @@ export class CentralConfigManager {
 
     // Default to empty array if not configured
     return [];
+  }
+
+  /**
+   * Get the optional `transcription:` block (BroadcastBox W2). Raw + untyped —
+   * the transcription service normalizes it (normalizeTranscriptionConfig).
+   * Prefers data/.civic/config.yml, then deprecated .civicrc; undefined if unset
+   * (the worker then stays off). Mirrors getModules()'s source precedence.
+   */
+  static getTranscriptionConfig(): Record<string, unknown> | undefined {
+    const dataDir = this.getDataDir();
+    const userConfig = this.loadYamlIfExists(
+      path.join(dataDir, '.civic', 'config.yml')
+    );
+    if (userConfig && userConfig.transcription) {
+      return userConfig.transcription as Record<string, unknown>;
+    }
+    const config = this.getConfig() as CentralConfig & {
+      transcription?: Record<string, unknown>;
+    };
+    return config.transcription;
   }
 
   /**

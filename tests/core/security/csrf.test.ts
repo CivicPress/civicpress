@@ -50,6 +50,16 @@ describe('CsrfProtection', () => {
     expect(isValid).toBe(false);
   });
 
+  // Re-audit: a structurally-valid but short/odd-length signature makes
+  // Buffer.from(...,'hex') a wrong-length buffer; timingSafeEqual throws on a
+  // length mismatch. validateToken must return false, never throw (→ 500).
+  test('malformed signature returns false, does not throw', () => {
+    expect(() => csrfProtection.validateToken('abc.b')).not.toThrow();
+    expect(csrfProtection.validateToken('abc.b')).toBe(false);
+    expect(csrfProtection.validateToken('abc.zz')).toBe(false);
+    expect(csrfProtection.validateToken('abc.')).toBe(false);
+  });
+
   test('should return token string from getTokenForResponse', () => {
     const token = csrfProtection.getTokenForResponse();
 

@@ -16,7 +16,7 @@ export const useCsrf = () => {
    * Fetch and store CSRF token from API
    */
   const fetchCsrfToken = async (): Promise<string | null> => {
-    if (!process.client) {
+    if (!import.meta.client) {
       return null;
     }
 
@@ -39,7 +39,7 @@ export const useCsrf = () => {
    * Get CSRF token from localStorage
    */
   const getCsrfToken = (): string | null => {
-    if (!process.client) {
+    if (!import.meta.client) {
       return null;
     }
     return localStorage.getItem(STORAGE_KEY);
@@ -49,7 +49,7 @@ export const useCsrf = () => {
    * Clear CSRF token from localStorage
    */
   const clearCsrfToken = (): void => {
-    if (process.client) {
+    if (import.meta.client) {
       localStorage.removeItem(STORAGE_KEY);
     }
   };

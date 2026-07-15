@@ -34,18 +34,23 @@ describe('withTimeout', () => {
   });
 
   it('should throw StorageTimeoutError with correct timeout value', async () => {
+    // Operation delay must exceed the timeout for the timeout to fire; the
+    // prior config (200ms operation vs 5000ms timeout) meant the operation
+    // always completed before the timeout, so expect.fail() was reached and
+    // AssertionError got caught by the catch block (a latent stale test that
+    // the bug-5 source fix surfaced — the assertion would have always failed).
     const operation = async () => {
       await new Promise((resolve) => setTimeout(resolve, 200));
       return 'success';
     };
 
     try {
-      await withTimeout(operation, 5000, 'upload');
+      await withTimeout(operation, 100, 'upload');
       expect.fail('Should have thrown StorageTimeoutError');
     } catch (error) {
       expect(error).toBeInstanceOf(StorageTimeoutError);
       if (error instanceof StorageTimeoutError) {
-        expect(error.context?.timeout).toBe(5000);
+        expect(error.context?.timeout).toBe(100);
         expect(error.context?.operation).toBe('upload');
       }
     }

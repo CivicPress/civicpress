@@ -9,7 +9,6 @@ import {
   cliSuccess,
   cliError,
   cliInfo,
-  cliWarn,
   cliStartOperation,
 } from '../utils/cli-output.js';
 import { AuthUtils } from '../utils/auth-utils.js';
@@ -24,6 +23,7 @@ export const autoIndexCommand = (cli: CAC) => {
     .option('--demo', 'Run a complete auto-indexing demo')
     .option('--json', 'Output in JSON format')
     .option('--silent', 'Suppress output')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .action(async (options: any) => {
       // Initialize CLI output with global options
       const globalOpts = getGlobalOptionsFromArgs();
@@ -92,8 +92,11 @@ export const autoIndexCommand = (cli: CAC) => {
 
 async function runAutoIndexingDemo(
   civicPress: CivicPress,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   options: any,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   globalOpts: any,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   logger: any
 ) {
   if (!globalOpts.silent) {
@@ -160,6 +163,7 @@ async function runAutoIndexingDemo(
 
     // Check if our updated record is in the index
     const demoRecordInIndex = index.entries.find(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (entry: any) => entry.title === 'Updated Demo Bylaw for Auto-Indexing'
     );
 
@@ -192,8 +196,11 @@ async function runAutoIndexingDemo(
 async function createTestRecord(
   civicPress: CivicPress,
   title: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   options: any,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   globalOpts: any,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   logger: any
 ) {
   // TODO: Fix AuthUser type compatibility
@@ -208,8 +215,11 @@ async function createTestRecord(
 async function updateTestRecord(
   civicPress: CivicPress,
   recordId: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   options: any,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   globalOpts: any,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   logger: any
 ) {
   // TODO: Fix AuthUser type compatibility
@@ -223,8 +233,11 @@ async function updateTestRecord(
 
 async function listRecords(
   civicPress: CivicPress,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   options: any,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   globalOpts: any,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   logger: any
 ) {
   const result = await civicPress.getRecordManager().listRecords();

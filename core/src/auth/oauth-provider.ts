@@ -18,8 +18,29 @@ export interface OAuthProvider {
   getUserInfo(token: string): Promise<OAuthUser>;
 }
 
-// Import Octokit dynamically to avoid the problematic @octokit/app subpackage
-let Octokit: any = null;
+// Import Octokit dynamically to avoid the problematic @octokit/app subpackage.
+// The cached value is the Octokit constructor (a class); we only `new` it +
+// call `octokit.rest.users.getAuthenticated()` so the structural shape is
+// narrow.
+export interface OctokitUser {
+  id: number;
+  login: string;
+  email?: string | null;
+  name?: string | null;
+  avatar_url?: string;
+}
+export type OctokitCtor = new (options: { auth: string }) => {
+  rest: {
+    users: {
+      getAuthenticated: () => Promise<{ data: OctokitUser }>;
+    };
+  };
+};
+// Loads the Octokit constructor (or null when the optional dep is absent).
+// Exposed so callers/tests can inject a fake loader and avoid real network +
+// module-mock path fragility. Defaults to the dynamic-import loader below.
+export type OctokitLoader = () => Promise<OctokitCtor | null>;
+let Octokit: OctokitCtor | null = null;
 
 async function getOctokit() {
   if (Octokit) return Octokit;
@@ -41,8 +62,11 @@ async function getOctokit() {
 export class GitHubOAuthProvider implements OAuthProvider {
   name = 'github';
 
+  // `loadOctokit` defaults to the dynamic-import loader; tests inject a fake.
+  constructor(private readonly loadOctokit: OctokitLoader = getOctokit) {}
+
   async validateToken(token: string): Promise<OAuthUser> {
-    const OctokitClass = await getOctokit();
+    const OctokitClass = await this.loadOctokit();
     if (!OctokitClass) {
       throw new Error(
         'GitHub OAuth is not available - Octokit dependency is missing'
@@ -80,9 +104,11 @@ export class GitHubOAuthProvider implements OAuthProvider {
 export class OAuthProviderManager {
   private providers: Map<string, OAuthProvider> = new Map();
 
-  constructor() {
+  // `octokitLoader` is forwarded to the default GitHub provider (tests inject
+  // a fake; production omits it and the dynamic-import loader is used).
+  constructor(octokitLoader?: OctokitLoader) {
     // Register default providers
-    this.registerProvider(new GitHubOAuthProvider());
+    this.registerProvider(new GitHubOAuthProvider(octokitLoader));
   }
 
   registerProvider(provider: OAuthProvider): void {

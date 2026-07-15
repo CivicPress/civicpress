@@ -1,8 +1,5 @@
 import { CAC } from 'cac';
 import path from 'path';
-import os from 'os';
-import { promises as fs } from 'fs';
-import tar from 'tar';
 import { createRequire } from 'module';
 import {
   BackupService,
@@ -65,6 +62,7 @@ export function registerBackupCommand(cli: CAC): void {
     .option('--overwrite', 'Overwrite existing data when restoring')
     .option('--json', 'Output in JSON format')
     .option('--silent', 'Suppress output')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .action(async (action: string, source: string | undefined, opts: any) => {
       const options = opts as BackupCommandOptions;
       const globalOpts = getGlobalOptionsFromArgs();
@@ -183,8 +181,8 @@ async function handleRestore(
 function outputCreateResult(
   result: BackupCreateResult,
   tarballPath: string | undefined,
-  jsonOutput: boolean | undefined,
-  logger: ReturnType<typeof initializeLogger>
+  _jsonOutput: boolean | undefined,
+  _logger: ReturnType<typeof initializeLogger>
 ): void {
   const payload = {
     success: true,
@@ -225,8 +223,8 @@ function outputCreateResult(
 
 function outputRestoreResult(
   result: BackupRestoreResult,
-  jsonOutput: boolean | undefined,
-  logger: ReturnType<typeof initializeLogger>
+  _jsonOutput: boolean | undefined,
+  _logger: ReturnType<typeof initializeLogger>
 ): void {
   const payload = {
     success: true,

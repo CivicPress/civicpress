@@ -245,43 +245,12 @@ const computedImageUrl = computed(() => {
 });
 
 // Methods
-const extractFolderFromPath = (path: string): string => {
-  // Extract folder from full system path like "/Users/.../data/storage/public/filename.ext"
-  // or from relative path like "storage/public/filename.ext"
-  const parts = path.split('/');
-
-  // Look for "storage" in the path and get the next part as folder
-  const storageIndex = parts.findIndex((part) => part === 'storage');
-  if (storageIndex !== -1 && storageIndex + 1 < parts.length) {
-    const folder = parts[storageIndex + 1] || 'public';
-    return folder;
-  }
-
-  // Fallback: look for common storage folder names
-  const storageFolders = [
-    'public',
-    'private',
-    'documents',
-    'images',
-    'videos',
-    'audio',
-  ];
-  for (const folder of storageFolders) {
-    if (parts.includes(folder)) {
-      return folder;
-    }
-  }
-
-  // Default fallback
-  return 'public';
-};
-
 const onMediaLoaded = () => {
   loading.value = false;
   error.value = null;
 };
 
-const onMediaError = (e: Event) => {
+const onMediaError = (_e: Event) => {
   loading.value = false;
   error.value = 'Failed to load media file';
 };
@@ -296,9 +265,6 @@ const loadImage = async () => {
   imageData.value = null;
 
   try {
-    // Use props.folder if provided, otherwise extract from file path
-    const folder = props.folder || extractFolderFromPath(props.file.path);
-
     // For file downloads, we need to use fetch directly to get the blob
     const config = useRuntimeConfig();
     const authStore = useAuthStore();
@@ -307,9 +273,12 @@ const loadImage = async () => {
       `${config.public.civicApiUrl}/api/v1/storage/files/${props.file.id}`,
       {
         method: 'GET',
-        headers: {
-          Authorization: `Bearer ${authStore.token}`,
-        },
+        // Public records UI: anonymous viewers have no token. Public-folder files
+        // (recordings A/V is public) are served via the storage public-folder
+        // bypass — only attach the bearer token when we actually have one.
+        headers: authStore.token
+          ? { Authorization: `Bearer ${authStore.token}` }
+          : {},
       }
     );
 
@@ -357,9 +326,6 @@ const loadPDF = async () => {
   pdfData.value = null;
 
   try {
-    // Use props.folder if provided, otherwise extract from file path
-    const folder = props.folder || extractFolderFromPath(props.file.path);
-
     // For file downloads, we need to use fetch directly to get the blob
     const config = useRuntimeConfig();
     const authStore = useAuthStore();
@@ -368,9 +334,12 @@ const loadPDF = async () => {
       `${config.public.civicApiUrl}/api/v1/storage/files/${props.file.id}`,
       {
         method: 'GET',
-        headers: {
-          Authorization: `Bearer ${authStore.token}`,
-        },
+        // Public records UI: anonymous viewers have no token. Public-folder files
+        // (recordings A/V is public) are served via the storage public-folder
+        // bypass — only attach the bearer token when we actually have one.
+        headers: authStore.token
+          ? { Authorization: `Bearer ${authStore.token}` }
+          : {},
       }
     );
 
@@ -400,9 +369,6 @@ const loadVideo = async () => {
   videoData.value = null;
 
   try {
-    // Use props.folder if provided, otherwise extract from file path
-    const folder = props.folder || extractFolderFromPath(props.file.path);
-
     // For file downloads, we need to use fetch directly to get the blob
     const config = useRuntimeConfig();
     const authStore = useAuthStore();
@@ -411,9 +377,12 @@ const loadVideo = async () => {
       `${config.public.civicApiUrl}/api/v1/storage/files/${props.file.id}`,
       {
         method: 'GET',
-        headers: {
-          Authorization: `Bearer ${authStore.token}`,
-        },
+        // Public records UI: anonymous viewers have no token. Public-folder files
+        // (recordings A/V is public) are served via the storage public-folder
+        // bypass — only attach the bearer token when we actually have one.
+        headers: authStore.token
+          ? { Authorization: `Bearer ${authStore.token}` }
+          : {},
       }
     );
 
@@ -443,9 +412,6 @@ const loadAudio = async () => {
   audioData.value = null;
 
   try {
-    // Use props.folder if provided, otherwise extract from file path
-    const folder = props.folder || extractFolderFromPath(props.file.path);
-
     // For file downloads, we need to use fetch directly to get the blob
     const config = useRuntimeConfig();
     const authStore = useAuthStore();
@@ -454,9 +420,12 @@ const loadAudio = async () => {
       `${config.public.civicApiUrl}/api/v1/storage/files/${props.file.id}`,
       {
         method: 'GET',
-        headers: {
-          Authorization: `Bearer ${authStore.token}`,
-        },
+        // Public records UI: anonymous viewers have no token. Public-folder files
+        // (recordings A/V is public) are served via the storage public-folder
+        // bypass — only attach the bearer token when we actually have one.
+        headers: authStore.token
+          ? { Authorization: `Bearer ${authStore.token}` }
+          : {},
       }
     );
 

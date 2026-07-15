@@ -1,33 +1,68 @@
 # CivicPress Project Status
 
-**Last Updated**: January 2025  
-**Current Version**: v0.2.0 (Alpha)  
-**Overall Status**: Stable & Production-Ready  
-**Test Coverage**: 1167+ tests passing (including 85+ security tests)  
-**Implementation**: Core maturity complete (v0.2.x goals achieved)
+> **Current status (2026-07-15) — supersedes the 2026-06-03 snapshot below.**
+> A second, full two-repo audit landed 2026-07-02 (`docs/audits/2026-07-02-full-audit.md`,
+> `FA-*` registry — the authoritative tracker). Its remediation is essentially
+> complete: **all 4 Criticals, all 22 Highs, and the entire actionable
+> Medium/Low security + correctness tail are CLOSED** across the monorepo
+> (`refactor/phase-6c-audit-mediums`) and the BroadcastBox hardware repo
+> (`refactor/phase-4-enrollment-hardening`). Only **FA-OPS-001** (this
+> tracking-doc reconciliation) and the residual **Low** defense-in-depth tier
+> remain. `origin/main` is still **frozen** pending a confirming pre-merge
+> re-audit; the remediation lives on the feature branches / open PRs. The
+> Phase 2/3 narrative below is retained for history but is no longer the
+> current state — trust the `FA-*` registry for the live picture.
+
+**Last Updated**: 2026-06-03 (lint-rule rollout + 4 of 6 sub-followups closed)
+**Current Version**: v0.2.0 (Alpha)
+**Overall Status**: Alpha — refactor in progress. Phase 2a merged to local `main`; Phase 2b + 2c + 2c.5 + 2d merged to local `dev`. **Phase 2d-followup `ui-002` (Nuxt UI Pro v3 → v4 migration) closed 2026-05-28**, **`lint-rule-rollout` (Phase 2d W3-T6 carry-forward) closed 2026-06-02 (merge `656adb5`)**, and **4 of 6 lint-rollout sub-followups closed on local `dev`**: **#3 modules/ui cruft deps** (merge `3103a74`, + pnpm 8→9 toolchain prereq), **#2 Vue-template `no-explicit-any` blind spot** (merge `d7447b4`, 13 sites + new `useTypedI18n` composable + `nuxt-ui-bridge.ts`), **#1.1 core unused-vars cleanup** (merge `60d91e8`, 170 sites + rule promoted to `error`), **#1.2 cli unused-vars cleanup** (merge `961547d`, 110 sites + rule promoted). Per the "finish lint followups before Phase 3" sequencing rule: the lint-rollout followups (#1.3 modules/ui, #1.4 modules/storage, #1.5 modules/api, plus the deferred vue/nuxt style rules / Tier C) were closed first. **Phase 3 (realtime reintroduction, Yjs-only) is then COMPLETE on the local `refactor/phase-3-realtime` branch — pending its `--no-ff` merge to `dev`** (14 findings closed, realtime-001 … realtime-014; closure report at `docs/audits/phase-3-closure-report.md`). See "Realtime Collaborative Editing" under What's Working.
+**Test Suite**: 1305+ passing / 1 known date-bomb (§9.1 session-mgmt, hardcoded 2025 expiry) / 19 skipped. UI workspace 138/138 passing under `vitest.config.ui.mjs` (under `@nuxt/ui` v4). Storage workspace 216/216 passing under `pnpm -C modules/storage test:run`. API workspace 270/270 passing.
+**Implementation**: v0.2.0 shipped; 2026-05 audit identified 205 findings (20 Critical, 65 High, 79 Medium, 41 Low). Base refactor cumulative state: **66 of 205 original findings closed** (32%); plus **47 refactor-surfaced closures** (6 Phase-2b + 4 Phase-2c.5 + 9 Phase-2d-W0 + 21 Phase-2d-W2-decomp + 6 Phase-2d-W3-latent-bugs + 1 Phase-2d-W4-T2-root-audit-gap surfaced during the v3→v4 migration baseline) for **113 total measurable progress items**.
 
 **Website:** [civicpress.io](https://civicpress.io) | **Contact:**
 [hello@civicpress.io](mailto:hello@civicpress.io)
 
+## Audit findings (2026-05)
+
+The 2026-05 manifesto-fit audit identified **205 findings (20 Critical, 65 High, 79 Medium, 41 Low)**. A post-audit base refactor is in progress; tracker at:
+
+- `docs/audits/2026-05-16-manifesto-fit-findings.md` — full registry with Status column
+- `docs/audits/phase-2a-closure-report.md` — Phase 2a Bleed-Stop summary (18 closed, 5 deferred by design)
+- `docs/audits/phase-2c-closure-report.md` — Phase 2c Foundation Cleanup summary
+- `docs/audits/phase-2c.5-closure-note.md` — Phase 2c.5 cleanup follow-ups
+- `docs/audits/phase-2d-closure-report.md` — Phase 2d Structural Hardening summary (13 closed across W0+W1+W2+W3+W4)
+- `docs/audits/phase-2d-type-cast-inventory.md` — Phase 2d W3 type-safety inventory + progress log (1,621 → 223 casts, 86% cleared)
+- `docs/audits/spec-stability-triage.md` — spec-by-spec honest status (61 specs reviewed in Phase 2b Task 1)
+- `docs/plans/2026-05-17-base-refactor-master-plan.md` — 7-phase roadmap (~3-5 months total)
+
+This file is **the public answer to "is it ready?"** The honest answer for v0.2.x is: **functional for early pilots; not yet production-grade by municipal procurement standards; expect breaking changes through v0.3.x as the refactor lands.**
+
 ## Current Status
 
-CivicPress is a **fully functional civic technology platform** with a solid
-foundation and comprehensive test coverage. The core platform is stable and
-ready for development and testing.
+CivicPress is a **working alpha** civic technology platform. The core record-management, Git-engine, CLI, API, and UI surfaces function for the v0.2.0 feature set. Post-audit refactor progress to date (2026-05-17 through 2026-05-25):
+
+- **Phase 2a (Bleed-Stop)** closed 15 Critical findings (auth gates wired, XSS sanitized, quotas enforced, audit logs made truthful, stub routers demoted to 501). Merged to local `main`.
+- **Phase 2b (Truth Restoration)** + **Phase 2c (Foundation Cleanup)** + **Phase 2c.5 (cleanup followups)** merged to local `dev`. Truth meter advanced from 18 → 51 of 205 findings closed; orphaned subsystems delete-or-wired; audit-trail unified via the `AuditChannel`.
+- **Phase 2d (Structural Hardening) fully closed** on a local-only branch (89 commits). W0 cleared all 28 carry-forward storage test failures and surfaced + fixed 9 reliability-primitive bugs. W1 shipped the canonical module contract + `ModuleResolver`. W2 decomposed all 18 named god-files + 3 surfaced extras (largest: `cloud-uuid-storage-service.ts` 2,711 → 539 LoC). W3 drove 1,621 `: any`/`as any` casts to an annotated-allowlist 223 (86% cleared) and surfaced + fixed 6 latent bugs in the process. W4 made every workspace declare every imported package + flipped `.npmrc` to strict hoist + moved cloud SDKs to `optionalDependencies` (with lazy SDK loader) + generated `docs/licenses.md` (1,460 packages catalogued). Closure report at `docs/audits/phase-2d-closure-report.md`.
+- **Phase 2d-followup `ui-002` v3→v4 migration closed 2026-05-28** on a local-only branch. Swapped paid `@nuxt/ui-pro ^3.3.7` + free `@nuxt/ui ^3.3.7` (both v3) for the single MIT-licensed `@nuxt/ui ^4.8.0` (v4 folded Pro components into the free package — the separate `@nuxt/ui-pro` package was dropped upstream). Closed 2 original-205 findings: `ui-002` (Critical, vendor lock-in) and `deps-009` (Medium, paid-commercial dep). v4 was a near-drop-in for our usage: 138/138 UI tests green throughout, only one real source change (drop the `ui.theme.colors` useHead workaround in `nuxt.config.ts:15-20`). Baseline run surfaced + fixed a pre-existing Phase-2d-W4-T2 audit-coverage gap (root workspace not scanned by `audit-package-imports.mjs`) before T0 could complete — sibling-branch fix at `a92b842`, merged to `dev` at `7f08521`.
+- **Phase 2d-followup `lint-rule-rollout` closed 2026-06-02** (merge `656adb5` on local `dev`). The deferred Phase 2d W3-T6 `@typescript-eslint/no-explicit-any: error` enforcement landed across all 5 production workspaces (`core`, `cli`, `modules/api`, `modules/ui`, `modules/storage`); baseline went from **1,488 errors → 0**. ~120 production cast sites annotated; 114 test-mock casts covered by the test-file `warn` override; `modules/ui` switched to `@nuxt/eslint`'s Option A integration with a `STYLE_RULES_DEFERRED` map silencing ~30 vue/nuxt style rules out of scope. No CI gate (per the project's no-CI/CD posture); root `pnpm lint` script signals locally. Closure report at `docs/audits/phase-2d-closure-report.md` § "Deferred to dedicated lint-hygiene session" (CLOSED line back-filled at `21da688`).
+- **4 of 6 lint-rollout sub-followups closed 2026-06-02 / 2026-06-03** on local `dev`. `#3 modules/ui cruft deps` (merge `3103a74`) dropped `@eslint/js`, `vue-eslint-parser`, and `@typescript-eslint/parser` from `modules/ui/package.json` (the last is transitively provided by `@nuxt/eslint`); also bumped declared `packageManager` from `pnpm@8.15.0` to `pnpm@9.15.9` after discovering the lockfile was already in v9 format. `#2 Vue-template `no-explicit-any` blind spot` (merge `d7447b4`) refactored 13 `as any` casts inside `<template>` regions of `modules/ui/app/**/*.vue` to `<script setup>` or removed them by typing the source; introduced one new composable (`composables/useTypedI18n.ts` with `tPlural(key, count)`) and one types bridge (`types/nuxt-ui-bridge.ts`). `#1.1 core unused-vars cleanup` (merge `60d91e8`) cleared 170 sites across `core/src/{diagnostics,saga,records,di,database,geography,templates,utils}` + top-level files; rule promoted from `warn` to `error` in both production and test config blocks of `core/eslint.config.cjs`. `#1.2 cli unused-vars cleanup` (merge `961547d`) cleared 110 sites across `cli/src/commands/**` (including a 301-line strip of a superseded validation pipeline in `validate.ts`); rule promoted to `error` in both blocks of `cli/eslint.config.cjs`. 8 surfaced findings recorded for separate triage (sanitizer-not-wired, missing-assertion test patterns, stub-pattern methods, orphan operation logging) — see [[lint-followups-before-phase-3]] / `lint-rollout-2026-06-02-followups` memory.
+
+The platform is suitable for early pilots and development; it is not yet production-grade by the standards a municipal procurement reviewer would apply. The lint-rollout followups closed first per the sequencing rule; **Phase 3 (realtime reintroduction, Yjs-only) is then complete on the local `refactor/phase-3-realtime` branch (pending `--no-ff` merge to `dev`)**. Phases 4 (hardware audit) and 5 (broadcast-box reintegration) follow. Other Phase 2d carry-forwards still pending: realtime-012 (handled inside Phase 3), test-suite repair session (date-bomb + lock-endpoints flake + surfaced missing-assertions in cli/saga test files). Branch is local-only per the `refactor-push-policy` — nothing in the refactor pushes to any origin until all 7 phases finish.
 
 ### What's Working
 
-#### **Core Platform (100% Functional)**
+#### **Core Platform (Working in v0.2.0)**
 
 - **CLI Interface**: Complete command-line interface with 25+ commands
 - **REST API**: Comprehensive API with 25+ endpoints and authentication
 - **Authentication**: Multi-method auth (OAuth, password, simulated)
 - **Database**: SQLite with Git integration and full CRUD operations
-- **Testing**: 600+ tests passing with comprehensive coverage
+- **Testing**: 1305 root-runner cases passing (1 known §9.1 date-bomb, 19 skipped); 114/114 UI workspace; 216/216 storage workspace. Coverage is uneven across surfaces — see the **Test Coverage Summary** table below for the honest per-component breakdown.
 - **File Attachments**: Complete system for linking files to records
 - **Configuration Management**: Dynamic UI with full backend integration
 
-#### **Record Management (100% Functional)**
+#### **Record Management (Working in v0.2.0)**
 
 - **Record CRUD**: Create, read, update, delete operations
 - **Directory Layout**: Records stored under `data/records/<type>/<year>/...` to
@@ -68,14 +103,14 @@ ready for development and testing.
   archival
 - **Extensions Support**: Flexible metadata.extensions object for custom fields
 
-#### **User Management (100% Functional)**
+#### **User Management (Working in v0.2.0)**
 
 - **Role-Based Access Control**: Granular permissions system
 - **User CRUD**: Complete user management operations
 - **Authentication**: Multiple auth methods with JWT tokens
 - **Authorization**: Permission-based access control
 
-#### **Development Tools (100% Functional)**
+#### **Development Tools (Working in v0.2.0)**
 
 - **Build System**: pnpm workspaces with TypeScript
 - **Testing Framework**: Vitest with comprehensive test suite
@@ -98,7 +133,34 @@ ready for development and testing.
   - Automatic error recognition in API layer
   - Correlation ID tracking for debugging
   - Enhanced UI error handling with dev mode visibility
-  - Comprehensive test coverage (1048+ tests passing)
+  - Test coverage per the Phase 2a verified run: 1213 passing / 1 known flake / 27 skipped (API+core); 67/67 passing (UI). Component coverage is sparse and expanding in Phase 2b/2d.
+
+#### **Realtime Collaborative Editing (shipped in refactor Phase 3, local `dev`)**
+
+- Module: `modules/realtime/` (`@civicpress/realtime`); shared schema:
+  `packages/editor-schema/` (`@civicpress/editor-schema`).
+- Status: complete on the local `refactor/phase-3-realtime` branch (pending the
+  `--no-ff` merge to `dev`; not yet on `main`). Local-only per the
+  `refactor-push-policy`.
+- What it does: **collaborative record editing** over a **binary y-protocols**
+  (Yjs CRDT over WebSocket) server, run **in-process with the API** on its own
+  port (default 3001, gated by `realtime.enabled`). The server serializes the
+  Yjs doc to Markdown and writes it back to a **review-gated DB draft**
+  (`record_drafts.markdown_body`, authored `realtime-snapshot`) through the
+  records-draft pipeline — it does **not** auto-commit to Git. **Markdown-in-Git
+  stays the durable archive**, produced on human *publish*. Ephemeral 48h-TTL
+  snapshot blobs are reconnection merge-aids only.
+- Findings closed: 14 (realtime-001 … realtime-014). Exit criteria met:
+  `realtime-server.ts` 3,581 → 1,495 LoC (target <1,500);
+  offline-edit-then-reconnect and collab-edit-writes-Markdown-draft tests green.
+- Tests: realtime module 148 passing / 1 skipped; `@civicpress/editor-schema`
+  32; repo-level `tests/realtime/` exit-criteria; UI vitest 186/186.
+- Known limits: **single-node** deploy (no multi-node Redis adapter — a
+  documented future option, not shipped); **browser E2E pending** a follow-up
+  (integration tests use simulated y-protocols clients); collaborative writebacks
+  are not yet auditable Git civic events (deferred follow-up); block-level
+  civic-refs round-trip only inline. Details in
+  `docs/audits/phase-3-closure-report.md`.
 
 ### In Progress
 
@@ -137,11 +199,28 @@ ready for development and testing.
 - Password reset functionality - In Progress
 - Admin dashboard - In Progress
 
+#### **BroadcastBox Hardware Appliance (Alpha — Phase 4)**
+
+The meeting-capture hardware appliance lives in a **separate repository**
+(`civicpress-broadcast-box`, Python, AGPL-3.0-or-later). It is **alpha, not
+pilot-ready**:
+
+- **Working:** video capture, encoding (incl. Raspberry Pi `h264_v4l2m2m`
+  hardware encoder), WebRTC preview, AP-mode enrollment, and CivicPress API
+  integration.
+- **Not yet there (the mission gap):** recordings produce `.mp4` only — **no
+  Markdown civic record** (transcript, motions, attendees, speaker turns) is
+  generated yet. There is also no clerk-installable appliance image.
+- **Status:** refactor **Phase 4** is auditing and fixing the hardware repo
+  (canonical cross-repo protocol artifact, the video→Markdown civic-artifact
+  pipeline, and a real install path). See
+  `docs/plans/2026-06-18-base-refactor-phase-4-broadcast-box-hw.md`.
+
 ### Recently Completed Features
 
 #### **Google Cloud Storage (GCS) Provider Support (January 2025)**
 
-- **Status**: Fully Implemented and Production-Ready
+- **Status**: Implemented in v0.2.0 (alpha — see Audit findings section)
 - **Complete GCS Integration**: Full support for Google Cloud Storage as a
   storage provider
   - Service account key file authentication
@@ -164,7 +243,7 @@ ready for development and testing.
 
 #### **Diagnostic & Repair System (January 2025)**
 
-- **Status**: Fully Implemented
+- **Status**: Implemented in v0.2.0 (alpha)
 - **Diagnostic Command**: `civic diagnose` with component-specific checks
   - Database diagnostics (integrity, schema, indexes, FTS5)
   - Search diagnostics (index sync, performance, cache)
@@ -183,7 +262,7 @@ ready for development and testing.
 
 #### **Sort Options API (January 2025)**
 
-- **Status**: Fully Implemented
+- **Status**: Implemented in v0.2.0 (alpha)
 - **API Endpoints**: Sort parameter added to records and search endpoints
   - `/api/v1/records`: `updated_desc`, `created_desc`, `title_asc`, `title_desc`
   - `/api/v1/search`: `relevance`, `updated_desc`, `created_desc`, `title_asc`,
@@ -196,7 +275,7 @@ ready for development and testing.
 
 #### **Internationalization (i18n) System (December 2025)**
 
-- **Status**: Fully Implemented and Production-Ready
+- **Status**: Implemented in v0.2.0 (alpha — see Audit findings section)
 - **Complete UI Translation**: All UI components, pages, and messages translated
   to English and French
 - **Translation Coverage**:
@@ -232,7 +311,7 @@ ready for development and testing.
 
 #### **Record Format Standardization (November 2025)**
 
-- **Status**: Fully Implemented and Production-Ready
+- **Status**: Implemented in v0.2.0 (alpha — see Audit findings section)
 - **Comprehensive Standardization**: Unified markdown format across all record
   types
 - **RecordParser Class**: Central parsing/serialization with backward
@@ -384,13 +463,18 @@ ready for development and testing.
 
 ### Test Coverage Summary
 
-| Component | Tests | Status  | Coverage |
-| --------- | ----- | ------- | -------- |
-| **CLI**   | 120+  | Passing | 95%      |
-| **API**   | 200+  | Passing | 90%      |
-| **Core**  | 160+  | Passing | 90%      |
-| **UI**    | 80+   | Passing | 85%      |
-| **Total** | 600+  | Passing | 90%      |
+Post Phase 2d closure (2026-05-25):
+
+| Component | Test files | Cases | Component coverage |
+| --------- | ---------- | ----- | ------------------ |
+| **CLI**   | 12 (`cli/src/commands/__tests__/`) + 10 integration (`tests/cli/`) | ~84 unit + integration cases | Phase 2b Tasks 10+11 closed `cli-001` (test theatre): 13 → 84 honest cases. Tier 1/2 commands covered; rest still uneven. |
+| **API**   | ~50 integration files (`tests/api/`) | 270 passing in workspace runner | Integration coverage strong; per-route unit coverage uneven. 22 retroactive characterization tests added in Phase 2d for `records-service.ts` post-decomposition. |
+| **Core**  | bundled with API in `tests/` + `core/src/**/__tests__/` | 357+ passing | Integration coverage strong; Phase 2d W2 added characterization tests for `template-engine`, `database-checker`, `sqlite-search` (26 + 5 + 8 = 39 cases). Phase 2d W3 added 17 indexing integration tests. Storage W0 triage added 4 rewritten unit tests + closed 9 reliability bugs. |
+| **UI**    | 7+ component/composable files (`tests/ui/`) | 138 passing under `vitest.config.ui.mjs` | Phase 2b Tasks 8+9 closed `ui-005` (test theatre): 47 new component tests for forms + record viewing. Phase 2d added 24 char-tests for `useFileBrowser` (T14). |
+| **Storage** | 17 unit files (`modules/storage/src/__tests__/`) + 1 char-test (`tests/storage/characterization/`) | 216 unit-runner passing + 37 char-tests | Phase 2d W0 cleared all 28 carry-forward failures + surfaced/closed 9 reliability bugs (retry, timeout, circuit-breaker, batch ops, lifecycle, stream errors, error inheritance). W2 added 37 char-tests for `cloud-uuid-storage-service` post-decomposition. W3 + W4 maintained 216/216 throughout. |
+| **Notifications** | 1 integration | (audited 2026-05) | Phase 2c routed notifications through the unified `AuditChannel`; Phase 2b Task 7 added ~10 unit cases. No new Phase 2d work. |
+
+> **Note:** The previous version of this table claimed CLI 120+ / 90%, API 200+ / 90%, Core 160+ / 90%, UI 80+ / 85%, Total 600+ / 90%. The 2026-05 manifesto-fit audit (findings `cli-001`, `ui-005`) showed those numbers were not substantiated by files on disk. The honest counts above replace them. See `docs/audits/2026-05-16-manifesto-fit-findings.md` and `docs/audits/phase-2a-closure-report.md` for the full audit trail.
 
 ### Test Categories
 
@@ -491,7 +575,7 @@ pnpm run clean
 
 ## Security Status
 
-**Security Implementation**: Complete & Production-Ready
+**Security Implementation**: Working alpha — 2026-05 audit identified 20 Critical findings (15 closed in Phase 2a, 5 deferred to Phase 4/5 by design). Trust-restoration work (api-001/2/3/4, ui-001/3, storage-001/2, notifications-001/2/3) landed in Phase 2a; see `docs/audits/phase-2a-closure-report.md`.
 
 ### Comprehensive Security System
 
@@ -528,12 +612,14 @@ pnpm run clean
 
 ### Security Testing & Validation
 
-#### **Comprehensive Test Coverage (85+ Security Tests)**
+#### **Security test coverage (post-Phase-2a)**
 
-- **Core Security Tests**: Email validation, security guards, auth flows
-- **API Security Tests**: Endpoint protection, permission enforcement
-- **CLI Security Tests**: Command security, interactive validation
-- **UI Security Tests**: Component behavior, conditional rendering
+- **Core Security Tests**: Email validation, security guards, auth flows (verified passing in Phase 2a test run)
+- **API Security Tests**: Endpoint protection, permission enforcement (Phase 2a Task 2 closed api-001/2/3 — auth gates now actually enforce; previously some mounts skipped auth)
+- **CLI Security Tests**: Phase 2b Tasks 10-11 closed `cli-001` and expanded coverage to ~84 unit/integration cases across Tier 1/2 commands; broader 28-command coverage still rolls into a later phase.
+- **UI Security Tests**: Phase 2a Task 4 added 8 XSS-pinning tests for `useMarkdown` (DOMPurify). Phase 2b Tasks 8-9 added 47 component-level tests (closed `ui-005`).
+
+> **Note:** The previous version of this section claimed "85+ security tests" as a count. The 2026-05 audit (finding `ui-005`) showed UI security claims were unsubstantiated; the count above is the honest tally as of Phase 2a closure. Total test count: see Testing Status table.
 
 #### **Security Verification**
 
@@ -642,19 +728,20 @@ pnpm run clean
 
 ## Success Metrics
 
-### Technical Metrics
+### Technical Metrics (post-Phase-2a, 2026-05-17)
 
-- 600+ tests passing (including comprehensive security test suite)
-- 0 critical security vulnerabilities
-- < 100ms API response times
-- 88% test coverage
+- 1213 + 67 tests passing across API/core/UI suites (verified Phase 2a run); 1 known pre-existing flake (`database-integration session-mgmt`) tracked for a dedicated session
+- `pnpm audit`: 0 Critical / 10 High (all transitive in dev/test paths) — down from 4 / 73 pre-Phase-2a
+- 2026-05 audit Criticals: **15 of 20 closed**, 5 deferred to Phase 4/5 by design (see findings registry)
+- API response times: not currently measured under load — claim removed pending Phase 2c benchmarking
+- Test coverage: per-module honest counts in the Testing Status table above; aggregate percentage not currently produced
 
 ### Development Metrics
 
-- All core features implemented
-- Comprehensive documentation
-- Active development workflow
-- Clear project roadmap
+- v0.2.0 core feature set implemented (audit Criticals being closed across the 7-phase refactor)
+- Documentation truth-restoration in progress (Phase 2b); 39 specs demoted from `stable` to `partial`/`planned` per `docs/audits/spec-stability-triage.md`
+- Active development on `dev` branch off `main` (post-Phase-2a merge `0e40ea3`)
+- Clear refactor roadmap: `docs/plans/2026-05-17-base-refactor-master-plan.md`
 
 ## Contributing
 

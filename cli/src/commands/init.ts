@@ -17,10 +17,99 @@ import {
 import {
   cliSuccess,
   cliError,
-  cliInfo,
   cliStartOperation,
 } from '../utils/cli-output.js';
 import { fileURLToPath } from 'url';
+
+// FA-CLI-005: the default record-type / status config blocks were inlined
+// verbatim in every config-building path (skip-prompts and --data-dir). They
+// are hoisted here to a single source so the two seed paths can never drift.
+// (Kept CLI-local rather than importing core's DEFAULT_RECORD_TYPES/STATUSES,
+// which carry a different, larger set — importing them would change what
+// `civic init` seeds.)
+const INIT_RECORD_TYPES_CONFIG = {
+  bylaw: {
+    label: 'Bylaws',
+    description: 'Municipal bylaws and regulations',
+    source: 'core',
+    priority: 1,
+  },
+  ordinance: {
+    label: 'Ordinances',
+    description: 'Local ordinances and laws',
+    source: 'core',
+    priority: 2,
+  },
+  policy: {
+    label: 'Policies',
+    description: 'Administrative policies',
+    source: 'core',
+    priority: 3,
+  },
+  proclamation: {
+    label: 'Proclamations',
+    description: 'Official proclamations',
+    source: 'core',
+    priority: 4,
+  },
+  resolution: {
+    label: 'Resolutions',
+    description: 'Council resolutions',
+    source: 'core',
+    priority: 5,
+  },
+} as const;
+
+const INIT_RECORD_STATUSES_CONFIG = {
+  draft: {
+    label: 'Draft',
+    description: 'Initial working version, not yet ready for review',
+    source: 'core',
+    priority: 1,
+  },
+  pending_review: {
+    label: 'Pending Review',
+    description: 'Submitted for review and awaiting approval',
+    source: 'core',
+    priority: 2,
+  },
+  under_review: {
+    label: 'Under Review',
+    description: 'Currently under active review by authorized personnel',
+    source: 'core',
+    priority: 3,
+  },
+  approved: {
+    label: 'Approved',
+    description: 'Approved and currently in effect',
+    source: 'core',
+    priority: 4,
+  },
+  published: {
+    label: 'Published',
+    description: 'Publicly available and in effect',
+    source: 'core',
+    priority: 5,
+  },
+  rejected: {
+    label: 'Rejected',
+    description: 'Rejected and not approved',
+    source: 'core',
+    priority: 6,
+  },
+  archived: {
+    label: 'Archived',
+    description: 'No longer active but preserved for reference',
+    source: 'core',
+    priority: 7,
+  },
+  expired: {
+    label: 'Expired',
+    description: 'Past its effective date and no longer in force',
+    source: 'core',
+    priority: 8,
+  },
+} as const;
 
 export const initCommand = (cli: CAC) => {
   cli
@@ -36,6 +125,7 @@ export const initCommand = (cli: CAC) => {
       '--demo-data [city]',
       'Load demo data (optional: specify city name)'
     )
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .action(async (options: any) => {
       const skipPrompts = options.yes || options.noPrompt;
       // Initialize CLI output with global options
@@ -58,6 +148,7 @@ export const initCommand = (cli: CAC) => {
           logger.info('🚀 Initializing CivicPress repository...');
         }
 
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         let config: any;
         let dataDir = 'data';
 
@@ -73,90 +164,8 @@ export const initCommand = (cli: CAC) => {
             repo_url: null,
             modules: ['legal-register'],
             record_types: ['bylaw', 'policy'],
-            record_types_config: {
-              bylaw: {
-                label: 'Bylaws',
-                description: 'Municipal bylaws and regulations',
-                source: 'core',
-                priority: 1,
-              },
-              ordinance: {
-                label: 'Ordinances',
-                description: 'Local ordinances and laws',
-                source: 'core',
-                priority: 2,
-              },
-              policy: {
-                label: 'Policies',
-                description: 'Administrative policies',
-                source: 'core',
-                priority: 3,
-              },
-              proclamation: {
-                label: 'Proclamations',
-                description: 'Official proclamations',
-                source: 'core',
-                priority: 4,
-              },
-              resolution: {
-                label: 'Resolutions',
-                description: 'Council resolutions',
-                source: 'core',
-                priority: 5,
-              },
-            },
-            record_statuses_config: {
-              draft: {
-                label: 'Draft',
-                description:
-                  'Initial working version, not yet ready for review',
-                source: 'core',
-                priority: 1,
-              },
-              pending_review: {
-                label: 'Pending Review',
-                description: 'Submitted for review and awaiting approval',
-                source: 'core',
-                priority: 2,
-              },
-              under_review: {
-                label: 'Under Review',
-                description:
-                  'Currently under active review by authorized personnel',
-                source: 'core',
-                priority: 3,
-              },
-              approved: {
-                label: 'Approved',
-                description: 'Approved and currently in effect',
-                source: 'core',
-                priority: 4,
-              },
-              published: {
-                label: 'Published',
-                description: 'Publicly available and in effect',
-                source: 'core',
-                priority: 5,
-              },
-              rejected: {
-                label: 'Rejected',
-                description: 'Rejected and not approved',
-                source: 'core',
-                priority: 6,
-              },
-              archived: {
-                label: 'Archived',
-                description: 'No longer active but preserved for reference',
-                source: 'core',
-                priority: 7,
-              },
-              expired: {
-                label: 'Expired',
-                description: 'Past its effective date and no longer in force',
-                source: 'core',
-                priority: 8,
-              },
-            },
+            record_types_config: INIT_RECORD_TYPES_CONFIG,
+            record_statuses_config: INIT_RECORD_STATUSES_CONFIG,
             default_role: 'clerk',
             hooks: { enabled: true },
             workflows: { enabled: true },
@@ -206,90 +215,8 @@ export const initCommand = (cli: CAC) => {
             repo_url: null,
             modules: ['legal-register'],
             record_types: ['bylaw', 'policy'],
-            record_types_config: {
-              bylaw: {
-                label: 'Bylaws',
-                description: 'Municipal bylaws and regulations',
-                source: 'core',
-                priority: 1,
-              },
-              ordinance: {
-                label: 'Ordinances',
-                description: 'Local ordinances and laws',
-                source: 'core',
-                priority: 2,
-              },
-              policy: {
-                label: 'Policies',
-                description: 'Administrative policies',
-                source: 'core',
-                priority: 3,
-              },
-              proclamation: {
-                label: 'Proclamations',
-                description: 'Official proclamations',
-                source: 'core',
-                priority: 4,
-              },
-              resolution: {
-                label: 'Resolutions',
-                description: 'Council resolutions',
-                source: 'core',
-                priority: 5,
-              },
-            },
-            record_statuses_config: {
-              draft: {
-                label: 'Draft',
-                description:
-                  'Initial working version, not yet ready for review',
-                source: 'core',
-                priority: 1,
-              },
-              pending_review: {
-                label: 'Pending Review',
-                description: 'Submitted for review and awaiting approval',
-                source: 'core',
-                priority: 2,
-              },
-              under_review: {
-                label: 'Under Review',
-                description:
-                  'Currently under active review by authorized personnel',
-                source: 'core',
-                priority: 3,
-              },
-              approved: {
-                label: 'Approved',
-                description: 'Approved and currently in effect',
-                source: 'core',
-                priority: 4,
-              },
-              published: {
-                label: 'Published',
-                description: 'Publicly available and in effect',
-                source: 'core',
-                priority: 5,
-              },
-              rejected: {
-                label: 'Rejected',
-                description: 'Rejected and not approved',
-                source: 'core',
-                priority: 6,
-              },
-              archived: {
-                label: 'Archived',
-                description: 'No longer active but preserved for reference',
-                source: 'core',
-                priority: 7,
-              },
-              expired: {
-                label: 'Expired',
-                description: 'Past its effective date and no longer in force',
-                source: 'core',
-                priority: 8,
-              },
-            },
+            record_types_config: INIT_RECORD_TYPES_CONFIG,
+            record_statuses_config: INIT_RECORD_STATUSES_CONFIG,
             default_role: 'clerk',
             hooks: {
               enabled: true,
@@ -659,6 +586,7 @@ export const initCommand = (cli: CAC) => {
                 logger.info(`📧 Email: ${adminDetails.email}`);
                 logger.info(`🔑 Role: admin`);
               }
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             } catch (error: any) {
               logger.warn(`⚠️  Failed to create admin user: ${error.message}`);
               logger.info(
@@ -731,6 +659,7 @@ export const initCommand = (cli: CAC) => {
             logger.info('🔄 Syncing indexed records to database...');
           await indexingService.generateIndexes({ syncDatabase: true });
           if (!shouldOutputJson) logger.success('🗄️  Database sync complete');
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } catch (err: any) {
           logger.warn(
             '⚠️  Indexing or DB sync failed: ' +
@@ -761,6 +690,7 @@ Date: ${new Date().toISOString()}`;
             if (!shouldOutputJson) {
               logger.success('📝 Initial commit created');
             }
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           } catch (commitError: any) {
             if (!shouldOutputJson) {
               logger.warn(
@@ -816,6 +746,7 @@ Date: ${new Date().toISOString()}`;
         }
         // Explicitly flush stdout before exit (for test environments)
         process.stdout.write('', () => process.exit(0));
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } catch (err: any) {
         cliError(
           'Failed to initialize repository',
@@ -843,8 +774,10 @@ Date: ${new Date().toISOString()}`;
 
 async function setupCivicrcFromFile(
   civicrcPath: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   config: any,
   dataDir: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   logger: any
 ): Promise<void> {
   logger.info('⚙️  Setting up configuration from file...');
@@ -972,6 +905,7 @@ async function setupCivicrcFromFile(
 async function setupCivicrcNonInteractive(
   civicrcPath: string,
   dataDir: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   logger: any
 ): Promise<void> {
   logger.info('⚙️  Setting up configuration (non-interactive)...');
@@ -1062,6 +996,7 @@ async function setupCivicrcNonInteractive(
 async function loadDemoData(
   dataDir: string,
   demoCity: string = 'richmond-quebec',
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   logger: any
 ): Promise<void> {
   try {
@@ -1096,7 +1031,7 @@ async function loadDemoData(
     let dbConfig;
     try {
       dbConfig = CentralConfigManager.getDatabaseConfig();
-    } catch (error) {
+    } catch {
       // Database config might not be available during init, that's okay
       logger.info(
         '⚠️  Database config not available, storage file metadata will not be restored'
@@ -1163,10 +1098,12 @@ async function loadDemoData(
       );
 
       logger.info(`🎯 Triggered hooks for demo data loading`);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (hookError: any) {
       logger.warn(`⚠️  Hook triggering failed: ${hookError.message}`);
       // Don't fail the entire demo data loading if hooks fail
     }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } catch (error: any) {
     logger.error(`❌ Failed to load demo data: ${error.message}`);
     throw error;
@@ -1176,6 +1113,7 @@ async function loadDemoData(
 async function setupCivicrc(
   civicrcPath: string,
   dataDir: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   logger: any
 ): Promise<string | undefined> {
   logger.info('⚙️  Setting up configuration...');
@@ -1249,6 +1187,7 @@ async function setupCivicrc(
       name: 'database_path',
       message: 'SQLite database file path:',
       default: path.join(process.cwd(), '.system-data/civic.db'),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       when: (answers: any) => answers.database_type === 'sqlite',
     },
     {
@@ -1256,6 +1195,7 @@ async function setupCivicrc(
       name: 'database_url',
       message: 'PostgreSQL connection URL:',
       default: 'postgres://user:password@localhost:5432/civicpress',
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       when: (answers: any) => answers.database_type === 'postgres',
     },
     {
@@ -1393,6 +1333,7 @@ async function setupCivicrc(
 
 async function setupNotifications(
   systemDataDir: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   logger: any,
   shouldOutputJson: boolean
 ): Promise<void> {
@@ -1507,6 +1448,7 @@ async function setupNotifications(
         );
       }
     }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } catch (error: any) {
     if (!shouldOutputJson) {
       logger.warn(`⚠️  Failed to setup notifications: ${error.message}`);
@@ -1519,6 +1461,7 @@ async function setupNotifications(
 
 async function setupStorage(
   systemDataDir: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   logger: any,
   shouldOutputJson: boolean,
   storagePath?: string
@@ -1685,6 +1628,7 @@ async function setupStorage(
         logger.info('💡 Test with: civic storage:list');
       }
     }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } catch (error: any) {
     if (!shouldOutputJson) {
       logger.warn(`⚠️  Failed to setup storage: ${error.message}`);

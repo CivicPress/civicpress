@@ -2,7 +2,7 @@
 
 ---
 
-version: 1.0.0 status: stable created: '2025-07-03' updated: '2025-07-15'
+version: 0.2.x status: partial created: '2025-07-03' updated: '2025-07-15'
 deprecated: false sunset_date: null additions:
 
 - comprehensive activity log documentation

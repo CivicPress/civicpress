@@ -35,6 +35,32 @@ describe('Authentication API', () => {
       expect(response.body.data.session.user.username).toBeDefined();
     });
 
+    // FA-API-001: the endpoint must refuse to mint a token when simulated auth
+    // is not explicitly enabled. Cover both an unset NODE_ENV (the realistic
+    // deployment default that was the actual exploit) and an explicit
+    // production process.
+    it.each([
+      ['unset NODE_ENV (deployment default)', undefined],
+      ['NODE_ENV=production', 'production'],
+    ])('fails closed with %s (FA-API-001)', async (_label, value) => {
+      const prev = process.env.NODE_ENV;
+      if (value === undefined) delete process.env.NODE_ENV;
+      else process.env.NODE_ENV = value;
+      try {
+        const response = await request(context.api.getApp())
+          .post('/api/v1/auth/simulated')
+          .send({ username: 'attacker', role: 'admin' });
+
+        expect(response.status).toBe(403);
+        expect(response.body.success).toBe(false);
+        expect(response.body.error.code).toBe('SIMULATED_AUTH_DISABLED');
+        expect(response.body.data?.session).toBeUndefined();
+      } finally {
+        if (prev === undefined) delete process.env.NODE_ENV;
+        else process.env.NODE_ENV = prev;
+      }
+    });
+
     it('should reject login without username', async () => {
       const response = await request(context.api.getApp())
         .post('/api/v1/auth/simulated')

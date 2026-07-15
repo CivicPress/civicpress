@@ -74,7 +74,7 @@ export function createTestContainer(
  * @returns Configured mock container
  */
 export function createMockContainer(mocks?: {
-  [key: string]: any;
+  [key: string]: unknown;
 }): ServiceContainer {
   const container = new ServiceContainer();
 
@@ -145,7 +145,7 @@ export async function createTestConfig(options?: {
 export async function cleanupTestConfig(dataDir: string): Promise<void> {
   try {
     await fs.rm(dataDir, { recursive: true, force: true });
-  } catch (error) {
+  } catch {
     // Ignore cleanup errors
   }
 }

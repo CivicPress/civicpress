@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { useMediaQuery } from '@vueuse/core';
+import { extractErrorMessage, type ApiResponse } from '~/utils/api-response';
+import { errorMessage } from '~/utils/errors';
 
 interface StatusHistoryEntry {
   status: string;
@@ -16,8 +18,26 @@ interface Props {
 
 const props = defineProps<Props>();
 const emit = defineEmits<{
-  changed: [{ newStatus: string; record?: any }];
+  changed: [{ newStatus: string; record?: Record<string, unknown> }];
 }>();
+
+interface StatusOption {
+  label: string;
+  value: string;
+  icon?: string;
+  description?: string;
+}
+
+interface TimelineItem {
+  value: string;
+  title: string;
+  icon?: string;
+  description?: string;
+  status: string;
+  isCurrent: boolean;
+  isTransition: boolean;
+  color: 'primary' | 'neutral';
+}
 
 const { getStatusColor, getStatusLabel, getStatusIcon, formatDate } =
   useRecordUtils();
@@ -38,7 +58,7 @@ const showConfirm = ref(false);
 const saving = ref(false);
 const inlineError = ref<string | null>(null);
 
-const timelineEntries = computed<any[]>(() => {
+const timelineEntries = computed<TimelineItem[]>(() => {
   const historyEntries = Array.isArray(props.statusHistory)
     ? props.statusHistory
     : [];
@@ -49,12 +69,12 @@ const timelineEntries = computed<any[]>(() => {
     }
   });
 
-  const options = recordStatusOptions();
+  const options = recordStatusOptions() as StatusOption[];
   const availableSet = new Set(
-    availableTargets.value.map((opt: any) => opt.value as string)
+    (availableTargets.value as StatusOption[]).map((opt) => opt.value)
   );
 
-  const items = options.map((opt: any) => {
+  const items = options.map<TimelineItem>((opt) => {
     const history = historyMap.get(opt.value);
     const formattedDate = history?.date ? formatDate(history.date) : undefined;
     const details = [formattedDate, history?.user].filter(Boolean).join(' · ');
@@ -104,14 +124,14 @@ onMounted(async () => {
       const { $civicApi } = useNuxtApp();
       const res = (await $civicApi(
         `/api/v1/records/${props.recordId}/transitions`
-      )) as any;
+      )) as ApiResponse;
       if (res?.success && res?.data?.transitions) {
         allowedTargets.value = res.data.transitions as string[];
       }
-    } catch (e) {
+    } catch {
       // Ignore; will fall back to status list
     }
-  } catch (err: any) {
+  } catch {
     // handled via statusesError
   }
 });
@@ -119,11 +139,11 @@ onMounted(async () => {
 // Allowed transitions fetched from API, fall back to system status transitions if API call fails
 const allowedTargets = ref<string[] | null>(null);
 
-const availableTargets = computed(() => {
-  const options = recordStatusOptions();
-  const base = options.filter((opt: any) => opt.value !== props.currentStatus);
+const availableTargets = computed<StatusOption[]>(() => {
+  const options = recordStatusOptions() as StatusOption[];
+  const base = options.filter((opt) => opt.value !== props.currentStatus);
   if (Array.isArray(allowedTargets.value) && allowedTargets.value.length > 0) {
-    return base.filter((opt: any) => allowedTargets.value!.includes(opt.value));
+    return base.filter((opt) => allowedTargets.value!.includes(opt.value));
   }
   return base;
 });
@@ -156,7 +176,7 @@ const confirmChange = async () => {
           status: pendingStatus.value,
         },
       }
-    )) as any;
+    )) as ApiResponse;
 
     if (response && response.success) {
       emit('changed', {
@@ -167,12 +187,10 @@ const confirmChange = async () => {
       pendingStatus.value = null;
     } else {
       inlineError.value =
-        response?.error?.message ||
-        response?.message ||
-        'Failed to change status';
+        extractErrorMessage(response) || 'Failed to change status';
     }
-  } catch (err: any) {
-    inlineError.value = err?.message || 'Failed to change status';
+  } catch (err: unknown) {
+    inlineError.value = errorMessage(err, 'Failed to change status');
   } finally {
     saving.value = false;
   }
@@ -186,11 +204,11 @@ const confirmChange = async () => {
       :orientation="timelineOrientation"
       color="neutral"
       size="sm"
-      :items="timelineEntries"
+      :items="(timelineEntries as never)"
       :default-value="currentStatus"
       class="mt-2"
     >
-      <template #default="{ item }">
+      <template #default="{ item }: { item: TimelineItem }">
         <div class="flex flex-col gap-1 w-full max-w-xs lg:max-w-sm">
           <div class="flex items-center justify-between">
             <span
@@ -222,14 +240,16 @@ const confirmChange = async () => {
           <div
             v-if="item.isTransition"
             class="mt-2 rounded-lg border border-dashed border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/40 p-2"
+            :data-test="`transition-${item.status}`"
           >
             <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">
               Transition to {{ getStatusLabel(item.status) }}
               <span v-if="!showStatusTransitions">(permission required)</span>
             </p>
             <UButton
+              :data-test="`transition-button-${item.status}`"
               size="xs"
-              :color="getStatusColor(item.status) as any"
+              :color="(getStatusColor(item.status) as 'error' | 'primary' | 'neutral')"
               :icon="getStatusIcon(item.status)"
               variant="outline"
               :disabled="!showStatusTransitions"
@@ -264,7 +284,11 @@ const confirmChange = async () => {
       <UIcon name="i-lucide-loader-2" class="w-4 h-4 animate-spin" /> Loading
       statuses...
     </div>
-    <div v-else-if="!showStatusTransitions" class="text-sm text-gray-500">
+    <div
+      v-else-if="!showStatusTransitions"
+      data-test="no-permission"
+      class="text-sm text-gray-500"
+    >
       You don't have permission to change record status.
     </div>
 

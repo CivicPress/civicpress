@@ -5,7 +5,7 @@
  */
 
 import { Logger } from '@civicpress/core';
-import type { StorageFile } from '../types/storage.types.js';
+import type { StorageFile , StorageDatabaseService } from '../types/storage.types.js';
 
 export interface LifecyclePolicy {
   name: string;
@@ -37,13 +37,15 @@ export interface LifecycleResult {
  */
 export class LifecycleManager {
   private logger: Logger;
-  private databaseService: any;
-  private storageService: any; // CloudUuidStorageService
+  private databaseService: StorageDatabaseService;
+  private storageService: import("../cloud-uuid-storage-service.js").CloudUuidStorageService; // CloudUuidStorageService
   private policies: LifecyclePolicy[];
+  // FA-STOR-003: warn once (not per file) when an archive policy is ignored.
+  private archiveNotImplementedWarned = false;
 
   constructor(
-    databaseService: any,
-    storageService: any,
+    databaseService: StorageDatabaseService,
+    storageService: import("../cloud-uuid-storage-service.js").CloudUuidStorageService,
     policies: LifecyclePolicy[] = [],
     logger?: Logger
   ) {
@@ -68,23 +70,36 @@ export class LifecycleManager {
       files = [];
       // For now, we'll need to get files from database directly
       const allFiles = await this.databaseService.getAllStorageFiles();
-      files = allFiles.map((record: any) => this.dbRecordToStorageFile(record));
+      files = allFiles.map((record) => this.dbRecordToStorageFile(record));
     }
 
-    // Apply policies to each file
+    // Apply policies to each file. Evaluate every applicable enabled policy
+    // and pick the highest-priority action across all (delete > archive >
+    // retain). The earlier "break on first match" behavior made action
+    // priority depend on policy insertion order — a [archive, delete]
+    // ordering would archive a file past both thresholds instead of
+    // deleting it.
     for (const file of files) {
       const applicablePolicies = this.getApplicablePolicies(file.folder);
 
+      const candidates: LifecycleAction[] = [];
       for (const policy of applicablePolicies) {
         if (!policy.enabled) {
           continue;
         }
-
         const action = this.evaluatePolicy(file, policy);
         if (action) {
-          actions.push(action);
-          break; // Apply first matching policy
+          candidates.push(action);
         }
+      }
+
+      const winner =
+        candidates.find((a) => a.action === 'delete') ||
+        candidates.find((a) => a.action === 'archive') ||
+        candidates.find((a) => a.action === 'retain') ||
+        null;
+      if (winner) {
+        actions.push(winner);
       }
     }
 
@@ -117,16 +132,22 @@ export class LifecycleManager {
             }
           );
           result.processed++;
-          if (action.action === 'archive') result.archived++;
-          else if (action.action === 'delete') result.deleted++;
+          // FA-STOR-003: archive actions are no longer produced (see
+          // evaluatePolicy); archived stays 0 so results never claim a move
+          // that did not happen.
+          if (action.action === 'delete') result.deleted++;
           else result.retained++;
           continue;
         }
 
         switch (action.action) {
           case 'archive':
-            await this.archiveFile(action.file, action.reason);
-            result.archived++;
+            // FA-STOR-003: unreachable (evaluatePolicy no longer emits archive
+            // actions). Kept defensively — count nothing rather than report a
+            // phantom archive if an archive action is ever constructed directly.
+            this.logger.warn(
+              `Ignoring archive action for file ${action.file.id}: archival is not implemented`
+            );
             break;
           case 'delete':
             await this.deleteFile(action.file, action.reason);
@@ -176,7 +197,12 @@ export class LifecycleManager {
     policy: LifecyclePolicy
   ): LifecycleAction | null {
     const now = new Date();
-    const fileAge = now.getTime() - file.created_at.getTime();
+    if (!file.created_at) return null;
+    const createdAt =
+      file.created_at instanceof Date
+        ? file.created_at
+        : new Date(file.created_at);
+    const fileAge = now.getTime() - createdAt.getTime();
     const fileAgeDays = fileAge / (1000 * 60 * 60 * 24);
 
     // Check delete policy
@@ -189,22 +215,20 @@ export class LifecycleManager {
       };
     }
 
-    // Check archive policy
+    // Check archive policy.
+    // FA-STOR-003: archival was a DB-only no-op that still reported
+    // `archived: N` as if bytes had moved. Rather than claim work that never
+    // happens, an archiveAfterDays policy is honestly reported as unimplemented
+    // and produces NO action (OrphanedFileCleaner handles real archival drift).
     if (policy.archiveAfterDays && fileAgeDays >= policy.archiveAfterDays) {
-      // Check if already archived
-      if (
-        file.folder?.includes('archive') ||
-        file.folder?.includes('archived')
-      ) {
-        return null; // Already archived
+      if (!this.archiveNotImplementedWarned) {
+        this.archiveNotImplementedWarned = true;
+        this.logger.warn(
+          'Lifecycle archiveAfterDays is not implemented (no file is moved); ' +
+            'the policy is ignored. Use a delete policy or an external archival process.'
+        );
       }
-
-      return {
-        file,
-        action: 'archive',
-        reason: `File age (${Math.floor(fileAgeDays)} days) exceeds archive threshold (${policy.archiveAfterDays} days)`,
-        scheduledDate: now,
-      };
+      return null;
     }
 
     // Check retention policy
@@ -218,27 +242,6 @@ export class LifecycleManager {
     }
 
     return null; // No action needed
-  }
-
-  /**
-   * Archive a file
-   */
-  private async archiveFile(file: StorageFile, reason: string): Promise<void> {
-    // For now, we'll just move the file to an archive folder
-    // In a full implementation, this might copy to a different provider
-    const archiveFolder = 'archive';
-
-    // Update file folder in database
-    await this.databaseService.updateStorageFile(file.id, {
-      folder: archiveFolder,
-      updated_at: new Date(),
-    });
-
-    this.logger.info(`Archived file: ${file.id}`, {
-      originalFolder: file.folder,
-      archiveFolder,
-      reason,
-    });
   }
 
   /**
@@ -278,7 +281,7 @@ export class LifecycleManager {
   /**
    * Convert database record to StorageFile
    */
-  private dbRecordToStorageFile(record: any): StorageFile {
+  private dbRecordToStorageFile(record: StorageFile): StorageFile {
     return {
       id: record.id,
       original_name: record.original_name,
@@ -290,8 +293,8 @@ export class LifecycleManager {
       mime_type: record.mime_type,
       description: record.description,
       uploaded_by: record.uploaded_by,
-      created_at: new Date(record.created_at),
-      updated_at: new Date(record.updated_at),
+      created_at: record.created_at ? new Date(record.created_at) : undefined,
+      updated_at: record.updated_at ? new Date(record.updated_at) : undefined,
     };
   }
 }

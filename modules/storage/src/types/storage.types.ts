@@ -37,6 +37,7 @@ export interface StorageProvider {
   // GCS provider config
   project_id?: string;
   // Provider-specific options
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   options?: Record<string, any>;
 }
 
@@ -45,6 +46,12 @@ export interface GlobalStorageSettings {
   health_checks: boolean;
   health_check_interval: number;
   retry_attempts: number;
+  // Optional retry-manager knobs. Read by `RetryManager` (defaults applied
+  // when omitted). Surfaced here so the config object is fully typed.
+  retry_initial_delay?: number; // ms
+  retry_max_delay?: number; // ms
+  retry_backoff_multiplier?: number;
+  retryable_errors?: string[];
   cross_provider_backup: boolean;
   backup_providers: string[];
   max_concurrent_uploads?: number;
@@ -78,13 +85,60 @@ export interface AzureCredentials {
 export interface GCSCredentials {
   projectId: string;
   keyFilename?: string;
-  credentials?: Record<string, any>;
+  credentials?: Record<string, unknown>;
 }
 
 export type ProviderCredentials =
   | S3Credentials
   | AzureCredentials
   | GCSCredentials;
+
+/**
+ * Minimal structural interface for the methods on `DatabaseService`
+ * that storage modules call. The real `DatabaseService` lives in
+ * `@civicpress/core` and would create a circular import; this surface
+ * lets storage type its `databaseService` field without that hazard.
+ * Phase 2d W3-T6.
+ *
+ * Method signatures mirror the actual `DatabaseService` / `StorageFileStore`
+ * return types so consumers (like `file-mgmt-ops.ts`) can treat the
+ * `deleteStorageFile`/`updateStorageFile` results as booleans.
+ */
+export interface StorageDatabaseService {
+  createStorageFile(file: {
+    id: string;
+    original_name: string;
+    stored_filename: string;
+    folder: string;
+    relative_path: string;
+    provider_path: string;
+    size: number;
+    mime_type: string;
+    description?: string;
+    uploaded_by?: string;
+  }): Promise<void>;
+  // FA-STOR-004: insert-or-replace, used by manifest reconstruction.
+  upsertStorageFile(file: {
+    id: string;
+    original_name: string;
+    stored_filename: string;
+    folder: string;
+    relative_path: string;
+    provider_path: string;
+    size: number;
+    mime_type: string;
+    description?: string;
+    uploaded_by?: string;
+  }): Promise<void>;
+  getStorageFileById(id: string): Promise<StorageFile | null>;
+  getStorageFilesByFolder(folder: string): Promise<StorageFile[]>;
+  getAllStorageFiles(): Promise<StorageFile[]>;
+  updateStorageFile(
+    id: string,
+    updates: { description?: string; updated_by?: string }
+  ): Promise<boolean>;
+  deleteStorageFile(id: string): Promise<boolean>;
+}
 
 export interface StorageFolder {
   path: string;
@@ -109,6 +163,7 @@ export interface FileInfo {
   mime_type: string;
   created: Date;
   modified: Date;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   metadata?: Record<string, any>;
 }
 
@@ -127,6 +182,7 @@ export interface StorageOperation {
   timestamp: Date;
   success: boolean;
   error?: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   metadata?: Record<string, any>;
 }
 
@@ -144,6 +200,10 @@ export interface FileValidationResult {
 }
 
 // UUID-based file system interfaces
+// Field shapes match `StorageFileRow` from `@civicpress/core`: SQLite returns
+// `DATETIME` columns as ISO-ish strings (not Date objects), and nullable
+// columns surface as `undefined` (per the per-table-Row typing convention).
+// Consumers that need a Date should parse with `new Date(row.created_at)`.
 export interface StorageFile {
   id: string; // UUID
   original_name: string;
@@ -155,8 +215,8 @@ export interface StorageFile {
   mime_type: string;
   description?: string;
   uploaded_by?: string;
-  created_at: Date;
-  updated_at: Date;
+  created_at?: string | Date;
+  updated_at?: string | Date;
 }
 
 // Multer file interface
@@ -266,7 +326,11 @@ export interface StreamDownloadOptions {
 }
 
 export interface StreamUploadRequest {
-  stream: Readable;
+  // Provide EITHER a ready stream OR a filePath. With filePath the service opens
+  // the stream only AFTER validation passes, so a rejected upload never leaves a
+  // dangling fs.ReadStream racing the caller's temp-file cleanup (FA-API-016).
+  stream?: Readable;
+  filePath?: string;
   filename: string;
   folder: string;
   size?: number; // Optional size hint

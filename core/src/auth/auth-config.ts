@@ -46,6 +46,16 @@ export interface OAuthProviderConfig {
   allowedDomains: string[];
 }
 
+/**
+ * Deep-partial helper for mergeWithDefaults: callers may supply any subset
+ * of `AuthConfig` (loaded from civic.yml); defaults fill the rest.
+ */
+type DeepPartial<T> = T extends Array<infer _U>
+  ? T
+  : T extends object
+    ? { [K in keyof T]?: DeepPartial<T[K]> }
+    : T;
+
 export class AuthConfigManager {
   private static instance: AuthConfigManager;
   private config: AuthConfig | null = null;
@@ -66,7 +76,7 @@ export class AuthConfigManager {
 
     try {
       const centralConfig = await CentralConfigManager.getConfig();
-      const authConfig = centralConfig?.auth as AuthConfig;
+      const authConfig = centralConfig?.auth as unknown as AuthConfig;
 
       if (!authConfig) {
         logger.warn('No auth configuration found, using defaults');
@@ -101,9 +111,13 @@ export class AuthConfigManager {
   private getDefaultConfig(): AuthConfig {
     return {
       jwt: {
-        secret:
-          (globalThis as any).process?.env?.JWT_SECRET ||
-          'default-jwt-secret-change-in-production',
+        // FA-API-021: no hardcoded fallback secret. The session/token path is
+        // opaque-token based (signed via SecretsManager), so jwt.secret is
+        // currently unconsumed — but shipping a known default here would be a
+        // latent signing credential the moment any code did start using it.
+        // Left empty; validateConfig warns, and any real JWT use must set
+        // JWT_SECRET explicitly.
+        secret: process.env.JWT_SECRET || '',
         expiresIn: '24h',
       },
       password: {
@@ -153,7 +167,7 @@ export class AuthConfigManager {
     };
   }
 
-  private mergeWithDefaults(userConfig: any): AuthConfig {
+  private mergeWithDefaults(userConfig: DeepPartial<AuthConfig>): AuthConfig {
     const defaults = this.getDefaultConfig();
 
     return {
@@ -180,12 +194,16 @@ export class AuthConfigManager {
   }
 
   private validateConfig(config: AuthConfig): void {
-    // Validate JWT secret
+    // FA-API-021: warn when no JWT secret is configured (the old hardcoded
+    // default is gone). Harmless while the JWT path stays unconsumed; a loud
+    // signal the moment anything relies on it.
     if (
       !config.jwt.secret ||
       config.jwt.secret === 'default-jwt-secret-change-in-production'
     ) {
-      logger.warn('Using default JWT secret. Change this in production!');
+      logger.warn(
+        'No JWT_SECRET configured (jwt.secret is empty). Set JWT_SECRET if any JWT-signed path is enabled.'
+      );
     }
 
     // Validate password settings

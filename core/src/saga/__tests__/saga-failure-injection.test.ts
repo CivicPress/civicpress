@@ -16,7 +16,6 @@ import {
 import { DatabaseService } from '../../database/database-service.js';
 import { RecordManager } from '../../records/record-manager.js';
 import { AuthUser } from '../../auth/auth-service.js';
-import { GitEngine } from '../../git/git-engine.js';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';
@@ -29,6 +28,7 @@ describe('Saga Failure Injection Tests', () => {
   let db: DatabaseService;
   let recordManager: RecordManager;
   let sagaExecutor: SagaExecutor;
+  let stateStore: SagaStateStore;
   let testUser: AuthUser;
 
   beforeEach(async () => {
@@ -65,7 +65,7 @@ describe('Saga Failure Injection Tests', () => {
     db = civic.getDatabaseService();
     recordManager = civic.getRecordManager();
 
-    const stateStore = new SagaStateStore(db);
+    stateStore = new SagaStateStore(db);
     const idempotencyManager = new IdempotencyManager(stateStore);
     const lockManager = new ResourceLockManager(db);
     sagaExecutor = new SagaExecutor(
@@ -87,13 +87,13 @@ describe('Saga Failure Injection Tests', () => {
     if (civic) {
       try {
         await civic.shutdown();
-      } catch (error) {
+      } catch {
         // Ignore
       }
     }
     try {
       await fs.rm(testDir, { recursive: true, force: true });
-    } catch (error) {
+    } catch {
       // Ignore
     }
   });
@@ -208,7 +208,6 @@ describe('Saga Failure Injection Tests', () => {
 
       // Mock GitEngine to fail on commit
       const git = civic.getGitEngine();
-      const originalCommit = git.commit.bind(git);
       git.commit = vi.fn().mockRejectedValue(new Error('Git commit failed'));
 
       const saga = new PublishDraftSaga(
@@ -252,8 +251,6 @@ describe('Saga Failure Injection Tests', () => {
 
       // Mock IndexingService to fail
       const indexingService = civic.getIndexingService();
-      const originalGenerate =
-        indexingService.generateIndexes.bind(indexingService);
       indexingService.generateIndexes = vi
         .fn()
         .mockRejectedValue(new Error('Indexing failed'));
@@ -391,7 +388,16 @@ describe('Saga Failure Injection Tests', () => {
   });
 
   describe('Compensation Failure Scenarios', () => {
-    it('should handle compensation failures gracefully', async () => {
+    // Marked `.fails` because the strengthened assertion below surfaced a
+    // pre-existing bug: when compensation also fails, the SagaStateStore
+    // is not persisting a 'failed' row (or the row is being rolled back).
+    // getFailedSagas() returns empty even though the saga clearly threw.
+    // This blocks the missing-assertion fix from #3 in
+    // lint-followups-surfaced-findings memory. See #3.1 (new sub-finding).
+    // When the recording path is fixed, this should flip to a passing test;
+    // vitest will report the unexpected pass and the `.fails` marker should
+    // be removed at that point.
+    it.fails('should handle compensation failures gracefully', async () => {
       const draftId = 'compensation-failure-test';
       await db.createDraft({
         id: draftId,
@@ -426,16 +432,26 @@ describe('Saga Failure Injection Tests', () => {
 
       // Should fail, and compensation may also fail
       // System should handle this gracefully
+      let sagaThrew = false;
       try {
         await sagaExecutor.execute(saga, context);
         // If it doesn't throw, that's also acceptable (compensation might have succeeded)
       } catch (error) {
         // Saga failed - verify state is tracked
-        const stateStore = new SagaStateStore(db);
-        const failedSagas = await stateStore.getFailedSagas();
-        // State might be persisted or might not, depending on when it failed
-        // Just verify the saga didn't complete successfully
+        sagaThrew = true;
         expect(error).toBeDefined();
+      }
+
+      // Verify failure recording: if the saga threw, the state store should
+      // have at least one failed saga (status='failed' AND
+      // compensation_status IS NULL OR != 'completed'). This catches a
+      // regression where the failure-recording path stops persisting state
+      // — without this assertion the test would pass whether or not
+      // anything was tracked.
+      if (sagaThrew) {
+        const failedSagas = await stateStore.getFailedSagas();
+        expect(failedSagas.length).toBeGreaterThan(0);
+        expect(failedSagas.some((s) => s.correlationId === context.correlationId)).toBe(true);
       }
     });
   });

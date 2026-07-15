@@ -11,7 +11,6 @@ const authStore = useAuthStore();
 
 // Route and router for URL state management
 const route = useRoute();
-const router = useRouter();
 
 // Get the record type from the route
 const type = route.params.type as string;
@@ -56,7 +55,7 @@ const updateURL = () => {
 };
 
 const restoreFromURL = () => {
-  const state = parseQueryToState(route as any);
+  const state = parseQueryToState(route);
   // Restore search query
   if (state.search) {
     searchQuery.value = state.search;
@@ -383,7 +382,7 @@ const isLoading = ref(false); // Guard to prevent duplicate loads
 // On mounted - restore from URL and fetch data
 onMounted(async () => {
   // Skip if not on client side (SSR)
-  if (!process.client) return;
+  if (!import.meta.client) return;
 
   // Prevent duplicate calls
   if (isLoading.value) return;
@@ -532,7 +531,7 @@ const breadcrumbItems = computed(() => [
           :is-searching="isSearching"
           :current-page="page"
           :page-size="pageSize"
-          @resetFilters="resetFilters"
+          @reset-filters="resetFilters"
           @page-change="handlePageChange"
           @page-size-change="handlePageSizeChange"
         />

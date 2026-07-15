@@ -11,6 +11,7 @@ watch(
     const t = setTimeout(() => {
       debouncedContent.value = v || '';
     }, 200);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return () => clearTimeout(t as any);
   },
   { immediate: true }
@@ -26,12 +27,11 @@ const html = computed(() =>
 <template>
   <div
     class="markdown-content"
+    data-test="record-preview"
     :class="wrap ? 'whitespace-pre-wrap break-words' : ''"
   >
-    <div
-      class="prose prose-sm max-w-none prose-code:bg-gray-100 dark:prose-code:bg-gray-800 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-a:text-primary-600 prose-a:no-underline hover:prose-a:underline"
-      v-html="html"
-    />
+    <!-- eslint-disable-next-line vue/no-v-html -- sanitized via DOMPurify.sanitize() in renderMarkdown (useMarkdown composable) before this value is bound -->
+    <div class="prose prose-sm max-w-none prose-code:bg-gray-100 dark:prose-code:bg-gray-800 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-a:text-primary-600 prose-a:no-underline hover:prose-a:underline" data-test="record-preview-body" v-html="html" />
   </div>
 </template>
 

@@ -1,233 +1,169 @@
 /**
- * Saga Recovery
+ * Saga crash-recovery (FA-CORE-001).
  *
- * Handles recovery of failed and stuck sagas.
+ * Sagas persist their state, but nothing consumed `getStuckSagas` /
+ * `getFailedSagas`: a process that died between the SQLite write (step 1) and
+ * the git commit (step 3) left the saga row stuck `executing` FOREVER, its
+ * resource locks held forever, and SQLite + git silently divergent.
+ *
+ * This service runs at startup. For every saga orphaned by a prior crash
+ * (executing past a generous threshold, or failed with incomplete
+ * compensation) it:
+ *   1. releases the saga's resource locks (so the record is no longer pinned);
+ *   2. runs a per-saga-type recoverer if one is registered (roll-forward or
+ *      roll-back reconciliation the saga author supplies);
+ *   3. otherwise transitions the saga out of the permanent `executing` limbo
+ *      into `failed` (compensation `partial`) and logs LOUDLY with the id,
+ *      type, and last step so an operator can reconcile the SQLite/git split.
+ *
+ * Full automatic SQLite↔git reconciliation for arbitrary saga types needs the
+ * in-code saga definition and is left to per-type recoverers; the default is
+ * fail-safe (surface + unpin, never silently drop data).
  */
 
-import { SagaStateStore } from './saga-state-store.js';
-import { SagaState, SagaStatus } from './types.js';
-import { SagaRecoveryError } from './errors.js';
-import { Logger } from '../utils/logger.js';
-import {
-  coreDebug,
-  coreError,
-  coreInfo,
-  coreWarn,
-} from '../utils/core-output.js';
+import type { SagaStateStore } from './saga-state-store.js';
+import type { ResourceLockManager } from './resource-lock.js';
+import type { SagaState } from './types.js';
+import { coreInfo, coreWarn, coreError } from '../utils/core-output.js';
 
-const logger = new Logger();
+/** Outcome a per-type recoverer reports. */
+export type SagaRecoveryOutcome = 'recovered' | 'flagged';
 
-/**
- * Saga recovery configuration
- */
-export interface SagaRecoveryConfig {
-  /** Timeout for stuck sagas (ms) */
-  stuckSagaTimeout?: number;
-  /** Maximum retry attempts for failed sagas */
-  maxRetryAttempts?: number;
-  /** Retry delay (ms) */
-  retryDelay?: number;
+/** A per-saga-type recovery handler; may reconcile then return 'recovered'. */
+export type SagaRecoverer = (
+  state: SagaState
+) => Promise<SagaRecoveryOutcome>;
+
+export interface SagaRecoveryOptions {
+  /**
+   * A saga still `executing` older than this is treated as orphaned by a dead
+   * process (a live process's in-flight sagas are younger). Default 10 min.
+   */
+  stuckTimeoutMs?: number;
 }
 
-/**
- * Saga recovery manager
- */
-export class SagaRecovery {
-  private stateStore: SagaStateStore;
-  private config: Required<SagaRecoveryConfig>;
+export interface SagaRecoverySummary {
+  scanned: number;
+  recovered: number;
+  flagged: number;
+  locksReleased: number;
+}
 
-  constructor(stateStore: SagaStateStore, config: SagaRecoveryConfig = {}) {
-    this.stateStore = stateStore;
-    this.config = {
-      stuckSagaTimeout: config.stuckSagaTimeout || 300000, // 5 minutes
-      maxRetryAttempts: config.maxRetryAttempts || 3,
-      retryDelay: config.retryDelay || 60000, // 1 minute
+export class SagaRecoveryService {
+  private readonly recoverers = new Map<string, SagaRecoverer>();
+  private readonly stuckTimeoutMs: number;
+
+  constructor(
+    private readonly stateStore: SagaStateStore,
+    private readonly lockManager: ResourceLockManager,
+    options: SagaRecoveryOptions = {}
+  ) {
+    this.stuckTimeoutMs = options.stuckTimeoutMs ?? 10 * 60 * 1000;
+  }
+
+  /** Register a reconciliation handler for a saga type. */
+  registerRecoverer(sagaType: string, recoverer: SagaRecoverer): void {
+    this.recoverers.set(sagaType, recoverer);
+  }
+
+  /**
+   * Scan for orphaned sagas and recover/flag them. Never throws — recovery
+   * must not block startup; a per-saga failure is logged and the scan
+   * continues.
+   */
+  async recover(): Promise<SagaRecoverySummary> {
+    const summary: SagaRecoverySummary = {
+      scanned: 0,
+      recovered: 0,
+      flagged: 0,
+      locksReleased: 0,
     };
-  }
 
-  /**
-   * Recover stuck sagas (executing for too long)
-   */
-  async recoverStuckSagas(): Promise<number> {
+    let orphaned: SagaState[];
     try {
-      const stuckSagas = await this.stateStore.getStuckSagas(
-        this.config.stuckSagaTimeout
-      );
-
-      if (stuckSagas.length === 0) {
-        return 0;
-      }
-
-      coreInfo(`Found ${stuckSagas.length} stuck sagas to recover`, {
-        count: stuckSagas.length,
-        timeout: this.config.stuckSagaTimeout,
-      });
-
-      let recovered = 0;
-      for (const saga of stuckSagas) {
-        try {
-          await this.markSagaAsFailed(
-            saga.id,
-            `Saga stuck in executing state for more than ${this.config.stuckSagaTimeout}ms`
-          );
-          recovered++;
-        } catch (error) {
-          coreError(
-            `Failed to recover stuck saga: ${saga.id}`,
-            'SAGA_RECOVERY_ERROR',
-            {
-              sagaId: saga.id,
-              error: error instanceof Error ? error.message : String(error),
-            }
-          );
-        }
-      }
-
-      coreInfo(`Recovered ${recovered} stuck sagas`, {
-        recovered,
-        total: stuckSagas.length,
-      });
-
-      return recovered;
-    } catch (error) {
-      coreError('Failed to recover stuck sagas', 'SAGA_RECOVERY_ERROR', {
-        error: error instanceof Error ? error.message : String(error),
-      });
-      throw error;
-    }
-  }
-
-  /**
-   * Recover failed sagas (attempt compensation if needed)
-   */
-  async recoverFailedSagas(): Promise<number> {
-    try {
-      const failedSagas = await this.stateStore.getFailedSagas();
-
-      if (failedSagas.length === 0) {
-        return 0;
-      }
-
-      coreInfo(`Found ${failedSagas.length} failed sagas to recover`, {
-        count: failedSagas.length,
-      });
-
-      let recovered = 0;
-      for (const saga of failedSagas) {
-        try {
-          // Check if compensation is needed
-          if (
-            !saga.compensationStatus ||
-            saga.compensationStatus === 'pending' ||
-            saga.compensationStatus === 'partial'
-          ) {
-            coreWarn(`Failed saga requires compensation: ${saga.id}`, {
-              sagaId: saga.id,
-              sagaType: saga.sagaType,
-              compensationStatus: saga.compensationStatus,
-            });
-            // Note: Actual compensation would need saga instance
-            // This is a placeholder for recovery logic
-          }
-
-          // Mark as requiring manual intervention if compensation failed
-          if (saga.compensationStatus === 'failed') {
-            await this.markSagaAsRequiringIntervention(saga.id);
-          }
-
-          recovered++;
-        } catch (error) {
-          coreError(
-            `Failed to recover failed saga: ${saga.id}`,
-            'SAGA_RECOVERY_ERROR',
-            {
-              sagaId: saga.id,
-              error: error instanceof Error ? error.message : String(error),
-            }
-          );
-        }
-      }
-
-      coreInfo(`Processed ${recovered} failed sagas`, {
-        recovered,
-        total: failedSagas.length,
-      });
-
-      return recovered;
-    } catch (error) {
-      coreError('Failed to recover failed sagas', 'SAGA_RECOVERY_ERROR', {
-        error: error instanceof Error ? error.message : String(error),
-      });
-      throw error;
-    }
-  }
-
-  /**
-   * Mark saga as failed
-   */
-  private async markSagaAsFailed(
-    sagaId: string,
-    reason: string
-  ): Promise<void> {
-    await this.stateStore.updateStatus(sagaId, 'failed', undefined, reason);
-
-    coreDebug(`Marked saga as failed: ${sagaId}`, {
-      sagaId,
-      reason,
-    });
-  }
-
-  /**
-   * Mark saga as requiring manual intervention
-   */
-  private async markSagaAsRequiringIntervention(sagaId: string): Promise<void> {
-    // Update error message to indicate manual intervention needed
-    const state = await this.stateStore.getState(sagaId);
-    if (state) {
-      const errorMessage = state.error
-        ? `${state.error} [MANUAL_INTERVENTION_REQUIRED]`
-        : 'Manual intervention required';
-      await this.stateStore.updateStatus(
-        sagaId,
-        'failed',
-        undefined,
-        errorMessage
-      );
-    }
-
-    coreWarn(`Saga requires manual intervention: ${sagaId}`, {
-      sagaId,
-    });
-  }
-
-  /**
-   * Get recovery statistics
-   */
-  async getRecoveryStats(): Promise<{
-    stuckCount: number;
-    failedCount: number;
-    totalRecoverable: number;
-  }> {
-    try {
-      const stuckSagas = await this.stateStore.getStuckSagas(
-        this.config.stuckSagaTimeout
-      );
-      const failedSagas = await this.stateStore.getFailedSagas();
-
-      return {
-        stuckCount: stuckSagas.length,
-        failedCount: failedSagas.length,
-        totalRecoverable: stuckSagas.length + failedSagas.length,
-      };
+      const [stuck, failed] = await Promise.all([
+        this.stateStore.getStuckSagas(this.stuckTimeoutMs),
+        this.stateStore.getFailedSagas(),
+      ]);
+      // De-dupe (a saga could appear in both lists across a race).
+      const byId = new Map<string, SagaState>();
+      for (const s of [...stuck, ...failed]) byId.set(s.id, s);
+      orphaned = [...byId.values()];
     } catch (error) {
       coreError(
-        'Failed to get recovery statistics',
-        'SAGA_RECOVERY_STATS_ERROR',
-        {
-          error: error instanceof Error ? error.message : String(error),
-        }
+        error instanceof Error ? error : new Error(String(error)),
+        'SAGA_RECOVERY_SCAN_FAILED',
+        {},
+        { operation: 'saga:recovery:scan' }
       );
-      throw error;
+      return summary;
     }
+
+    if (orphaned.length === 0) return summary;
+
+    coreWarn('Saga recovery: orphaned sagas found from a prior run', {
+      operation: 'saga:recovery:found',
+      count: orphaned.length,
+    });
+
+    for (const state of orphaned) {
+      summary.scanned++;
+      try {
+        summary.locksReleased += await this.lockManager.releaseAllForSaga(
+          state.id
+        );
+
+        const recoverer = this.recoverers.get(state.sagaType);
+        if (recoverer) {
+          const outcome = await recoverer(state);
+          if (outcome === 'recovered') {
+            summary.recovered++;
+            continue;
+          }
+        }
+
+        // Default: unpin the permanent 'executing' limbo + surface for review.
+        await this.flagForReview(state);
+        summary.flagged++;
+      } catch (error) {
+        coreError(
+          error instanceof Error ? error : new Error(String(error)),
+          'SAGA_RECOVERY_ITEM_FAILED',
+          { sagaId: state.id, sagaType: state.sagaType },
+          { operation: 'saga:recovery:item' }
+        );
+        // Best-effort flag so it doesn't stay stuck executing.
+        await this.flagForReview(state).catch(() => {});
+        summary.flagged++;
+      }
+    }
+
+    coreInfo('Saga recovery complete', {
+      operation: 'saga:recovery:complete',
+      ...summary,
+    });
+    return summary;
+  }
+
+  private async flagForReview(state: SagaState): Promise<void> {
+    if (state.status === 'executing') {
+      await this.stateStore.updateStatus(
+        state.id,
+        'failed',
+        state.currentStep,
+        state.error ??
+          'Orphaned by a crashed process before completion (recovered at startup)'
+      );
+    }
+    await this.stateStore.updateCompensationStatus(state.id, 'partial');
+    coreWarn(
+      'Saga flagged for manual review — SQLite and git may be divergent',
+      {
+        operation: 'saga:recovery:flagged',
+        sagaId: state.id,
+        sagaType: state.sagaType,
+        lastStep: state.currentStep,
+      }
+    );
   }
 }

@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { AuditLogger } from '@civicpress/core';
-import { authMiddleware, requirePermission } from '../middleware/auth.js';
+import { requirePermission } from '../middleware/auth.js';
 
 export function createAuditRouter() {
   const router = Router();
@@ -31,7 +31,7 @@ export function createAuditRouter() {
       const sinceMs = parseTs(since);
       const beforeMs = parseTs(before);
 
-      const filtered = items.filter((e: any) => {
+      const filtered = items.filter((e) => {
         if (source && e.source !== source) return false;
         if (outcome && e.outcome !== outcome) return false;
         if (action && e.action !== action) return false;
@@ -61,7 +61,7 @@ export function createAuditRouter() {
           },
         },
       });
-    } catch (error) {
+    } catch {
       res.status(500).json({
         success: false,
         error: 'Failed to load activity log',

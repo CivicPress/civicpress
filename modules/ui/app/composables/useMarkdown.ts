@@ -1,17 +1,22 @@
 import { marked, type MarkedOptions } from 'marked';
+import DOMPurify from 'isomorphic-dompurify';
 
 // In Nuxt, useRuntimeConfig is globally available at runtime.
 // We declare it here for TypeScript without importing '#imports',
 // so that plain Vitest tests can import this module without Nuxt aliases.
-declare function useRuntimeConfig(): any;
+declare function useRuntimeConfig(): {
+  public?: { civicApiUrl?: string } & Record<string, unknown>;
+} & Record<string, unknown>;
 
 const EMPTY_LINE_MARKER = '[[CIVIC_EMPTY_LINE_MARKER]]';
 
 export const useMarkdown = () => {
   // Configure marked to shift all headings up by 1 level
   const renderer = new marked.Renderer();
-  renderer.heading = ({ tokens, depth }: { tokens: any[]; depth: number }) => {
-    const text = tokens.map((token) => token.text).join('');
+  renderer.heading = ({ tokens, depth }) => {
+    const text = tokens
+      .map((token) => (token as { text?: string }).text ?? '')
+      .join('');
     const newLevel = Math.min(depth + 1, 6); // Shift up by 1, max h6
     return `<h${newLevel}>${text}</h${newLevel}>`;
   };
@@ -23,7 +28,7 @@ export const useMarkdown = () => {
       // useRuntimeConfig will be available in a Nuxt runtime environment
       if (typeof useRuntimeConfig === 'function') {
         const runtimeConfig = useRuntimeConfig();
-        const url = (runtimeConfig?.public as any)?.civicApiUrl;
+        const url = runtimeConfig?.public?.civicApiUrl;
         if (typeof url === 'string' && url.length > 0) {
           return url;
         }
@@ -141,11 +146,23 @@ export const useMarkdown = () => {
 
     const processed = shouldPreserve ? postprocessHtml(html) : html;
 
+    // ui-001 (Critical) — sanitize the rendered HTML before handing it
+    // to any v-html sink. marked.parse does NOT strip <script>,
+    // <iframe>, on* handlers, or javascript: URIs by default; rendering
+    // unsanitized output in v-html on the public record page is a
+    // direct XSS vector (a malicious published record could steal JWT
+    // + CSRF tokens from localStorage). Allow the empty-line marker
+    // span class we add in postprocessHtml.
+    const sanitized = DOMPurify.sanitize(processed, {
+      USE_PROFILES: { html: true },
+      ADD_ATTR: ['aria-hidden'],
+    });
+
     if (typeof options?.onTransformHtml === 'function') {
-      return options.onTransformHtml(processed);
+      return options.onTransformHtml(sanitized);
     }
 
-    return processed;
+    return sanitized;
   };
 
   return {

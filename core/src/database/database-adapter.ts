@@ -1,30 +1,73 @@
+/**
+ * Database Adapter — connection lifecycle, query/execute, transactions,
+ * and schema initialization for the SQLite backend. Phase 2d W2-T4
+ * decomposed the prior 923-LoC monolith: the table DDL, column
+ * migrations, index/FTS5 setup now live under `schema/`.
+ */
+
 import sqlite3 from 'sqlite3';
 import * as path from 'path';
 import * as fs from 'fs';
-import { coreError, coreInfo, coreDebug } from '../utils/core-output.js';
+import { coreError, coreDebug } from '../utils/core-output.js';
+import { CORE_TABLE_STATEMENTS } from './schema/tables.js';
+import {
+  runSimpleColumnMigrations,
+  ensureWorkflowStateColumn,
+  runUserSecurityMigrations,
+  migrateSearchIndexColumns,
+  type DDLExecutor,
+} from './schema/migrations.js';
+import {
+  createSagaIndexes,
+  createSortIndexes,
+  createFTS5Table,
+} from './schema/indexes-and-fts.js';
 
 /**
  * Transaction handle for managing database transactions
  */
 export interface Transaction {
-  /** Transaction ID for tracking */
   id: string;
-  /** Whether transaction is active */
   isActive: boolean;
 }
 
+export type SqlParam =
+  | string
+  | number
+  | boolean
+  | null
+  | undefined
+  | Date
+  | Buffer;
+export type SqlRow = Record<string, unknown>;
+
+export interface ExecuteResult {
+  lastID?: number;
+  changes?: number;
+}
+
+/**
+ * SQLite driver returns untyped rows; per-callsite generic narrowing via
+ * `query<TypedRow>(sql, params)` is the expected pattern (typed Row
+ * interfaces live in `./types/row-types.ts`). The default is `unknown`
+ * so unparametrized callers must narrow explicitly — the previous `any`
+ * default silently leaked untyped values everywhere a query was made.
+ */
 export interface DatabaseAdapter {
   connect(): Promise<void>;
-  query(sql: string, params?: any[]): Promise<any[]>;
-  execute(sql: string, params?: any[]): Promise<any>;
+  query<T = unknown>(sql: string, params?: SqlParam[]): Promise<T[]>;
+  execute(sql: string, params?: SqlParam[]): Promise<ExecuteResult>;
   close(): Promise<void>;
   initialize(): Promise<void>;
-  /** Begin a transaction */
   beginTransaction(): Promise<Transaction>;
-  /** Commit a transaction */
   commitTransaction(transaction: Transaction): Promise<void>;
-  /** Rollback a transaction */
   rollbackTransaction(transaction: Transaction): Promise<void>;
+  /**
+   * Return the configuration this adapter was constructed with. Lets
+   * diagnostics + health-checks read backend-specific settings (e.g. the
+   * SQLite file path) without leaking through `(adapter as any).config`.
+   */
+  getConfig(): DatabaseConfig;
 }
 
 export interface DatabaseConfig {
@@ -67,7 +110,7 @@ export class SQLiteAdapter implements DatabaseAdapter {
     });
   }
 
-  async query(sql: string, params: any[] = []): Promise<any[]> {
+  async query<T = unknown>(sql: string, params: SqlParam[] = []): Promise<T[]> {
     return new Promise((resolve, reject) => {
       if (!this.db) {
         reject(new Error('Database not connected'));
@@ -78,13 +121,13 @@ export class SQLiteAdapter implements DatabaseAdapter {
         if (err) {
           reject(err);
         } else {
-          resolve(rows || []);
+          resolve((rows as T[]) || []);
         }
       });
     });
   }
 
-  async execute(sql: string, params: any[] = []): Promise<any> {
+  async execute(sql: string, params: SqlParam[] = []): Promise<ExecuteResult> {
     return new Promise((resolve, reject) => {
       if (!this.db) {
         reject(new Error('Database not connected'));
@@ -95,7 +138,7 @@ export class SQLiteAdapter implements DatabaseAdapter {
         if (err) {
           reject(err);
         } else {
-          resolve(this);
+          resolve({ lastID: this.lastID, changes: this.changes });
         }
       });
     });
@@ -118,665 +161,57 @@ export class SQLiteAdapter implements DatabaseAdapter {
     });
   }
 
+  /**
+   * Initialize schema: create core tables, run column migrations, create
+   * indexes + FTS5. Each step is idempotent so re-running is safe.
+   */
   async initialize(): Promise<void> {
-    // Create tables for performance layer
-    const tables = [
-      // Users table for API keys and sessions
-      `CREATE TABLE IF NOT EXISTS users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        username TEXT UNIQUE NOT NULL,
-        role TEXT NOT NULL,
-        email TEXT,
-        name TEXT,
-        avatar_url TEXT,
-        password_hash TEXT,
-        auth_provider TEXT DEFAULT 'password',
-        email_verified BOOLEAN DEFAULT FALSE,
-        pending_email TEXT,
-        pending_email_token TEXT,
-        pending_email_expires DATETIME,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-      )`,
+    const exec: DDLExecutor = {
+      query: (sql, params) => this.query(sql, params),
+      execute: (sql, params) => this.execute(sql, params),
+    };
 
-      // API keys table
-      `CREATE TABLE IF NOT EXISTS api_keys (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        key_hash TEXT UNIQUE NOT NULL,
-        user_id INTEGER NOT NULL,
-        name TEXT NOT NULL,
-        expires_at DATETIME,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (user_id) REFERENCES users (id)
-      )`,
-
-      // Sessions table
-      `CREATE TABLE IF NOT EXISTS sessions (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        token_hash TEXT UNIQUE NOT NULL,
-        user_id INTEGER NOT NULL,
-        expires_at DATETIME NOT NULL,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (user_id) REFERENCES users (id)
-      )`,
-
-      // Search index table
-      `CREATE TABLE IF NOT EXISTS search_index (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        record_id TEXT NOT NULL,
-        record_type TEXT NOT NULL,
-        title TEXT NOT NULL,
-        content TEXT,
-        tags TEXT,
-        metadata TEXT,
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        title_normalized TEXT,
-        content_preview TEXT,
-        word_count INTEGER,
-        UNIQUE(record_id, record_type)
-      )`,
-
-      // Records table
-      `CREATE TABLE IF NOT EXISTS records (
-        id TEXT PRIMARY KEY,
-        title TEXT NOT NULL,
-        type TEXT NOT NULL,
-        status TEXT DEFAULT 'draft',
-        workflow_state TEXT DEFAULT 'draft',
-        content TEXT,
-        metadata TEXT,
-        geography TEXT,
-        attached_files TEXT,
-        linked_records TEXT,
-        path TEXT,
-        author TEXT,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-      )`,
-
-      // Audit logs table
-      `CREATE TABLE IF NOT EXISTS audit_logs (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER,
-        action TEXT NOT NULL,
-        resource_type TEXT,
-        resource_id TEXT,
-        details TEXT,
-        ip_address TEXT,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (user_id) REFERENCES users (id)
-      )`,
-
-      // Storage files table for UUID-based file tracking
-      `CREATE TABLE IF NOT EXISTS storage_files (
-        id TEXT PRIMARY KEY, -- UUID
-        original_name TEXT NOT NULL,
-        stored_filename TEXT NOT NULL,
-        folder TEXT NOT NULL,
-        relative_path TEXT NOT NULL, -- folder/stored_filename
-        provider_path TEXT NOT NULL, -- full path in storage provider
-        size INTEGER NOT NULL,
-        mime_type TEXT NOT NULL,
-        description TEXT,
-        uploaded_by TEXT,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-      )`,
-
-      // Email verification tokens table
-      `CREATE TABLE IF NOT EXISTS email_verifications (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER NOT NULL,
-        email TEXT NOT NULL,
-        token TEXT UNIQUE NOT NULL,
-        type TEXT NOT NULL CHECK (type IN ('initial', 'change')),
-        expires_at DATETIME NOT NULL,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
-      )`,
-
-      // Record drafts table (temporary until v3 collaboration)
-      `CREATE TABLE IF NOT EXISTS record_drafts (
-        id TEXT PRIMARY KEY,
-        title TEXT NOT NULL,
-        type TEXT NOT NULL,
-        status TEXT DEFAULT 'draft',
-        workflow_state TEXT DEFAULT 'draft',
-        markdown_body TEXT,
-        metadata TEXT,
-        geography TEXT,
-        attached_files TEXT,
-        linked_records TEXT,
-        linked_geography_files TEXT,
-        author TEXT,
-        created_by TEXT,
-        last_draft_saved_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-      )`,
-
-      // Record locks table (temporary until v3 collaboration)
-      `CREATE TABLE IF NOT EXISTS record_locks (
-        record_id TEXT PRIMARY KEY,
-        locked_by TEXT NOT NULL,
-        locked_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        expires_at DATETIME,
-        FOREIGN KEY (record_id) REFERENCES records(id) ON DELETE CASCADE
-      )`,
-
-      // Saga states table for saga pattern persistence and recovery
-      `CREATE TABLE IF NOT EXISTS saga_states (
-        id TEXT PRIMARY KEY,
-        saga_type TEXT NOT NULL,
-        saga_version TEXT,
-        context TEXT NOT NULL,
-        status TEXT NOT NULL CHECK (status IN ('pending', 'executing', 'completed', 'failed', 'compensating', 'compensated')),
-        current_step INTEGER DEFAULT 0,
-        step_results TEXT NOT NULL DEFAULT '[]',
-        started_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        completed_at DATETIME,
-        error TEXT,
-        compensation_status TEXT CHECK (compensation_status IN ('pending', 'executing', 'completed', 'failed', 'partial')),
-        compensation_completed_at DATETIME,
-        compensation_error TEXT,
-        idempotency_key TEXT UNIQUE,
-        correlation_id TEXT NOT NULL
-      )`,
-
-      // Saga resource locks for concurrency control
-      `CREATE TABLE IF NOT EXISTS saga_resource_locks (
-        resource_key TEXT PRIMARY KEY,
-        saga_id TEXT NOT NULL,
-        acquired_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        expires_at DATETIME NOT NULL,
-        FOREIGN KEY (saga_id) REFERENCES saga_states(id) ON DELETE CASCADE
-      )`,
-    ];
-
-    for (const table of tables) {
+    // Step 1: create all core tables
+    for (const tableSql of CORE_TABLE_STATEMENTS) {
       try {
-        await this.execute(table);
-      } catch (error) {
+        await this.execute(tableSql);
+      } catch (err) {
         coreError(
           'Error creating table',
           'TABLE_CREATION_ERROR',
           {
-            error: error instanceof Error ? error.message : String(error),
-            table: table.substring(0, 100), // Truncate for readability
+            error: err instanceof Error ? err.message : String(err),
+            table: tableSql.substring(0, 100),
           },
           { operation: 'database:initialize' }
         );
-        throw error;
+        throw err;
       }
     }
 
-    // Add geography column to existing records table if it doesn't exist
-    try {
-      await this.execute('ALTER TABLE records ADD COLUMN geography TEXT');
-    } catch (error) {
-      // Column already exists, ignore error
-      coreDebug('Geography column already exists or migration not needed', {
-        operation: 'database:initialize',
-      });
-    }
+    // Step 2: simple ALTER TABLE column migrations (idempotent)
+    await runSimpleColumnMigrations(exec);
 
-    // Create indexes for saga tables
-    await this.createSagaIndexes();
+    // Step 3: saga-related indexes (run before workflow_state migrations
+    // so the orchestrator's prior behavior is preserved — the original
+    // code interleaved these calls)
+    await createSagaIndexes(exec);
 
-    // Add attached_files column to existing records table if it doesn't exist
-    try {
-      await this.execute('ALTER TABLE records ADD COLUMN attached_files TEXT');
-    } catch (error) {
-      // Column already exists, ignore error
-      coreDebug(
-        'Attached files column already exists or migration not needed',
-        { operation: 'database:initialize' }
-      );
-    }
+    // Step 4: verbose workflow_state migrations for records + drafts
+    await ensureWorkflowStateColumn(exec, 'records');
+    await ensureWorkflowStateColumn(exec, 'record_drafts');
 
-    // Add linked_records column to existing records table if it doesn't exist
-    try {
-      await this.execute('ALTER TABLE records ADD COLUMN linked_records TEXT');
-    } catch (error) {
-      // Column already exists, ignore error
-      coreDebug(
-        'Linked records column already exists or migration not needed',
-        { operation: 'database:initialize' }
-      );
-    }
+    // Step 5: user security migrations
+    await runUserSecurityMigrations(exec);
 
-    // Add linked_geography_files column to existing records table if it doesn't exist
-    try {
-      await this.execute(
-        'ALTER TABLE records ADD COLUMN linked_geography_files TEXT'
-      );
-    } catch (error) {
-      // Column already exists, ignore error
-      coreDebug(
-        'Linked geography files column already exists or migration not needed',
-        { operation: 'database:initialize' }
-      );
-    }
+    // Step 6: search_index column migrations
+    await migrateSearchIndexColumns(exec);
 
-    // Add workflow_state column to existing records table if it doesn't exist
-    try {
-      // Always check if table exists first (it should exist after CREATE TABLE above)
-      const tableExists = await this.query(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name='records'"
-      );
+    // Step 7: FTS5 virtual table + triggers
+    await createFTS5Table(exec);
 
-      if (tableExists.length > 0) {
-        // Table exists, check if column exists
-        const tableInfo = await this.query('PRAGMA table_info(records)');
-        const columnNames = tableInfo.map((col: any) => col.name);
-        const hasWorkflowState = columnNames.includes('workflow_state');
-
-        coreDebug('Checking workflow_state column in records', {
-          operation: 'database:initialize',
-          tableExists: true,
-          columnNames,
-          hasWorkflowState,
-        });
-
-        if (!hasWorkflowState) {
-          coreInfo(
-            'Adding workflow_state column to records table via migration',
-            { operation: 'database:initialize' }
-          );
-          await this.execute(
-            "ALTER TABLE records ADD COLUMN workflow_state TEXT DEFAULT 'draft'"
-          );
-
-          // Verify it was added
-          const verifyInfo = await this.query('PRAGMA table_info(records)');
-          const verifyColumns = verifyInfo.map((col: any) => col.name);
-          const verifyHasWorkflowState =
-            verifyColumns.includes('workflow_state');
-
-          if (verifyHasWorkflowState) {
-            coreInfo(
-              'Successfully added workflow_state column to records table',
-              { operation: 'database:initialize' }
-            );
-          } else {
-            coreError(
-              'Failed to verify workflow_state column was added to records',
-              'MIGRATION_VERIFICATION_FAILED',
-              {
-                columns: verifyColumns,
-                operation: 'database:initialize',
-              },
-              { operation: 'database:initialize' }
-            );
-          }
-        } else {
-          coreDebug('workflow_state column already exists in records table', {
-            operation: 'database:initialize',
-          });
-        }
-      } else {
-        // Table doesn't exist yet - it will be created with the column via CREATE TABLE above
-        coreDebug(
-          'records table does not exist yet, will be created with workflow_state column',
-          { operation: 'database:initialize' }
-        );
-      }
-    } catch (error: any) {
-      // Log the actual error for debugging, but don't fail initialization
-      coreError(
-        'Workflow state column migration check failed',
-        'MIGRATION_ERROR',
-        {
-          error: error?.message || String(error),
-          stack: error?.stack,
-          operation: 'database:initialize',
-        },
-        { operation: 'database:initialize' }
-      );
-    }
-
-    // Add workflow_state column to existing record_drafts table if it doesn't exist
-    try {
-      // Always check if table exists first (it should exist after CREATE TABLE above)
-      const tableExists = await this.query(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name='record_drafts'"
-      );
-
-      if (tableExists.length > 0) {
-        // Table exists, check if column exists
-        const tableInfo = await this.query('PRAGMA table_info(record_drafts)');
-        const columnNames = tableInfo.map((col: any) => col.name);
-        const hasWorkflowState = columnNames.includes('workflow_state');
-
-        coreDebug('Checking workflow_state column in record_drafts', {
-          operation: 'database:initialize',
-          tableExists: true,
-          columnNames,
-          hasWorkflowState,
-        });
-
-        if (!hasWorkflowState) {
-          coreInfo(
-            'Adding workflow_state column to record_drafts table via migration',
-            { operation: 'database:initialize' }
-          );
-          await this.execute(
-            "ALTER TABLE record_drafts ADD COLUMN workflow_state TEXT DEFAULT 'draft'"
-          );
-
-          // Verify it was added
-          const verifyInfo = await this.query(
-            'PRAGMA table_info(record_drafts)'
-          );
-          const verifyColumns = verifyInfo.map((col: any) => col.name);
-          const verifyHasWorkflowState =
-            verifyColumns.includes('workflow_state');
-
-          if (verifyHasWorkflowState) {
-            coreInfo(
-              'Successfully added workflow_state column to record_drafts table',
-              { operation: 'database:initialize' }
-            );
-          } else {
-            coreError(
-              'Failed to verify workflow_state column was added to record_drafts',
-              'MIGRATION_VERIFICATION_FAILED',
-              {
-                columns: verifyColumns,
-                operation: 'database:initialize',
-              },
-              { operation: 'database:initialize' }
-            );
-          }
-        } else {
-          coreDebug(
-            'workflow_state column already exists in record_drafts table',
-            { operation: 'database:initialize' }
-          );
-        }
-      } else {
-        // Table doesn't exist yet - it will be created with the column via CREATE TABLE above
-        coreDebug(
-          'record_drafts table does not exist yet, will be created with workflow_state column',
-          { operation: 'database:initialize' }
-        );
-      }
-    } catch (error: any) {
-      // Log the actual error for debugging, but don't fail initialization
-      coreError(
-        'Workflow state column migration check failed',
-        'MIGRATION_ERROR',
-        {
-          error: error?.message || String(error),
-          stack: error?.stack,
-          operation: 'database:initialize',
-        },
-        { operation: 'database:initialize' }
-      );
-    }
-
-    // Security Enhancement Migrations - Add new user security fields
-    const userSecurityMigrations = [
-      {
-        column: 'auth_provider',
-        sql: 'ALTER TABLE users ADD COLUMN auth_provider TEXT DEFAULT "password"',
-        description: 'Authentication provider tracking',
-      },
-      {
-        column: 'email_verified',
-        sql: 'ALTER TABLE users ADD COLUMN email_verified BOOLEAN DEFAULT FALSE',
-        description: 'Email verification status',
-      },
-      {
-        column: 'pending_email',
-        sql: 'ALTER TABLE users ADD COLUMN pending_email TEXT',
-        description: 'Pending email change',
-      },
-      {
-        column: 'pending_email_token',
-        sql: 'ALTER TABLE users ADD COLUMN pending_email_token TEXT',
-        description: 'Email change verification token',
-      },
-      {
-        column: 'pending_email_expires',
-        sql: 'ALTER TABLE users ADD COLUMN pending_email_expires DATETIME',
-        description: 'Email change token expiration',
-      },
-    ];
-
-    for (const migration of userSecurityMigrations) {
-      try {
-        await this.execute(migration.sql);
-        coreInfo(
-          `✓ Added ${migration.column} column for ${migration.description}`,
-          { operation: 'database:initialize' }
-        );
-      } catch (error) {
-        // Column already exists, ignore error
-        coreDebug(
-          `${migration.column} column already exists or migration not needed`,
-          { operation: 'database:initialize' }
-        );
-      }
-    }
-
-    // Set default auth_provider for existing users with password_hash
-    try {
-      await this.execute(`
-        UPDATE users 
-        SET auth_provider = 'password', email_verified = TRUE 
-        WHERE password_hash IS NOT NULL AND auth_provider IS NULL
-      `);
-      coreInfo('Updated existing password users with auth_provider', {
-        operation: 'database:initialize',
-      });
-    } catch (error) {
-      coreDebug('Auth provider update not needed or already completed', {
-        operation: 'database:initialize',
-      });
-    }
-
-    // Migrate search_index table (add new columns if needed)
-    await this.migrateSearchIndex();
-
-    // Create FTS5 virtual table and triggers
-    await this.createFTS5Table();
-
-    // Create indexes for sort performance
-    await this.createSortIndexes();
-  }
-
-  /**
-   * Create indexes for saga tables
-   */
-  private async createSagaIndexes(): Promise<void> {
-    const indexes = [
-      {
-        name: 'idx_saga_status',
-        sql: 'CREATE INDEX IF NOT EXISTS idx_saga_status ON saga_states(status)',
-        description: 'Index for saga status queries',
-      },
-      {
-        name: 'idx_saga_type',
-        sql: 'CREATE INDEX IF NOT EXISTS idx_saga_type ON saga_states(saga_type)',
-        description: 'Index for saga type queries',
-      },
-      {
-        name: 'idx_idempotency_key',
-        sql: 'CREATE INDEX IF NOT EXISTS idx_idempotency_key ON saga_states(idempotency_key)',
-        description: 'Index for idempotency key lookups',
-      },
-      {
-        name: 'idx_correlation_id',
-        sql: 'CREATE INDEX IF NOT EXISTS idx_correlation_id ON saga_states(correlation_id)',
-        description: 'Index for correlation ID lookups',
-      },
-      {
-        name: 'idx_expires_at',
-        sql: 'CREATE INDEX IF NOT EXISTS idx_expires_at ON saga_resource_locks(expires_at)',
-        description: 'Index for lock expiration queries',
-      },
-    ];
-
-    for (const index of indexes) {
-      try {
-        await this.execute(index.sql);
-        coreDebug(`Created saga index ${index.name} for ${index.description}`, {
-          operation: 'database:initialize',
-        });
-      } catch (error: any) {
-        // Index might already exist, log but don't fail
-        coreDebug(
-          `Saga index ${index.name} already exists or creation failed: ${error.message}`,
-          { operation: 'database:initialize' }
-        );
-      }
-    }
-  }
-
-  /**
-   * Create indexes for sort performance
-   */
-  private async createSortIndexes(): Promise<void> {
-    const indexes = [
-      {
-        name: 'idx_records_updated_at',
-        sql: 'CREATE INDEX IF NOT EXISTS idx_records_updated_at ON records(updated_at DESC)',
-        description: 'Index for updated_desc sort',
-      },
-      {
-        name: 'idx_records_created_at',
-        sql: 'CREATE INDEX IF NOT EXISTS idx_records_created_at ON records(created_at DESC)',
-        description: 'Index for created_desc sort',
-      },
-      {
-        name: 'idx_records_title',
-        sql: 'CREATE INDEX IF NOT EXISTS idx_records_title ON records(title COLLATE NOCASE)',
-        description: 'Index for title_asc/title_desc sort',
-      },
-      {
-        name: 'idx_search_index_updated_at',
-        sql: 'CREATE INDEX IF NOT EXISTS idx_search_index_updated_at ON search_index(updated_at DESC)',
-        description: 'Index for search updated_desc sort',
-      },
-      {
-        name: 'idx_search_index_title',
-        sql: 'CREATE INDEX IF NOT EXISTS idx_search_index_title ON search_index(title COLLATE NOCASE)',
-        description: 'Index for search title sort',
-      },
-    ];
-
-    for (const index of indexes) {
-      try {
-        await this.execute(index.sql);
-        coreDebug(`Created index ${index.name} for ${index.description}`, {
-          operation: 'database:initialize',
-        });
-      } catch (error: any) {
-        // Index might already exist, log but don't fail
-        coreDebug(
-          `Index ${index.name} already exists or creation failed: ${error.message}`,
-          { operation: 'database:initialize' }
-        );
-      }
-    }
-  }
-
-  /**
-   * Migrate search_index table to add new columns
-   */
-  private async migrateSearchIndex(): Promise<void> {
-    const columns = [
-      { name: 'title_normalized', type: 'TEXT' },
-      { name: 'content_preview', type: 'TEXT' },
-      { name: 'word_count', type: 'INTEGER' },
-    ];
-
-    for (const column of columns) {
-      try {
-        await this.execute(
-          `ALTER TABLE search_index ADD COLUMN ${column.name} ${column.type}`
-        );
-        coreDebug(`Added column ${column.name} to search_index`);
-      } catch (error: any) {
-        // Column might already exist, ignore
-        if (
-          !error.message?.includes('duplicate column') &&
-          !error.message?.includes('already exists')
-        ) {
-          coreDebug(`Error adding column ${column.name}:`, error.message);
-        }
-      }
-    }
-  }
-
-  /**
-   * Create FTS5 virtual table and triggers
-   */
-  private async createFTS5Table(): Promise<void> {
-    try {
-      // Create FTS5 virtual table
-      await this.execute(`
-        CREATE VIRTUAL TABLE IF NOT EXISTS search_index_fts5 USING fts5(
-          record_id UNINDEXED,
-          record_type UNINDEXED,
-          title,
-          content,
-          tags,
-          metadata UNINDEXED,
-          content='search_index',
-          content_rowid='rowid'
-        );
-      `);
-      coreDebug('Created FTS5 virtual table');
-
-      // Drop existing triggers if they exist (for clean migration)
-      try {
-        await this.execute('DROP TRIGGER IF EXISTS search_index_fts5_insert');
-        await this.execute('DROP TRIGGER IF EXISTS search_index_fts5_update');
-        await this.execute('DROP TRIGGER IF EXISTS search_index_fts5_delete');
-      } catch {
-        // Triggers might not exist yet, that's fine
-      }
-
-      // Create insert trigger
-      await this.execute(`
-        CREATE TRIGGER search_index_fts5_insert 
-        AFTER INSERT ON search_index 
-        BEGIN
-          INSERT INTO search_index_fts5(rowid, record_id, record_type, title, content, tags, metadata)
-          VALUES (new.rowid, new.record_id, new.record_type, new.title, new.content, new.tags, new.metadata);
-        END;
-      `);
-
-      // Create update trigger
-      await this.execute(`
-        CREATE TRIGGER search_index_fts5_update 
-        AFTER UPDATE ON search_index 
-        BEGIN
-          INSERT INTO search_index_fts5(search_index_fts5, rowid, record_id, record_type, title, content, tags, metadata)
-          VALUES('delete', old.rowid, old.record_id, old.record_type, old.title, old.content, old.tags, old.metadata);
-          INSERT INTO search_index_fts5(rowid, record_id, record_type, title, content, tags, metadata)
-          VALUES (new.rowid, new.record_id, new.record_type, new.title, new.content, new.tags, new.metadata);
-        END;
-      `);
-
-      // Create delete trigger
-      await this.execute(`
-        CREATE TRIGGER search_index_fts5_delete 
-        AFTER DELETE ON search_index 
-        BEGIN
-          INSERT INTO search_index_fts5(search_index_fts5, rowid, record_id, record_type, title, content, tags, metadata)
-          VALUES('delete', old.rowid, old.record_id, old.record_type, old.title, old.content, old.tags, old.metadata);
-        END;
-      `);
-
-      coreDebug('Created FTS5 triggers');
-    } catch (error: any) {
-      coreError('Error creating FTS5 table or triggers:', error.message);
-      // Don't throw - FTS5 might not be available in some SQLite builds
-      // System will fall back to LIKE queries if needed
-    }
+    // Step 8: sort indexes
+    await createSortIndexes(exec);
   }
 
   async beginTransaction(): Promise<Transaction> {
@@ -792,10 +227,7 @@ export class SQLiteAdapter implements DatabaseAdapter {
           reject(err);
         } else {
           this.activeTransactions.set(transactionId, true);
-          resolve({
-            id: transactionId,
-            isActive: true,
-          });
+          resolve({ id: transactionId, isActive: true });
         }
       });
     });
@@ -828,7 +260,6 @@ export class SQLiteAdapter implements DatabaseAdapter {
     }
 
     if (!this.activeTransactions.has(transaction.id)) {
-      // Transaction might already be rolled back, log warning but don't fail
       coreDebug(
         `Transaction ${transaction.id} is not active, may already be rolled back`,
         { operation: 'database:rollback' }
@@ -847,15 +278,26 @@ export class SQLiteAdapter implements DatabaseAdapter {
       });
     });
   }
+
+  getConfig(): DatabaseConfig {
+    return this.config;
+  }
 }
 
+ 
 // Placeholder for PostgreSQL adapter (future implementation)
 export class PostgresAdapter implements DatabaseAdapter {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  private config: DatabaseConfig;
+
   constructor(_config: DatabaseConfig) {
+    this.config = _config;
     throw new Error(
       'PostgreSQL adapter is not yet implemented. Please use SQLite for now. PostgreSQL support is coming soon.'
     );
+  }
+
+  getConfig(): DatabaseConfig {
+    return this.config;
   }
 
   async connect(): Promise<void> {
@@ -864,15 +306,13 @@ export class PostgresAdapter implements DatabaseAdapter {
     );
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  async query(_sql: string, _params?: any[]): Promise<any[]> {
+  async query<T = unknown>(_sql: string, _params?: SqlParam[]): Promise<T[]> {
     throw new Error(
       'PostgreSQL adapter is not yet implemented. Please use SQLite for now. PostgreSQL support is coming soon.'
     );
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  async execute(_sql: string, _params?: any[]): Promise<void> {
+  async execute(_sql: string, _params?: SqlParam[]): Promise<ExecuteResult> {
     throw new Error(
       'PostgreSQL adapter is not yet implemented. Please use SQLite for now. PostgreSQL support is coming soon.'
     );
@@ -908,9 +348,11 @@ export class PostgresAdapter implements DatabaseAdapter {
     );
   }
 }
-/* eslint-enable @typescript-eslint/no-unused-vars */
+ 
 
-// Factory function to create the appropriate adapter
+/**
+ * Factory: pick the adapter for the configured database type.
+ */
 export function createDatabaseAdapter(config: DatabaseConfig): DatabaseAdapter {
   switch (config.type) {
     case 'sqlite':

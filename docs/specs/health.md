@@ -2,10 +2,10 @@
 
 ---
 
-version: 1.0.0 
-status: stable 
-created: '2025-01-15' 
-updated: '2025-01-15' 
+version: 0.2.x
+status: partial
+created: '2025-01-15'
+updated: '2026-05-17'
 deprecated: false
 
 ---

@@ -4,7 +4,7 @@
  * This module handles dependency extraction and resolution.
  */
 
-import { Class, ServiceMetadata } from './types.js';
+import { Class } from './types.js';
 import { ServiceContainer } from './container.js';
 import { CircularDependencyDetector } from './circular-dependency-detector.js';
 import { MissingDependencyError } from './errors.js';
@@ -25,9 +25,9 @@ export class DependencyResolver {
    * @throws CircularDependencyError if a circular dependency is detected
    */
   resolveDependencies(
-    dependencies: Array<string | Class<any>>,
+    dependencies: Array<string | Class>,
     container: ServiceContainer
-  ): any[] {
+  ): unknown[] {
     return dependencies.map((dep) => {
       // Check if dependency is registered
       if (!container.isRegistered(dep)) {
@@ -54,7 +54,8 @@ export class DependencyResolver {
    * @param constructor - Class constructor
    * @returns Array of dependency keys (empty for now, requires manual specification)
    */
-  extractDependencies(constructor: Class<any>): Array<string | Class<any>> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  extractDependencies(_constructor: Class<any>): Array<string | Class<any>> {
     // TODO: In the future, this could use:
     // - TypeScript decorators (@Inject('key'))
     // - Reflection metadata (reflect-metadata)
@@ -72,6 +73,7 @@ export class DependencyResolver {
    * @throws MissingDependencyError if any dependency is not registered
    */
   validateDependencies(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     dependencies: Array<string | Class<any>>,
     container: ServiceContainer
   ): void {

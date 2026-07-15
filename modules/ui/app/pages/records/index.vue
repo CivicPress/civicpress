@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { useDebounceFn } from '@vueuse/core';
 import SystemFooter from '~/components/SystemFooter.vue';
 
 const { t } = useI18n();
@@ -11,7 +10,6 @@ const { buildQueryFromState, parseQueryToState } = await import(
 
 // Route and router for URL state management
 const route = useRoute();
-const router = useRouter();
 
 // Reactive data
 const searchQuery = ref('');
@@ -46,7 +44,7 @@ const updateURL = () => {
 };
 
 const restoreFromURL = () => {
-  const state = parseQueryToState(route as any);
+  const state = parseQueryToState(route);
   if (state.search) {
     searchQuery.value = state.search;
     filters.value.search = state.search;
@@ -70,38 +68,6 @@ const restoreFromURL = () => {
     sort.value = searchQuery.value ? 'relevance' : 'created_desc';
   }
 };
-
-// Debounced API search function
-// Only triggers search if query has at least 3 characters
-const debouncedApiSearch = useDebounceFn(async (query: string) => {
-  const typeFilter =
-    filters.value.types.length > 0 ? filters.value.types.join(',') : undefined;
-  const statusFilter =
-    filters.value.statuses.length > 0
-      ? filters.value.statuses.join(',')
-      : undefined;
-
-  const trimmedQuery = query?.trim() || '';
-
-  // Only search if query has at least 3 characters, otherwise load initial records
-  if (trimmedQuery.length >= 3) {
-    await recordsStore.searchRecords(trimmedQuery, {
-      type: typeFilter,
-      status: statusFilter,
-      sort: sort.value,
-    });
-  } else {
-    // Query is empty or less than 3 chars - load initial records
-    await recordsStore.loadInitialRecords({
-      type: typeFilter,
-      status: statusFilter,
-      sort: sort.value,
-    });
-  }
-
-  // Clear searching state after search completes
-  isSearching.value = false;
-}, 300);
 
 // Handle search input changes (only updates local state, doesn't execute search)
 const handleSearch = (query: string) => {
@@ -281,7 +247,7 @@ const isLoading = ref(false); // Guard to prevent duplicate loads
 // On mounted - restore from URL and fetch data
 onMounted(async () => {
   // Skip if not on client side (SSR)
-  if (!process.client) return;
+  if (!import.meta.client) return;
 
   // Prevent duplicate calls
   if (isLoading.value) return;
@@ -439,11 +405,11 @@ const scrollToTop = () => {
         <RecordList
           :filters="filters"
           :search-query="searchQuery"
-          :breadcrumbs-ref="breadcrumbsRef as any"
+          :breadcrumbs-ref="breadcrumbsRef"
           :is-searching="isSearching"
           :current-page="page"
           :page-size="pageSize"
-          @resetFilters="resetAllFilters"
+          @reset-filters="resetAllFilters"
           @page-change="handlePageChange"
           @page-size-change="handlePageSizeChange"
         />

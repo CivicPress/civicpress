@@ -27,6 +27,7 @@ export interface ActivityLogEntry {
   target?: ActivityTarget;
   outcome: ActivityOutcome;
   message?: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   metadata?: Record<string, any>;
 }
 
@@ -37,16 +38,28 @@ export interface ActivityLogEntry {
 export class AuditLogger {
   private readonly logPath: string;
   private readonly maxEntries: number;
+  // FA-CORE-004: track dropped audit writes so an invisible gap in the
+  // trust/transparency trail (full disk, permissions) is observable rather
+  // than merely logged-and-forgotten. With failFast the write also rethrows.
+  private writeFailureCount = 0;
+  private readonly failFast: boolean;
 
   constructor(options?: {
     dataDir?: string;
     fileName?: string;
     maxEntries?: number;
+    failFast?: boolean;
   }) {
     const dataDir = options?.dataDir ?? '.system-data';
     const fileName = options?.fileName ?? 'activity.log';
     this.logPath = path.join(dataDir, fileName);
     this.maxEntries = options?.maxEntries ?? 10000;
+    this.failFast = options?.failFast ?? false;
+  }
+
+  /** Number of audit entries that failed to persist since construction. */
+  getWriteFailureCount(): number {
+    return this.writeFailureCount;
   }
 
   async log(entry: Omit<ActivityLogEntry, 'id' | 'timestamp'>): Promise<void> {
@@ -75,15 +88,23 @@ export class AuditLogger {
       fs.appendFileSync(this.logPath, JSON.stringify(entry) + '\n');
       await this.rotateIfNeeded();
     } catch (err) {
-      // Best-effort audit; never throw
+      this.writeFailureCount++;
       coreError(
         '[AuditLogger] Failed to write entry',
         'AUDIT_WRITE_FAILED',
         {
           error: err instanceof Error ? err.message : String(err),
+          writeFailureCount: this.writeFailureCount,
         },
         { operation: 'audit:log' }
       );
+      // Fail-fast callers (e.g. a strict compliance deployment) surface the
+      // gap immediately; the default stays best-effort and never throws.
+      if (this.failFast) {
+        throw err instanceof Error
+          ? err
+          : new Error(`Audit write failed: ${String(err)}`);
+      }
     }
   }
 
@@ -100,11 +121,13 @@ export class AuditLogger {
         fs.writeFileSync(this.logPath, kept.join('\n') + '\n');
       }
     } catch (err) {
+      this.writeFailureCount++;
       coreError(
         '[AuditLogger] Rotate failed',
         'AUDIT_ROTATE_FAILED',
         {
           error: err instanceof Error ? err.message : String(err),
+          writeFailureCount: this.writeFailureCount,
         },
         { operation: 'audit:rotate' }
       );

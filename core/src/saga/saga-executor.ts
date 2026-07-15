@@ -11,7 +11,6 @@ import {
   SagaExecutionResult,
   CompensationResult,
   SagaState,
-  SagaStatus,
   CompensationStatus,
 } from './types.js';
 import { SagaStateStore } from './saga-state-store.js';
@@ -19,26 +18,22 @@ import { IdempotencyManager } from './idempotency.js';
 import { ResourceLockManager } from './resource-lock.js';
 import {
   SagaStepError,
-  SagaCompensationError,
   SagaContextError,
   SagaTimeoutError,
-  UncompensatableFailureError,
 } from './errors.js';
-import { Logger } from '../utils/logger.js';
 import {
   coreDebug,
   coreError,
   coreInfo,
   coreWarn,
 } from '../utils/core-output.js';
+import type { AuditChannel } from '../audit/audit-channel.js';
 /**
  * Generate unique saga ID
  */
 function generateSagaId(): string {
   return `saga_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
 }
-
-const logger = new Logger();
 
 /**
  * Saga executor configuration
@@ -65,23 +60,84 @@ export class SagaExecutor {
   private idempotencyManager: IdempotencyManager;
   private lockManager: ResourceLockManager;
   private config: Required<SagaExecutorConfig>;
+  private auditChannel?: AuditChannel;
 
   constructor(
     stateStore: SagaStateStore,
     idempotencyManager: IdempotencyManager,
     lockManager: ResourceLockManager,
-    config: SagaExecutorConfig = {}
+    config: SagaExecutorConfig = {},
+    auditChannel?: AuditChannel
   ) {
     this.stateStore = stateStore;
     this.idempotencyManager = idempotencyManager;
     this.lockManager = lockManager;
+    const defaultTimeout = config.defaultTimeout || 300000; // 5 minutes
     this.config = {
-      defaultTimeout: config.defaultTimeout || 300000, // 5 minutes
+      defaultTimeout,
       defaultStepTimeout: config.defaultStepTimeout || 60000, // 1 minute
-      lockTimeout: config.lockTimeout || 30000, // 30 seconds
+      // FA-CORE-007: the lock must outlive the longest possible saga run,
+      // otherwise a second saga can grab the "lock" mid-execution and
+      // interleave DB + file + git writes on the same record.
+      lockTimeout: config.lockTimeout || defaultTimeout + 30000,
       idempotencyTtl: config.idempotencyTtl || 24 * 60 * 60 * 1000, // 24 hours
       persistState: config.persistState !== false, // Default true
     };
+    this.auditChannel = auditChannel;
+  }
+
+  /**
+   * Write a saga lifecycle audit entry through the unified channel.
+   * No-op if no channel was injected (transitional safety; production
+   * wires the channel via civic-core-services.ts).
+   *
+   * Phase 2c Task 9 — closes core-013 (sagas previously wrote no audit
+   * to either store).
+   */
+  private async auditSagaLifecycle(
+    saga: { name: string },
+    context: SagaContext,
+    phase: 'start' | 'complete' | 'failure',
+    extra?: { sagaId?: string; durationMs?: number; error?: string }
+  ): Promise<void> {
+    if (!this.auditChannel) return;
+    try {
+      const ctx = context as SagaContext & {
+        userId?: unknown;
+        user?: { id?: unknown };
+      };
+      const userId =
+        typeof ctx.userId === 'number'
+          ? ctx.userId
+          : typeof ctx.user?.id === 'number'
+            ? ctx.user.id
+            : undefined;
+      await this.auditChannel.record({
+        action: `saga:${saga.name}:${phase}`,
+        resourceType: 'saga',
+        resourceId: extra?.sagaId,
+        userId,
+        source: 'saga',
+        outcome: phase === 'failure' ? 'failure' : 'success',
+        message:
+          phase === 'failure'
+            ? `Saga ${saga.name} failed${
+                extra?.error ? `: ${extra.error}` : ''
+              }`
+            : `Saga ${saga.name} ${phase}`,
+        details: {
+          sagaId: extra?.sagaId,
+          durationMs: extra?.durationMs,
+          correlationId: context.correlationId,
+        },
+      });
+    } catch (err) {
+      // Audit write must never break saga execution.
+      coreWarn(
+        `[SagaExecutor] Audit write failed for saga ${saga.name}:${phase}`,
+        { error: err instanceof Error ? err.message : String(err) }
+      );
+    }
   }
 
   /**
@@ -94,13 +150,13 @@ export class SagaExecutor {
     const startTime = Date.now();
     const sagaId = generateSagaId();
 
-    // Generate idempotency key if not provided
-    if (!context.idempotencyKey) {
-      context.idempotencyKey = IdempotencyManager.generateIdempotencyKey(
-        saga.name,
-        context
-      );
-    }
+    // Normalize the idempotency key (FA-CORE-008): caller-provided keys are
+    // scoped per saga type + user, absent keys are derived from the stable
+    // operation content so real retries map to the same key.
+    context.idempotencyKey = IdempotencyManager.generateIdempotencyKey(
+      saga.name,
+      context
+    );
 
     // Check idempotency
     const cachedResult =
@@ -158,10 +214,18 @@ export class SagaExecutor {
         correlationId: context.correlationId,
       };
 
-      // Persist initial state
+      // Persist initial state. The idempotency key column is UNIQUE, so a
+      // prior run (expired, failed, or abandoned) that still owns this key
+      // must give it up before this run can register it (FA-CORE-008).
       if (this.config.persistState) {
+        if (context.idempotencyKey) {
+          await this.stateStore.clearIdempotencyKey(context.idempotencyKey);
+        }
         await this.stateStore.saveState(initialState);
       }
+
+      // Audit: saga start (Phase 2c Task 9 — closes core-013)
+      await this.auditSagaLifecycle(saga, context, 'start', { sagaId });
 
       // Execute saga with timeout
       const result = await Promise.race([
@@ -175,6 +239,12 @@ export class SagaExecutor {
       if (this.config.persistState) {
         await this.stateStore.updateStatus(sagaId, 'completed');
       }
+
+      // Audit: saga complete (Phase 2c Task 9)
+      await this.auditSagaLifecycle(saga, context, 'complete', {
+        sagaId,
+        durationMs: duration,
+      });
 
       coreInfo(`Saga completed successfully: ${saga.name}`, {
         sagaId,
@@ -200,6 +270,12 @@ export class SagaExecutor {
           undefined,
           error.message
         );
+        // Audit: saga failure (Phase 2c Task 9 — closes core-013)
+        await this.auditSagaLifecycle(saga, context, 'failure', {
+          sagaId,
+          durationMs: duration,
+          error: error.message,
+        });
         throw error;
       }
 
@@ -219,6 +295,13 @@ export class SagaExecutor {
           undefined,
           error.message
         );
+
+        // Audit: saga failure (Phase 2c Task 9 — closes core-013)
+        await this.auditSagaLifecycle(saga, context, 'failure', {
+          sagaId,
+          durationMs: duration,
+          error: error.message,
+        });
 
         if (compensationResult.requiresManualIntervention) {
           coreError(
@@ -243,6 +326,13 @@ export class SagaExecutor {
         undefined,
         error instanceof Error ? error.message : String(error)
       );
+
+      // Audit: saga failure (Phase 2c Task 9 — closes core-013)
+      await this.auditSagaLifecycle(saga, context, 'failure', {
+        sagaId,
+        durationMs: duration,
+        error: error instanceof Error ? error.message : String(error),
+      });
 
       throw error;
     } finally {
@@ -269,7 +359,7 @@ export class SagaExecutor {
     context: TContext,
     sagaId: string
   ): Promise<TResult> {
-    const stepResults: any[] = [];
+    const stepResults: unknown[] = [];
     let currentStepIndex = 0;
 
     try {
@@ -351,11 +441,11 @@ export class SagaExecutor {
    * Compensate for failed saga
    */
   private async compensate<TContext extends SagaContext>(
-    saga: Saga<TContext, any>,
+    saga: Saga<TContext, unknown>,
     context: TContext,
     sagaId: string,
     failedStepName: string,
-    originalError: SagaStepError
+    _originalError: SagaStepError<TContext>
   ): Promise<CompensationResult> {
     const failedStepIndex = saga.steps.findIndex(
       (s) => s.name === failedStepName
@@ -463,6 +553,7 @@ export class SagaExecutor {
    * Check if step is critical (compensation failure requires manual intervention)
    */
   private isCriticalStep<TContext extends SagaContext>(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     step: SagaStep<TContext, any>
   ): boolean {
     // Git commits are always critical
@@ -492,7 +583,22 @@ export class SagaExecutor {
     sagaName: string,
     context: SagaContext
   ): string | null {
-    // Generate resource key from context
+    // Generate resource key from context. This lock serializes DIFFERENT
+    // operations on the SAME record/draft (its purpose), keyed by the caller's
+    // stable id.
+    //
+    // FA-CORE-008 (re-audit, accepted narrow limitation): a CreateRecord saga
+    // whose recordId is a generated placeholder (record-<ts>) gets a per-call
+    // key, so two genuinely-simultaneous identical creates are not mutually
+    // excluded and — with the check-idempotency/save-state TOCTOU — could both
+    // proceed. Sequential retries ARE deduplicated (content-based idempotency
+    // key + cached result), and the HTTP create path goes through createDraft
+    // (draftId-locked), not this saga, so the exposure is a non-HTTP,
+    // same-instant duplicate-create edge. A correct fix (atomically CLAIM the
+    // idempotency key via the UNIQUE column instead of INSERT-OR-REPLACE, with
+    // an expired/failed-holder takeover) is dedicated saga-engine work with its
+    // own concurrency harness, intentionally not rushed into the pre-merge
+    // window.
     if (context.metadata?.recordId) {
       return `record:${context.metadata.recordId}`;
     }
@@ -507,7 +613,7 @@ export class SagaExecutor {
   /**
    * Create saga timeout promise
    */
-  private createSagaTimeout(sagaName: string, sagaId: string): Promise<never> {
+  private createSagaTimeout(sagaName: string, _sagaId: string): Promise<never> {
     return new Promise((_, reject) => {
       setTimeout(() => {
         reject(
@@ -523,7 +629,7 @@ export class SagaExecutor {
   private createStepTimeout(
     stepName: string,
     timeout: number,
-    sagaId: string
+    _sagaId: string
   ): Promise<never> {
     return new Promise((_, reject) => {
       setTimeout(() => {

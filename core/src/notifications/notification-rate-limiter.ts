@@ -1,7 +1,10 @@
 export interface RateLimitConfig {
-  email_per_hour: number;
-  sms_per_hour: number;
-  slack_per_hour: number;
+  email_per_hour?: number;
+  sms_per_hour?: number;
+  slack_per_hour?: number;
+  // Extra channel limits (e.g. `webhook_per_hour`) are looked up by
+  // `${channel}_per_hour` via the index signature.
+  [channelPerHourKey: string]: number | undefined;
 }
 
 export interface RateLimitResult {
@@ -21,7 +24,9 @@ export class NotificationRateLimiter {
   /**
    * Check rate limit for notification request
    */
-  async checkRateLimit(request: any): Promise<RateLimitResult> {
+  async checkRateLimit(request: {
+    channels: string[];
+  }): Promise<RateLimitResult> {
     const now = new Date();
     const results: RateLimitResult[] = [];
 
@@ -82,16 +87,8 @@ export class NotificationRateLimiter {
    * Get rate limit for channel
    */
   private getChannelLimit(channel: string): number {
-    switch (channel) {
-      case 'email':
-        return this.config.email_per_hour;
-      case 'sms':
-        return this.config.sms_per_hour;
-      case 'slack':
-        return this.config.slack_per_hour;
-      default:
-        return 100; // Default limit
-    }
+    const key = `${channel}_per_hour`;
+    return this.config[key] ?? 100;
   }
 
   /**
@@ -102,7 +99,10 @@ export class NotificationRateLimiter {
     { count: number; limit: number; resetTime: Date }
   > {
     const now = new Date();
-    const status: Record<string, any> = {};
+    const status: Record<
+      string,
+      { count: number; limit: number; resetTime: Date }
+    > = {};
 
     for (const [key, rateLimit] of this.limits.entries()) {
       const channel = key.replace('rate_limit_', '');

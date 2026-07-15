@@ -36,7 +36,7 @@ describe('CircuitBreaker', () => {
       for (let i = 0; i < 5; i++) {
         try {
           await circuitBreaker.execute(operation);
-        } catch (error) {
+        } catch {
           // Expected
         }
       }
@@ -51,7 +51,7 @@ describe('CircuitBreaker', () => {
       for (let i = 0; i < 5; i++) {
         try {
           await circuitBreaker.execute(operation);
-        } catch (error) {
+        } catch {
           // Expected
         }
       }
@@ -65,32 +65,32 @@ describe('CircuitBreaker', () => {
     });
 
     it('should transition to half-open after timeout', async () => {
-      // Open the circuit
-      const operation = vi.fn().mockRejectedValue(new Error('Failure'));
-      for (let i = 0; i < 5; i++) {
-        try {
-          await circuitBreaker.execute(operation);
-        } catch (error) {
-          // Expected
-        }
-      }
-
-      expect(circuitBreaker.getState()).toBe('open');
-
-      // Wait for timeout (default: 60s, but we'll use a shorter timeout for testing)
+      // CircuitBreaker transitions are lazy — open→half-open happens inside
+      // execute() (see circuit-breaker.ts:51-58), not on getState(). To
+      // observe the transition we run one successful execute() after the
+      // timeout has elapsed, which transitions the breaker to half-open and
+      // (because the default successThreshold is 2) leaves it in half-open
+      // after a single success.
       const breaker = new CircuitBreaker('test', { timeout: 100 }, mockLogger);
+      const failingOp = vi.fn().mockRejectedValue(new Error('Failure'));
       for (let i = 0; i < 5; i++) {
         try {
-          await breaker.execute(operation);
-        } catch (error) {
+          await breaker.execute(failingOp);
+        } catch {
           // Expected
         }
       }
 
-      // Wait for timeout
+      expect(breaker.getState()).toBe('open');
+
+      // Wait past the timeout window
       await new Promise((resolve) => setTimeout(resolve, 150));
 
-      // Should transition to half-open
+      // One successful call triggers the lazy open→half-open transition
+      // (and stays in half-open since successCount 1 < successThreshold 2)
+      const successOp = vi.fn().mockResolvedValue('success');
+      await breaker.execute(successOp);
+
       expect(breaker.getState()).toBe('half-open');
     });
 
@@ -109,7 +109,7 @@ describe('CircuitBreaker', () => {
       for (let i = 0; i < 5; i++) {
         try {
           await breaker.execute(failingOp);
-        } catch (error) {
+        } catch {
           // Expected
         }
       }
@@ -139,7 +139,7 @@ describe('CircuitBreaker', () => {
       for (let i = 0; i < 5; i++) {
         try {
           await breaker.execute(failingOp);
-        } catch (error) {
+        } catch {
           // Expected
         }
       }
@@ -161,7 +161,7 @@ describe('CircuitBreaker', () => {
       for (let i = 0; i < 2; i++) {
         try {
           await circuitBreaker.execute(operation);
-        } catch (error) {
+        } catch {
           // Expected
         }
       }
@@ -186,11 +186,16 @@ describe('CircuitBreaker', () => {
 
   describe('Half-Open Limits', () => {
     it('should limit calls in half-open state', async () => {
+      // Need successThreshold > halfOpenMaxCalls so the breaker stays in
+      // half-open through the call-limit boundary; otherwise the 2nd success
+      // (default successThreshold) closes the breaker and the 3rd call
+      // succeeds instead of being limit-blocked.
       const breaker = new CircuitBreaker(
         'test',
         {
           timeout: 100,
           halfOpenMaxCalls: 2,
+          successThreshold: 99,
         },
         mockLogger
       );
@@ -200,7 +205,7 @@ describe('CircuitBreaker', () => {
       for (let i = 0; i < 5; i++) {
         try {
           await breaker.execute(failingOp);
-        } catch (error) {
+        } catch {
           // Expected
         }
       }
@@ -208,12 +213,13 @@ describe('CircuitBreaker', () => {
       // Wait for timeout
       await new Promise((resolve) => setTimeout(resolve, 150));
 
-      // Should allow limited calls
+      // Two half-open calls (within limit; circuit stays half-open
+      // because successThreshold=99 is unreachable in 2 calls)
       const successOp = vi.fn().mockResolvedValue('success');
       await breaker.execute(successOp);
       await breaker.execute(successOp);
 
-      // Third call should be blocked
+      // Third call should be blocked by halfOpenMaxCalls=2
       await expect(breaker.execute(successOp)).rejects.toThrow('Max calls');
     });
   });
@@ -226,7 +232,7 @@ describe('CircuitBreaker', () => {
       for (let i = 0; i < 5; i++) {
         try {
           await circuitBreaker.execute(operation);
-        } catch (error) {
+        } catch {
           // Expected
         }
       }
@@ -298,7 +304,7 @@ describe('CircuitBreakerManager', () => {
       for (let i = 0; i < 5; i++) {
         try {
           await breaker.execute(operation);
-        } catch (error) {
+        } catch {
           // Expected
         }
       }
@@ -322,7 +328,7 @@ describe('CircuitBreakerManager', () => {
         for (let i = 0; i < 5; i++) {
           try {
             await breaker.execute(operation);
-          } catch (error) {
+          } catch {
             // Expected
           }
         }

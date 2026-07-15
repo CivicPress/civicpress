@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { ApiResponse } from '~/utils/api-response';
 interface Props {
   size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl';
   showText?: boolean;
@@ -21,13 +22,14 @@ const sizeClasses = {
 
 // Get organization info from the store or composable
 const { $civicApi } = useNuxtApp();
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const organizationInfo = ref<any>(null);
 
 // Fetch organization info if not already available
 const fetchOrgInfo = async () => {
   if (!organizationInfo.value) {
     try {
-      const response = (await $civicApi('/api/v1/info')) as any;
+      const response = (await $civicApi('/api/v1/info')) as ApiResponse;
       if (response?.success && response.organization) {
         organizationInfo.value = response.organization;
       }

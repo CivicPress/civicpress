@@ -17,12 +17,45 @@ import {
 } from '../utils/api-logger.js';
 import * as fs from 'fs';
 import * as path from 'path';
-import * as yaml from 'js-yaml';
 import matter from 'gray-matter';
+import { resolveInsideRecordsRoot } from '../utils/record-path-guard.js';
 
 type Severity = 'error' | 'warning' | 'info';
-function isSeverity(val: any): val is Severity {
+function isSeverity(val: unknown): val is Severity {
   return val === 'error' || val === 'warning' || val === 'info';
+}
+
+interface ValidationIssue {
+  type?: string;
+  severity?: Severity;
+  message: string;
+  code?: string;
+  field?: string;
+  line?: number;
+  details?: unknown;
+  metadata?: Record<string, unknown>;
+  file?: string;
+}
+
+interface RecordValidationMetadata {
+  schemaValid: boolean;
+  schemaErrors: number;
+  schemaWarnings: number;
+  title?: string;
+  type?: string;
+  status?: string;
+  author?: string;
+  created?: string;
+  updated?: string;
+}
+
+interface RecordValidationReport {
+  recordId: string;
+  isValid: boolean;
+  issues: ValidationIssue[];
+  metadata?: RecordValidationMetadata;
+  content?: string;
+  error?: string;
 }
 
 const logger = new Logger();
@@ -55,7 +88,7 @@ export function createValidationRouter() {
           );
         }
 
-        const civicPress = (req as any).civicPress;
+        const civicPress = req.civicPress;
         if (!civicPress) {
           throw new Error('CivicPress not initialized');
         }
@@ -69,7 +102,7 @@ export function createValidationRouter() {
           recordId,
           isValid: result.isValid,
           issues: result.issues.length,
-          requestId: (req as any).requestId,
+          requestId: req.requestId,
         });
 
         sendSuccess(result, req, res, {
@@ -117,7 +150,7 @@ export function createValidationRouter() {
           );
         }
 
-        const civicPress = (req as any).civicPress;
+        const civicPress = req.civicPress;
         if (!civicPress) {
           throw new Error('CivicPress not initialized');
         }
@@ -136,7 +169,7 @@ export function createValidationRouter() {
           totalRecords: validationResults.results.length,
           validRecords: validationResults.summary.validCount,
           invalidRecords: validationResults.summary.invalidCount,
-          requestId: (req as any).requestId,
+          requestId: req.requestId,
         });
 
         sendSuccess(validationResults, req, res, {
@@ -188,7 +221,7 @@ export function createValidationRouter() {
           );
         }
 
-        const civicPress = (req as any).civicPress;
+        const civicPress = req.civicPress;
         if (!civicPress) {
           throw new Error('CivicPress not initialized');
         }
@@ -205,7 +238,7 @@ export function createValidationRouter() {
         logger.info('Validation status retrieved', {
           totalIssues: validationStatus.summary.totalIssues,
           bySeverity: validationStatus.summary.bySeverity,
-          requestId: (req as any).requestId,
+          requestId: req.requestId,
         });
 
         sendSuccess(validationStatus, req, res, {
@@ -251,7 +284,7 @@ export function createValidationRouter() {
           );
         }
 
-        const civicPress = (req as any).civicPress;
+        const civicPress = req.civicPress;
         if (!civicPress) {
           throw new Error('CivicPress not initialized');
         }
@@ -270,7 +303,7 @@ export function createValidationRouter() {
           recordId,
           isValid: result.isValid,
           issues: result.issues.length,
-          requestId: (req as any).requestId,
+          requestId: req.requestId,
         });
 
         sendSuccess(result, req, res, {
@@ -300,8 +333,8 @@ async function validateSingleRecord(
   dataDir: string,
   recordId: string,
   type?: string
-): Promise<any> {
-  const issues: any[] = [];
+): Promise<RecordValidationReport> {
+  const issues: ValidationIssue[] = [];
   let recordContent: string | null = null;
 
   const normalizedInput = recordId.replace(/\.md$/, '');
@@ -315,12 +348,12 @@ async function validateSingleRecord(
     const fullCandidateSegments = relativeCandidate
       .replace(/^records\//, '')
       .split('/');
-    const fullCandidate = path.join(
+    // FA-API-005: the caller-supplied path must stay inside data/records.
+    const fullCandidate = resolveInsideRecordsRoot(
       dataDir,
-      'records',
-      ...fullCandidateSegments
+      fullCandidateSegments
     );
-    if (fs.existsSync(fullCandidate)) {
+    if (fullCandidate && fs.existsSync(fullCandidate)) {
       recordRelativePath = relativeCandidate;
     }
   }
@@ -362,16 +395,18 @@ async function validateSingleRecord(
       recordId,
       isValid: false,
       issues,
-      content: null,
+      content: undefined,
     };
   }
 
   const normalizedPath = recordRelativePath.replace(/^records\//, '');
   const fullPathSegments = normalizedPath.split('/');
-  const fullPath = path.join(dataDir, 'records', ...fullPathSegments);
+  // FA-API-005: containment-checked resolve (recordRelativePath may derive
+  // from caller input above).
+  const fullPath = resolveInsideRecordsRoot(dataDir, fullPathSegments);
 
   try {
-    if (!fs.existsSync(fullPath)) {
+    if (!fullPath || !fs.existsSync(fullPath)) {
       issues.push({
         severity: 'error' as Severity,
         code: 'RECORD_NOT_FOUND',
@@ -382,7 +417,7 @@ async function validateSingleRecord(
         recordId,
         isValid: false,
         issues,
-        content: null,
+        content: undefined,
       };
     }
 
@@ -398,7 +433,7 @@ async function validateSingleRecord(
       recordId,
       isValid: false,
       issues,
-      content: null,
+      content: undefined,
     };
   }
 
@@ -423,6 +458,7 @@ async function validateSingleRecord(
 async function validateRecordContent(
   content: string,
   recordId: string
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): Promise<any> {
   try {
     // Extract frontmatter for schema validation
@@ -453,14 +489,14 @@ async function validateRecordContent(
 
     // Combine schema and business rule validation results
     // Schema errors are already included in RecordValidator results, but we track them separately for clarity
-    const issues: any[] = [
+    const issues: ValidationIssue[] = [
       ...validationResult.errors,
       ...validationResult.warnings,
       ...validationResult.info,
     ];
 
     // Extract metadata from parsed record (if parsing succeeded)
-    const metadata: any = {
+    const metadata: RecordValidationMetadata = {
       schemaValid: schemaValidation.isValid,
       schemaErrors: schemaValidation.errors.length,
       schemaWarnings: schemaValidation.warnings.length,
@@ -537,6 +573,7 @@ async function validateBulkRecords(
   recordIds: string[],
   types?: string[],
   includeContent = false
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): Promise<any> {
   const results = [];
   const summary = {
@@ -592,9 +629,12 @@ async function getValidationStatus(
     severity?: string;
     limit?: number;
   }
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): Promise<any> {
   const recordsDir = path.join(dataDir, 'records');
-  const allIssues: any[] = [];
+  const allIssues: Array<
+    ValidationIssue & { recordId?: string; recordType?: string }
+  > = [];
   const summary = {
     totalIssues: 0,
     bySeverity: {

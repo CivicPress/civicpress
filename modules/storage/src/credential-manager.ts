@@ -2,7 +2,6 @@ import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { parse, stringify } from 'yaml';
 import {
-  StorageProvider,
   S3Credentials,
   AzureCredentials,
   GCSCredentials,
@@ -74,7 +73,7 @@ export class CredentialManager {
     providerType: string
   ): ProviderCredentials | null {
     switch (providerType) {
-      case 's3':
+      case 's3': {
         const s3AccessKey =
           process.env.S3_ACCESS_KEY_ID || process.env.AWS_ACCESS_KEY_ID;
         const s3SecretKey =
@@ -90,8 +89,9 @@ export class CredentialManager {
           } as S3Credentials;
         }
         break;
+      }
 
-      case 'azure':
+      case 'azure': {
         const azureConnectionString =
           process.env.AZURE_STORAGE_CONNECTION_STRING;
         const azureAccountName = process.env.AZURE_STORAGE_ACCOUNT_NAME;
@@ -110,8 +110,9 @@ export class CredentialManager {
           } as AzureCredentials;
         }
         break;
+      }
 
-      case 'gcs':
+      case 'gcs': {
         const gcsProjectId =
           process.env.GOOGLE_CLOUD_PROJECT || process.env.GCS_PROJECT_ID;
         const gcsKeyFile = process.env.GOOGLE_APPLICATION_CREDENTIALS;
@@ -123,6 +124,7 @@ export class CredentialManager {
           } as GCSCredentials;
         }
         break;
+      }
     }
 
     return null;
@@ -135,47 +137,60 @@ export class CredentialManager {
     providerType: string
   ): ProviderCredentials | null {
     try {
-      const config = this.getStorageConfig();
-      const providers = config.providers || {};
+      // Storage config files use snake_case credential keys
+      // (`access_key_id`, `connection_string`, etc.); the SDKs use
+      // camelCase. This method translates between the two shapes —
+      // the unknown-typed input lets us read the raw config without
+      // committing to either casing here.
+      const config = this.getStorageConfig() as
+        | {
+            providers?: Record<
+              string,
+              {
+                account_name?: string;
+                credentials?: Record<string, unknown>;
+              }
+            >;
+          }
+        | undefined;
+      const providers = config?.providers || {};
       const provider = providers[providerType];
 
       if (!provider || !provider.credentials) {
         return null;
       }
+      const rawCreds = provider.credentials as Record<string, string | undefined>;
 
       switch (providerType) {
         case 's3':
-          const s3Creds = provider.credentials;
-          if (s3Creds.access_key_id && s3Creds.secret_access_key) {
+          if (rawCreds.access_key_id && rawCreds.secret_access_key) {
             return {
-              accessKeyId: s3Creds.access_key_id,
-              secretAccessKey: s3Creds.secret_access_key,
-              sessionToken: s3Creds.session_token || undefined,
+              accessKeyId: rawCreds.access_key_id,
+              secretAccessKey: rawCreds.secret_access_key,
+              sessionToken: rawCreds.session_token || undefined,
             } as S3Credentials;
           }
           break;
 
         case 'azure':
-          const azureCreds = provider.credentials;
-          if (azureCreds.connection_string) {
+          if (rawCreds.connection_string) {
             return {
-              connectionString: azureCreds.connection_string,
+              connectionString: rawCreds.connection_string,
             } as AzureCredentials;
           }
-          if (provider.account_name && azureCreds.account_key) {
+          if (provider.account_name && rawCreds.account_key) {
             return {
               accountName: provider.account_name,
-              accountKey: azureCreds.account_key,
+              accountKey: rawCreds.account_key,
             } as AzureCredentials;
           }
           break;
 
         case 'gcs':
-          const gcsCreds = provider.credentials;
-          if (gcsCreds.project_id) {
+          if (rawCreds.project_id) {
             return {
-              projectId: gcsCreds.project_id,
-              keyFilename: gcsCreds.service_account_key || undefined,
+              projectId: rawCreds.project_id,
+              keyFilename: rawCreds.service_account_key || undefined,
             } as GCSCredentials;
           }
           break;
@@ -223,7 +238,7 @@ export class CredentialManager {
       // For now, we'll return null and let the AWS SDK handle it
       this.logger.info('AWS instance credentials will be handled by AWS SDK');
       return null;
-    } catch (error) {
+    } catch {
       this.logger.debug('No AWS instance credentials available');
       return null;
     }
@@ -238,7 +253,7 @@ export class CredentialManager {
       // For now, we'll return null and let the Azure SDK handle it
       this.logger.info('Azure managed identity will be handled by Azure SDK');
       return null;
-    } catch (error) {
+    } catch {
       this.logger.debug('No Azure managed identity available');
       return null;
     }
@@ -255,7 +270,7 @@ export class CredentialManager {
         'GCP instance credentials will be handled by Google SDK'
       );
       return null;
-    } catch (error) {
+    } catch {
       this.logger.debug('No GCP instance credentials available');
       return null;
     }
@@ -343,6 +358,7 @@ export class CredentialManager {
   /**
    * Mask sensitive information in credentials for logging
    */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   maskCredentials(credentials: ProviderCredentials): Record<string, any> {
     if ('accessKeyId' in credentials) {
       // S3 credentials
@@ -380,7 +396,7 @@ export class CredentialManager {
   /**
    * Get current storage configuration
    */
-  getStorageConfig(): any {
+  getStorageConfig(): unknown {
     try {
       if (!existsSync(this.configPath)) {
         throw new Error(`Storage configuration not found: ${this.configPath}`);
@@ -397,7 +413,7 @@ export class CredentialManager {
   /**
    * Update storage configuration
    */
-  updateStorageConfig(config: any): void {
+  updateStorageConfig(config: unknown): void {
     try {
       const yamlContent = stringify(config, { indent: 2 });
       writeFileSync(this.configPath, yamlContent, 'utf8');

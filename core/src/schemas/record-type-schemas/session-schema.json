@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://civicpress.org/schemas/record-type-schemas/session-schema.json",
   "title": "CivicPress Session Record Type Schema",
-  "description": "JSON Schema extension for session-type records. This schema validates type-specific fields for session/minutes records as defined in docs/record-format-standard.md",
+  "description": "JSON Schema extension for session-type records. Validates type-specific fields for session/minutes records; base record fields are defined in record-base-schema.json.",
   "type": "object",
   "properties": {
     "session_type": {
@@ -136,6 +136,17 @@
         }
       },
       "additionalProperties": true
+    },
+    "visibility": {
+      "type": "string",
+      "enum": ["public", "in_camera"],
+      "default": "public",
+      "description": "Whether the session is open to the public or held in camera (closed / not-for-publication). In-camera sessions and segments are excluded from publication and from any livestream."
+    },
+    "minutes_status": {
+      "type": "string",
+      "enum": ["draft", "under_review", "adopted"],
+      "description": "Adoption state of the meeting minutes, distinct from the record-level publication `status`. Minutes are typically adopted at a subsequent meeting."
     }
   },
   "additionalProperties": true

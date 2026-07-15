@@ -1,0 +1,17 @@
+{
+  "$schema": "../../core/src/modules/module.schema.json",
+  "name": "legal-register",
+  "version": "0.3.0",
+  "kind": "schema-extension",
+  "description": "Schema extension that adds legal-specific metadata (document_number, legal_authority, jurisdiction, approval_chain, etc.) to bylaw, ordinance, policy, proclamation, and resolution record types.",
+  "license": "MIT",
+  "capabilities": {
+    "schemaExtensions": [
+      "bylaw",
+      "ordinance",
+      "policy",
+      "proclamation",
+      "resolution"
+    ]
+  }
+}

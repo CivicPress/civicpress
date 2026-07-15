@@ -4,7 +4,6 @@ import { existsSync } from 'fs';
 import { join } from 'path';
 import { HookSystem } from '@civicpress/core';
 import {
-  initializeLogger,
   getGlobalOptionsFromArgs,
   initializeCliOutput,
 } from '../utils/global-options.js';
@@ -30,6 +29,7 @@ export function registerHookCommand(cli: CAC) {
     .option('-w, --workflows', 'List available workflows')
     .option('--logs', 'Show hook execution logs')
     .option('--format <format>', 'Output format', { default: 'human' })
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .action(async (action: string, options: any) => {
       // Initialize CLI output with global options
       const globalOptions = getGlobalOptionsFromArgs();
@@ -316,7 +316,8 @@ async function listWorkflows(hookSystem: HookSystem) {
   );
 }
 
-async function showLogs(dataDir: string, options: any) {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function showLogs(dataDir: string, _options: any) {
   const logPath = join(dataDir, '.civic', 'hooks.log.jsonl');
 
   if (!existsSync(logPath)) {

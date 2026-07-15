@@ -222,8 +222,11 @@ describe('BatchOperationError', () => {
     expect(error.statusCode).toBe(207); // Multi-Status for partial success
     expect(error.retryable).toBe(false);
     expect(error.context?.batch).toBeDefined();
-    expect(error.context?.batch?.successful).toBe(7);
-    expect(error.context?.batch?.failed).toBe(3);
+    const batch = error.context?.batch as
+      | { successful?: number; failed?: number }
+      | undefined;
+    expect(batch?.successful).toBe(7);
+    expect(batch?.failed).toBe(3);
   });
 
   it('should set status 500 for complete failure', () => {

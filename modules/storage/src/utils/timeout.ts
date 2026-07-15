@@ -8,6 +8,10 @@ import { StorageTimeoutError } from '../errors/storage-errors.js';
 
 /**
  * Execute operation with timeout
+ *
+ * If the timeout fires first, the rejection is a StorageTimeoutError with
+ * the operation name and timeout in `context`. Other errors propagate
+ * unchanged.
  */
 export async function withTimeout<T>(
   operation: () => Promise<T>,
@@ -15,21 +19,15 @@ export async function withTimeout<T>(
   operationName: string = 'operation'
 ): Promise<T> {
   const timeoutPromise = createTimeoutPromise<T>(timeoutMs, operationName);
-
-  try {
-    return (await Promise.race([operation(), timeoutPromise])) as T;
-  } catch (error) {
-    // If it's a timeout error, throw StorageTimeoutError
-    if (error instanceof Error && error.message.includes('timeout')) {
-      throw new StorageTimeoutError(operationName, timeoutMs);
-    }
-    // Otherwise, re-throw the original error
-    throw error;
-  }
+  return (await Promise.race([operation(), timeoutPromise])) as T;
 }
 
 /**
- * Create a timeout promise that rejects after specified milliseconds
+ * Create a timeout promise that rejects with StorageTimeoutError after
+ * specified milliseconds. Constructing the typed error here removes the
+ * earlier (broken) `error.message.includes('timeout')` round-trip in
+ * withTimeout — the message produced by the prior plain-Error helper said
+ * "timed out" so the substring check never matched.
  */
 function createTimeoutPromise<T>(
   ms: number,
@@ -37,7 +35,7 @@ function createTimeoutPromise<T>(
 ): Promise<T> {
   return new Promise((_, reject) => {
     setTimeout(() => {
-      reject(new Error(`Operation '${operationName}' timed out after ${ms}ms`));
+      reject(new StorageTimeoutError(operationName, ms));
     }, ms);
   });
 }

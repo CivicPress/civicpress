@@ -1,0 +1,47 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://civicpress.org/schemas/record-type-schemas/meeting-schema.json",
+  "title": "CivicPress Meeting Record Type Schema",
+  "description": "JSON Schema for meeting-type records. A meeting is a scheduled civic event that owns 0..N session recordings (linked via the base record `linked_records` field, type=session). Base record fields are defined in record-base-schema.json. SCAFFOLD: recurring schedules, agenda↔transcript alignment, and device schedule-push are deliberately out of scope here (see docs/specs/2026-06-26-broadcast-box-meeting-model-design.md).",
+  "type": "object",
+  "properties": {
+    "meeting_type": {
+      "type": "string",
+      "enum": ["regular", "special", "committee", "public_hearing", "emergency"],
+      "description": "Kind of meeting"
+    },
+    "scheduled_start": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 scheduled start of the meeting"
+    },
+    "scheduled_end": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 scheduled end of the meeting"
+    },
+    "location": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500,
+      "description": "Where the meeting takes place (e.g., 'Council Chamber')"
+    },
+    "chair": {
+      "type": "string",
+      "description": "Name of the meeting chair"
+    },
+    "agenda": {
+      "type": "array",
+      "description": "Ordered agenda items",
+      "items": {
+        "type": "object",
+        "required": ["title"],
+        "properties": {
+          "title": { "type": "string", "minLength": 1 },
+          "description": { "type": "string" },
+          "order": { "type": "number", "minimum": 0 }
+        }
+      }
+    }
+  }
+}

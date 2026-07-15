@@ -20,6 +20,7 @@ export const historyCommand = (cli: CAC) => {
       default: '10',
     })
     .option('--format <format>', 'Output format', { default: 'human' })
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .action(async (record: string, options: any) => {
       // Initialize CLI output with global options
       const globalOptions = getGlobalOptionsFromArgs();
@@ -50,6 +51,7 @@ export const historyCommand = (cli: CAC) => {
         // Initialize GitEngine
         try {
           await git.initialize();
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } catch (error: any) {
           logger.error(
             '❌ Failed to initialize Git repository:',
@@ -61,10 +63,12 @@ export const historyCommand = (cli: CAC) => {
 
         // Get commit history
         const limit = parseInt(options.limit) || 10;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         let history: any[] = [];
 
         try {
           history = await git.getHistory(limit);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } catch (error: any) {
           // Handle case where there are no commits yet
           if (
@@ -120,6 +124,7 @@ export const historyCommand = (cli: CAC) => {
         }
 
         cliInfo('✅ History displayed successfully!', 'history');
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } catch (error: any) {
         cliError(
           'Failed to view history',

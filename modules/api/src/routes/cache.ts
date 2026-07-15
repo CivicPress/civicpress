@@ -70,6 +70,7 @@ export function createCacheRouter(cacheManager: UnifiedCacheManager): Router {
       const caches = Object.keys(stats.caches);
 
       // Check health for each cache
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const health: Record<string, any> = {};
       let overallHealthy = true;
 
@@ -117,6 +118,7 @@ export function createCacheRouter(cacheManager: UnifiedCacheManager): Router {
   router.get('/list', async (req: Request, res: Response) => {
     try {
       const caches = cacheManager.listCaches();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const configs: Record<string, any> = {};
       for (const name of caches) {
         const config = cacheManager.getConfig(name);
