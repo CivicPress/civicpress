@@ -321,7 +321,10 @@ export type {
 } from './indexing/indexing-service.js';
 
 // Export security services
-export { SecretsManager } from './security/secrets.js';
+export {
+  SecretsManager,
+  isSecretAutoGenerationAllowed,
+} from './security/secrets.js';
 export { CsrfProtection } from './security/csrf.js';
 export type { CsrfToken } from './security/csrf.js';
 

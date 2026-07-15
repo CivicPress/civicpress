@@ -6,6 +6,23 @@ import { Logger } from '../utils/logger.js';
 const logger = new Logger();
 
 /**
+ * FA-CORE-002 — fail-closed gate on auto-generating the root secret.
+ *
+ * A generated secret that lives only on the local disk is fine for dev, but in
+ * production it means (a) a silent misconfiguration goes unnoticed and (b) the
+ * secret is lost on any host that doesn't persist .system-data, invalidating
+ * every issued session/token on restart. Mirrors the isSimulatedAuthEnabled
+ * posture: anything that is not an explicit dev/test env is treated as
+ * production and must opt in via CIVICPRESS_ALLOW_GENERATED_SECRET=true.
+ */
+export function isSecretAutoGenerationAllowed(
+  env: NodeJS.ProcessEnv = process.env
+): boolean {
+  if (env.NODE_ENV === 'test' || env.NODE_ENV === 'development') return true;
+  return env.CIVICPRESS_ALLOW_GENERATED_SECRET === 'true';
+}
+
+/**
  * Secrets Manager - Centralized secret management with HKDF key derivation
  *
  * Derives scoped keys from a single root secret using HKDF-SHA256.
@@ -67,7 +84,17 @@ export class SecretsManager {
       // File doesn't exist or can't be read - will generate new one
     }
 
-    // Generate new secret (development only)
+    // Generate a new secret only where auto-generation is allowed. In
+    // production (or an unset NODE_ENV) refuse rather than silently minting a
+    // disk-only secret that is lost on restart (FA-CORE-002).
+    if (!isSecretAutoGenerationAllowed()) {
+      throw new Error(
+        'No CIVICPRESS_SECRET is configured. Set CIVICPRESS_SECRET (at least ' +
+          '64 hex characters) in this environment, or set ' +
+          'CIVICPRESS_ALLOW_GENERATED_SECRET=true to explicitly permit an ' +
+          'auto-generated, disk-persisted secret.'
+      );
+    }
     await this.generateAndSaveSecret();
   }
 
