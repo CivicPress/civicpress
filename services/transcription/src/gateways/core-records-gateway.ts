@@ -19,7 +19,7 @@
 
 import { mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, basename } from 'node:path';
 import type {
   AgendaItem,
   AudioRef,
@@ -254,7 +254,12 @@ export class CoreRecordsGateway implements RecordsGateway {
       );
     }
     const dir = await mkdtemp(join(tmpdir(), 'transcribe-av-'));
-    const path = join(dir, uuid); // raw container; the engine decodes to WAV
+    // FA-BB-013: `uuid` is capture.av_file — a device-controlled value. Reduce
+    // it to a bare basename so a traversal-laden id (e.g. `../../etc/x`) can
+    // never steer the temp WRITE out of the freshly-created temp dir. (The
+    // fetch above already resolves it as a storage file id, but the write path
+    // is defended independently.)
+    const path = join(dir, basename(uuid)); // raw container; the engine decodes to WAV
     await writeFile(path, buffer);
     return { path };
   }

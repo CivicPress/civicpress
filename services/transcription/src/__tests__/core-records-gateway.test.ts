@@ -102,6 +102,27 @@ describe('CoreRecordsGateway.prepareAudio', () => {
       gw.prepareAudio({ id: 's1', capture: { av_file: 'gone' } })
     ).rejects.toThrow(/not found in storage/);
   });
+
+  // FA-BB-013: capture.av_file is device-controlled. A traversal-laden id must
+  // not steer the temp WRITE out of the freshly-created temp dir.
+  it('sanitizes a path-traversal av_file to a basename before writing', async () => {
+    const bytes = Buffer.from('X');
+    const gw = new CoreRecordsGateway({
+      records: fakeStore([]).store,
+      storage: { async getFileContent() { return bytes; } },
+    });
+    const ref = await gw.prepareAudio({
+      id: 's1',
+      capture: { av_file: '../../../../etc/passwd' },
+    });
+    // The write lands inside a transcribe-av-* temp dir as 'passwd', never at /etc.
+    expect(ref.path).not.toContain('..');
+    expect(ref.path).toContain('transcribe-av-');
+    expect(ref.path.endsWith('/passwd') || ref.path.endsWith('\\passwd')).toBe(
+      true
+    );
+    expect(await readFile(ref.path)).toEqual(bytes);
+  });
 });
 
 describe('CoreRecordsGateway.writeTranscript', () => {

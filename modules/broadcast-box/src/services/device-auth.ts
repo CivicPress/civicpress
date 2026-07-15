@@ -260,18 +260,23 @@ export class DeviceAuthService {
    * Uses SecretsManager's deriveKey to get a scoped key for device tokens
    */
   private async getSecret(): Promise<string> {
-    if (this.secretsManager) {
-      // Use deriveKey to get a scoped key for device tokens
-      // This ensures each scope has its own derived key from the root secret
-      const keyBuffer = this.secretsManager.deriveKey(
-        'broadcast-box',
-        'device-token'
+    // FA-BB-011: fail closed. Signing device tokens with a hardcoded default
+    // secret would let anyone who read the source forge device tokens. Production
+    // always injects a SecretsManager (the DI container throws if it is not
+    // registered), so refusing here removes a latent hardcoded credential
+    // without affecting any real path.
+    if (!this.secretsManager) {
+      throw new Error(
+        'DeviceAuthService requires a SecretsManager; refusing to sign device tokens with a default secret'
       );
-      return keyBuffer.toString('hex');
     }
-
-    // Fallback: use default secret (not secure for production)
-    return 'default-device-token-secret-change-in-production';
+    // Use deriveKey to get a scoped key for device tokens so each scope has its
+    // own derived key from the root secret.
+    const keyBuffer = this.secretsManager.deriveKey(
+      'broadcast-box',
+      'device-token'
+    );
+    return keyBuffer.toString('hex');
   }
 
   /**
