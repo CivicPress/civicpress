@@ -309,6 +309,22 @@ export class DiagnosticService {
   ): Promise<FixResult[]> {
     const results: FixResult[] = [];
 
+    // FA-CORE-014: honor dryRun at the single choke point. A "preview" request
+    // must never call a checker's autoFix (which mutates the DB via VACUUM/DDL)
+    // nor invalidate caches — return simulated results describing what WOULD run.
+    if (options?.dryRun) {
+      for (const issue of issues) {
+        results.push({
+          issueId: issue.id,
+          success: true,
+          message: `[dry-run] Would apply: ${issue.fix?.description ?? issue.message}`,
+          rollbackAvailable: false,
+          duration: 0,
+        });
+      }
+      return results;
+    }
+
     // Group issues by component
     const issuesByComponent = new Map<string, DiagnosticIssue[]>();
     for (const issue of issues) {

@@ -33,13 +33,25 @@ describe('Query Parser', () => {
     it('should build simple FTS5 query', () => {
       const parsed = parseSearchQuery('budget');
       const query = buildFTS5Query(parsed);
-      expect(query).toBe('"budget" OR budget*');
+      expect(query).toBe('"budget" OR "budget" *');
     });
 
     it('should build multi-word query', () => {
       const parsed = parseSearchQuery('budget 2024');
       const query = buildFTS5Query(parsed);
-      expect(query).toBe('"budget" OR budget* "2024" OR 2024*');
+      expect(query).toBe('"budget" OR "budget" * "2024" OR "2024" *');
+    });
+
+    // FA-CORE-003: punctuation in a term must not leak into an unquoted prefix
+    // token — the quoted phrase-prefix form keeps FTS5 from raising a MATCH
+    // syntax error (which surfaced as a 500 / query DoS / error oracle).
+    it('quotes prefix terms so punctuation cannot break FTS5 syntax', () => {
+      for (const raw of ['foo-bar', 'a.b', 'colon:x', 'foo(bar']) {
+        const query = buildFTS5Query(parseSearchQuery(raw));
+        // No bareword-followed-by-* form remains; every term is quoted.
+        expect(query).not.toMatch(/[^"\s]\*/);
+        expect(query).toContain('"');
+      }
     });
   });
 

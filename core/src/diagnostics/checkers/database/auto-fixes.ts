@@ -9,6 +9,10 @@
 import type { DatabaseService } from '../../../database/database-service.js';
 import { errorMessage } from '../../../utils/error-narrow.js';
 import type { Logger } from '../../../utils/logger.js';
+import { SEARCH_INDEX_AUTOFIX_COLUMNS } from './schema-checks.js';
+
+// FA-CORE-005: defensive identifier shape for any name interpolated into DDL.
+const SAFE_IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
 /**
  * Rebuild the FTS5 virtual table + its triggers (drops + recreates).
@@ -143,8 +147,29 @@ export async function fixMissingColumns(
   const adapter = databaseService.getAdapter();
   const table = tableName || 'search_index';
 
+  // FA-CORE-005: the missing-column list and table originate from the
+  // request body (POST /diagnose/fix). Only ever alter the search_index table
+  // and only add columns from its known schema — never interpolate a
+  // caller-supplied identifier into ALTER TABLE raw (identifier injection).
+  if (table !== 'search_index') {
+    logger.warn(
+      `Refusing schema auto-fix on unexpected table '${table}' (only search_index is supported)`
+    );
+    return;
+  }
+
   for (const column of missingColumns) {
     try {
+      if (
+        !SAFE_IDENTIFIER.test(column) ||
+        !SEARCH_INDEX_AUTOFIX_COLUMNS.includes(column)
+      ) {
+        logger.warn(
+          `Skipping schema auto-fix for unrecognized column '${column}' on ${table}`
+        );
+        continue;
+      }
+
       let columnType = 'TEXT';
       if (column === 'title_normalized') {
         columnType = 'TEXT';

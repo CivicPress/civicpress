@@ -11,7 +11,7 @@ import { errorMessage } from '../../../utils/error-narrow.js';
 import type { CheckResult } from '../../types.js';
 import { pass, warning, error } from './result-builders.js';
 
-const REQUIRED_TABLES = [
+export const REQUIRED_TABLES = [
   'users',
   'api_keys',
   'sessions',
@@ -25,6 +25,24 @@ const REQUIRED_SEARCH_INDEX_COLUMNS = [
   'record_type',
   'title',
   'title_normalized',
+];
+
+// FA-CORE-005: the complete, authoritative set of search_index columns the
+// schema auto-fix is allowed to ADD (see database/schema/tables.ts). Used as a
+// strict identifier allowlist so request-supplied column names can never be
+// interpolated raw into an ALTER TABLE statement. `id` (PK) is intentionally
+// excluded — it can never be a legitimately "missing" column.
+export const SEARCH_INDEX_AUTOFIX_COLUMNS = [
+  'record_id',
+  'record_type',
+  'title',
+  'content',
+  'tags',
+  'metadata',
+  'updated_at',
+  'title_normalized',
+  'content_preview',
+  'word_count',
 ];
 
 const IMPORTANT_INDEXES = [
