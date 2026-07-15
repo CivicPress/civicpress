@@ -70,11 +70,12 @@ export function registerEmailChannelOn(
       | { rejectUnauthorized?: unknown }
       | null
       | undefined;
-    const rejectUnauthorized = Boolean(
-      tlsRaw?.rejectUnauthorized
-        ? normalizeValue(tlsRaw.rejectUnauthorized)
-        : false
-    );
+    // FA-API-017: validate the SMTP server cert by default; only an explicit
+    // rejectUnauthorized:false in config may turn it off (e.g. a test relay).
+    const rejectUnauthorized =
+      tlsRaw?.rejectUnauthorized !== undefined
+        ? Boolean(normalizeValue(tlsRaw.rejectUnauthorized))
+        : true;
 
     const options: EmailChannelOptions = {
       smtp: {

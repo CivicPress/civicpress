@@ -103,9 +103,9 @@ channels:
         required: true
       tls:
         rejectUnauthorized:
-          value: false
+          value: true
           type: 'boolean'
-          description: 'Reject unauthorized certificates'
+          description: 'Reject unauthorized (invalid/self-signed) certificates'
           required: true
 
     # Nodemailer Configuration

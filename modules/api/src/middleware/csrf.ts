@@ -10,8 +10,9 @@ import {
  *
  * Skips CSRF check for:
  * - GET, HEAD, OPTIONS requests
- * - Requests with valid Bearer token (API clients)
- * - Requests with X-CSRF-Bypass header (internal services)
+ * - Requests with valid Bearer token (API clients — header auth is not
+ *   attacker-forgeable cross-site, so it is CSRF-immune)
+ * - X-Mock-User requests, but only where simulated auth is enabled
  */
 export function csrfMiddleware(civicPress: CivicPress) {
   const secretsManager = civicPress.getSecretsManager();
@@ -36,10 +37,10 @@ export function csrfMiddleware(civicPress: CivicPress) {
       return next();
     }
 
-    // Skip CSRF for internal services (e.g., webhooks that have their own signature)
-    if (req.headers['x-csrf-bypass'] === 'true') {
-      return next();
-    }
+    // FA-API-018: the unconditional `X-CSRF-Bypass: true` skip is removed — any
+    // client could set it, defeating the layer entirely. Internal callers with
+    // their own signature (webhooks) authenticate via Bearer token (skipped
+    // above) rather than a header any browser origin can spoof.
 
     // Skip CSRF for X-Mock-User requests (test-only authentication bypass).
     // FA-API-002: honoured ONLY where the mock-user bypass itself is enabled

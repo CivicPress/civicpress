@@ -201,10 +201,27 @@ export class CivicPressAPI {
     // through untouched, so Range/206 streaming is unaffected).
     this.app.use(compression());
 
-    // CORS
+    // CORS (FA-API-013): never ship wildcard-origin + credentials by default.
+    // Explicit CORS_ORIGIN (comma-separated) always wins. With none set we fail
+    // closed in production — deny cross-origin reads rather than reflect '*' —
+    // and default to the local Nuxt UI origin only in development/test.
+    const corsOriginEnv = process.env.CORS_ORIGIN?.trim();
+    const isDevOrTest =
+      process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test';
+    let corsOrigin: string[] | boolean;
+    if (corsOriginEnv) {
+      corsOrigin = corsOriginEnv.split(',').map((s) => s.trim());
+    } else if (isDevOrTest) {
+      corsOrigin = ['http://localhost:3000'];
+    } else {
+      corsOrigin = false; // production / unset NODE_ENV: no cross-origin allowlist
+      logger.warn(
+        'CORS_ORIGIN is not set — cross-origin requests are denied. Set CORS_ORIGIN (comma-separated) to allow browser clients.'
+      );
+    }
     this.app.use(
       cors({
-        origin: process.env.CORS_ORIGIN || '*',
+        origin: corsOrigin,
         credentials: true,
       })
     );

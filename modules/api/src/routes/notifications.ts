@@ -74,8 +74,10 @@ router.post('/test', async (req, res) => {
           port: Number(credentials.port ?? 587),
           secure: Boolean(credentials.secure),
           auth: credentials.auth as { user: string; pass: string } | undefined,
+          // FA-API-017: validate the SMTP server cert by default. Only an
+          // explicit tls block may opt out (e.g. a self-signed test relay).
           tls: (credentials.tls as { rejectUnauthorized: boolean } | undefined) || {
-            rejectUnauthorized: false,
+            rejectUnauthorized: true,
           },
         },
         defaultFrom: credentials.from as string | undefined,
