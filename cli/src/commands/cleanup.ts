@@ -36,10 +36,14 @@ const resolveOrgChallengeName = (projectRoot: string): string => {
       const parsed = parseYaml(readFileSync(orgConfigPath, 'utf-8')) as
         | Record<string, any>
         | undefined;
+      // FA-CLI-002 (re-audit): prefer the ORG's own name field (`name.value`)
+      // over `_metadata.name`, which is just the config file's descriptive
+      // label (e.g. 'Test Org') — the challenge should be the organization's
+      // real name so it is specific to this install.
       const raw =
-        parsed?._metadata?.name ??
         parsed?.name?.value ??
-        (typeof parsed?.name === 'string' ? parsed.name : undefined);
+        (typeof parsed?.name === 'string' ? parsed.name : undefined) ??
+        parsed?._metadata?.name;
       const normalized = raw ? normalizeChallenge(String(raw)) : '';
       if (normalized) return normalized;
     }

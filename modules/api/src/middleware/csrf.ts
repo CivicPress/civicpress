@@ -29,11 +29,12 @@ export function csrfMiddleware(civicPress: CivicPress) {
       return next();
     }
 
-    // Skip CSRF for public config validation endpoint
-    // Path could be /api/v1/config/:type/validate or /config/:type/validate
-    // Use req.originalUrl or req.path to check
-    const pathToCheck = req.originalUrl || req.path;
-    if (pathToCheck.includes('/config/') && pathToCheck.includes('/validate')) {
+    // Skip CSRF for the public config-validation endpoint only.
+    // FA-API-018 (re-audit): match req.path (NO query string) against the exact
+    // /config/:type/validate shape. The old substring test on req.originalUrl
+    // matched the query too, so `PUT /config/raw/roles?x=/validate` satisfied
+    // both substrings and skipped CSRF on a config-WRITE route.
+    if (/(^|\/)config\/[^/]+\/validate$/.test(req.path)) {
       return next();
     }
 

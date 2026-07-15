@@ -186,10 +186,14 @@ export class SecretsManager {
    */
   verify(data: string, signature: string, key: Buffer): boolean {
     const expectedSignature = this.sign(data, key);
-    return crypto.timingSafeEqual(
-      Buffer.from(signature, 'hex'),
-      Buffer.from(expectedSignature, 'hex')
-    );
+    const sigBuf = Buffer.from(signature, 'hex');
+    const expBuf = Buffer.from(expectedSignature, 'hex');
+    // Re-audit: a malformed/short signature yields a wrong-length buffer, and
+    // crypto.timingSafeEqual THROWS on unequal lengths — turning a bad token
+    // into a 500 instead of a clean "invalid". A length mismatch is definitely
+    // not a match, so return false rather than throw.
+    if (sigBuf.length !== expBuf.length) return false;
+    return crypto.timingSafeEqual(sigBuf, expBuf);
   }
 
   /**
