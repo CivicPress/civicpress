@@ -8,6 +8,15 @@ export interface CsrfToken {
 
 /**
  * CSRF Protection Service
+ *
+ * FA-API-019 (accepted residual): these tokens are HMAC-signed but intentionally
+ * stateless / NOT session-bound. Session-binding only mitigates cross-site abuse
+ * of a cookie-identified victim session — and this API has no cookie-based auth
+ * path (every authenticated request carries an `Authorization: Bearer` header,
+ * which a cross-site attacker cannot forge). CSRF here is pure defense-in-depth
+ * over a surface that is already CSRF-immune, so an unbound token carries no
+ * residual risk. If a cookie-auth path is ever introduced, revisit this and bind
+ * the token to the session id.
  */
 export class CsrfProtection {
   constructor(private secretsManager: SecretsManager) {}

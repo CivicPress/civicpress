@@ -402,10 +402,17 @@ export async function completeServiceInitialization(
         );
       }
     }
-  } catch {
-    // Storage module not available - that's okay, it's optional
-    // This is expected in environments where storage module is not installed
-    // We silently skip registration (no error logging needed)
+  } catch (registrationError: unknown) {
+    // FA-CORE-013: a MISSING storage module is fine (optional, handled above via
+    // importError → storageModule stays null and we never reach here). This
+    // outer catch only fires when the module WAS loaded but registration itself
+    // threw (registerStorageServices / config resolution) — a real failure that
+    // was previously swallowed silently in every environment, so storage looked
+    // merely "absent". Surface it.
+    const logger = container.resolve<Logger>('logger');
+    logger.warn(
+      `Storage service registration failed: ${errorCode(registrationError) || 'unknown'} - ${errorMessage(registrationError) || 'no message'}`
+    );
   }
 
   // Register all caches with UnifiedCacheManager

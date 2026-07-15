@@ -358,9 +358,20 @@ export function registerSingleFileRoutes(router: Router): void {
           ? 'inline'
           : 'attachment';
         res.setHeader('Content-Type', fileInfo.mime_type);
+        // FA-API-020: the raw original_name could contain a `"` that breaks out
+        // of the quoted filename param (spoofing extra Content-Disposition
+        // params). Emit a sanitized ASCII fallback (quotes/backslashes/control
+        // chars + non-ASCII replaced) plus an RFC 5987 filename* for the true
+        // (UTF-8) name, which modern browsers prefer.
+        const asciiName = fileInfo.original_name
+          // eslint-disable-next-line no-control-regex
+          .replace(/["\\\r\n]/g, '_')
+          // eslint-disable-next-line no-control-regex
+          .replace(/[^\x20-\x7E]/g, '_');
+        const encodedName = encodeURIComponent(fileInfo.original_name);
         res.setHeader(
           'Content-Disposition',
-          `${disposition}; filename="${fileInfo.original_name}"`
+          `${disposition}; filename="${asciiName}"; filename*=UTF-8''${encodedName}`
         );
         res.setHeader('Accept-Ranges', 'bytes');
         if (isPartial) {
