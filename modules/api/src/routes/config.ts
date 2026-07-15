@@ -173,9 +173,18 @@ router.get('/metadata/:type', async (req, res) => {
   }
 });
 
+// FA-API-012: raised when the caller-supplied config type is not a bare name.
+class InvalidConfigTypeError extends Error {}
+
 function resolveRawPaths(type: string) {
   const key = (type || '').toLowerCase().trim();
   const canonical = key.startsWith('notif') ? 'notifications' : key;
+  // FA-API-012: the canonical name becomes a filesystem segment; reject anything
+  // that is not a bare config name so `../`, path separators, NUL, and absolute
+  // segments cannot escape the intended config directories.
+  if (!/^[a-z0-9-]+$/.test(canonical)) {
+    throw new InvalidConfigTypeError(`Invalid config type: ${type}`);
+  }
   const dataDir = CentralConfigManager.getDataDir();
   const userPath =
     canonical === 'notifications'
@@ -208,6 +217,9 @@ router.get('/raw/:type', async (req, res) => {
     res.setHeader('Content-Type', 'text/yaml; charset=utf-8');
     res.status(200).send(yaml);
   } catch (error) {
+    if (error instanceof InvalidConfigTypeError) {
+      return res.status(400).json({ success: false, error: error.message });
+    }
     res.status(404).json({
       success: false,
       error: `Raw configuration not found: ${error}`,
@@ -261,6 +273,9 @@ router.put(
         outcome: 'failure',
         message: String(error),
       });
+      if (error instanceof InvalidConfigTypeError) {
+        return res.status(400).json({ success: false, error: error.message });
+      }
       res.status(500).json({
         success: false,
         error: `Failed to save raw configuration: ${error}`,

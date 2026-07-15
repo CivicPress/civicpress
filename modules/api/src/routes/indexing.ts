@@ -411,7 +411,7 @@ export function createIndexingRouter() {
    * GET /api/indexing/stats
    * Get indexing statistics
    */
-  router.get('/stats', async (req: AuthenticatedRequest, res: Response) => {
+  router.get('/stats', requirePermission('records:view'), async (req: AuthenticatedRequest, res: Response) => {
     logApiRequest(req, { operation: 'get_indexing_stats' });
 
     try {
@@ -440,7 +440,7 @@ export function createIndexingRouter() {
    * GET /api/indexing/validate
    * Validate all indexes
    */
-  router.get('/validate', async (req: AuthenticatedRequest, res: Response) => {
+  router.get('/validate', requirePermission('records:import'), async (req: AuthenticatedRequest, res: Response) => {
     logApiRequest(req, { operation: 'validate_indexes' });
 
     try {

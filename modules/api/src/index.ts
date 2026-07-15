@@ -416,10 +416,11 @@ export class CivicPressAPI {
       createStatusRouter()
     );
 
-    // Cache metrics (requires auth)
+    // Cache metrics (operational diagnostics — admin only, FA-API-010)
     this.app.use(
       apiPath('cache'),
       authMiddleware(this.civicPress),
+      requirePermission('system:admin'),
       (req, _res, next) => {
         req.civicPress = this.civicPress;
         next();

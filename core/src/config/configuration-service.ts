@@ -55,7 +55,14 @@ export class ConfigurationService {
   } {
     // Canonicalize type (handle typos like "motifications", "notification", etc.)
     const key = (configType || '').toLowerCase().trim();
-    const canonical = key.startsWith('notif') ? 'notifications' : configType;
+    const canonical = key.startsWith('notif') ? 'notifications' : key;
+
+    // FA-API-012: the canonical name becomes a filesystem segment; reject
+    // anything that is not a bare config name so `../`, path separators, NUL,
+    // and absolute segments cannot escape the intended config directories.
+    if (!/^[a-z0-9-]+$/.test(canonical)) {
+      throw new Error(`Invalid config type: ${configType}`);
+    }
 
     const userPath =
       canonical === 'notifications'

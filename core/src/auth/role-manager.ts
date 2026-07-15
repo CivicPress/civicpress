@@ -523,12 +523,13 @@ export class RoleManager {
       throw error;
     }
 
-    // If role doesn't exist or has no permissions, fallback to public permissions
-    // No verbose fallback logs
-
-    if (!roleConfig || permissions.size === 0) {
+    // FA-API-009: only an UNKNOWN role falls back to public permissions
+    // (fail-safe for misconfigured references). A role that IS defined but was
+    // intentionally given no permissions (e.g. a locked-down 'suspended' role)
+    // must resolve to zero permissions, not silently inherit public read.
+    if (!roleConfig) {
       logger.warn(
-        `Role '${role}' not found or has no permissions, falling back to public role`
+        `Role '${role}' not found, falling back to public role`
       );
       try {
         const publicRole = config.roles['public'];
@@ -560,6 +561,10 @@ export class RoleManager {
         );
         throw error;
       }
+    } else if (permissions.size === 0) {
+      logger.debug(
+        `[RoleManager] Role '${role}' is defined with no permissions — granting none`
+      );
     }
 
     // Proceed to conversion without verbose debug

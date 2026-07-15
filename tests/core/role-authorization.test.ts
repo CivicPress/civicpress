@@ -141,6 +141,54 @@ describe('Role-Based Authorization System', () => {
       expect(await userCan(publicUser, 'system:admin')).toBe(false);
     });
 
+    // FA-API-009: an intentionally locked-down role that is DEFINED with an
+    // empty permission list must resolve to zero permissions, not silently
+    // inherit the public role's read access. Only genuinely UNKNOWN roles fall
+    // back to public (fail-safe for a dangling reference).
+    it('grants no permissions to a defined empty role (FA-API-009)', async () => {
+      const rolesPath = join(testConfig.civicDir, 'roles.yml');
+      const roles: any = yaml.load(readFileSync(rolesPath, 'utf8'));
+      roles.roles.suspended = {
+        name: { value: 'Suspended', type: 'string', required: true },
+        description: {
+          value: 'Locked-down role with no permissions',
+          type: 'string',
+          required: true,
+        },
+        permissions: {
+          value: [],
+          type: 'array',
+          description: 'Intentionally empty',
+          required: true,
+        },
+      };
+      writeFileSync(rolesPath, yaml.dump(roles));
+      initializeRoleManager(testConfig.dataDir);
+
+      const suspendedUser: AuthUser = {
+        id: 99,
+        username: 'suspended',
+        role: 'suspended',
+        email: 'suspended@example.com',
+        name: 'Suspended User',
+      };
+
+      // The defined-but-empty role gets nothing — NOT public's records:view.
+      expect(await userCan(suspendedUser, 'records:view')).toBe(false);
+      expect(await userCan(suspendedUser, 'records:create')).toBe(false);
+      expect(await getUserPermissions(suspendedUser)).toEqual([]);
+
+      // A genuinely unknown role still falls back to public (fail-safe).
+      const unknownUser: AuthUser = {
+        id: 100,
+        username: 'ghost',
+        role: 'nonexistent-role',
+        email: 'ghost@example.com',
+        name: 'Ghost User',
+      };
+      expect(await userCan(unknownUser, 'records:view')).toBe(true);
+    });
+
     it('should handle context-based permissions', async () => {
       const adminUser: AuthUser = {
         id: 1,
