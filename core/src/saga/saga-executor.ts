@@ -583,7 +583,22 @@ export class SagaExecutor {
     sagaName: string,
     context: SagaContext
   ): string | null {
-    // Generate resource key from context
+    // Generate resource key from context. This lock serializes DIFFERENT
+    // operations on the SAME record/draft (its purpose), keyed by the caller's
+    // stable id.
+    //
+    // FA-CORE-008 (re-audit, accepted narrow limitation): a CreateRecord saga
+    // whose recordId is a generated placeholder (record-<ts>) gets a per-call
+    // key, so two genuinely-simultaneous identical creates are not mutually
+    // excluded and — with the check-idempotency/save-state TOCTOU — could both
+    // proceed. Sequential retries ARE deduplicated (content-based idempotency
+    // key + cached result), and the HTTP create path goes through createDraft
+    // (draftId-locked), not this saga, so the exposure is a non-HTTP,
+    // same-instant duplicate-create edge. A correct fix (atomically CLAIM the
+    // idempotency key via the UNIQUE column instead of INSERT-OR-REPLACE, with
+    // an expired/failed-holder takeover) is dedicated saga-engine work with its
+    // own concurrency harness, intentionally not rushed into the pre-merge
+    // window.
     if (context.metadata?.recordId) {
       return `record:${context.metadata.recordId}`;
     }
