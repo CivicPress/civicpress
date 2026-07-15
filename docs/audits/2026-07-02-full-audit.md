@@ -438,15 +438,47 @@ Verified with targeted vitest runs (green standalone); `core`, `storage`, and
 session start — rebuilding them is what surfaced the latent geography-preset
 bugs (fixed in `2a1f3af`).
 
-**Still open (Medium/Low tail):** FA-STOR-004 (no sidecar manifest — resilient
-archival gap), FA-CORE-011 (geography DB persistence TODO), FA-CLI-005
-(init.ts config-literal duplication), FA-CLI-006 (no `--no-emoji` — deferred:
-`--json` is already emoji-free, full i18n is L), FA-OPS-001 (tracking-doc
-drift). **HW repo (`refactor/phase-4-enrollment-hardening`):** FA-HW-002/003
-already closed by the FA-HW-001 setup-token gate (`e249fc9`); FA-HW-010/011/012
-(residual AP-mode auto-start / plaintext Wi-Fi PSK / wildcard CORS),
-FA-HW-013 (raw WS-frame + RTMP-key logging), FA-DEP-004 (Python lockfile),
-FA-DEP-005 (`@nuxt/ui-pro` → `@nuxt/ui` v4) remain.
+**Second batch (same session, feature-completion tail):**
+
+- **FA-CORE-011** — `53d493f`: geography create/update/delete now mirror into a
+  new `geography_files` table (via `GeographyStore`, delegated from
+  `DatabaseService`) so DB-backed consumers can see geography. The markdown file
+  stays authoritative; the DB is an optional `GeographyManager` dependency and a
+  mirror error is logged, not fatal.
+- **FA-STOR-004** — `9828ff6`: each locally-stored file gets a `.meta.json`
+  sidecar (written on upload, removed on delete, excluded from the orphan scan);
+  `reconstructFromManifests()` rebuilds the `storage_files` rows from disk after
+  a metadata-DB loss — closing the "lose the DB → files unreachable" gap.
+- **FA-CLI-005** — `65d2a7d`: the duplicated init default record-type/status
+  config blocks are hoisted to two module constants (kept CLI-local — core's
+  set has drifted larger; importing it would change what `init` seeds). Seeded
+  `.civicrc` verified byte-identical.
+- **FA-CLI-006** — **DEFERRED (accepted):** `--json` already emits emoji-free
+  structured output; a minimal `--no-emoji` would still leak emoji from the many
+  direct `logger.info/warn` calls that bypass `CliOutput`, and a complete fix is
+  L-sized i18n work. No code change; use `--json` where emoji-free output is
+  needed.
+
+**HW repo (`refactor/phase-4-enrollment-hardening`) — CLOSED same session:**
+
+- **FA-HW-010/011/012** — `3ef97a6`: AP mode is not auto-started once enrolled
+  (unless `AP_MODE_FORCE=true`); the Wi-Fi PSK is no longer persisted to the
+  state DB (NetworkManager owns it); AP-mode CORS origins are pinned (no
+  wildcard).
+- **FA-HW-013** — `c7cce82`: new `utils/redaction.py` scrubs stream keys /
+  tokens / enrollment codes from the raw WS-frame INFO logs and masks the RTMP
+  URL on stream start.
+- **FA-DEP-004** — `ffc3dab`: hash-pinned `requirements-lock.txt` (uv compile,
+  universal) + `make lock` / `install-locked` / `deps-check` targets.
+- **FA-DEP-005** — `556f0f0`: hardware frontend migrated off the paid
+  `@nuxt/ui-pro` to MIT `@nuxt/ui` v4 (Dashboard components merged into the free
+  package); typecheck + build pass with no licence key.
+
+**Still open after 2026-07-15:** only **FA-OPS-001** (tracking-doc drift) and
+the residual **Low** tier (defense-in-depth / latent / polish — FA-API-019/020/
+021, FA-BB-011/012/013 partials, FA-CORE-013/016, FA-CLI-006 deferred, etc.).
+All Criticals, Highs, and the actionable Medium/Low security + correctness tail
+across both repos are now closed.
 
 ---
 
