@@ -56,6 +56,31 @@ describe('FA-API-008: status-transition authz on write paths', () => {
     expect(res.status).toBe(403);
   });
 
+  // Re-audit bypass: set the controlled status at draft-CREATE time (createDraft
+  // stored it verbatim), then publish with an empty body so the publish
+  // target-status guard was skipped → a published 'approved' record.
+  it('clerk cannot CREATE a draft directly at approved (draft-then-publish bypass)', async () => {
+    const res = await request(context.api.getApp())
+      .post('/api/v1/records')
+      .set('Authorization', `Bearer ${clerkToken}`)
+      .send({
+        type: 'policy',
+        title: 'Sneaky Approval',
+        content: '# Body',
+        status: 'approved',
+      });
+    expect(res.status).toBe(403);
+  });
+
+  it('clerk cannot UPDATE a draft to approved', async () => {
+    const id = await createDraft(clerkToken, 'Clerk Draft To Approve');
+    const put = await request(context.api.getApp())
+      .put(`/api/v1/records/${id}/draft`)
+      .set('Authorization', `Bearer ${clerkToken}`)
+      .send({ status: 'approved' });
+    expect(put.status).toBe(403);
+  });
+
   it('clerk cannot PUT an existing record to approved', async () => {
     // Admin creates + publishes a record (draft → published) first.
     const id = await createDraft(adminToken, 'Real Policy');

@@ -4,6 +4,7 @@ import {
   userCan,
   DatabaseService,
   Logger,
+  WorkflowConfigManager,
 } from '@civicpress/core';
 import type {
   AuthUser,
@@ -13,6 +14,7 @@ import type {
   SqlParam,
 } from '@civicpress/core';
 import { normalizeDateString } from './helpers.js';
+import { assertStatusWritableByRole } from './status-transition-guard.js';
 
 /** Shape returned by RecordsDrafts endpoints (draft envelope for API). */
 interface ApiDraft {
@@ -90,6 +92,7 @@ function parseGeography(
 export interface RecordsDraftsDeps {
   civicPress: CivicPress;
   recordManager: RecordManager;
+  workflowManager: WorkflowConfigManager;
   db: DatabaseService;
   logger: Logger;
 }
@@ -156,6 +159,26 @@ export class RecordsDrafts {
       throw new Error(
         `Permission denied: Cannot create records of type '${data.type}'`
       );
+    }
+
+    // FA-API-008: a draft is born at the workflow's initial status. If the
+    // caller supplies a workflow-CONTROLLED status (approved/archived/…), it
+    // must be a legal transition FROM the initial status for this role —
+    // otherwise createDraft would store it verbatim and an empty-body publish
+    // would land a published record at that status, skipping the review chain.
+    if (typeof data.status === 'string') {
+      const statuses = await this.deps.workflowManager.getAvailableStatuses(
+        data.type
+      );
+      const initialStatus = statuses[0];
+      if (initialStatus) {
+        await assertStatusWritableByRole(this.deps.workflowManager, {
+          fromStatus: initialStatus,
+          toStatus: data.status,
+          type: data.type,
+          userRole: user.role,
+        });
+      }
     }
 
     // Use provided ID or generate one
@@ -340,6 +363,19 @@ export class RecordsDrafts {
           `Permission denied: Cannot change record type to '${data.type}'`
         );
       }
+    }
+
+    // FA-API-008: moving the draft INTO a workflow-controlled status must be a
+    // legal transition from its current status for this role (same rule as
+    // POST /:id/status and generic update) — else a coarse records:edit role
+    // could set status:'approved' on a draft and publish it, skipping review.
+    if (typeof data.status === 'string') {
+      await assertStatusWritableByRole(this.deps.workflowManager, {
+        fromStatus: draft.status || 'draft',
+        toStatus: data.status,
+        type: recordType,
+        userRole: user.role,
+      });
     }
 
     // Get existing draft to preserve workflowState if not being updated

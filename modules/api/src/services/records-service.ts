@@ -81,6 +81,7 @@ export class RecordsService {
     this.drafts = new RecordsDrafts({
       civicPress: this.civicPress,
       recordManager: this.recordManager,
+      workflowManager: this.workflowManager,
       db: this.db,
       logger: this.logger,
     });
