@@ -756,16 +756,49 @@ Remediation lives on `refactor/phase-6c-audit-mediums` (monorepo) and
 `refactor/phase-4-enrollment-hardening` (BroadcastBox HW); `origin/main` stays
 frozen pending a confirming pre-merge re-audit.
 
-## Sign-off
+## Pre-merge re-audit + sign-off (2026-07-15)
 
-This audit is **advisory input to the origin/main unfreeze**, not a closure. The
-base refactor's verified closures hold and the BroadcastBox engineering is
-substantially complete — but **4 Critical findings (one of them, `FA-BB-002`, a
-direct violation of the platform's central privacy promise) and 22 High findings
-are open**, several of them in the newly-added surface. Per the standing freeze,
-nothing pushes to `origin/main` until these land and a confirming re-audit is
-clean. The honest read: the refactor made the base true; the new work now needs
-the same treatment before it goes public.
+The confirming pre-merge re-audit ran as an adversarial, finding-driven pass
+(12 cluster verifiers trying to REFUTE each closure + a fresh-eyes sweep for
+issues the remediation introduced). It was **not** a rubber stamp: **75 of 82
+closures held on the first pass**, and it caught **7 gaps + 9 new issues**,
+including two Critical-class controls that did not actually hold and four
+defects the remediation itself introduced. All were then fixed and
+re-verified:
+
+- **FA-API-008 (High) — was BYPASSABLE.** The transition guard sat on
+  `createRecord`/publish, but `POST /api/records` uses `createDraft` (stored
+  status verbatim) and an empty-body publish skipped the guard, so a clerk
+  could draft-then-publish straight to `approved`. Fixed (`bb1bd21`): a shared
+  `assertStatusWritableByRole` now guards createDraft/updateDraft and the
+  EFFECTIVE publish status.
+- **FA-BB-002 (Critical, privacy) — fail-closed invariant did NOT hold.** Two
+  fail-OPEN paths: `fullCover` measured the manifest-declared duration (a media
+  file longer than declared was copied out RAW), and the mixed-visibility
+  branch published uncovered gaps. Fixed (`a66307f`, `b34d057`): `hidden` is
+  the complement of *effective-public* over the *actual probed* duration, with
+  the fullCover start clamped to exactly 0.
+- **HW factory-reset (High, introduced).** The new FA-HW-010 enrolled-skip
+  turned a reset that retained `device_credentials` into a re-enrollment
+  BRICK + token-retention. Fixed (`7e7b861`): reset invalidates credentials.
+- **FA-HW-013 incomplete** (ffmpeg stderr still leaked the RTMP key) `12cdc77`;
+  **storage download fd-leak** + **FA-STOR-002 non-fail-closed listing**
+  `9a8d120`; **FA-API-018 CSRF path-match**, **CSRF token length-guard**,
+  **FA-CLI-002 org-name** `65c4715`; **stale `public_file` on re-record**
+  `9daea7a`.
+- **Accepted (narrow, not HTTP-reachable):** FA-CORE-008 concurrent-identical
+  create saga edge (`37ae600`, documented), S3/Azure size-0 stream upload,
+  legacy no-DCS FSM path. FA-CLI-006 / FA-API-019 remain deferrals.
+
+A focused adversarial **re-verification of the fixes** (skeptics trying to
+break the fixes) returned **all HOLD**; the only remaining residuals are
+theoretical and unreachable under the real configuration.
+
+**Verdict: CLEAR to unfreeze `origin/main`.** All 4 Criticals, all Highs, and
+the entire actionable Medium/Low tail across both repos are closed and
+independently re-verified; the only open items are documented accepted-
+deferrals. The refactor made the base true; the new work now stands on the same
+footing.
 
 🏛️ — _Make truth true again._
 
