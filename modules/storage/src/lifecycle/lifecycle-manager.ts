@@ -40,6 +40,8 @@ export class LifecycleManager {
   private databaseService: StorageDatabaseService;
   private storageService: import("../cloud-uuid-storage-service.js").CloudUuidStorageService; // CloudUuidStorageService
   private policies: LifecyclePolicy[];
+  // FA-STOR-003: warn once (not per file) when an archive policy is ignored.
+  private archiveNotImplementedWarned = false;
 
   constructor(
     databaseService: StorageDatabaseService,
@@ -130,18 +132,22 @@ export class LifecycleManager {
             }
           );
           result.processed++;
-          if (action.action === 'archive') result.archived++;
-          else if (action.action === 'delete') result.deleted++;
+          // FA-STOR-003: archive actions are no longer produced (see
+          // evaluatePolicy); archived stays 0 so results never claim a move
+          // that did not happen.
+          if (action.action === 'delete') result.deleted++;
           else result.retained++;
           continue;
         }
 
         switch (action.action) {
           case 'archive':
-            // Phase 2c: archiveFile was a no-op (DB-only folder rename, never
-            // moved bytes). OrphanedFileCleaner handles archival drift from
-            // any source. See storage-003 closure.
-            result.archived++;
+            // FA-STOR-003: unreachable (evaluatePolicy no longer emits archive
+            // actions). Kept defensively — count nothing rather than report a
+            // phantom archive if an archive action is ever constructed directly.
+            this.logger.warn(
+              `Ignoring archive action for file ${action.file.id}: archival is not implemented`
+            );
             break;
           case 'delete':
             await this.deleteFile(action.file, action.reason);
@@ -209,22 +215,20 @@ export class LifecycleManager {
       };
     }
 
-    // Check archive policy
+    // Check archive policy.
+    // FA-STOR-003: archival was a DB-only no-op that still reported
+    // `archived: N` as if bytes had moved. Rather than claim work that never
+    // happens, an archiveAfterDays policy is honestly reported as unimplemented
+    // and produces NO action (OrphanedFileCleaner handles real archival drift).
     if (policy.archiveAfterDays && fileAgeDays >= policy.archiveAfterDays) {
-      // Check if already archived
-      if (
-        file.folder?.includes('archive') ||
-        file.folder?.includes('archived')
-      ) {
-        return null; // Already archived
+      if (!this.archiveNotImplementedWarned) {
+        this.archiveNotImplementedWarned = true;
+        this.logger.warn(
+          'Lifecycle archiveAfterDays is not implemented (no file is moved); ' +
+            'the policy is ignored. Use a delete policy or an external archival process.'
+        );
       }
-
-      return {
-        file,
-        action: 'archive',
-        reason: `File age (${Math.floor(fileAgeDays)} days) exceeds archive threshold (${policy.archiveAfterDays} days)`,
-        scheduledDate: now,
-      };
+      return null;
     }
 
     // Check retention policy

@@ -107,7 +107,10 @@ describe('LifecycleManager', () => {
       expect(retainAction?.file.id).toBe('recent-file');
     });
 
-    it('should evaluate archive policy', async () => {
+    // FA-STOR-003: archival is not implemented (it was a DB-only no-op that
+    // still reported archived:N). An archiveAfterDays policy is now honestly
+    // ignored — it produces NO action rather than a phantom archive.
+    it('does not emit an archive action for an archive-only policy', async () => {
       const policy: LifecyclePolicy = {
         name: 'archive',
         archiveAfterDays: 90,
@@ -132,11 +135,11 @@ describe('LifecycleManager', () => {
 
       const actions = await manager.evaluateLifecycle();
 
-      expect(actions.length).toBeGreaterThan(0);
-      const archiveAction = actions.find((a) => a.action === 'archive');
-      expect(archiveAction).toBeDefined();
-      expect(archiveAction?.file.id).toBe('old-file');
-      expect(archiveAction?.reason).toContain('archive threshold');
+      // No archive action is produced, so the run never claims archived work.
+      expect(actions.find((a) => a.action === 'archive')).toBeUndefined();
+
+      const result = await manager.executeLifecycle(actions);
+      expect(result.archived).toBe(0);
     });
 
     it('should evaluate delete policy', async () => {
@@ -209,10 +212,12 @@ describe('LifecycleManager', () => {
     });
 
     it('should apply folder-specific policies', async () => {
+      // Uses a delete policy (archive is a no-op — FA-STOR-003) to exercise the
+      // folder-scoping: only the public-folder file should match.
       const policy: LifecyclePolicy = {
-        name: 'public-archive',
+        name: 'public-delete',
         folder: 'public',
-        archiveAfterDays: 90,
+        deleteAfterDays: 90,
         enabled: true,
       };
       manager.addPolicy(policy);
@@ -313,7 +318,9 @@ describe('LifecycleManager', () => {
   });
 
   describe('executeLifecycle', () => {
-    it('should execute archive action in dry-run mode', async () => {
+    // FA-STOR-003: even a directly-constructed archive action is a no-op and
+    // must never be reported as archived work.
+    it('never reports a phantom archive (archive is a no-op)', async () => {
       const oldFile = {
         id: 'old-file',
         folder: 'public',
@@ -339,7 +346,7 @@ describe('LifecycleManager', () => {
       const result = await manager.executeLifecycle(actions, true); // dryRun = true
 
       expect(result.processed).toBe(1);
-      expect(result.archived).toBe(1);
+      expect(result.archived).toBe(0);
       expect(result.deleted).toBe(0);
       expect(result.errors).toEqual([]);
 
