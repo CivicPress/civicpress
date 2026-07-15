@@ -1,5 +1,18 @@
 # CivicPress Project Status
 
+> **Current status (2026-07-15) — supersedes the 2026-06-03 snapshot below.**
+> A second, full two-repo audit landed 2026-07-02 (`docs/audits/2026-07-02-full-audit.md`,
+> `FA-*` registry — the authoritative tracker). Its remediation is essentially
+> complete: **all 4 Criticals, all 22 Highs, and the entire actionable
+> Medium/Low security + correctness tail are CLOSED** across the monorepo
+> (`refactor/phase-6c-audit-mediums`) and the BroadcastBox hardware repo
+> (`refactor/phase-4-enrollment-hardening`). Only **FA-OPS-001** (this
+> tracking-doc reconciliation) and the residual **Low** defense-in-depth tier
+> remain. `origin/main` is still **frozen** pending a confirming pre-merge
+> re-audit; the remediation lives on the feature branches / open PRs. The
+> Phase 2/3 narrative below is retained for history but is no longer the
+> current state — trust the `FA-*` registry for the live picture.
+
 **Last Updated**: 2026-06-03 (lint-rule rollout + 4 of 6 sub-followups closed)
 **Current Version**: v0.2.0 (Alpha)
 **Overall Status**: Alpha — refactor in progress. Phase 2a merged to local `main`; Phase 2b + 2c + 2c.5 + 2d merged to local `dev`. **Phase 2d-followup `ui-002` (Nuxt UI Pro v3 → v4 migration) closed 2026-05-28**, **`lint-rule-rollout` (Phase 2d W3-T6 carry-forward) closed 2026-06-02 (merge `656adb5`)**, and **4 of 6 lint-rollout sub-followups closed on local `dev`**: **#3 modules/ui cruft deps** (merge `3103a74`, + pnpm 8→9 toolchain prereq), **#2 Vue-template `no-explicit-any` blind spot** (merge `d7447b4`, 13 sites + new `useTypedI18n` composable + `nuxt-ui-bridge.ts`), **#1.1 core unused-vars cleanup** (merge `60d91e8`, 170 sites + rule promoted to `error`), **#1.2 cli unused-vars cleanup** (merge `961547d`, 110 sites + rule promoted). Per the "finish lint followups before Phase 3" sequencing rule: the lint-rollout followups (#1.3 modules/ui, #1.4 modules/storage, #1.5 modules/api, plus the deferred vue/nuxt style rules / Tier C) were closed first. **Phase 3 (realtime reintroduction, Yjs-only) is then COMPLETE on the local `refactor/phase-3-realtime` branch — pending its `--no-ff` merge to `dev`** (14 findings closed, realtime-001 … realtime-014; closure report at `docs/audits/phase-3-closure-report.md`). See "Realtime Collaborative Editing" under What's Working.

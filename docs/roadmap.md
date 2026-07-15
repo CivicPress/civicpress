@@ -4,6 +4,16 @@ _A unified, authoritative roadmap for CivicPress, guiding the project from early
 alpha toward a stable, production-grade civic infrastructure platform._
 
 **Current Version:** v0.2.0 (Alpha)
+
+> **Current status (2026-07-15) — supersedes the 2026-06-03 snapshot in the
+> line below.** The 2026-07-02 two-repo audit (`docs/audits/2026-07-02-full-audit.md`,
+> `FA-*` registry) is the authoritative tracker. Phases 4–6 landed: all
+> Criticals + Highs + the actionable Medium/Low security & correctness tail are
+> CLOSED on `refactor/phase-6c-audit-mediums` (monorepo) and
+> `refactor/phase-4-enrollment-hardening` (BroadcastBox HW). Only FA-OPS-001 +
+> the residual Low tier remain; `origin/main` stays frozen pending a confirming
+> pre-merge re-audit. The Phase 2/3 snapshot below is historical.
+
 **Status:** v0.2.0 shipped; **post-audit base refactor in progress** (2026-06-03 snapshot). Phase 2a merged to local `main`; Phase 2b + 2c + 2c.5 + 2d merged to local `dev`. **Phase 2d-followup `ui-002` v3→v4 migration closed 2026-05-28** (+2 original-205 findings: ui-002 + deps-009). **Phase 2d-followup `lint-rule-rollout` closed 2026-06-02** (merge `656adb5`); **all 4 numbered followups + Tier C cleanup CLOSED 2026-06-03**: `#1 unused-vars umbrella` (`82e3c1b`, 459 sites across 5 workspaces, rule = `error` repo-wide), `#2 Vue-template no-explicit-any blind spot` (`d7447b4`, 13 sites), `#3 modules/ui cruft deps + pnpm 8→9 prereq` (`3103a74`), `#4 STYLE_RULES_DEFERRED triage` (`c30e62c`, 27 rules into 4 tiers + 31 violations fixed + 89 deferred Tier C), **Tier C cleanup** (`3afd39a`, 89 → 0). **modules/ui ESLint: 0 errors, 0 warnings** (from 102). **66 of 205 original audit findings closed (32%) + 47 refactor-surfaced closures = 113 total measurable progress items** (lint rollout + followups + Tier C are procedural, not finding-counted). Per the "finish lint followups first" sequencing rule, **Phase 3 (realtime, Yjs-only) is now UNBLOCKED**. After: Phase 4 (hardware audit) and Phase 5 (broadcast-box reintegration). v0.3.x scope rebalanced to follow the refactor master plan at `docs/plans/2026-05-17-base-refactor-master-plan.md`. See `docs/audits/2026-05-16-manifesto-fit-findings.md` for the full registry and the per-phase closure reports under `docs/audits/`.
 
 ---

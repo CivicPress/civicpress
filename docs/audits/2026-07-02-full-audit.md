@@ -721,10 +721,29 @@ findings this audit **verified as genuinely closed** — `storage-001/004/006`,
 
 ## Status tracker (this registry)
 
-All `FA-*` findings default to `open`. None are closed yet. Next actions per the
-convention: triage `FA-API-001`, `FA-BB-002`, `FA-BB-001`, `FA-HW-001` (the
-Criticals) first, branch `refactor/phase-6-audit-remediation-*`, and close with
-`closes: FA-...` commit footers.
+**Updated 2026-07-15 (FA-OPS-001 reconciliation).** The remediation is
+essentially complete — the per-finding closure banners above (and their
+`closes: FA-...` commits) are authoritative:
+
+- **Criticals (4/4 closed):** FA-API-001/CLI-001, FA-BB-001, FA-BB-002,
+  FA-HW-001.
+- **Highs (all closed):** FA-API-002/003/004/005/006/007/008, FA-BB-003/004,
+  FA-UI-001, FA-CORE-001/006, FA-HW-004–009, plus the live-hardware addendum
+  FA-API-023 / FA-HW-014–017.
+- **Medium/Low security + correctness tail (closed 2026-07-14/15):** the saga
+  cluster (FA-CORE-007/008/009/010/015), BB server mediums
+  (FA-BB-005/006/007/009/010), the API/CORE/CLI/storage batch
+  (FA-DEP-001/002, FA-API-009–018, FA-CORE-002/003/004/005/011/012/014/017,
+  FA-CLI-002/003/004/005, FA-STOR-003/004, FA-BB-008), and the HW tail
+  (FA-HW-010/011/012/013, FA-DEP-004/005/006).
+- **Remaining OPEN:** `FA-OPS-001` (this doc reconciliation — in progress) and
+  the residual **Low** defense-in-depth / latent tier (FA-API-019/020/021,
+  FA-BB-011/012/013, FA-CORE-013, FA-CLI-006 deferred). See the Findings — Low
+  table for each item's status.
+
+Remediation lives on `refactor/phase-6c-audit-mediums` (monorepo) and
+`refactor/phase-4-enrollment-hardening` (BroadcastBox HW); `origin/main` stays
+frozen pending a confirming pre-merge re-audit.
 
 ## Sign-off
 
