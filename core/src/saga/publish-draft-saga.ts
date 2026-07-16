@@ -441,7 +441,11 @@ class DeleteDraftStep extends BaseSagaStep<PublishDraftContext, void> {
     }
     try {
       // Re-create the draft from the snapshot so a failed publish leaves the
-      // author's work intact (no manual intervention needed).
+      // author's CONTENT intact (no manual intervention needed). Note:
+      // createDraft does not accept timestamps, so the restored draft gets
+      // fresh created_at/updated_at/last_draft_saved_at — content and all
+      // fields are preserved, only the original save times are not. That is
+      // an acceptable trade for a rare rollback path.
       await this.db.createDraft({
         id: String(backup.id),
         title: String(backup.title),

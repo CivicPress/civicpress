@@ -428,8 +428,19 @@ export class RoleManager {
     // from a legal DIAMOND — admin → [clerk, public] plus clerk → public —
     // which the default roles.yml has. A global visited-set flagged the
     // diamond as a spurious cycle; the path set only fires on true cycles.
-    path: Set<string> = new Set()
+    path: Set<string> = new Set(),
+    // Memo of FULLY-resolved roles within this call. Restores O(V+E): a
+    // diamond node reached by a second path returns its cached union instead
+    // of re-walking its subtree (which is exponential on nested diamonds
+    // without this). Only complete resolutions are memoized — a cycle-broken
+    // `[]` is never cached, so it can't poison a legitimate resolution.
+    memo: Map<string, string[]> = new Map()
   ): string[] {
+    const cached = memo.get(role);
+    if (cached) {
+      return cached;
+    }
+
     const permissions = new Set<string>();
 
     // Cycle guard: a circular role_hierarchy used to recurse to stack
@@ -533,7 +544,8 @@ export class RoleManager {
         const inheritedPermissions = this.getRolePermissions(
           inheritedRole,
           config,
-          path
+          path,
+          memo
         );
         inheritedPermissions.forEach((p) => permissions.add(p));
       }
@@ -603,6 +615,8 @@ export class RoleManager {
       // Backtrack: leave the DFS path so a sibling branch that reaches this
       // same role (a legal diamond) is not mistaken for a cycle.
       path.delete(role);
+      // Memoize the fully-resolved union so a later diamond path reuses it.
+      memo.set(role, finalPermissions);
 
       return finalPermissions;
     } catch (error) {
