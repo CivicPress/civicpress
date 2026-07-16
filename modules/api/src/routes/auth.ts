@@ -221,13 +221,15 @@ router.post('/logout', async (req, res) => {
   try {
     const authHeader = req.headers.authorization;
 
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    // Parse like authMiddleware does (whitespace split, case-insensitive
+    // scheme) so a token that authenticates can never fail to revoke.
+    const [scheme, token] = (authHeader ?? '').split(/\s+/);
+    if (!scheme || scheme.toLowerCase() !== 'bearer' || !token) {
       const error = new HttpError(401, 'Authorization header required', 'MISSING_AUTH');
       return handleApiError('logout', error, req, res);
     }
 
     const civicPress = req.civicPress as CivicPress;
-    const token = authHeader.substring('Bearer '.length);
     await civicPress.getAuthService().logout(token);
 
     sendSuccess({ message: 'Logged out successfully' }, req, res, {

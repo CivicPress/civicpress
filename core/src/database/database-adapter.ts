@@ -12,6 +12,7 @@ import { coreError, coreDebug } from '../utils/core-output.js';
 import { CORE_TABLE_STATEMENTS } from './schema/tables.js';
 import {
   runSimpleColumnMigrations,
+  ensureRecordLocksWithoutFk,
   ensureWorkflowStateColumn,
   runUserSecurityMigrations,
   migrateSearchIndexColumns,
@@ -210,6 +211,10 @@ export class SQLiteAdapter implements DatabaseAdapter {
 
     // Step 2: simple ALTER TABLE column migrations (idempotent)
     await runSimpleColumnMigrations(exec);
+
+    // Step 2b: rebuild record_locks without its records(id) FK — draft
+    // locking is impossible with it under enforced foreign keys.
+    await ensureRecordLocksWithoutFk(exec);
 
     // Step 3: saga-related indexes (run before workflow_state migrations
     // so the orchestrator's prior behavior is preserved — the original

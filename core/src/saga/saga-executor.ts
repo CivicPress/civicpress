@@ -375,6 +375,18 @@ export class SagaExecutor {
           });
         }
       }
+
+      // A resource-keyed saga with persistence disabled still wrote the
+      // keyless parent stub (the lock row's FK needs it). Remove it here —
+      // otherwise it lingers as a phantom 'executing' row that the recovery
+      // scanner would eventually "fail" and try to reconcile.
+      if (!this.config.persistState && resourceKey) {
+        try {
+          await this.stateStore.deleteState(sagaId);
+        } catch {
+          // best effort — recovery handles a lingering stub
+        }
+      }
     }
   }
 

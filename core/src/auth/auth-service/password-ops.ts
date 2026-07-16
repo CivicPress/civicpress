@@ -190,6 +190,15 @@ export class PasswordOps {
       const bcrypt = await import('bcrypt');
       const passwordHash = await bcrypt.hash(newPassword, 12);
 
+      // Revoke every existing session BEFORE updating the credential: a
+      // password change must cut off whoever holds tokens minted under the
+      // old one (the stolen-token case is exactly why the user is changing
+      // it). Revoke-first is the fail-safe ordering — if revocation throws,
+      // the password stays unchanged; if the update below fails, the user
+      // is merely logged out everywhere, never left with live sessions
+      // spanning the credential change.
+      await this.deps.deleteUserSessions(userId);
+
       // Update password
       const updated = await this.deps.db.updateUser(userId, { passwordHash });
       if (!updated) {
@@ -198,11 +207,6 @@ export class PasswordOps {
           message: 'Failed to update password',
         };
       }
-
-      // Revoke every existing session: a password change must cut off
-      // whoever holds tokens minted under the old credential (the
-      // stolen-token case is exactly why the user is changing it).
-      await this.deps.deleteUserSessions(userId);
 
       // Log security event
       await this.deps.logAuthEvent(
@@ -269,6 +273,12 @@ export class PasswordOps {
       const bcrypt = await import('bcrypt');
       const passwordHash = await bcrypt.hash(newPassword, 12);
 
+      // Revoke the target user's sessions BEFORE the update — an admin
+      // reset is the standard compromise response, so live tokens must die
+      // with the old password (revoke-first: same fail-safe ordering as
+      // changePassword).
+      await this.deps.deleteUserSessions(userId);
+
       // Update password
       const updated = await this.deps.db.updateUser(userId, { passwordHash });
       if (!updated) {
@@ -277,10 +287,6 @@ export class PasswordOps {
           message: 'Failed to set password',
         };
       }
-
-      // Revoke the target user's sessions — an admin reset is the standard
-      // compromise response, so live tokens must die with the old password.
-      await this.deps.deleteUserSessions(userId);
 
       // Log security event
       await this.deps.logAuthEvent(

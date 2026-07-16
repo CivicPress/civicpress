@@ -45,6 +45,51 @@ export async function runSimpleColumnMigrations(
 }
 
 /**
+ * Rebuild record_locks without its FK to records(id). Editing locks are
+ * taken on DRAFTS — the id exists only in record_drafts until publish — so
+ * once PRAGMA foreign_keys=ON is enforced (post-audit hardening batch 2)
+ * the declared FK made draft locking fail outright. The table is ephemeral
+ * (locks expire and deleteRecord cleans up explicitly), so drop/recreate is
+ * safe; losing live editor locks during the one-time rebuild is acceptable.
+ * Idempotent: only fires while the old FK-carrying shape exists.
+ */
+export async function ensureRecordLocksWithoutFk(
+  exec: DDLExecutor
+): Promise<void> {
+  try {
+    const fks = await exec.query<{ table: string }>(
+      'PRAGMA foreign_key_list(record_locks)'
+    );
+    if (fks.length === 0) {
+      return;
+    }
+    await exec.execute('DROP TABLE IF EXISTS record_locks');
+    await exec.execute(
+      `CREATE TABLE record_locks (
+        record_id TEXT PRIMARY KEY,
+        locked_by TEXT NOT NULL,
+        locked_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        expires_at DATETIME
+      )`
+    );
+    coreInfo('Rebuilt record_locks without records(id) FK (draft locking)', {
+      operation: 'database:initialize',
+    });
+  } catch (error) {
+    coreError(
+      'Failed to rebuild record_locks without FK',
+      'DATABASE_MIGRATION_ERROR',
+      {
+        operation: 'database:initialize',
+        error: errorMessage(error),
+        stack: errorStack(error),
+      }
+    );
+    throw error;
+  }
+}
+
+/**
  * Add workflow_state column to a target table when missing. Verbose
  * because the migration is double-checked (column existence verified
  * via PRAGMA table_info, then re-verified after the ALTER).

@@ -11,6 +11,16 @@ Status legend: `[ ]` open · `[~]` in progress · `[x]` landed+verified · `[-]`
 
 ## DO FIRST
 
+- [~] **Tier A landed on `refactor/phase-7b-tier-a` (`9572520`)** — pragmas +
+  git mutex + session revocation; see the commit body for the four latent
+  bugs FK enforcement exposed. **Audit-trail correction to that commit
+  message (skeptic-verified):** the FA-CORE-008 idempotency-key collision it
+  describes affected *directly-executed* saga contexts lacking
+  `metadata.draftId` (core's saga-e2e tests + the documented direct-saga
+  convention) — NOT the API/record-manager publish path, which supplies
+  `metadata.draftId` and never collided. Optional follow-up (deliberate
+  key-rotation, 5-min dedupe gap): include `targetStatus` in derived publish
+  keys — same-draft publish-vs-archive currently share a key.
 - [~] **CI on both repos** — GH Actions `ci.yml` in monorepo (pnpm frozen
   install → core-first build (core↔storage workspace cycle defeats pnpm's
   topo ordering from clean) → `-r build` → lint → registry:check →
@@ -71,6 +81,17 @@ Status legend: `[ ]` open · `[~]` in progress · `[x]` landed+verified · `[-]`
 
 ## Improvements
 
+- [ ] **Tier-A skeptic deferrals (2026-07-16):** realtime/WS connections
+  established before a revocation stay live until they reconnect — publish a
+  revocation event the realtime server subscribes to (defense-in-depth);
+  session-token signatures are optional-if-present (unsigned tokens accepted
+  even when a secretsManager exists — require them once minted-signed);
+  backup fidelity under WAL — `fs.cp` copies the `-wal`/`-shm` sidecars but a
+  mid-write copy is fuzzy; checkpoint or `VACUUM INTO` from a live
+  connection; UX: self-service password change logs the requester out
+  everywhere — mint a fresh session or show a deliberate re-login message;
+  idempotency: include `targetStatus` in derived publish keys (deliberate
+  key rotation, 5-min dedupe gap).
 - [ ] Enforce-or-delete dead session config (`sessionTimeout`/`maxConcurrentSessions`/`requireHttps`)
 - [ ] Wire the 3 uncalled cleanup sweeps (sessions / email tokens / login_attempts)
 - [ ] Move runtime `ALTER TABLE workflow_state` off the GET path

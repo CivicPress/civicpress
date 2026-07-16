@@ -59,19 +59,36 @@ describe('SQLiteAdapter connection pragmas', () => {
     ).rejects.toThrow(/FOREIGN KEY/i);
   });
 
-  it('brings the declared ON DELETE CASCADEs to life (record_locks)', async () => {
+  it('brings the declared ON DELETE CASCADEs to life (saga locks)', async () => {
     await adapter.execute(
-      "INSERT INTO records (id, title, type) VALUES ('rec-1', 'A record', 'bylaw')"
+      `INSERT INTO saga_states (id, saga_type, context, status, current_step, step_results, started_at, correlation_id)
+       VALUES ('saga-1', 'TestSaga', '{}', 'executing', 0, '[]', ?, 'corr-1')`,
+      [new Date().toISOString()]
     );
     await adapter.execute(
-      "INSERT INTO record_locks (record_id, locked_by) VALUES ('rec-1', 'editor')"
+      `INSERT INTO saga_resource_locks (resource_key, saga_id, acquired_at, expires_at)
+       VALUES ('record:r1', 'saga-1', ?, ?)`,
+      [
+        new Date().toISOString(),
+        new Date(Date.now() + 60_000).toISOString(),
+      ]
     );
 
-    await adapter.execute("DELETE FROM records WHERE id = 'rec-1'");
+    await adapter.execute("DELETE FROM saga_states WHERE id = 'saga-1'");
 
     const locks = await adapter.query(
-      "SELECT * FROM record_locks WHERE record_id = 'rec-1'"
+      "SELECT * FROM saga_resource_locks WHERE saga_id = 'saga-1'"
     );
     expect(locks).toHaveLength(0);
+  });
+
+  it('record_locks carries NO FK — draft ids (no records row) must be lockable', async () => {
+    await adapter.execute(
+      "INSERT INTO record_locks (record_id, locked_by) VALUES ('draft-only-id', 'editor')"
+    );
+    const locks = await adapter.query(
+      "SELECT * FROM record_locks WHERE record_id = 'draft-only-id'"
+    );
+    expect(locks).toHaveLength(1);
   });
 });

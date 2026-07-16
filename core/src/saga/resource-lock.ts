@@ -33,6 +33,56 @@ export class ResourceLockManager {
   }
 
   /**
+   * Acquire a lock for a NON-saga holder (e.g. the FA-BB-002 capture merge).
+   * saga_resource_locks.saga_id carries an enforced FK to saga_states(id),
+   * so an external holder needs a parent row: a keyless 'external-lock'
+   * stub is upserted first. Pair with releaseExternalLock, which removes
+   * both. A crashed holder's stub is an 'executing' row the recovery
+   * scanner eventually fails and unlocks — exactly what should happen.
+   */
+  async acquireExternalLock(
+    resourceKey: string,
+    holderId: string,
+    timeout: number = this.defaultTimeout
+  ): Promise<ResourceLock> {
+    await this.db.getAdapter().execute(
+      `INSERT INTO saga_states (id, saga_type, context, status, current_step, step_results, started_at, correlation_id)
+       VALUES (?, 'external-lock', '{}', 'executing', 0, '[]', ?, ?)
+       ON CONFLICT(id) DO NOTHING`,
+      [holderId, new Date().toISOString(), holderId]
+    );
+    try {
+      return await this.acquireLock(resourceKey, holderId, timeout);
+    } catch (error) {
+      try {
+        await this.db
+          .getAdapter()
+          .execute(
+            "DELETE FROM saga_states WHERE id = ? AND saga_type = 'external-lock'",
+            [holderId]
+          );
+      } catch {
+        // best effort — a lingering stub is cleaned by recovery
+      }
+      throw error;
+    }
+  }
+
+  /** Release an external holder's lock and its saga_states stub. */
+  async releaseExternalLock(
+    resourceKey: string,
+    holderId: string
+  ): Promise<void> {
+    await this.releaseLock(resourceKey, holderId);
+    await this.db
+      .getAdapter()
+      .execute(
+        "DELETE FROM saga_states WHERE id = ? AND saga_type = 'external-lock'",
+        [holderId]
+      );
+  }
+
+  /**
    * Acquire lock on a resource
    * Throws SagaLockError if lock cannot be acquired
    */
@@ -85,6 +135,24 @@ export class ResourceLockManager {
         throw new SagaLockError(
           resourceKey,
           `Resource is locked by saga ${existingLock.holder} until ${existingLock.expiresAt.toISOString()}`
+        );
+      }
+
+      // The INSERT can only hit a resource_key conflict if someone held the
+      // lock at insert time. If getLock now finds nothing, the holder
+      // released inside the window — that's contention, not a fault, so
+      // signal retryable instead of rethrowing the raw constraint error.
+      // (FOREIGN KEY failures are real faults — a holder without its parent
+      // saga_states row — and must surface raw.)
+      const constraintMessage =
+        error instanceof Error ? error.message : String(error);
+      if (
+        !/FOREIGN KEY/i.test(constraintMessage) &&
+        /SQLITE_CONSTRAINT|UNIQUE|PRIMARY KEY/i.test(constraintMessage)
+      ) {
+        throw new SagaLockError(
+          resourceKey,
+          'Resource lock was held during acquisition and released since — retry'
         );
       }
 
