@@ -1,0 +1,107 @@
+# Post-audit hardening batch 1: this repo previously had NO CI — the only
+# gate was a flaky pre-commit hook routinely bypassed with --no-verify.
+# renovate.json (added 2026-05-17) configures branch automerge for
+# minor/patch deps; the app has not been active yet, but once it is, that
+# automerge would land unverified without checks on renovate branches.
+#
+# This workflow is the gate. It runs on every PR, on pushes to main, and on
+# renovate/** branches: Renovate's branch automerge waits for checks on the
+# renovate branch itself (renovate.json leaves ignoreTests at its default
+# `false`), so a red run here blocks the automerge. NOTE: this is a
+# Renovate-side courtesy until an admin adds branch protection on main
+# requiring the `build-test` check (status check only — requiring PRs would
+# disable branch automerge entirely).
+#
+# Ordering matters inside the job: core/storage/cli dist are gitignored and
+# API/CLI integration tests import the built dist, so `pnpm -r build` must
+# run before any test step.
+#
+# Action refs are SHA-pinned (supply-chain hardening); the comment records
+# the tag the SHA was resolved from.
+
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - 'renovate/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      # Test suites exercise the API with simulated auth (same as local runs).
+      CIVIC_ALLOW_SIMULATED_AUTH: 'true'
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
+        # pnpm version comes from the `packageManager` field in package.json.
+
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install ffmpeg (broadcast-box / transcription media tests)
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # core <-> storage is a cyclic workspace dependency (core optionally
+      # peer-depends on storage), which makes pnpm abandon topological order
+      # and start both tsc builds concurrently — storage then fails on a
+      # missing core/dist. Building core first breaks the tie.
+      - name: Build core first (core<->storage cycle defeats pnpm ordering)
+        run: pnpm --filter @civicpress/core run build
+
+      - name: Build all workspaces
+        run: pnpm -r build
+
+      - name: Lint
+        run: pnpm run lint
+
+      - name: Registry check
+        run: pnpm run registry:check
+
+      # Serialized until the known cross-file DB/auth races are fixed (the
+      # CentralConfigManager static-cache item in the test-health batch);
+      # with fileParallelism the suite flakes tens of files under load.
+      # CIVIC_TEST_QUARANTINE excludes 5 files (11 tests) that fail
+      # deterministically from a clean checkout of main — pre-existing
+      # failures surfaced by standing up CI, quarantined so the gate is
+      # honest-green for everything else. List + burn-down owner:
+      # vitest.config.mjs and docs/backlog/2026-07-post-audit-hardening.md.
+      - name: Root test suite (5 files quarantined — see vitest.config.mjs)
+        run: npx vitest run --fileParallelism=false
+        env:
+          CIVIC_TEST_QUARANTINE: '1'
+
+      - name: UI test suite
+        run: npx vitest run --config vitest.config.ui.mjs
+
+      # These module suites are not covered by the root vitest configs and
+      # must run from inside the module (their own vitest.config).
+      - name: Storage module tests
+        run: npx vitest run
+        working-directory: modules/storage
+
+      - name: Broadcast-box module tests
+        run: npx vitest run
+        working-directory: modules/broadcast-box
+
+      - name: Transcription service tests
+        run: npx vitest run
+        working-directory: services/transcription
