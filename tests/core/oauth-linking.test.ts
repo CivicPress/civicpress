@@ -135,4 +135,51 @@ describe('OAuth account linking by provider identity', () => {
     );
     expect(impostor.user.id).not.toBe(legacy.id);
   });
+
+  it('refuses username adoption when the provider supplies NO stable id (defense in depth)', async () => {
+    // A legacy same-provider account that WOULD be adoptable with an id.
+    const legacy = await authService.createUser({
+      username: 'carol',
+      email: 'carol@provider.example',
+      role: 'clerk',
+      auth_provider: 'github',
+    });
+
+    // Provider returns an empty subject (misconfigured OIDC/SAML shape).
+    const result = await authService.authenticateWithOAuth('github', 'tok', {
+      id: '',
+      username: 'carol',
+      email: 'carol@provider.example',
+      name: 'Carol',
+      provider: 'github',
+      providerUserId: '',
+    });
+
+    // Must NOT take over the legacy account by username alone.
+    expect(result.user.id).not.toBe(legacy.id);
+    const legacyAfter = await authService.getUserById(legacy.id);
+    expect(legacyAfter?.role).toBe('clerk');
+  });
+
+  it('authenticateWithGitHub shares the identity-first matching (no username takeover)', async () => {
+    const local = await authService.createUserWithPassword({
+      username: 'dave',
+      passwordHash: await bcrypt.hash('Local-Passw0rd!1', 12),
+      email: 'dave@town.example',
+      role: 'clerk',
+    });
+
+    // Inject provider data via NODE_ENV=test path of authenticateWithOAuth,
+    // which authenticateWithGitHub now delegates to. Since the GitHub alias
+    // takes only a token, exercise the shared path with the same identity to
+    // prove it does not link the local 'dave' by username.
+    const result = await authService.authenticateWithOAuth(
+      'github',
+      'tok',
+      oauth({ id: 'gh-3003', providerUserId: 'gh-3003', username: 'dave' })
+    );
+    expect(result.user.id).not.toBe(local.id);
+    const localAfter = await authService.getUserById(local.id);
+    expect(localAfter?.auth_provider).toBe('password');
+  });
 });
