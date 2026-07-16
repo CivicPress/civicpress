@@ -118,6 +118,14 @@ follow-up. (Storage, config+CLI, API-routes clusters + saga/BB/notifications.)
 
 ## Test & CI health
 
+- [ ] **Tier-C skeptic coverage-gap follow-up:** the geography `/linked-records`
+  batch-scan fix has no test — add one that seeds >`LINKED_RECORDS_SCAN_CAP`
+  (1000) records with a subset linking the geography across multiple pages and
+  asserts the total is correct + no rows past page 1 are dropped. (The fix
+  itself was skeptic-verified correct; termination is safe by inspection. The
+  history-pathspec sibling gap IS now covered by
+  `core/src/git/__tests__/git-engine-history-pathspec.test.ts`.)
+
 - [ ] **QUARANTINE BURN-DOWN (added with the CI batch — top of this tier):**
   5 files / 11 tests fail deterministically from a CLEAN checkout of main and
   are excluded in CI only via `CIVIC_TEST_QUARANTINE=1` (list in
