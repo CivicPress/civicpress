@@ -90,10 +90,16 @@ export class DownloadOps {
         const executeWithTimeout = () =>
           withTimeout(executeDownload, timeout, 'download');
 
-        // Apply circuit breaker if configured
+        // Apply circuit breaker if configured. A 404 (object absent on this
+        // provider) is NOT a provider fault — exempt it so repeated
+        // missing-object reads don't trip the breaker OPEN against a healthy
+        // provider (the same reasoning the failover manager applies).
+        const isNotFound = (err: unknown) =>
+          err instanceof StorageFileNotFoundError ||
+          (err as { statusCode?: number })?.statusCode === 404;
         if (host.circuitBreakerManager) {
           const breaker = host.circuitBreakerManager.getBreaker(providerName);
-          return breaker.execute(executeWithTimeout);
+          return breaker.execute(executeWithTimeout, isNotFound);
         }
 
         return executeWithTimeout();
@@ -263,7 +269,13 @@ export class DownloadOps {
       const downloadResponse = await blockBlobClient.download();
 
       if (!downloadResponse.readableStreamBody) {
-        return null;
+        // Empty body ~ absent on Azure — throw (not null) so failover
+        // proceeds, consistent with local/S3/GCS.
+        throw new StorageFileNotFoundError(file.id, {
+          folder: file.folder,
+          provider: 'azure',
+          path: file.provider_path,
+        });
       }
 
       // Convert stream to buffer
