@@ -291,11 +291,19 @@ export class ApiLogger {
         statusCode?: number;
         code?: string;
       };
+      const statusCode = legacy.statusCode ?? 500;
+      // A 5xx from an untyped third-party error (AWS SDK, HTTP clients) can
+      // carry hosts/paths — redact its message like the generic-500 branch.
+      // 4xx messages are caller-facing and safe to pass through.
+      const isServerError = statusCode >= 500;
       return {
-        statusCode: legacy.statusCode ?? 500,
+        statusCode,
         success: false,
         error: {
-          message: error.message,
+          message:
+            isServerError && process.env.NODE_ENV !== 'development'
+              ? defaultMessage
+              : error.message,
           code: legacy.code ?? 'API_ERROR',
         },
       };

@@ -58,9 +58,21 @@ export class StorageValidation {
       );
     }
 
-    // Executable types are DENIED outright — a warning that nobody reads
-    // while the upload proceeds is not a control (post-audit hardening).
-    if (['exe', 'bat', 'cmd', 'sh', 'ps1'].includes(fileExtension)) {
+    // Executable / installer / script types are DENIED outright — a warning
+    // that nobody reads while the upload proceeds is not a control
+    // (post-audit hardening). This is an extension deny-list, not a full
+    // content sniff, but it covers the common executable set across
+    // Windows / *nix / cross-platform runtimes.
+    const EXECUTABLE_EXTENSIONS = new Set([
+      // Windows
+      'exe', 'bat', 'cmd', 'com', 'scr', 'msi', 'dll', 'cpl', 'vbs', 'vbe',
+      'js', 'jse', 'wsf', 'wsh', 'ps1', 'psm1', 'reg', 'lnk',
+      // *nix / shells
+      'sh', 'bash', 'zsh', 'ksh', 'csh', 'run', 'bin', 'elf',
+      // cross-platform runtimes / installers
+      'jar', 'app', 'deb', 'rpm', 'dmg', 'pkg', 'apk',
+    ]);
+    if (EXECUTABLE_EXTENSIONS.has(fileExtension)) {
       errors.push(
         `Executable file type '${fileExtension}' is not allowed for upload`
       );

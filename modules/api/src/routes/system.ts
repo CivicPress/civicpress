@@ -4,6 +4,7 @@ import {
   getRecordTypesWithMetadata,
   getRecordStatusesWithMetadata,
 } from '@civicpress/core';
+import { logApiError } from '../utils/api-logger.js';
 
 const router = Router();
 
@@ -36,12 +37,12 @@ router.get('/record-types', (req, res) => {
       },
     });
   } catch (error) {
+    logApiError('system:record-types', error, req);
     res.status(500).json({
       success: false,
       error: {
         message: 'Failed to fetch record types',
         code: 'RECORD_TYPES_FETCH_FAILED',
-        details: error instanceof Error ? error.message : String(error),
       },
     });
   }
@@ -79,12 +80,12 @@ router.get('/record-statuses', (req, res) => {
       },
     });
   } catch (error) {
+    logApiError('system:record-statuses', error, req);
     res.status(500).json({
       success: false,
       error: {
         message: 'Failed to fetch record statuses',
         code: 'RECORD_STATUSES_FETCH_FAILED',
-        details: error instanceof Error ? error.message : String(error),
       },
     });
   }

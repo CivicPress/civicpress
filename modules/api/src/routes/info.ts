@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { CentralConfigManager } from '@civicpress/core';
 import type { AuthUser } from '@civicpress/core';
+import { logApiError } from '../utils/api-logger.js';
 
 const router = Router();
 
@@ -95,9 +96,12 @@ router.get('/', async (req, res) => {
 
     res.json(response);
   } catch (error) {
+    // Unauthenticated endpoint — never surface the raw message (this route
+    // reads YAML config, so errors can carry filesystem paths).
+    logApiError('info', error, req);
     res.status(500).json({
       success: false,
-      error: error instanceof Error ? error.message : 'Unknown error',
+      error: 'Failed to load system info',
     });
   }
 });
