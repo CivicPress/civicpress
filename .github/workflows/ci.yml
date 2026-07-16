@@ -57,6 +57,13 @@ jobs:
       - name: Install ffmpeg (broadcast-box / transcription media tests)
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
 
+      # The integration suites commit to real git repos; a bare runner has no
+      # git identity and every git-touching test dies on "empty ident name".
+      - name: Configure git identity for integration tests
+        run: |
+          git config --global user.name "civicpress-ci"
+          git config --global user.email "ci@civicpress.example"
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
