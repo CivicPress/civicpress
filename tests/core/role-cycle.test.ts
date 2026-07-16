@@ -76,4 +76,31 @@ describe('Role hierarchy cycle detection', () => {
     // without re-walking admin → clerk forever.
     expect(await authService.userCan(clerk, 'system:admin')).toBe(true);
   });
+
+  it('a node reachable by two paths (public) is NOT flagged as a cycle', async () => {
+    // `public` is reached from admin both directly (admin → public) and via
+    // clerk (admin → clerk → public) — a diamond, not a cycle. A path-based
+    // (not global) visited set must resolve it without a spurious "circular"
+    // warning, even though a REAL cycle (clerk → admin) exists elsewhere in
+    // this fixture. Only the true back-edge should warn.
+    const warnings: string[] = [];
+    const originalWarn = console.warn;
+    console.warn = (...args: unknown[]) => {
+      warnings.push(args.join(' '));
+    };
+    try {
+      const admin = await authService.createUser({
+        username: 'diamondadmin',
+        email: 'diamondadmin@example.com',
+        role: 'admin',
+      });
+      expect(await authService.userCan(admin, 'records:view')).toBe(true);
+    } finally {
+      console.warn = originalWarn;
+    }
+    // The diamond node 'public' must never be reported as circular.
+    expect(
+      warnings.some((w) => /Circular role inheritance.*'public'/.test(w))
+    ).toBe(false);
+  });
 });

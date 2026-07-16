@@ -422,20 +422,26 @@ export class RoleManager {
   private getRolePermissions(
     role: string,
     config: RolesConfig,
-    visited: Set<string> = new Set()
+    // `path` is the ANCESTOR chain on the current DFS branch, not every role
+    // ever visited. Tracking the path (not a global visited-set) distinguishes
+    // a real CYCLE — a back-edge to an ancestor, e.g. admin → clerk → admin —
+    // from a legal DIAMOND — admin → [clerk, public] plus clerk → public —
+    // which the default roles.yml has. A global visited-set flagged the
+    // diamond as a spurious cycle; the path set only fires on true cycles.
+    path: Set<string> = new Set()
   ): string[] {
     const permissions = new Set<string>();
 
-    // Cycle guard: a circular role_hierarchy (e.g. admin → clerk → admin)
-    // used to recurse to stack overflow, which userCan then swallowed as
-    // `false` — silently denying EVERY permission with no diagnosable error.
-    if (visited.has(role)) {
+    // Cycle guard: a circular role_hierarchy used to recurse to stack
+    // overflow, which userCan then swallowed as `false` — silently denying
+    // EVERY permission with no diagnosable error.
+    if (path.has(role)) {
       logger.warn(
-        `[RoleManager] Circular role inheritance detected at '${role}' (chain: ${[...visited].join(' → ')}) — check role_hierarchy in roles.yml`
+        `[RoleManager] Circular role inheritance detected at '${role}' (chain: ${[...path, role].join(' → ')}) — check role_hierarchy in roles.yml`
       );
       return [];
     }
-    visited.add(role);
+    path.add(role);
 
     logger.debug(`[RoleManager] Getting permissions for role: ${role}`);
 
@@ -527,7 +533,7 @@ export class RoleManager {
         const inheritedPermissions = this.getRolePermissions(
           inheritedRole,
           config,
-          visited
+          path
         );
         inheritedPermissions.forEach((p) => permissions.add(p));
       }
@@ -593,6 +599,10 @@ export class RoleManager {
       logger.debug(
         `[RoleManager] Final permissions for role ${role}`
       );
+
+      // Backtrack: leave the DFS path so a sibling branch that reaches this
+      // same role (a legal diamond) is not mistaken for a cycle.
+      path.delete(role);
 
       return finalPermissions;
     } catch (error) {
