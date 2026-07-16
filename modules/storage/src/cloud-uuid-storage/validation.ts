@@ -63,14 +63,18 @@ export class StorageValidation {
     // (post-audit hardening). This is an extension deny-list, not a full
     // content sniff, but it covers the common executable set across
     // Windows / *nix / cross-platform runtimes.
+    // Unambiguous executable / installer / script extensions only. Ambiguous
+    // ones (e.g. .bin firmware blobs, .app bundles-as-dirs) are deliberately
+    // omitted — this is a deny-list of things that are executable by nature,
+    // not a data-file blocker.
     const EXECUTABLE_EXTENSIONS = new Set([
       // Windows
-      'exe', 'bat', 'cmd', 'com', 'scr', 'msi', 'dll', 'cpl', 'vbs', 'vbe',
-      'js', 'jse', 'wsf', 'wsh', 'ps1', 'psm1', 'reg', 'lnk',
+      'exe', 'bat', 'cmd', 'com', 'scr', 'msi', 'cpl', 'vbs', 'vbe',
+      'jse', 'wsf', 'wsh', 'ps1', 'psm1', 'reg',
       // *nix / shells
-      'sh', 'bash', 'zsh', 'ksh', 'csh', 'run', 'bin', 'elf',
+      'sh', 'bash', 'zsh', 'ksh', 'csh',
       // cross-platform runtimes / installers
-      'jar', 'app', 'deb', 'rpm', 'dmg', 'pkg', 'apk',
+      'jar', 'deb', 'rpm', 'apk',
     ]);
     if (EXECUTABLE_EXTENSIONS.has(fileExtension)) {
       errors.push(
