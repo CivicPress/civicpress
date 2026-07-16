@@ -712,7 +712,7 @@ export class RecordManager {
       // Extension fields may surface top-level after parse.
       const existing: Record<string, unknown> =
         (record.metadata?.capture as Record<string, unknown> | undefined) ??
-        ((record as Record<string, any>).capture as
+        ((record as unknown as Record<string, unknown>).capture as
           | Record<string, unknown>
           | undefined) ??
         {};

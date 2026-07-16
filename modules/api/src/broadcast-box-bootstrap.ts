@@ -19,11 +19,19 @@
  */
 
 import type { Application } from 'express';
-import type { CivicPress, Logger } from '@civicpress/core';
+import type { CivicPress, CivicPressConfig, Logger } from '@civicpress/core';
 import { CentralConfigManager } from '@civicpress/core';
 import {
   registerBroadcastBoxServices,
   registerBroadcastBoxRoutes,
+} from '@civicpress/broadcast-box';
+import type {
+  DeviceManager,
+  DeviceAuthService,
+  DeviceConnectionTracker,
+  DeviceCommandService,
+  SessionController,
+  UploadProcessor,
 } from '@civicpress/broadcast-box';
 import { authMiddleware } from './middleware/auth.js';
 
@@ -92,7 +100,7 @@ export async function startInProcessBroadcastBox(
   const container = civicPress.getContainer();
 
   try {
-    const config = container.resolve<any>('config');
+    const config = container.resolve<CivicPressConfig>('config');
 
     // Bridge the in-process realtime server into the DI container so
     // registerBroadcastBoxServices wires the device room:
@@ -129,24 +137,28 @@ export async function startInProcessBroadcastBox(
     //    required; the rest are optional (e.g. uploads needs `storage`, which is
     //    only present when the storage module is mounted) — a missing optional
     //    service just omits its router.
-    const deviceManager = container.resolve<any>('broadcastBoxDeviceManager');
-    const deviceAuth = container.resolve<any>('broadcastBoxDeviceAuth');
-    const connectionTracker = resolveOptional(
+    const deviceManager = container.resolve<DeviceManager>(
+      'broadcastBoxDeviceManager'
+    );
+    const deviceAuth = container.resolve<DeviceAuthService>(
+      'broadcastBoxDeviceAuth'
+    );
+    const connectionTracker = resolveOptional<DeviceConnectionTracker>(
       container,
       'broadcastBoxConnectionTracker',
       logger
     );
-    const deviceCommandService = resolveOptional(
+    const deviceCommandService = resolveOptional<DeviceCommandService>(
       container,
       'broadcastBoxDeviceCommandService',
       logger
     );
-    const sessionController = resolveOptional(
+    const sessionController = resolveOptional<SessionController>(
       container,
       'broadcastBoxSessionController',
       logger
     );
-    const uploadProcessor = resolveOptional(
+    const uploadProcessor = resolveOptional<UploadProcessor>(
       container,
       'broadcastBoxUploadProcessor',
       logger
@@ -182,13 +194,13 @@ export async function startInProcessBroadcastBox(
 }
 
 /** Resolve a container service, returning undefined (and logging) if absent. */
-function resolveOptional(
+function resolveOptional<T>(
   container: ReturnType<CivicPress['getContainer']>,
   key: string,
   logger: Logger
-): any {
+): T | undefined {
   try {
-    return container.resolve<any>(key);
+    return container.resolve<T>(key);
   } catch (error) {
     logger.warn(
       `Broadcast-box: optional service '${key}' unavailable; its router is omitted`,
@@ -209,7 +221,7 @@ function stopBroadcastBox(
   ]) {
     try {
       if (container.isRegistered(key)) {
-        container.resolve<any>(key).stop();
+        container.resolve<{ stop: () => void }>(key).stop();
       }
     } catch (error) {
       logger.warn(`Broadcast-box: failed to stop background service '${key}'`, {
