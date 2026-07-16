@@ -55,18 +55,22 @@ Status legend: `[ ]` open · `[~]` in progress · `[x]` landed+verified · `[-]`
 
 ## Tier C — correctness bugs (SCOUTED 2026-07-16, file:line below)
 
-- [ ] Storage streaming (`modules/storage/.../streaming-ops.ts`): GCS missing from the switch (L142-180, throws at L178); stream path bypasses failover/retry/metrics (calls uploadStreamTo* directly, no StorageFailoverManager); S3/Azure streamed `size` persisted as 0 (L164/L176 `request.size||0`, comment "provider will set size" is false → breaks quota)
-- [ ] `updateFile` (`file-mgmt-ops.ts:273-291`) never invalidates folder cache (dead `invalidateFile` at `storage-metadata-cache-adapter.ts:124`); failover-on-read returns `null` as "success" so it never fails over to the provider holding the object (`download-ops.ts` L159/L191/L306 return null; `storage-failover-manager.ts:100` treats resolved null as success)
-- [ ] `CIVIC_DATA_DIR` (`central-config.ts:144-156`): early-return hardcodes sqlite path AND skips the entire `.civicrc` load/merge (drops `auth` + all other config)
-- [ ] CLI login token (`login.ts:163-177` / `auth.ts:80-95`): never writes `~/.civicpress/token` that `resolveToken` reads (`auth-utils.ts:31-38`); human mode never prints the token either
-- [ ] geography `/linked-records` (`geography.ts:448-499`, cap L27) loses rows past 1000 + wrong total/totalPages; `/records/:id/raw` (`read-handlers.ts:374`) missing `optionalAuth` → editors always treated as public
-- [ ] record-history filter: no-op `.replace('/','/')` substring match (`history.ts:103,263`); CLI `civic history` ignores the record arg entirely (`history.ts:70`). Fix = pathspec-scoped `GitEngine.getHistory` (`git-engine.ts:139`)
-- [ ] publishDraft ordering (`publish-draft-saga.ts` steps L552-559): DeleteDraftStep (L402) runs after the irreversible CommitToGitStep (L362, isCompensatable=false) with a log-only no-op compensation (L423) → DB hiccup loses a committed record's draft unrecoverably
-- [ ] BB device health-monitor + stale-reaper implemented (`device-connection-tracker.ts:304`/`335`) but never started in production; wire at the tracker factory (`broadcast-box-services.ts:294-310`)
-- [ ] UI: `useMarkdown` heading inline formatting; autosave timer unmount; editor host collab-vs-CM latch at mount
-- [ ] HW multi-output ffmpeg filtergraph pad reuse (`[v_wm]` mapped twice)
+**Batch 4 landed on `refactor/phase-7d-tier-c` (stacked on #17):** all 9
+findings below fixed across 4 thematic commits + a role-manager diamond
+follow-up. (Storage, config+CLI, API-routes clusters + saga/BB/notifications.)
+
+- [x] Storage streaming (`modules/storage/.../streaming-ops.ts`): GCS missing from the switch (L142-180, throws at L178); stream path bypasses failover/retry/metrics (calls uploadStreamTo* directly, no StorageFailoverManager); S3/Azure streamed `size` persisted as 0 (L164/L176 `request.size||0`, comment "provider will set size" is false → breaks quota)
+- [x] `updateFile` (`file-mgmt-ops.ts:273-291`) never invalidates folder cache (dead `invalidateFile` at `storage-metadata-cache-adapter.ts:124`); failover-on-read returns `null` as "success" so it never fails over to the provider holding the object (`download-ops.ts` L159/L191/L306 return null; `storage-failover-manager.ts:100` treats resolved null as success)
+- [x] `CIVIC_DATA_DIR` (`central-config.ts:144-156`): early-return hardcodes sqlite path AND skips the entire `.civicrc` load/merge (drops `auth` + all other config)
+- [x] CLI login token (`login.ts:163-177` / `auth.ts:80-95`): never writes `~/.civicpress/token` that `resolveToken` reads (`auth-utils.ts:31-38`); human mode never prints the token either
+- [x] geography `/linked-records` (`geography.ts:448-499`, cap L27) loses rows past 1000 + wrong total/totalPages; `/records/:id/raw` (`read-handlers.ts:374`) missing `optionalAuth` → editors always treated as public
+- [x] record-history filter: no-op `.replace('/','/')` substring match (`history.ts:103,263`); CLI `civic history` ignores the record arg entirely (`history.ts:70`). Fix = pathspec-scoped `GitEngine.getHistory` (`git-engine.ts:139`)
+- [x] publishDraft ordering (`publish-draft-saga.ts` steps L552-559): DeleteDraftStep (L402) runs after the irreversible CommitToGitStep (L362, isCompensatable=false) with a log-only no-op compensation (L423) → DB hiccup loses a committed record's draft unrecoverably
+- [x] BB device health-monitor + stale-reaper implemented (`device-connection-tracker.ts:304`/`335`) but never started in production; wire at the tracker factory (`broadcast-box-services.ts:294-310`)
+- [ ] UI: `useMarkdown` heading inline formatting; autosave timer unmount; editor host collab-vs-CM latch at mount (NOT in Batch 4 — UI cluster deferred)
+- [ ] HW multi-output ffmpeg filtergraph pad reuse (`[v_wm]` mapped twice) — lives in the separate BroadcastBox HW repo, not this monorepo batch
 - [x] `.npmrc:29` jammed keys (folded into CI batch — trailing `strict-peer-dependencies=false` never parsed; dropped it, preserving effective config)
-- [ ] Notifications: empty recipient dispatched silently (`notification-service.ts:278-292` returns '', no guard in sendToChannel L262); SMS/Slack config declared (`notification-config.ts:51-66`) but only email channel implemented → "Channel not found" throw if enabled
+- [x] Notifications: empty recipient dispatched silently (`notification-service.ts:278-292` returns '', no guard in sendToChannel L262); SMS/Slack config declared (`notification-config.ts:51-66`) but only email channel implemented → "Channel not found" throw if enabled
 
 ## Tier D — small, batchable
 

@@ -117,6 +117,24 @@ describe('NotificationService — truthful audit log (notifications-001)', () =>
     expect(entry.details.template).toBe('test_template');
   });
 
+  it('a notification with NO recipient fails the channel (never silently "sent")', async () => {
+    // Post-audit Tier-C: getChannelRecipient returns '' for a missing
+    // address, and the old sendToChannel dispatched to '' and logged
+    // success. It must fail the channel instead.
+    service.registerChannel('email', makeChannel('success') as any);
+
+    const response = await service.sendNotification({
+      // no `email` field → blank recipient
+      channels: ['email'],
+      template: 'test_template',
+      data: { name: 'Nobody' },
+    });
+
+    expect(response.success).toBe(false);
+    expect(response.failedChannels).toEqual(['email']);
+    expect(response.sentChannels).toEqual([]);
+  });
+
   it('records success: false and action notification_partial_or_failed when the only channel fails', async () => {
     service.registerChannel(
       'email',

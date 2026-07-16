@@ -296,6 +296,43 @@ export class DeviceConnectionTracker {
   }
 
   private healthMonitorInterval: ReturnType<typeof setInterval> | null = null;
+  private staleReaperInterval: ReturnType<typeof setInterval> | null = null;
+
+  /**
+   * Start BOTH the health monitor and the stale-connection reaper. These were
+   * implemented but never wired, so a device that dropped without a clean
+   * disconnect stayed `connected=true` forever — blocking new sessions on
+   * that device. Pair with stop() at shutdown (the timers are not unref'd).
+   */
+  start(
+    healthIntervalMs = 15000,
+    reapIntervalMs = 60000,
+    staleTimeoutMs = 90000
+  ): void {
+    this.startHealthMonitor(healthIntervalMs);
+    this.stopStaleReaper();
+    this.staleReaperInterval = setInterval(() => {
+      void this.cleanupStaleConnections(staleTimeoutMs).catch((error) => {
+        coreWarn('Stale-connection reaper failed', {
+          operation: 'broadcast-box:connection:reaper',
+          error: error instanceof Error ? error.message : String(error),
+        });
+      });
+    }, reapIntervalMs);
+  }
+
+  /** Stop both periodic tasks. */
+  stop(): void {
+    this.stopHealthMonitor();
+    this.stopStaleReaper();
+  }
+
+  private stopStaleReaper(): void {
+    if (this.staleReaperInterval) {
+      clearInterval(this.staleReaperInterval);
+      this.staleReaperInterval = null;
+    }
+  }
 
   /**
    * Start periodic health monitoring.

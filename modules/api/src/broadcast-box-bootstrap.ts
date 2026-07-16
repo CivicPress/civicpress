@@ -210,7 +210,8 @@ function resolveOptional<T>(
   }
 }
 
-/** Stop background work — the enrollment-cleanup interval + redaction worker. */
+/** Stop background work — enrollment cleanup, redaction worker, and the
+ * connection tracker's health-monitor/reaper intervals. */
 function stopBroadcastBox(
   container: ReturnType<CivicPress['getContainer']>,
   logger: Logger
@@ -218,6 +219,7 @@ function stopBroadcastBox(
   for (const key of [
     'broadcastBoxEnrollmentCleanup',
     'broadcastBoxRedactionWorker',
+    'broadcastBoxConnectionTracker',
   ]) {
     try {
       if (container.isRegistered(key)) {

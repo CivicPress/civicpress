@@ -42,6 +42,8 @@ export interface PublishDraftContext extends SagaContext {
   commitHash?: string;
   /** Whether record already existed (for compensation logic) */
   recordExisted?: boolean;
+  /** Snapshot of the deleted draft (captured in step 4 to enable rollback) */
+  deletedDraftBackup?: Record<string, unknown>;
 }
 
 /**
@@ -412,6 +414,14 @@ class DeleteDraftStep extends BaseSagaStep<PublishDraftContext, void> {
     this.logStep('start', context);
 
     try {
+      // Snapshot the draft BEFORE deleting so compensate() can restore it.
+      // Fire-and-forget steps run after this one, but a future failing step
+      // (or a DB hiccup) would otherwise lose the draft permanently while the
+      // irreversible git commit stands.
+      const backup = await this.db.getDraft(context.draftId);
+      if (backup) {
+        context.deletedDraftBackup = backup as Record<string, unknown>;
+      }
       await this.db.deleteDraft(context.draftId);
       this.logStep('complete', context);
     } catch (error) {
@@ -421,16 +431,47 @@ class DeleteDraftStep extends BaseSagaStep<PublishDraftContext, void> {
   }
 
   async compensate(context: PublishDraftContext): Promise<void> {
-    // If draft was deleted but saga failed, we can't easily restore it
-    // This is a limitation - in production, we might want to store draft backup
-    // For now, log a warning
-    coreDebug(
-      `Draft ${context.draftId} was deleted but saga failed - manual intervention may be needed`,
-      {
+    const backup = context.deletedDraftBackup;
+    if (!backup) {
+      coreDebug(
+        `Draft ${context.draftId} deletion had no backup to restore`,
+        { draftId: context.draftId, correlationId: context.correlationId }
+      );
+      return;
+    }
+    try {
+      // Re-create the draft from the snapshot so a failed publish leaves the
+      // author's work intact (no manual intervention needed).
+      await this.db.createDraft({
+        id: String(backup.id),
+        title: String(backup.title),
+        type: String(backup.type),
+        status: backup.status as string | undefined,
+        workflow_state: backup.workflow_state as string | undefined,
+        markdown_body: (backup.markdown_body as string | null) ?? null,
+        metadata: (backup.metadata as string | null) ?? null,
+        geography: (backup.geography as string | null) ?? null,
+        attached_files: (backup.attached_files as string | null) ?? null,
+        linked_records: (backup.linked_records as string | null) ?? null,
+        linked_geography_files:
+          (backup.linked_geography_files as string | null) ?? null,
+        author: String(backup.author ?? ''),
+        created_by: String(backup.created_by ?? backup.author ?? ''),
+      });
+      coreDebug(`Restored draft ${context.draftId} after saga rollback`, {
         draftId: context.draftId,
         correlationId: context.correlationId,
-      }
-    );
+      });
+    } catch (error) {
+      coreError(
+        `Failed to restore draft ${context.draftId} during compensation`,
+        'SAGA_DRAFT_RESTORE_ERROR',
+        {
+          draftId: context.draftId,
+          error: error instanceof Error ? error.message : String(error),
+        }
+      );
+    }
   }
 }
 
