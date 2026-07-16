@@ -120,8 +120,15 @@ export class StorageFailoverManager {
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
 
-        // Mark provider as unhealthy
-        this.markProviderUnhealthy(provider, lastError);
+        // A 404 means the provider responded fine — the OBJECT just isn't on
+        // it. That is NOT a health problem, so don't penalize the provider
+        // (it must stay eligible for other objects); still try the next
+        // provider, because a failover replica may hold the object. Any
+        // other error is a real provider fault → mark unhealthy.
+        const statusCode = (error as { statusCode?: number })?.statusCode;
+        if (statusCode !== 404) {
+          this.markProviderUnhealthy(provider, lastError);
+        }
 
         // Log failover attempt
         this.logger.warn(
@@ -130,6 +137,7 @@ export class StorageFailoverManager {
             provider,
             operation: operationName,
             error: lastError.message,
+            objectNotFound: statusCode === 404,
           }
         );
 

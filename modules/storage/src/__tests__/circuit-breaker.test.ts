@@ -45,6 +45,25 @@ describe('CircuitBreaker', () => {
       expect(circuitBreaker.getFailureCount()).toBe(5);
     });
 
+    it('does NOT count isExpectedError throws toward the threshold', async () => {
+      // Post-audit Tier-C: an absent-object read (404) throws but is not a
+      // provider fault — many missing-object reads must not trip the breaker
+      // OPEN against a healthy provider.
+      const notFound = Object.assign(new Error('absent'), { statusCode: 404 });
+      const op = vi.fn().mockRejectedValue(notFound);
+      const isExpected = (e: unknown) =>
+        (e as { statusCode?: number })?.statusCode === 404;
+
+      for (let i = 0; i < 10; i++) {
+        await expect(circuitBreaker.execute(op, isExpected)).rejects.toBe(
+          notFound
+        );
+      }
+
+      expect(circuitBreaker.getState()).toBe('closed');
+      expect(circuitBreaker.getFailureCount()).toBe(0);
+    });
+
     it('should block operations when open', async () => {
       // Open the circuit
       const operation = vi.fn().mockRejectedValue(new Error('Failure'));

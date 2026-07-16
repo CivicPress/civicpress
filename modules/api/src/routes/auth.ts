@@ -211,7 +211,9 @@ router.get('/me', async (req, res) => {
 
 /**
  * POST /api/auth/logout
- * Logout (in stateless mode, just returns success)
+ * Revoke the presented session server-side. Idempotent: an unknown or
+ * already-revoked token still returns success (the caller's goal — that the
+ * token no longer works — holds either way).
  */
 router.post('/logout', async (req, res) => {
   logApiRequest(req, { operation: 'logout' });
@@ -219,14 +221,16 @@ router.post('/logout', async (req, res) => {
   try {
     const authHeader = req.headers.authorization;
 
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    // Parse like authMiddleware does (whitespace split, case-insensitive
+    // scheme) so a token that authenticates can never fail to revoke.
+    const [scheme, token] = (authHeader ?? '').split(/\s+/);
+    if (!scheme || scheme.toLowerCase() !== 'bearer' || !token) {
       const error = new HttpError(401, 'Authorization header required', 'MISSING_AUTH');
       return handleApiError('logout', error, req, res);
     }
 
-    // In stateless mode, we don't actually invalidate sessions
-    // The client should delete the token
-    // TODO: Implement proper session invalidation if needed
+    const civicPress = req.civicPress as CivicPress;
+    await civicPress.getAuthService().logout(token);
 
     sendSuccess({ message: 'Logged out successfully' }, req, res, {
       operation: 'logout',

@@ -151,6 +151,8 @@ export class AuthService {
       emailValidationService: this.emailValidationService,
       logAuthEvent,
       createSession,
+      deleteUserSessions: (userId: number) =>
+        this.sessionOps.deleteUserSessions(userId),
       canSetPassword,
       getUserAuthProvider,
     });
@@ -328,6 +330,18 @@ export class AuthService {
     return this.sessionOps.deleteSession(...args);
   }
 
+  async deleteUserSessions(
+    ...args: Parameters<SessionOps['deleteUserSessions']>
+  ): ReturnType<SessionOps['deleteUserSessions']> {
+    return this.sessionOps.deleteUserSessions(...args);
+  }
+
+  async revokeSessionByToken(
+    ...args: Parameters<SessionOps['revokeSessionByToken']>
+  ): ReturnType<SessionOps['revokeSessionByToken']> {
+    return this.sessionOps.revokeSessionByToken(...args);
+  }
+
   async cleanupExpiredSessions(): Promise<void> {
     return this.sessionOps.cleanupExpiredSessions();
   }
@@ -455,10 +469,18 @@ export class AuthService {
     return this.oauthOps.authenticateWithSimulatedAccount(...args);
   }
 
-  async logout(): Promise<void> {
-    // This would typically invalidate the current session
-    // For now, we'll just log the event
-    await this.logAuthEvent(undefined, 'logout', 'User logged out');
+  async logout(token?: string): Promise<void> {
+    // Revoke the presented session server-side. Logout used to be a no-op —
+    // the token stayed valid for its full 24h lifetime after "logging out".
+    let revoked = false;
+    if (token) {
+      revoked = await this.sessionOps.revokeSessionByToken(token);
+    }
+    await this.logAuthEvent(
+      undefined,
+      'logout',
+      revoked ? 'User logged out (session revoked)' : 'User logged out'
+    );
   }
 
   async getCurrentUser(): Promise<AuthUser | null> {
@@ -611,6 +633,13 @@ export class AuthService {
   // ===============================
   // SECURE PASSWORD MANAGEMENT (delegated to PasswordOps)
   // ===============================
+
+  /** Single password-policy chokepoint (see PasswordOps). */
+  validatePasswordPolicy(
+    ...args: Parameters<PasswordOps['validatePasswordPolicy']>
+  ): ReturnType<PasswordOps['validatePasswordPolicy']> {
+    return this.passwordOps.validatePasswordPolicy(...args);
+  }
 
   /**
    * Change user password with security guards

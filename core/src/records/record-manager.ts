@@ -688,12 +688,17 @@ export class RecordManager {
       .toString(36)
       .slice(2)}`;
 
-    // Bounded acquire: capture merges are short (one record update), so a
-    // held lock clears quickly; give up loudly rather than write unlocked.
-    const maxAttempts = 20;
+    // Bounded acquire: capture merges are one record update each, but that
+    // update commits through the serialized git index, so N racing writers
+    // legitimately queue for N full update durations (seconds each under
+    // load). Budget generously and still give up loudly rather than write
+    // unlocked.
+    const maxAttempts = 60;
     for (let attempt = 1; ; attempt++) {
       try {
-        await lockManager.acquireLock(lockKey, holderId, 30_000);
+        // External (non-saga) acquisition: writes the saga_states stub the
+        // lock row's enforced FK requires.
+        await lockManager.acquireExternalLock(lockKey, holderId, 30_000);
         break;
       } catch (error) {
         if (error instanceof SagaLockError && attempt < maxAttempts) {
@@ -712,7 +717,7 @@ export class RecordManager {
       // Extension fields may surface top-level after parse.
       const existing: Record<string, unknown> =
         (record.metadata?.capture as Record<string, unknown> | undefined) ??
-        ((record as Record<string, any>).capture as
+        ((record as unknown as Record<string, unknown>).capture as
           | Record<string, unknown>
           | undefined) ??
         {};
@@ -737,7 +742,7 @@ export class RecordManager {
       await this.updateRecord(id, request, user);
       return merged;
     } finally {
-      await lockManager.releaseLock(lockKey, holderId).catch(() => {});
+      await lockManager.releaseExternalLock(lockKey, holderId).catch(() => {});
     }
   }
 

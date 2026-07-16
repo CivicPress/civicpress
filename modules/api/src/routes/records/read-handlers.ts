@@ -373,6 +373,11 @@ export function registerReadRoutes(
   // GET /api/records/:id/raw - Get raw file content for a record (including frontmatter)
   router.get(
     '/:id/raw',
+    // optionalAuth populates req.user for a valid token — without it (the
+    // sibling GET routes all have it) an authenticated editor was always
+    // treated as public here and could not fetch their own draft's raw
+    // content.
+    optionalAuth(recordsService.getCivicPress()),
     param('id').isString().notEmpty(),
     async (req: Request, res: Response) => {
       const isAuthenticated = req.user !== undefined;

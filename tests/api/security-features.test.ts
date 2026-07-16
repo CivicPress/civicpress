@@ -30,7 +30,7 @@ describe('API Security Features', () => {
         .send({
           username: 'passworduser',
           email: 'password@example.com',
-          password: 'currentpass123',
+          password: 'Currentpass!123',
           name: 'Password User',
         });
       passwordUserId = passwordUserResponse.body.data.user.id;
@@ -68,8 +68,8 @@ describe('API Security Features', () => {
           .post(`/api/v1/users/${simulatedUserId}/change-password`)
           .set('Authorization', `Bearer ${userToken}`)
           .send({
-            currentPassword: 'currentpass123',
-            newPassword: 'newpass123',
+            currentPassword: 'Currentpass!123',
+            newPassword: 'Newpass!123',
           });
 
         // Note: This will fail because simulated auth doesn't have actual password
@@ -91,7 +91,7 @@ describe('API Security Features', () => {
           .set('Authorization', `Bearer ${adminToken}`)
           .send({
             currentPassword: 'anypassword',
-            newPassword: 'newpass123',
+            newPassword: 'Newpass!123',
           });
 
         expect(response.status).toBe(403);
@@ -104,8 +104,8 @@ describe('API Security Features', () => {
         const response = await request(context.api.getApp())
           .post(`/api/v1/users/${passwordUserId}/change-password`)
           .send({
-            currentPassword: 'currentpass123',
-            newPassword: 'newpass123',
+            currentPassword: 'Currentpass!123',
+            newPassword: 'Newpass!123',
           });
 
         expect(response.status).toBe(401);
@@ -136,7 +136,7 @@ describe('API Security Features', () => {
           .post(`/api/v1/users/${passwordUserId}/set-password`)
           .set('Authorization', `Bearer ${adminToken}`)
           .send({
-            password: 'adminsetpass123',
+            password: 'Adminsetpass!123',
           });
 
         expect(response.status).toBe(200);
@@ -151,7 +151,7 @@ describe('API Security Features', () => {
           .post(`/api/v1/users/${githubUserId}/set-password`)
           .set('Authorization', `Bearer ${adminToken}`)
           .send({
-            password: 'adminsetpass123',
+            password: 'Adminsetpass!123',
           });
 
         expect(response.status).toBe(403);
@@ -172,7 +172,7 @@ describe('API Security Features', () => {
           .post(`/api/v1/users/${passwordUserId}/set-password`)
           .set('Authorization', `Bearer ${userToken}`)
           .send({
-            password: 'usersetpass123',
+            password: 'Usersetpass!123',
           });
 
         expect(response.status).toBe(403);
@@ -186,7 +186,7 @@ describe('API Security Features', () => {
           .post('/api/v1/users/99999/set-password')
           .set('Authorization', `Bearer ${adminToken}`)
           .send({
-            password: 'adminsetpass123',
+            password: 'Adminsetpass!123',
           });
 
         expect(response.status).toBe(404);
@@ -206,7 +206,7 @@ describe('API Security Features', () => {
         .send({
           username: 'emailtestuser',
           email: 'emailtest@example.com',
-          password: 'password123',
+          password: 'Passw0rd!123',
           name: 'Email Test User',
         });
       testUserId = userResponse.body.data.user.id;
@@ -260,7 +260,7 @@ describe('API Security Features', () => {
           .send({
             username: 'existinguser',
             email: 'existing@example.com',
-            password: 'password123',
+            password: 'Passw0rd!123',
             name: 'Existing User',
           });
 
@@ -294,7 +294,7 @@ describe('API Security Features', () => {
           .send({
             username: 'otheruser',
             email: 'other@example.com',
-            password: 'password123',
+            password: 'Passw0rd!123',
             name: 'Other User',
           });
         const otherUserId = otherUserResponse.body.data.user.id;
@@ -457,7 +457,7 @@ describe('API Security Features', () => {
           .send({
             username: 'securityother',
             email: 'securityother@example.com',
-            password: 'password123',
+            password: 'Passw0rd!123',
             name: 'Security Other User',
           });
         const otherUserId = otherUserResponse.body.data.user.id;
@@ -494,7 +494,7 @@ describe('API Security Features', () => {
         .send({
           username: 'updatepassworduser',
           email: 'updatepassword@example.com',
-          password: 'password123',
+          password: 'Passw0rd!123',
           name: 'Update Password User',
         });
       passwordUserId = passwordUserResponse.body.data.user.id;
@@ -539,7 +539,7 @@ describe('API Security Features', () => {
           .set('Authorization', `Bearer ${adminToken}`)
           .send({
             name: 'Updated GitHub User',
-            password: 'newpassword123',
+            password: 'Newpassword!123',
           });
 
         expect(response.status).toBe(403);
@@ -554,7 +554,7 @@ describe('API Security Features', () => {
           .set('Authorization', `Bearer ${adminToken}`)
           .send({
             name: 'Updated Password User',
-            password: 'newpassword123',
+            password: 'Newpassword!123',
           });
 
         expect(response.status).toBe(200);

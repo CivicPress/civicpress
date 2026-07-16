@@ -147,6 +147,19 @@ export default function setupUsersCommand(cli: CAC) {
           process.exit(1);
         }
 
+        // Enforce the configured password policy — the interactive prompt's
+        // inline length check is bypassed entirely when --password is passed.
+        const policy = authService.validatePasswordPolicy(password);
+        if (!policy.valid) {
+          cliError(
+            `Password does not meet requirements: ${policy.errors.join('; ')}`,
+            'WEAK_PASSWORD',
+            { errors: policy.errors },
+            'users:create'
+          );
+          process.exit(1);
+        }
+
         // Hash password
         const bcrypt = await import('bcrypt');
         const saltRounds = 12;
@@ -362,6 +375,19 @@ export default function setupUsersCommand(cli: CAC) {
                 details:
                   'Password management is handled by the external provider',
               },
+              'users:update'
+            );
+            process.exit(1);
+          }
+
+          // Enforce the configured password policy (users:update hashes
+          // inline, so PasswordOps never sees the plaintext).
+          const policy = authService.validatePasswordPolicy(password);
+          if (!policy.valid) {
+            cliError(
+              `Password does not meet requirements: ${policy.errors.join('; ')}`,
+              'WEAK_PASSWORD',
+              { errors: policy.errors },
               'users:update'
             );
             process.exit(1);

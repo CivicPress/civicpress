@@ -3,6 +3,7 @@ import { configurationService, CentralConfigManager } from '@civicpress/core';
 import { readFile, writeFile, mkdir } from 'fs/promises';
 import { join, dirname } from 'path';
 import { authMiddleware, requirePermission } from '../middleware/auth.js';
+import { logApiError } from '../utils/api-logger.js';
 import { AuditLogger } from '@civicpress/core';
 
 const router = Router();
@@ -22,9 +23,10 @@ router.get('/attachment-types', async (req, res) => {
       data: config,
     });
   } catch (error) {
+    logApiError('config', error, req);
     res.status(500).json({
       success: false,
-      error: `Failed to get attachment types: ${error}`,
+      error: 'Failed to get attachment types',
     });
   }
 });
@@ -42,9 +44,10 @@ router.get('/link-categories', async (req, res) => {
       data: config,
     });
   } catch (error) {
+    logApiError('config', error, req);
     res.status(500).json({
       success: false,
-      error: `Failed to get link categories: ${error}`,
+      error: 'Failed to get link categories',
     });
   }
 });
@@ -117,9 +120,10 @@ router.post(
           message: String(error),
         });
       }
+      logApiError('config', error, req);
       res.status(500).json({
         success: false,
-        error: `Failed to validate configuration: ${error}`,
+        error: 'Failed to validate configuration',
       });
     }
   }
@@ -145,9 +149,10 @@ router.get('/list', async (req, res) => {
       data: configs,
     });
   } catch (error) {
+    logApiError('config', error, req);
     res.status(500).json({
       success: false,
-      error: `Failed to get configuration list: ${error}`,
+      error: 'Failed to get configuration list',
     });
   }
 });
@@ -166,9 +171,10 @@ router.get('/metadata/:type', async (req, res) => {
       data: metadata,
     });
   } catch (error) {
+    logApiError('config', error, req);
     res.status(404).json({
       success: false,
-      error: `Configuration metadata not found: ${error}`,
+      error: 'Configuration metadata not found',
     });
   }
 });
@@ -220,9 +226,10 @@ router.get('/raw/:type', async (req, res) => {
     if (error instanceof InvalidConfigTypeError) {
       return res.status(400).json({ success: false, error: error.message });
     }
+    logApiError('config', error, req);
     res.status(404).json({
       success: false,
-      error: `Raw configuration not found: ${error}`,
+      error: 'Raw configuration not found',
     });
   }
 });
@@ -276,9 +283,10 @@ router.put(
       if (error instanceof InvalidConfigTypeError) {
         return res.status(400).json({ success: false, error: error.message });
       }
+      logApiError('config', error, req);
       res.status(500).json({
         success: false,
-        error: `Failed to save raw configuration: ${error}`,
+        error: 'Failed to save raw configuration',
       });
     }
   }
@@ -296,9 +304,10 @@ router.get('/status', async (req, res) => {
       data: status,
     });
   } catch (error) {
+    logApiError('config', error, req);
     res.status(500).json({
       success: false,
-      error: `Failed to get configuration status: ${error}`,
+      error: 'Failed to get configuration status',
     });
   }
 });
@@ -317,9 +326,10 @@ router.get('/:type', async (req, res) => {
       data: config,
     });
   } catch (error) {
+    logApiError('config', error, req);
     res.status(404).json({
       success: false,
-      error: `Configuration not found: ${error}`,
+      error: 'Configuration not found',
     });
   }
 });
@@ -359,9 +369,10 @@ router.put('/:type', async (req, res) => {
       outcome: 'failure',
       message: String(error),
     });
+    logApiError('config', error, req);
     res.status(500).json({
       success: false,
-      error: `Failed to save configuration: ${error}`,
+      error: 'Failed to save configuration',
     });
   }
 });
@@ -400,9 +411,10 @@ router.post('/:type/reset', async (req, res) => {
       outcome: 'failure',
       message: String(error),
     });
+    logApiError('config', error, req);
     res.status(500).json({
       success: false,
-      error: `Failed to reset configuration: ${error}`,
+      error: 'Failed to reset configuration',
     });
   }
 });
@@ -427,9 +439,10 @@ router.get('/validate/all', async (req, res) => {
       try {
         results[type] = await configurationService.validateConfiguration(type);
       } catch (error) {
+        logApiError('config', error, req);
         results[type] = {
           valid: false,
-          errors: [`Failed to validate: ${error}`],
+          errors: ['Failed to validate'],
         };
       }
     }
@@ -439,9 +452,10 @@ router.get('/validate/all', async (req, res) => {
       data: results,
     });
   } catch (error) {
+    logApiError('config', error, req);
     res.status(500).json({
       success: false,
-      error: `Failed to validate configurations: ${error}`,
+      error: 'Failed to validate configurations',
     });
   }
 });

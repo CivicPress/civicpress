@@ -69,6 +69,28 @@ export class GitEngine {
   }
 
   /**
+   * All index mutations funnel through this promise chain. `git add` +
+   * `git commit` are two steps against ONE shared .git/index, so two
+   * concurrent operations — even on different records, each holding its own
+   * per-record saga lock — interleave staging and commit each other's files
+   * (git/DB divergence). In-process serialization is sufficient for a given
+   * CivicPress instance because every writer (sagas AND the record-manager
+   * file-ops direct path, which bypasses saga locks entirely) shares this
+   * one GitEngine via DI; concurrent WRITES from a second process are not
+   * covered, but there git's own index.lock fails the loser loudly instead
+   * of interleaving silently.
+   */
+  private mutationChain: Promise<unknown> = Promise.resolve();
+
+  private serializeMutation<T>(fn: () => Promise<T>): Promise<T> {
+    const run = this.mutationChain.then(fn, fn);
+    // Keep the chain alive whether fn resolved or rejected; the caller still
+    // sees the original rejection through `run`.
+    this.mutationChain = run.catch(() => {});
+    return run;
+  }
+
+  /**
    * Create a role-based commit
    */
   async commit(message: string, files?: string[]): Promise<string> {
@@ -84,36 +106,51 @@ export class GitEngine {
       return 'dev-skip-commit';
     }
 
-    try {
-      const git = this.getGit();
+    return this.serializeMutation(async () => {
+      try {
+        const git = this.getGit();
 
-      // Stage files if provided
-      if (files && files.length > 0) {
-        await git.add(files);
-      } else {
-        await git.add('.');
+        // Stage files if provided
+        if (files && files.length > 0) {
+          await git.add(files);
+        } else {
+          await git.add('.');
+        }
+
+        // Create role-based commit message
+        const rolePrefix = this.currentRole
+          ? `feat(${this.currentRole}): `
+          : '';
+        const commitMessage = `${rolePrefix}${message}`;
+
+        // Create commit
+        const result = await git.commit(commitMessage);
+
+        return result.commit;
+      } catch (error) {
+        throw new Error(`Failed to create commit: ${error}`);
       }
-
-      // Create role-based commit message
-      const rolePrefix = this.currentRole ? `feat(${this.currentRole}): ` : '';
-      const commitMessage = `${rolePrefix}${message}`;
-
-      // Create commit
-      const result = await git.commit(commitMessage);
-
-      return result.commit;
-    } catch (error) {
-      throw new Error(`Failed to create commit: ${error}`);
-    }
+    });
   }
 
   /**
-   * Get commit history
+   * Get commit history. When `pathspec` is given, the log is scoped to that
+   * path (`git log -- <pathspec>`) — the correct way to get a single record's
+   * history. Callers previously substring-matched commit MESSAGES for the
+   * record id, which both missed commits touching the file without naming it
+   * and matched unrelated commits that happened to mention the id.
    */
-  async getHistory(limit?: number): Promise<GitCommit[]> {
+  async getHistory(limit?: number, pathspec?: string): Promise<GitCommit[]> {
     try {
       const git = this.getGit();
-      const options = limit ? ['-n', limit.toString()] : [];
+      const options: Record<string, unknown> = {};
+      if (limit) {
+        options.maxCount = limit;
+      }
+      if (pathspec) {
+        // simple-git scopes the log to this path when `file` is set.
+        options.file = pathspec;
+      }
       const log = await git.log(options);
       return Array.from(log.all);
     } catch (error) {

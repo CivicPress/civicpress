@@ -27,6 +27,8 @@ export interface PasswordOpsDeps {
     userId: number,
     expiresInHours?: number
   ) => Promise<{ token: string; session: Session }>;
+  /** SessionOps relay — revoke every session a user holds. */
+  deleteUserSessions: (userId: number) => Promise<void>;
   /** Authentication-provider guards (live on the orchestrator). */
   canSetPassword: (user: AuthUser) => boolean;
   getUserAuthProvider: (user: AuthUser) => string;
@@ -124,6 +126,20 @@ export class PasswordOps {
     }
   }
 
+  /**
+   * The single password-policy chokepoint. AuthConfigManager's validator
+   * existed but was dead code — 1-character passwords were accepted at
+   * every entry point. Every path that receives a PLAINTEXT password must
+   * run it: change/set enforce it below; registration and the CLI (which
+   * hash before core ever sees the password) call it via AuthService.
+   */
+  validatePasswordPolicy(password: string): {
+    valid: boolean;
+    errors: string[];
+  } {
+    return AuthConfigManager.getInstance().validatePassword(password);
+  }
+
   async changePassword(
     userId: number,
     newPassword: string,
@@ -164,6 +180,15 @@ export class PasswordOps {
         };
       }
 
+      // Enforce the configured password policy before anything mutates.
+      const policy = this.validatePasswordPolicy(newPassword);
+      if (!policy.valid) {
+        return {
+          success: false,
+          message: `Password does not meet requirements: ${policy.errors.join('; ')}`,
+        };
+      }
+
       // Verify current password if provided (for password changes by the user themselves)
       if (currentPassword) {
         const userWithPassword = await this.deps.db.getUserWithPassword(
@@ -188,6 +213,15 @@ export class PasswordOps {
       const bcrypt = await import('bcrypt');
       const passwordHash = await bcrypt.hash(newPassword, 12);
 
+      // Revoke every existing session BEFORE updating the credential: a
+      // password change must cut off whoever holds tokens minted under the
+      // old one (the stolen-token case is exactly why the user is changing
+      // it). Revoke-first is the fail-safe ordering — if revocation throws,
+      // the password stays unchanged; if the update below fails, the user
+      // is merely logged out everywhere, never left with live sessions
+      // spanning the credential change.
+      await this.deps.deleteUserSessions(userId);
+
       // Update password
       const updated = await this.deps.db.updateUser(userId, { passwordHash });
       if (!updated) {
@@ -201,7 +235,7 @@ export class PasswordOps {
       await this.deps.logAuthEvent(
         userId,
         'password_changed',
-        `Password changed for user ${currentUser.username}`
+        `Password changed for user ${currentUser.username}; all sessions revoked`
       );
 
       this.deps.logger?.info(
@@ -258,9 +292,24 @@ export class PasswordOps {
         };
       }
 
+      // Enforce the configured password policy — admin resets included.
+      const policy = this.validatePasswordPolicy(newPassword);
+      if (!policy.valid) {
+        return {
+          success: false,
+          message: `Password does not meet requirements: ${policy.errors.join('; ')}`,
+        };
+      }
+
       // Hash new password
       const bcrypt = await import('bcrypt');
       const passwordHash = await bcrypt.hash(newPassword, 12);
+
+      // Revoke the target user's sessions BEFORE the update — an admin
+      // reset is the standard compromise response, so live tokens must die
+      // with the old password (revoke-first: same fail-safe ordering as
+      // changePassword).
+      await this.deps.deleteUserSessions(userId);
 
       // Update password
       const updated = await this.deps.db.updateUser(userId, { passwordHash });
@@ -275,7 +324,7 @@ export class PasswordOps {
       await this.deps.logAuthEvent(
         adminUserId,
         'admin_password_set',
-        `Password set for user ${targetUser.username} by admin`
+        `Password set for user ${targetUser.username} by admin; all sessions revoked`
       );
 
       this.deps.logger?.info(

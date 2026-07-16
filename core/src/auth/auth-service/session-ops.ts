@@ -71,25 +71,31 @@ export class SessionOps {
     return { token: finalToken, session };
   }
 
+  /**
+   * Verify + strip the signature from a presented token, returning the raw
+   * token to hash — or null when the signature does not verify.
+   */
+  private unwrapToken(token: string): string | null {
+    const secretsManager = this.deps.getSecretsManager();
+    if (secretsManager && token.includes('.')) {
+      const parts = token.split('.');
+      if (parts.length === 2) {
+        const [rawToken, signature] = parts;
+        const signingKey = secretsManager.getSessionSigningKey();
+        if (secretsManager.verify(rawToken, signature, signingKey)) {
+          return rawToken;
+        }
+        return null; // invalid signature
+      }
+    }
+    return token;
+  }
+
   async validateSession(token: string): Promise<AuthUser | null> {
     try {
-      let tokenToHash = token;
-
-      // If token is signed, verify and extract raw token
-      const secretsManager = this.deps.getSecretsManager();
-      if (secretsManager && token.includes('.')) {
-        const parts = token.split('.');
-        if (parts.length === 2) {
-          const [rawToken, signature] = parts;
-          const signingKey = secretsManager.getSessionSigningKey();
-
-          if (secretsManager.verify(rawToken, signature, signingKey)) {
-            tokenToHash = rawToken;
-          } else {
-            // Invalid signature
-            return null;
-          }
-        }
+      const tokenToHash = this.unwrapToken(token);
+      if (tokenToHash === null) {
+        return null;
       }
 
       // Hash and lookup in database (using raw token)
@@ -123,6 +129,30 @@ export class SessionOps {
 
   async deleteSession(sessionId: number): Promise<void> {
     await this.deps.db.deleteSession(sessionId);
+  }
+
+  /** Revoke every session a user holds (logout-everywhere, password change). */
+  async deleteUserSessions(userId: number): Promise<void> {
+    await this.deps.db.deleteUserSessions(userId);
+  }
+
+  /**
+   * Revoke the single session a presented token identifies (logout). Unknown,
+   * expired, or badly-signed tokens are a no-op so logout stays idempotent.
+   * Returns whether a live session was actually revoked.
+   */
+  async revokeSessionByToken(token: string): Promise<boolean> {
+    const tokenToHash = this.unwrapToken(token);
+    if (tokenToHash === null) {
+      return false;
+    }
+    const tokenHash = hashToken(tokenToHash);
+    const session = await this.deps.db.getSessionByToken(tokenHash);
+    if (!session) {
+      return false;
+    }
+    await this.deps.db.deleteSession(session.id);
+    return true;
   }
 
   async cleanupExpiredSessions(): Promise<void> {

@@ -1,7 +1,10 @@
 #!/usr/bin/env sh
 . "$(dirname -- "$0")/_/husky.sh"
 
+# Keep this hook fast and deterministic: formatting + the cheap registry
+# invariant only. Build + full test suite moved to CI (.github/workflows/
+# ci.yml) — the old full-suite hook was flaky on parallel DB/auth races and
+# trained everyone to commit with --no-verify, which gated nothing.
+
 pnpm exec lint-staged
-pnpm run build:cli
-pnpm run test:run
 pnpm run registry:check

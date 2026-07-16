@@ -52,6 +52,7 @@ describe('History API', () => {
       expect(response.body.data.history).toBeDefined();
     });
 
+
     it('should support pagination', async () => {
       const response = await request(context.api.getApp())
         .get('/api/v1/history?limit=5&offset=0')

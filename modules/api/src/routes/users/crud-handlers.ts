@@ -141,6 +141,17 @@ export function registerCrudRoutes(router: Router): void {
       // Hash password if provided
       let passwordHash: string | undefined;
       if (userData.password) {
+        // Enforce the password policy — this admin create route hashes
+        // inline, so it must run the check itself (like register + CLI).
+        const policy = authService.validatePasswordPolicy(userData.password);
+        if (!policy.valid) {
+          const error = new HttpError(
+            400,
+            `Password does not meet requirements: ${policy.errors.join('; ')}`,
+            'WEAK_PASSWORD'
+          );
+          return handleApiError('create_user', error, req, res);
+        }
         const bcrypt = await import('bcrypt');
         const saltRounds = 12;
         passwordHash = await bcrypt.hash(userData.password, saltRounds);
@@ -383,6 +394,19 @@ export function registerCrudRoutes(router: Router): void {
           const error = new HttpError(400, 
             `Users authenticated via ${provider} cannot set passwords. Password management is handled by the external provider.`
           , 'EXTERNAL_AUTH_PASSWORD_FORBIDDEN');
+          return handleApiError('update_user', error, req, res);
+        }
+
+        // Enforce the password policy — this admin update route hashes
+        // inline (unlike POST /:id/set-password, which goes through
+        // PasswordOps), so it must run the check itself.
+        const policy = authService.validatePasswordPolicy(userData.password);
+        if (!policy.valid) {
+          const error = new HttpError(
+            400,
+            `Password does not meet requirements: ${policy.errors.join('; ')}`,
+            'WEAK_PASSWORD'
+          );
           return handleApiError('update_user', error, req, res);
         }
 

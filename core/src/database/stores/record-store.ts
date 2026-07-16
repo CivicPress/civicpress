@@ -395,6 +395,12 @@ export class RecordStore {
   }
 
   async deleteRecord(id: string): Promise<void> {
+    // record_locks intentionally has no FK/cascade (locks are taken on
+    // drafts too, which have no records row) — clean up explicitly.
+    await this.adapter.execute(
+      'DELETE FROM record_locks WHERE record_id = ?',
+      [id]
+    );
     await this.adapter.execute('DELETE FROM records WHERE id = ?', [id]);
     await this.removeRecordFromIndex(id, '');
   }

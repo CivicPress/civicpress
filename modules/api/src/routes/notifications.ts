@@ -164,9 +164,11 @@ router.post('/test', async (req, res) => {
       outcome: 'failure',
       message: errorMessage,
     });
+    // The raw message stays in the audit log above — never on the wire
+    // (SMTP errors carry hosts, credential hints, and config paths).
     return res.status(500).json({
       success: false,
-      error: errorMessage || 'Failed to send test email',
+      error: 'Failed to send test email',
     });
   }
 });

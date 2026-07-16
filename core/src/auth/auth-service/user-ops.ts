@@ -52,6 +52,7 @@ export class UserOps {
     name?: string;
     avatar_url?: string;
     auth_provider?: string;
+    provider_user_id?: string;
     email_verified?: boolean;
   }): Promise<AuthUser> {
     // Set default role if not provided
@@ -117,6 +118,13 @@ export class UserOps {
         email: user.email,
         name: user.name,
         avatar_url: user.avatar_url,
+        // auth_provider / email_verified / pending_email were previously
+        // dropped here — AuthUser declares them, so a consumer reading the
+        // provider off getUserById() saw undefined (e.g. an OAuth-takeover
+        // guard would misjudge the account type).
+        auth_provider: user.auth_provider,
+        email_verified: !!user.email_verified,
+        pending_email: user.pending_email,
         created_at: user.created_at ? new Date(user.created_at) : undefined,
         updated_at: user.updated_at ? new Date(user.updated_at) : undefined,
       };

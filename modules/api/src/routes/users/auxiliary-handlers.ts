@@ -67,6 +67,18 @@ export function registerRegistrationRoutes(router: Router): void {
 
       const authService = civicPress.getAuthService();
 
+      // Enforce the configured password policy — registration hashes the
+      // plaintext below, so this is its only chance to be checked.
+      const policy = authService.validatePasswordPolicy(userData.password);
+      if (!policy.valid) {
+        const error = new HttpError(
+          400,
+          `Password does not meet requirements: ${policy.errors.join('; ')}`,
+          'WEAK_PASSWORD'
+        );
+        return handleApiError('register_user', error, req, res);
+      }
+
       // Normalize email (lowercase) for consistency
       const normalizedEmail = userData.email.toLowerCase().trim();
 

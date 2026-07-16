@@ -41,7 +41,7 @@ describe('Core User Management', () => {
     it('should create a user with password', async () => {
       const userData = {
         username: 'testuser1',
-        password: 'testpass123',
+        password: 'Testpass!123',
         name: 'Test User 1',
         email: 'test1@example.com',
         role: 'public' as const,
@@ -57,7 +57,7 @@ describe('Core User Management', () => {
     it('should create a user with minimal fields', async () => {
       const userData = {
         username: 'testuser2',
-        password: 'testpass123',
+        password: 'Testpass!123',
         role: 'public', // Explicitly provide role
       };
       const user = await createUserWithPassword(authService, userData);
@@ -69,7 +69,7 @@ describe('Core User Management', () => {
     it('should fail to create user with duplicate username', async () => {
       const userData = {
         username: 'testuser3',
-        password: 'testpass123',
+        password: 'Testpass!123',
         role: 'public', // Explicitly provide role
       };
       await createUserWithPassword(authService, userData);
@@ -83,7 +83,7 @@ describe('Core User Management', () => {
     beforeEach(async () => {
       await createUserWithPassword(authService, {
         username: 'testauth',
-        password: 'testpass123',
+        password: 'Testpass!123',
         name: 'Test Auth User',
         role: 'public',
       });
@@ -92,7 +92,7 @@ describe('Core User Management', () => {
     it('should authenticate with correct password', async () => {
       const session = await authService.authenticateWithPassword(
         'testauth',
-        'testpass123'
+        'Testpass!123'
       );
       expect(session).toBeDefined();
       expect(session.token).toBeDefined();
@@ -110,7 +110,7 @@ describe('Core User Management', () => {
 
     it('should fail authentication with non-existent user', async () => {
       await expect(
-        authService.authenticateWithPassword('nonexistent', 'testpass123')
+        authService.authenticateWithPassword('nonexistent', 'Testpass!123')
       ).rejects.toThrow();
     });
   });
@@ -119,7 +119,7 @@ describe('Core User Management', () => {
     beforeEach(async () => {
       await createUserWithPassword(authService, {
         username: 'testretrieve',
-        password: 'testpass123',
+        password: 'Testpass!123',
         name: 'Test Retrieve User',
         email: 'retrieve@example.com',
         role: 'clerk',
@@ -147,7 +147,7 @@ describe('Core User Management', () => {
     beforeEach(async () => {
       const user = await createUserWithPassword(authService, {
         username: 'testupdate',
-        password: 'testpass123',
+        password: 'Testpass!123',
         name: 'Test Update User',
         email: 'update@example.com',
         role: 'public',
@@ -171,7 +171,7 @@ describe('Core User Management', () => {
     });
 
     it('should update user password', async () => {
-      const newPasswordHash = await bcrypt.hash('newpass123', 10);
+      const newPasswordHash = await bcrypt.hash('Newpass!123', 10);
       const result = await authService.updateUser(userId, {
         passwordHash: newPasswordHash,
       });
@@ -182,7 +182,7 @@ describe('Core User Management', () => {
       // Verify new password works
       const session = await authService.authenticateWithPassword(
         'testupdate',
-        'newpass123'
+        'Newpass!123'
       );
       expect(session).toBeDefined();
       expect(session.user.username).toBe('testupdate');
@@ -203,7 +203,7 @@ describe('Core User Management', () => {
     beforeEach(async () => {
       const user = await createUserWithPassword(authService, {
         username: 'testdelete',
-        password: 'testpass123',
+        password: 'Testpass!123',
         name: 'Test Delete User',
         role: 'public',
       });
@@ -226,7 +226,7 @@ describe('Core User Management', () => {
     it('should fail to authenticate deleted user', async () => {
       await authService.deleteUser(userId);
       await expect(
-        authService.authenticateWithPassword('testdelete', 'testpass123')
+        authService.authenticateWithPassword('testdelete', 'Testpass!123')
       ).rejects.toThrow();
     });
   });
@@ -237,14 +237,14 @@ describe('Core User Management', () => {
     beforeEach(async () => {
       await createUserWithPassword(authService, {
         username: 'testsession',
-        password: 'testpass123',
+        password: 'Testpass!123',
         name: 'Test Session User',
         role: 'public',
       });
 
       const session = await authService.authenticateWithPassword(
         'testsession',
-        'testpass123'
+        'Testpass!123'
       );
       sessionToken = session.token;
     });

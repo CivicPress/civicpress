@@ -290,6 +290,10 @@ export class RealtimeServer {
       this.server = new WebSocketServer({
         port: this.realtimeConfig.port,
         host: this.realtimeConfig.host,
+        // Cap per-message size — the ws default (~100 MiB) is a one-message
+        // memory-DoS surface. 10 MiB comfortably covers Yjs document
+        // updates while bounding the damage.
+        maxPayload: 10 * 1024 * 1024,
         // Use verifyClient to ensure path starts with /realtime
         verifyClient: (info: {
           origin: string;
@@ -703,6 +707,19 @@ export class RealtimeServer {
 
     if (!this.roomManager) {
       throw new Error('Room manager not initialized');
+    }
+
+    // Enforce rooms.max_rooms — previously only reported in health metrics
+    // while room creation stayed unbounded (memory DoS via unique room ids).
+    // Joining an EXISTING room is always allowed at the cap.
+    const maxRooms = this.realtimeConfig?.rooms.max_rooms || 100;
+    if (
+      !this.roomManager.getRoom(fullRoomId) &&
+      this.roomManager.getRoomCount() >= maxRooms
+    ) {
+      throw new Error(
+        `Room limit reached (${maxRooms}); cannot create room ${fullRoomId}`
+      );
     }
 
     room = this.roomManager.getOrCreateRoom(fullRoomId, roomInfo.roomType, {});

@@ -119,7 +119,7 @@ describe('Security Guards', () => {
 
       const result = await authService.changePassword(
         user.id,
-        'newpassword123',
+        'Newpassword!123',
         'currentpassword'
       );
 
@@ -141,7 +141,7 @@ describe('Security Guards', () => {
 
       const result = await authService.changePassword(
         user.id,
-        'newpassword123',
+        'Newpassword!123',
         'anypassword'
       );
 
@@ -174,7 +174,7 @@ describe('Security Guards', () => {
 
       const result = await authService.setUserPassword(
         targetUser.id,
-        'newpassword123',
+        'Newpassword!123',
         adminUser.id
       );
 
@@ -206,7 +206,7 @@ describe('Security Guards', () => {
 
       const result = await authService.setUserPassword(
         externalUser.id,
-        'newpassword123',
+        'Newpassword!123',
         adminUser.id
       );
 

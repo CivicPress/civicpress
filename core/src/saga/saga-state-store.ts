@@ -42,13 +42,32 @@ export class SagaStateStore {
    */
   async saveState(state: SagaState): Promise<void> {
     try {
+      // Upsert via ON CONFLICT, NOT `INSERT OR REPLACE`: with foreign keys
+      // enforced, REPLACE is a DELETE+INSERT, and the DELETE fires the
+      // saga_resource_locks ON DELETE CASCADE — every re-save of a running
+      // saga's state would silently drop the saga's own resource locks.
       const sql = `
-        INSERT OR REPLACE INTO saga_states (
+        INSERT INTO saga_states (
           id, saga_type, saga_version, context, status, current_step,
           step_results, started_at, completed_at, error,
           compensation_status, compensation_completed_at, compensation_error,
           idempotency_key, correlation_id
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET
+          saga_type = excluded.saga_type,
+          saga_version = excluded.saga_version,
+          context = excluded.context,
+          status = excluded.status,
+          current_step = excluded.current_step,
+          step_results = excluded.step_results,
+          started_at = excluded.started_at,
+          completed_at = excluded.completed_at,
+          error = excluded.error,
+          compensation_status = excluded.compensation_status,
+          compensation_completed_at = excluded.compensation_completed_at,
+          compensation_error = excluded.compensation_error,
+          idempotency_key = excluded.idempotency_key,
+          correlation_id = excluded.correlation_id
       `;
 
       await this.db
@@ -184,6 +203,17 @@ export class SagaStateStore {
       );
       throw error;
     }
+  }
+
+  /**
+   * Remove a saga state row outright. Used for the keyless pre-lock stub
+   * when lock acquisition fails — the saga never ran, so no history is
+   * lost. ON DELETE CASCADE clears any lock rows that reference it.
+   */
+  async deleteState(sagaId: string): Promise<void> {
+    await this.db
+      .getAdapter()
+      .execute('DELETE FROM saga_states WHERE id = ?', [sagaId]);
   }
 
   /**
