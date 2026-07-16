@@ -148,6 +148,32 @@ describe('StorageFailoverManager', () => {
       expect(health?.healthy).toBe(true);
     });
 
+    it('fails over on a 404 WITHOUT marking the provider unhealthy (object-absent, not down)', async () => {
+      // Post-audit Tier-C: a provider that lacks the object must fail over to
+      // one that has it, but a 404 is not a health fault — the provider
+      // responded fine, so it must stay eligible for other objects.
+      const notFound = Object.assign(new Error('not on primary'), {
+        statusCode: 404,
+      });
+      const operation = vi.fn().mockImplementation((provider: string) => {
+        if (provider === 'primary') {
+          return Promise.reject(notFound);
+        }
+        return Promise.resolve('found-on-backup');
+      });
+
+      const result = await failoverManager.executeWithFailover(
+        operation,
+        'download'
+      );
+
+      expect(result).toBe('found-on-backup');
+      expect(operation).toHaveBeenCalledWith('primary');
+      expect(operation).toHaveBeenCalledWith('backup1');
+      // Primary must remain healthy — it was up, the object just wasn't there.
+      expect(failoverManager.getProviderHealth('primary')?.healthy).toBe(true);
+    });
+
     it('should skip unhealthy providers', async () => {
       // First, mark primary as unhealthy
       const operation1 = vi.fn().mockImplementation((provider: string) => {

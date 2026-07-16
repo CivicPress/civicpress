@@ -283,7 +283,19 @@ export class FileMgmtOps {
         throw new Error('Database service not initialized');
       }
 
-      return await host.databaseService.updateStorageFile(id, updates);
+      const updated = await host.databaseService.updateStorageFile(id, updates);
+
+      // Invalidate the folder cache — a cached listing still holds the old
+      // metadata otherwise (deleteFile + uploadFile already do this; this
+      // path silently didn't, which is what the dead invalidateFile was for).
+      if (updated && host.cacheAdapter) {
+        const file = await host.getFileById(id);
+        if (file) {
+          await host.cacheAdapter.invalidateFolder(file.folder);
+        }
+      }
+
+      return updated;
     } catch (error) {
       host.logger.error('Failed to update file:', error);
       return false;

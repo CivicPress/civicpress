@@ -14,6 +14,7 @@ import {
   getTimeoutForOperation,
 } from '../utils/timeout.js';
 import { dbRecordToStorageFile } from './internals.js';
+import { StorageFileNotFoundError } from '../errors/storage-errors.js';
 import type { CloudUuidStorageService } from '../cloud-uuid-storage-service.js';
 
 export interface DownloadOpsDeps {
@@ -155,10 +156,15 @@ export class DownloadOps {
   private async getFileContentFromLocal(
     file: StorageFile
   ): Promise<Buffer | null> {
-    const host = this.deps.host;
     if (!(await fs.pathExists(file.provider_path))) {
-      host.logger.error(`File not found on disk: ${file.provider_path}`);
-      return null;
+      // Absent on THIS provider — throw (not return null) so failover tries
+      // the next provider. Returning null read as "success" to the failover
+      // manager, so it never failed over to a provider holding the object.
+      throw new StorageFileNotFoundError(file.id, {
+        folder: file.folder,
+        provider: 'local',
+        path: file.provider_path,
+      });
     }
 
     return await fs.readFile(file.provider_path);
@@ -189,7 +195,12 @@ export class DownloadOps {
       const response = await host.s3Client!.send(command);
 
       if (!response.Body) {
-        return null;
+        // Absent/empty on S3 — throw so failover proceeds (see local).
+        throw new StorageFileNotFoundError(file.id, {
+          folder: file.folder,
+          provider: 's3',
+          path: file.provider_path,
+        });
       }
 
       // Convert stream to buffer (AWS SDK v3)
@@ -276,12 +287,10 @@ export class DownloadOps {
       return host.retryManager.withRetry(downloadOperation);
     }
 
-    try {
-      return await downloadOperation();
-    } catch (error) {
-      host.logger.error('Failed to download from Azure:', error);
-      return null;
-    }
+    // Let errors propagate — the failover manager (and getFileContent's
+    // top-level catch) decide the outcome. Swallowing to null here defeated
+    // failover, the same bug as the provider absence-returns.
+    return await downloadOperation();
   }
 
   /**
@@ -305,7 +314,12 @@ export class DownloadOps {
       // Check if file exists
       const [exists] = await gcsFile.exists();
       if (!exists) {
-        return null;
+        // Absent on GCS — throw so failover proceeds (see local).
+        throw new StorageFileNotFoundError(file.id, {
+          folder: file.folder,
+          provider: 'gcs',
+          path: file.provider_path,
+        });
       }
 
       // Download file content
@@ -318,12 +332,8 @@ export class DownloadOps {
       return host.retryManager.withRetry(downloadOperation);
     }
 
-    try {
-      return await downloadOperation();
-    } catch (error) {
-      host.logger.error('Failed to download from GCS:', error);
-      return null;
-    }
+    // Let errors propagate (see Azure) — swallowing to null defeated failover.
+    return await downloadOperation();
   }
 
   /**
