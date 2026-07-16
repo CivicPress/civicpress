@@ -19,15 +19,24 @@ describe('CLI Security Commands', () => {
     if (context.adminToken) {
       adminToken = context.adminToken;
 
-      // Create CivicPress instance for test user creation
+      // Create CivicPress instance for test user creation. Anchor it to the
+      // test context's OWN tree: the test process cwd is the repo root, so
+      // CentralConfigManager here would resolve whatever ambient config the
+      // checkout happens to have (a dev machine's gitignored .civicrc; on a
+      // clean checkout/CI runner: nothing, and initialize() dies on a
+      // nonexistent dataDir). The `civic init --yes` the fixture runs writes
+      // a .civicrc with no dataDir/database keys, so the CLI subprocesses
+      // resolve the defaults <testDir>/data + <testDir>/.system-data/civic.db
+      // — construct the same paths so both sides share one database.
       const { CivicPress } = await import('@civicpress/core');
-      const { CentralConfigManager } = await import('@civicpress/core');
-      const dataDir = CentralConfigManager.getDataDir();
-      const dbConfig = CentralConfigManager.getDatabaseConfig();
+      const { join } = await import('path');
 
       const civic = new CivicPress({
-        dataDir,
-        database: dbConfig,
+        dataDir: join(context.testDir, 'data'),
+        database: {
+          type: 'sqlite' as const,
+          sqlite: { file: join(context.testDir, '.system-data', 'civic.db') },
+        },
       });
       await civic.initialize();
 
@@ -90,7 +99,12 @@ describe('CLI Security Commands', () => {
     command: string
   ): { stdout: string; stderr: string; status: number } => {
     try {
-      const result = execSync(command, {
+      // Invoke via `node` explicitly (like every other CLI test file):
+      // dist/index.js has a shebang but a fresh tsc build carries no exec
+      // bit, so executing it directly exits 126 on clean checkouts — dev
+      // machines only keep an exec bit by historical accident (tsc
+      // preserves the mode of the file it overwrites).
+      const result = execSync(`node ${command}`, {
         cwd: context.testDir,
         encoding: 'utf8',
         env: { ...process.env, NODE_ENV: 'test' },
