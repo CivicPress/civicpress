@@ -127,7 +127,7 @@ describe('CLI Security Commands', () => {
       }
 
       const result = runCLI(
-        `${context.cliPath} users:change-password clipassworduser --new-password "newpass123"`
+        `${context.cliPath} users:change-password clipassworduser --new-password "Newpass!123"`
       );
 
       expect(result.status).toBe(1);
@@ -145,7 +145,7 @@ describe('CLI Security Commands', () => {
       }
 
       const result = runCLI(
-        `${context.cliPath} users:change-password cligithubuser --token "${adminToken}" --current-password "any" --new-password "newpass123"`
+        `${context.cliPath} users:change-password cligithubuser --token "${adminToken}" --current-password "any" --new-password "Newpass!123"`
       );
 
       expect(result.status).toBe(1);
@@ -179,7 +179,7 @@ describe('CLI Security Commands', () => {
       }
 
       const result = runCLI(
-        `${context.cliPath} users:change-password cligithubuser --token "${adminToken}" --current-password "any" --new-password "newpass123" --json`
+        `${context.cliPath} users:change-password cligithubuser --token "${adminToken}" --current-password "any" --new-password "Newpass!123" --json`
       );
 
       expect(result.status).toBe(1);
@@ -207,7 +207,7 @@ describe('CLI Security Commands', () => {
 
       // Create a non-admin token (simulated)
       const result = runCLI(
-        `${context.cliPath} users:set-password clipassworduser --token "fake-user-token" --password "newpass123"`
+        `${context.cliPath} users:set-password clipassworduser --token "fake-user-token" --password "Newpass!123"`
       );
 
       expect(result.status).toBe(1);
@@ -225,7 +225,7 @@ describe('CLI Security Commands', () => {
       }
 
       const result = runCLI(
-        `${context.cliPath} users:set-password cligithubuser --token "${adminToken}" --password "newpass123"`
+        `${context.cliPath} users:set-password cligithubuser --token "${adminToken}" --password "Newpass!123"`
       );
 
       expect(result.status).toBe(1);
@@ -244,7 +244,7 @@ describe('CLI Security Commands', () => {
       }
 
       const result = runCLI(
-        `${context.cliPath} users:set-password clipassworduser --token "${adminToken}" --password "adminsetpass123"`
+        `${context.cliPath} users:set-password clipassworduser --token "${adminToken}" --password "Adminsetpass!123"`
       );
 
       // Check if command succeeded or failed with expected error
@@ -597,7 +597,7 @@ describe('CLI Security Commands', () => {
       }
 
       const result = runCLI(
-        `${context.cliPath} users:create --token "${adminToken}" --username "newsecureuser" --email "newsecure@example.com" --password "securepass123" --name "New Secure User"`
+        `${context.cliPath} users:create --token "${adminToken}" --username "newsecureuser" --email "newsecure@example.com" --password "Securepass!123" --name "New Secure User"`
       );
 
       expect(result.status).toBe(0);
@@ -626,7 +626,7 @@ describe('CLI Security Commands', () => {
       }
 
       const result = runCLI(
-        `${context.cliPath} users:update --token "${adminToken}" --username "cligithubuser" --password "newpass123"`
+        `${context.cliPath} users:update --token "${adminToken}" --username "cligithubuser" --password "Newpass!123"`
       );
 
       expect(result.status).toBe(1);

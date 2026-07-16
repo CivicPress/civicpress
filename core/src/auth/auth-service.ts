@@ -634,6 +634,13 @@ export class AuthService {
   // SECURE PASSWORD MANAGEMENT (delegated to PasswordOps)
   // ===============================
 
+  /** Single password-policy chokepoint (see PasswordOps). */
+  validatePasswordPolicy(
+    ...args: Parameters<PasswordOps['validatePasswordPolicy']>
+  ): ReturnType<PasswordOps['validatePasswordPolicy']> {
+    return this.passwordOps.validatePasswordPolicy(...args);
+  }
+
   /**
    * Change user password with security guards
    */

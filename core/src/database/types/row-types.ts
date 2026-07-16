@@ -44,6 +44,7 @@ export interface UserRow extends SqlRow {
   avatar_url?: string;
   password_hash?: string;
   auth_provider?: string;
+  provider_user_id?: string;
   email_verified?: number;
   pending_email?: string;
   pending_email_token?: string;

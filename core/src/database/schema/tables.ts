@@ -15,6 +15,7 @@ export const CORE_TABLE_STATEMENTS: string[] = [
     avatar_url TEXT,
     password_hash TEXT,
     auth_provider TEXT DEFAULT 'password',
+    provider_user_id TEXT,
     email_verified BOOLEAN DEFAULT FALSE,
     pending_email TEXT,
     pending_email_token TEXT,

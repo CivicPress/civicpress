@@ -29,6 +29,7 @@ export interface OAuthOpsDeps {
     name?: string;
     avatar_url?: string;
     auth_provider?: string;
+    provider_user_id?: string;
     email_verified?: boolean;
   }) => Promise<AuthUser>;
   updateUser: (
@@ -127,43 +128,90 @@ export class OAuthOps {
         oauthUser = await this.deps.oauthManager.validateToken(provider, token);
       }
 
-      // Check if user exists, create if not
-      let user = await this.deps.getUserByUsername(oauthUser.username);
-      if (!user) {
-        const defaultRole = await this.deps.getDefaultRole();
-        user = await this.deps.createUser({
-          username: oauthUser.username,
-          role: defaultRole,
-          email: oauthUser.email,
-          name: oauthUser.name,
-          avatar_url: oauthUser.avatar_url,
-          auth_provider: provider, // Set the authentication provider
-          email_verified: true, // OAuth emails are considered verified
-        });
-      } else {
-        // Update existing user's information on re-authentication
-        const updateData: Parameters<DatabaseService['updateUser']>[1] = {
-          auth_provider: provider,
-          email_verified: true,
-        };
+      // Match by STABLE PROVIDER IDENTITY, never by username alone:
+      // provider usernames are attacker-choosable (register a victim's
+      // username at the provider → the old code silently linked the local
+      // account and overwrote its email), provider user ids are not.
+      const providerUserId =
+        oauthUser.providerUserId || oauthUser.id
+          ? String(oauthUser.providerUserId || oauthUser.id)
+          : undefined;
 
-        // Update fields that might have changed
-        if (oauthUser.email && oauthUser.email !== user.email) {
-          updateData.email = oauthUser.email;
-        }
-        if (oauthUser.name && oauthUser.name !== user.name) {
-          updateData.name = oauthUser.name;
-        }
-        if (oauthUser.avatar_url && oauthUser.avatar_url !== user.avatar_url) {
-          updateData.avatar_url = oauthUser.avatar_url;
-        }
+      let matchedId: number | undefined = providerUserId
+        ? (await this.deps.db.getUserByProvider(provider, providerUserId))?.id
+        : undefined;
 
-        await this.deps.db.updateUser(user.id, updateData);
+      if (matchedId === undefined) {
+        const byUsername = await this.deps.db.getUserByUsername(
+          oauthUser.username
+        );
+        if (
+          byUsername &&
+          byUsername.auth_provider === provider &&
+          !byUsername.provider_user_id
+        ) {
+          // Legacy adoption: an account this provider created BEFORE
+          // provider_user_id existed — bind the identity below. Anything
+          // else holding this username (a local/password account, another
+          // provider's, or a same-provider account bound to a DIFFERENT
+          // identity) must NOT be linked.
+          matchedId = byUsername.id;
+        } else {
+          // Create a fresh account; de-conflict the username when a
+          // non-linkable account already holds it.
+          let username = oauthUser.username;
+          if (byUsername) {
+            username = `${oauthUser.username}-${provider}`;
+            for (
+              let i = 2;
+              (await this.deps.db.getUserByUsername(username)) && i < 50;
+              i++
+            ) {
+              username = `${oauthUser.username}-${provider}-${i}`;
+            }
+          }
+          const defaultRole = await this.deps.getDefaultRole();
+          const created = await this.deps.createUser({
+            username,
+            role: defaultRole,
+            email: oauthUser.email,
+            name: oauthUser.name,
+            avatar_url: oauthUser.avatar_url,
+            auth_provider: provider, // Set the authentication provider
+            provider_user_id: providerUserId,
+            email_verified: true, // OAuth emails are considered verified
+          });
+          matchedId = created.id;
+        }
+      }
 
-        // Refresh user data
-        const updatedUser = await this.deps.db.getUserById(user.id);
-        if (updatedUser) {
-          user = {
+      // Update the matched account on re-authentication and bind the
+      // provider identity for fresh creates / legacy adoptees.
+      const updateData: Parameters<DatabaseService['updateUser']>[1] = {
+        auth_provider: provider,
+        email_verified: true,
+      };
+      if (providerUserId) {
+        updateData.provider_user_id = providerUserId;
+      }
+      const current = await this.deps.db.getUserById(matchedId);
+      if (oauthUser.email && oauthUser.email !== current?.email) {
+        updateData.email = oauthUser.email;
+      }
+      if (oauthUser.name && oauthUser.name !== current?.name) {
+        updateData.name = oauthUser.name;
+      }
+      if (
+        oauthUser.avatar_url &&
+        oauthUser.avatar_url !== current?.avatar_url
+      ) {
+        updateData.avatar_url = oauthUser.avatar_url;
+      }
+      await this.deps.db.updateUser(matchedId, updateData);
+
+      const updatedUser = await this.deps.db.getUserById(matchedId);
+      const user: AuthUser | null = updatedUser
+        ? {
             id: updatedUser.id,
             username: updatedUser.username,
             role: updatedUser.role,
@@ -179,9 +227,8 @@ export class OAuthOps {
             updated_at: updatedUser.updated_at
               ? new Date(updatedUser.updated_at)
               : undefined,
-          };
-        }
-      }
+          }
+        : null;
 
       // Ensure user is not null
       if (!user) {

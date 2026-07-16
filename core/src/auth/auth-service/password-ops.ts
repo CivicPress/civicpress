@@ -126,6 +126,20 @@ export class PasswordOps {
     }
   }
 
+  /**
+   * The single password-policy chokepoint. AuthConfigManager's validator
+   * existed but was dead code — 1-character passwords were accepted at
+   * every entry point. Every path that receives a PLAINTEXT password must
+   * run it: change/set enforce it below; registration and the CLI (which
+   * hash before core ever sees the password) call it via AuthService.
+   */
+  validatePasswordPolicy(password: string): {
+    valid: boolean;
+    errors: string[];
+  } {
+    return AuthConfigManager.getInstance().validatePassword(password);
+  }
+
   async changePassword(
     userId: number,
     newPassword: string,
@@ -163,6 +177,15 @@ export class PasswordOps {
         return {
           success: false,
           message: `Users authenticated via ${provider} cannot change passwords. Password management is handled by the external authentication.`,
+        };
+      }
+
+      // Enforce the configured password policy before anything mutates.
+      const policy = this.validatePasswordPolicy(newPassword);
+      if (!policy.valid) {
+        return {
+          success: false,
+          message: `Password does not meet requirements: ${policy.errors.join('; ')}`,
         };
       }
 
@@ -266,6 +289,15 @@ export class PasswordOps {
         return {
           success: false,
           message: `Cannot set password for users authenticated via ${provider}. Password management is handled by the external authentication.`,
+        };
+      }
+
+      // Enforce the configured password policy — admin resets included.
+      const policy = this.validatePasswordPolicy(newPassword);
+      if (!policy.valid) {
+        return {
+          success: false,
+          message: `Password does not meet requirements: ${policy.errors.join('; ')}`,
         };
       }
 

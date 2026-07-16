@@ -272,7 +272,16 @@ export class AuthConfigManager {
   }
 
   validatePassword(password: string): { valid: boolean; errors: string[] } {
-    const requirements = this.getPasswordRequirements();
+    // Enforceable from ANY context: CLI commands reach this before anything
+    // calls loadConfig(). Failing open would skip the policy; throwing
+    // breaks the command — fall back to the compiled-in defaults instead
+    // (same posture as PasswordOps.getThrottle).
+    let requirements: AuthConfig['password'];
+    try {
+      requirements = this.getPasswordRequirements();
+    } catch {
+      requirements = this.getDefaultConfig().password;
+    }
     const errors: string[] = [];
 
     if (password.length < requirements.minLength) {

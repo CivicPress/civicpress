@@ -188,6 +188,12 @@ export class DatabaseService {
     return this.users.getUserByEmail(...args);
   }
 
+  async getUserByProvider(
+    ...args: Parameters<UserStore['getUserByProvider']>
+  ): ReturnType<UserStore['getUserByProvider']> {
+    return this.users.getUserByProvider(...args);
+  }
+
   async getUserWithPassword(
     ...args: Parameters<UserStore['getUserWithPassword']>
   ): ReturnType<UserStore['getUserWithPassword']> {

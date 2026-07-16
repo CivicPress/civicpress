@@ -58,9 +58,12 @@ export class StorageValidation {
       );
     }
 
-    // Check for suspicious file types
+    // Executable types are DENIED outright — a warning that nobody reads
+    // while the upload proceeds is not a control (post-audit hardening).
     if (['exe', 'bat', 'cmd', 'sh', 'ps1'].includes(fileExtension)) {
-      warnings.push(`Executable file type '${fileExtension}' detected`);
+      errors.push(
+        `Executable file type '${fileExtension}' is not allowed for upload`
+      );
     }
 
     return {

@@ -67,7 +67,7 @@ describe('CLI User Management', () => {
       }
 
       const result = execSync(
-        `cd ${context.testDir} && node ${context.cliPath} users:create --username testuser1 --password testpass123 --name "Test User 1" --role public --token ${adminToken}`,
+        `cd ${context.testDir} && node ${context.cliPath} users:create --username testuser1 --password Testpass!123 --name "Test User 1" --role public --token ${adminToken}`,
         { encoding: 'utf8' }
       );
 
@@ -82,7 +82,7 @@ describe('CLI User Management', () => {
       }
 
       const result = execSync(
-        `cd ${context.testDir} && node ${context.cliPath} users:create --username testuser2 --password testpass123 --token ${adminToken}`,
+        `cd ${context.testDir} && node ${context.cliPath} users:create --username testuser2 --password Testpass!123 --token ${adminToken}`,
         { encoding: 'utf8' }
       );
 
@@ -98,7 +98,7 @@ describe('CLI User Management', () => {
 
       expect(() => {
         execSync(
-          `cd ${context.testDir} && node ${context.cliPath} users:create --password testpass123 --token ${adminToken}`,
+          `cd ${context.testDir} && node ${context.cliPath} users:create --password Testpass!123 --token ${adminToken}`,
           { encoding: 'utf8' }
         );
       }).toThrow();
@@ -125,7 +125,7 @@ describe('CLI User Management', () => {
       }
 
       const result = execSync(
-        `cd ${context.testDir} && node ${context.cliPath} users:create --username testuser4 --password testpass123 --name "Test User 4" --json --token ${adminToken}`,
+        `cd ${context.testDir} && node ${context.cliPath} users:create --username testuser4 --password Testpass!123 --name "Test User 4" --json --token ${adminToken}`,
         { encoding: 'utf8' }
       );
 
@@ -144,7 +144,7 @@ describe('CLI User Management', () => {
       }
 
       execSync(
-        `cd ${context.testDir} && node ${context.cliPath} users:create --username testregular --password regularpass123 --name "Test Regular" --role public --token ${adminToken}`,
+        `cd ${context.testDir} && node ${context.cliPath} users:create --username testregular --password Regularpass!123 --name "Test Regular" --role public --token ${adminToken}`,
         { stdio: 'pipe' }
       );
     });
@@ -172,7 +172,7 @@ describe('CLI User Management', () => {
       }
 
       const result = execSync(
-        `cd ${context.testDir} && node ${context.cliPath} auth:password --username testregular --password regularpass123 --json`,
+        `cd ${context.testDir} && node ${context.cliPath} auth:password --username testregular --password Regularpass!123 --json`,
         { encoding: 'utf8' }
       );
 
@@ -206,7 +206,7 @@ describe('CLI User Management', () => {
 
       expect(() => {
         execSync(
-          `cd ${context.testDir} && node ${context.cliPath} auth:password --username nonexistent --password testpass123`,
+          `cd ${context.testDir} && node ${context.cliPath} auth:password --username nonexistent --password Testpass!123`,
           { stdio: 'pipe' }
         );
       }).toThrow();
@@ -222,13 +222,13 @@ describe('CLI User Management', () => {
       }
 
       execSync(
-        `cd ${context.testDir} && node ${context.cliPath} users:create --username testregular --password regularpass123 --name "Test Regular" --role public --token ${adminToken}`,
+        `cd ${context.testDir} && node ${context.cliPath} users:create --username testregular --password Regularpass!123 --name "Test Regular" --role public --token ${adminToken}`,
         { stdio: 'pipe' }
       );
 
       // Get regular user token
       const regularResult = execSync(
-        `cd ${context.testDir} && node ${context.cliPath} auth:password --username testregular --password regularpass123 --json`,
+        `cd ${context.testDir} && node ${context.cliPath} auth:password --username testregular --password Regularpass!123 --json`,
         { encoding: 'utf8' }
       );
       const regularJsonResult = extractJSONFromOutput(regularResult);
@@ -303,13 +303,13 @@ describe('CLI User Management', () => {
       }
 
       execSync(
-        `cd ${context.testDir} && node ${context.cliPath} users:create --username testregular --password regularpass123 --name "Test Regular" --role public --token ${adminToken}`,
+        `cd ${context.testDir} && node ${context.cliPath} users:create --username testregular --password Regularpass!123 --name "Test Regular" --role public --token ${adminToken}`,
         { stdio: 'pipe' }
       );
 
       // Get regular user token
       const regularResult = execSync(
-        `cd ${context.testDir} && node ${context.cliPath} auth:password --username testregular --password regularpass123 --json`,
+        `cd ${context.testDir} && node ${context.cliPath} auth:password --username testregular --password Regularpass!123 --json`,
         { encoding: 'utf8' }
       );
       const regularJsonResult = extractJSONFromOutput(regularResult);
@@ -373,17 +373,17 @@ describe('CLI User Management', () => {
       }
 
       execSync(
-        `cd ${context.testDir} && node ${context.cliPath} users:create --username testregular --password regularpass123 --name "Test Regular" --role public --token ${adminToken}`,
+        `cd ${context.testDir} && node ${context.cliPath} users:create --username testregular --password Regularpass!123 --name "Test Regular" --role public --token ${adminToken}`,
         { stdio: 'pipe' }
       );
       execSync(
-        `cd ${context.testDir} && node ${context.cliPath} users:create --username testdelete --password deletepass123 --name "Test Delete" --role public --token ${adminToken}`,
+        `cd ${context.testDir} && node ${context.cliPath} users:create --username testdelete --password Deletepass!123 --name "Test Delete" --role public --token ${adminToken}`,
         { stdio: 'pipe' }
       );
 
       // Get regular user token
       const regularResult = execSync(
-        `cd ${context.testDir} && node ${context.cliPath} auth:password --username testregular --password regularpass123 --json`,
+        `cd ${context.testDir} && node ${context.cliPath} auth:password --username testregular --password Regularpass!123 --json`,
         { encoding: 'utf8' }
       );
       const regularJsonResult = extractJSONFromOutput(regularResult);

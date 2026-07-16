@@ -82,7 +82,7 @@ describe('Session revocation', () => {
   it('changePassword revokes every session the user holds', async () => {
     const user = await authService.createUserWithPassword({
       username: 'pwchange',
-      passwordHash: await bcrypt.hash('old-password-123', 12),
+      passwordHash: await bcrypt.hash('Old-Passw0rd!123', 12),
       email: 'pwchange@example.com',
       role: 'public',
     });
@@ -94,8 +94,8 @@ describe('Session revocation', () => {
 
     const result = await authService.changePassword(
       user.id,
-      'new-password-456',
-      'old-password-123'
+      'New-Passw0rd!456',
+      'Old-Passw0rd!123'
     );
     expect(result.success).toBe(true);
 
@@ -106,7 +106,7 @@ describe('Session revocation', () => {
   it('a failed changePassword (wrong current password) revokes nothing', async () => {
     const user = await authService.createUserWithPassword({
       username: 'pwfail',
-      passwordHash: await bcrypt.hash('old-password-123', 12),
+      passwordHash: await bcrypt.hash('Old-Passw0rd!123', 12),
       email: 'pwfail@example.com',
       role: 'public',
     });
@@ -114,7 +114,7 @@ describe('Session revocation', () => {
 
     const result = await authService.changePassword(
       user.id,
-      'new-password-456',
+      'New-Passw0rd!456',
       'WRONG-current'
     );
     expect(result.success).toBe(false);
@@ -130,7 +130,7 @@ describe('Session revocation', () => {
     });
     const user = await authService.createUserWithPassword({
       username: 'resetme',
-      passwordHash: await bcrypt.hash('stolen-password-1', 12),
+      passwordHash: await bcrypt.hash('Stolen-Passw0rd!1', 12),
       email: 'resetme@example.com',
       role: 'public',
     });
@@ -139,7 +139,7 @@ describe('Session revocation', () => {
 
     const result = await authService.setUserPassword(
       user.id,
-      'fresh-password-2',
+      'Fresh-Passw0rd!2',
       admin.id
     );
     expect(result.success).toBe(true);

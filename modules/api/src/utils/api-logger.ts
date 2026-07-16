@@ -301,12 +301,20 @@ export class ApiLogger {
       };
     }
 
+    // Unexpected error: never leak the raw message to the client — it can
+    // carry paths, SQL fragments, or config values. Full detail stays in the
+    // server-side log (handleError logs before responding); clients get it
+    // only in development.
     return {
       statusCode: 500,
       success: false,
       error: {
         message: defaultMessage,
-        details: error instanceof Error ? error.message : 'Unknown error',
+        ...(process.env.NODE_ENV === 'development'
+          ? {
+              details: error instanceof Error ? error.message : String(error),
+            }
+          : {}),
       },
     };
   }

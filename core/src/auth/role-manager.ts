@@ -419,8 +419,23 @@ export class RoleManager {
     return false;
   }
 
-  private getRolePermissions(role: string, config: RolesConfig): string[] {
+  private getRolePermissions(
+    role: string,
+    config: RolesConfig,
+    visited: Set<string> = new Set()
+  ): string[] {
     const permissions = new Set<string>();
+
+    // Cycle guard: a circular role_hierarchy (e.g. admin → clerk → admin)
+    // used to recurse to stack overflow, which userCan then swallowed as
+    // `false` — silently denying EVERY permission with no diagnosable error.
+    if (visited.has(role)) {
+      logger.warn(
+        `[RoleManager] Circular role inheritance detected at '${role}' (chain: ${[...visited].join(' → ')}) — check role_hierarchy in roles.yml`
+      );
+      return [];
+    }
+    visited.add(role);
 
     logger.debug(`[RoleManager] Getting permissions for role: ${role}`);
 
@@ -511,7 +526,8 @@ export class RoleManager {
       for (const inheritedRole of inheritedRoles) {
         const inheritedPermissions = this.getRolePermissions(
           inheritedRole,
-          config
+          config,
+          visited
         );
         inheritedPermissions.forEach((p) => permissions.add(p));
       }

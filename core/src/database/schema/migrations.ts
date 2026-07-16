@@ -180,6 +180,12 @@ const USER_SECURITY_MIGRATIONS = [
     description: 'Authentication provider tracking',
   },
   {
+    column: 'provider_user_id',
+    sql: 'ALTER TABLE users ADD COLUMN provider_user_id TEXT',
+    description:
+      'Stable OAuth provider identity — account linking must match (auth_provider, provider_user_id), never username',
+  },
+  {
     column: 'email_verified',
     sql: 'ALTER TABLE users ADD COLUMN email_verified BOOLEAN DEFAULT FALSE',
     description: 'Email verification status',
@@ -230,6 +236,21 @@ export async function runUserSecurityMigrations(
     });
   } catch {
     coreDebug('Auth provider update not needed or already completed', {
+      operation: 'database:initialize',
+    });
+  }
+
+  // One provider identity maps to at most one account. Partial index so the
+  // NULLs of local/password users (and legacy OAuth rows awaiting adoption)
+  // don't collide.
+  try {
+    await exec.execute(`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_users_provider_identity
+      ON users(auth_provider, provider_user_id)
+      WHERE provider_user_id IS NOT NULL
+    `);
+  } catch {
+    coreDebug('Provider identity index already exists', {
       operation: 'database:initialize',
     });
   }
