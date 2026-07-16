@@ -77,6 +77,9 @@ export default function setupAuthCommand(cli: CAC) {
           options.token
         );
 
+        // Persist where resolveToken() reads it (see login.ts).
+        const tokenFile = AuthUtils.saveToken(session.token);
+
         cliSuccess(
           {
             session: {
@@ -84,8 +87,9 @@ export default function setupAuthCommand(cli: CAC) {
               user: session.user,
               expiresAt: session.expiresAt,
             },
+            tokenFile,
           },
-          `Authentication successful: ${session.user.username}`,
+          `Authentication successful: ${session.user.username} (session saved to ${tokenFile})`,
           {
             operation: 'auth:login',
             provider: options.provider,

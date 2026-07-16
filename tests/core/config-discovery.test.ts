@@ -185,7 +185,7 @@ describe('Config Discovery with Database Configuration', () => {
   });
 
   describe('Configuration file precedence', () => {
-    it('should prioritize .civicrc over environment variables', async () => {
+    it('CIVIC_DATA_DIR overrides dataDir but does not discard the .civicrc database block', async () => {
       const civicrcPath = join(context.testDir, '.civicrc');
       const civicrc = {
         dataDir: 'data',
@@ -213,11 +213,49 @@ describe('Config Discovery with Database Configuration', () => {
       try {
         const config = CentralConfigManager.getConfig();
 
-        // Should use .civicrc configuration, not environment variable
-        // Note: The current implementation prioritizes environment variables
-        // This test documents the expected behavior
-        expect(config.dataDir).toBeDefined();
+        // CIVIC_DATA_DIR overrides the data directory...
+        expect(config.dataDir).toBe('/different/path');
+        // ...but the .civicrc database block is still honored (post-audit
+        // Tier-C: the env var used to early-return a minimal config and drop
+        // the entire .civicrc, hardcoding the DB to <env>/civic.db).
         expect(config.database?.type).toBe('sqlite');
+        expect(config.database?.sqlite?.file).toContain(
+          'data/.civic/civic.db'
+        );
+      } finally {
+        process.chdir(originalCwd);
+        if (originalEnv) {
+          process.env.CIVIC_DATA_DIR = originalEnv;
+        } else {
+          delete process.env.CIVIC_DATA_DIR;
+        }
+      }
+    });
+
+    it('preserves non-database .civicrc fields (e.g. auth) when CIVIC_DATA_DIR is set', async () => {
+      const civicrcPath = join(context.testDir, '.civicrc');
+      const civicrc = {
+        dataDir: 'data',
+        database: { type: 'sqlite', sqlite: { file: 'data/.civic/civic.db' } },
+        auth: { providers: ['password'], defaultRole: 'public' },
+      };
+      writeFileSync(civicrcPath, yaml.dump(civicrc));
+      CentralConfigManager.reset();
+
+      const originalEnv = process.env.CIVIC_DATA_DIR;
+      process.env.CIVIC_DATA_DIR = '/different/path';
+      const originalCwd = process.cwd();
+      process.chdir(context.testDir);
+
+      try {
+        const config = CentralConfigManager.getConfig() as {
+          dataDir?: string;
+          auth?: { providers?: string[]; defaultRole?: string };
+        };
+        expect(config.dataDir).toBe('/different/path');
+        // auth was silently discarded by the old early-return.
+        expect(config.auth?.providers).toEqual(['password']);
+        expect(config.auth?.defaultRole).toBe('public');
       } finally {
         process.chdir(originalCwd);
         if (originalEnv) {
