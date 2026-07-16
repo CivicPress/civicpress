@@ -139,34 +139,41 @@ export class StreamingOps {
         sourceStream = fs.createReadStream(request.filePath as string);
       }
 
-      // Count bytes as they flow to the provider. Streaming uploads without a
-      // Content-Length used to persist size=0 for S3/Azure ("provider will set
-      // size" — it never did), which silently broke quota accounting. The
-      // counter is an in-band Transform (NOT a 'data' listener, which would
-      // be a second consumer racing the provider's pipe) so it observes every
-      // byte exactly once and passes each chunk straight through.
-      let byteCount = 0;
-      const counter = new Transform({
-        transform(chunk: Buffer, _enc, cb) {
-          byteCount += chunk.length;
-          cb(null, chunk);
-        },
-      });
-      const countedStream = sourceStream.pipe(counter);
-      // .pipe() does not forward source errors; without this a source-stream
-      // error would leave the provider pipe hanging (the exact hazard the
-      // pre-existing code guarded against by passing the source directly).
-      sourceStream.on('error', (err) => counter.destroy(err));
+      // For REMOTE providers, count bytes as they flow so the DB row records
+      // the real size — streamed S3/Azure uploads without a Content-Length
+      // used to persist size=0 ("provider will set size" — it never did),
+      // silently breaking quota. The counter is an in-band Transform (not a
+      // 'data' listener, which would be a second consumer racing the pipe).
+      // The LOCAL path deliberately does NOT use the counter: its size comes
+      // from an authoritative fs.stat, and inserting a second pipe stage
+      // there only added a stream-error-propagation hazard for no benefit.
+      const makeCountedStream = (): {
+        stream: Readable;
+        getSize: () => number;
+      } => {
+        let byteCount = 0;
+        const counter = new Transform({
+          transform(chunk: Buffer, _enc, cb) {
+            byteCount += chunk.length;
+            cb(null, chunk);
+          },
+        });
+        const piped = sourceStream!.pipe(counter);
+        // .pipe() doesn't forward source errors — destroy the counter so the
+        // provider's consumption rejects instead of hanging.
+        sourceStream!.once('error', (err) => counter.destroy(err));
+        return { stream: piped, getSize: () => byteCount };
+      };
 
       try {
         // Upload to provider using stream
         switch (provider.type) {
           case 'local': {
             providerPath = await this.uploadStreamToLocal(
-              countedStream,
+              sourceStream,
               relativePath
             );
-            // Prefer the on-disk size (authoritative); fall back to the count.
+            // Authoritative on-disk size.
             const fullPath = path.join(
               getLocalStoragePath(host),
               relativePath
@@ -175,9 +182,10 @@ export class StreamingOps {
             actualSize = stats.size;
             break;
           }
-          case 's3':
+          case 's3': {
+            const counted = makeCountedStream();
             providerPath = await this.uploadStreamToS3(
-              countedStream,
+              counted.stream,
               relativePath,
               provider,
               request.contentType ||
@@ -185,11 +193,13 @@ export class StreamingOps {
                 'application/octet-stream',
               request.options?.metadata
             );
-            actualSize = byteCount;
+            actualSize = counted.getSize();
             break;
-          case 'azure':
+          }
+          case 'azure': {
+            const counted = makeCountedStream();
             providerPath = await this.uploadStreamToAzure(
-              countedStream,
+              counted.stream,
               relativePath,
               provider,
               request.contentType ||
@@ -197,11 +207,13 @@ export class StreamingOps {
                 'application/octet-stream',
               request.options?.metadata
             );
-            actualSize = byteCount;
+            actualSize = counted.getSize();
             break;
-          case 'gcs':
+          }
+          case 'gcs': {
+            const counted = makeCountedStream();
             providerPath = await this.uploadStreamToGCS(
-              countedStream,
+              counted.stream,
               relativePath,
               provider,
               request.contentType ||
@@ -209,8 +221,9 @@ export class StreamingOps {
                 'application/octet-stream',
               request.options?.metadata
             );
-            actualSize = byteCount;
+            actualSize = counted.getSize();
             break;
+          }
           default:
             throw new Error(`Unsupported provider type: ${provider.type}`);
         }
@@ -225,7 +238,7 @@ export class StreamingOps {
               : 'UNKNOWN_ERROR';
           host.metricsCollector.recordUpload(
             false,
-            byteCount || request.size || 0,
+            request.size || 0,
             Date.now() - startTime,
             activeProvider,
             errorCode
