@@ -206,6 +206,22 @@ export class UserStore {
   }
 
   async deleteUser(userId: number): Promise<void> {
+    // Application-level cascade: with PRAGMA foreign_keys=ON a bare user
+    // DELETE fails while sessions/api_keys/audit_logs rows reference the
+    // user — their FKs are declared without ON DELETE actions, and existing
+    // databases can't be re-declared without a table-rebuild migration.
+    // Sessions and API keys die with the account; audit rows are history,
+    // so they are kept and detached (SET NULL semantics).
+    await this.adapter.execute('DELETE FROM sessions WHERE user_id = ?', [
+      userId,
+    ]);
+    await this.adapter.execute('DELETE FROM api_keys WHERE user_id = ?', [
+      userId,
+    ]);
+    await this.adapter.execute(
+      'UPDATE audit_logs SET user_id = NULL WHERE user_id = ?',
+      [userId]
+    );
     await this.adapter.execute('DELETE FROM users WHERE id = ?', [userId]);
   }
 
@@ -310,6 +326,13 @@ export class UserStore {
 
   async deleteSession(id: number): Promise<void> {
     await this.adapter.execute('DELETE FROM sessions WHERE id = ?', [id]);
+  }
+
+  /** Revoke every session a user holds (logout-everywhere, password change). */
+  async deleteUserSessions(userId: number): Promise<void> {
+    await this.adapter.execute('DELETE FROM sessions WHERE user_id = ?', [
+      userId,
+    ]);
   }
 
   async cleanupExpiredSessions(): Promise<void> {

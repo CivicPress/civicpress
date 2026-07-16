@@ -256,6 +256,12 @@ export class DatabaseService {
     return this.users.deleteSession(...args);
   }
 
+  async deleteUserSessions(
+    ...args: Parameters<UserStore['deleteUserSessions']>
+  ): Promise<void> {
+    return this.users.deleteUserSessions(...args);
+  }
+
   async cleanupExpiredSessions(): Promise<void> {
     return this.users.cleanupExpiredSessions();
   }
@@ -505,17 +511,38 @@ export class DatabaseService {
     details?: string;
     ipAddress?: string;
   }): Promise<void> {
-    await this.adapter.execute(
-      'INSERT INTO audit_logs (user_id, action, resource_type, resource_id, details, ip_address) VALUES (?, ?, ?, ?, ?, ?)',
-      [
-        auditData.userId,
-        auditData.action,
-        auditData.resourceType,
-        auditData.resourceId,
-        auditData.details,
-        auditData.ipAddress,
-      ]
-    );
+    const insert = (userId: number | null, details?: string) =>
+      this.adapter.execute(
+        'INSERT INTO audit_logs (user_id, action, resource_type, resource_id, details, ip_address) VALUES (?, ?, ?, ?, ?, ?)',
+        [
+          userId,
+          auditData.action,
+          auditData.resourceType,
+          auditData.resourceId,
+          details,
+          auditData.ipAddress,
+        ]
+      );
+
+    try {
+      await insert(auditData.userId ?? null, auditData.details);
+    } catch (error) {
+      // audit_logs is append-only history; its user_id FK (declared with no
+      // ON DELETE action, and unchangeable on existing databases without a
+      // table rebuild) must not abort the business operation or lose the
+      // audit row when the actor's user row is absent — a user deleted
+      // mid-flight, or a synthetic actor in tests. Keep the row, detach the
+      // reference, and preserve the numeric attribution in details.
+      const message = error instanceof Error ? error.message : String(error);
+      if (auditData.userId != null && /FOREIGN KEY/i.test(message)) {
+        await insert(
+          null,
+          `${auditData.details ?? ''} [detached user_id=${auditData.userId}: not in users]`.trim()
+        );
+        return;
+      }
+      throw error;
+    }
   }
 
   async getAuditLogs(

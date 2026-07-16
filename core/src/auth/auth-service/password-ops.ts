@@ -27,6 +27,8 @@ export interface PasswordOpsDeps {
     userId: number,
     expiresInHours?: number
   ) => Promise<{ token: string; session: Session }>;
+  /** SessionOps relay — revoke every session a user holds. */
+  deleteUserSessions: (userId: number) => Promise<void>;
   /** Authentication-provider guards (live on the orchestrator). */
   canSetPassword: (user: AuthUser) => boolean;
   getUserAuthProvider: (user: AuthUser) => string;
@@ -197,11 +199,16 @@ export class PasswordOps {
         };
       }
 
+      // Revoke every existing session: a password change must cut off
+      // whoever holds tokens minted under the old credential (the
+      // stolen-token case is exactly why the user is changing it).
+      await this.deps.deleteUserSessions(userId);
+
       // Log security event
       await this.deps.logAuthEvent(
         userId,
         'password_changed',
-        `Password changed for user ${currentUser.username}`
+        `Password changed for user ${currentUser.username}; all sessions revoked`
       );
 
       this.deps.logger?.info(
@@ -271,11 +278,15 @@ export class PasswordOps {
         };
       }
 
+      // Revoke the target user's sessions — an admin reset is the standard
+      // compromise response, so live tokens must die with the old password.
+      await this.deps.deleteUserSessions(userId);
+
       // Log security event
       await this.deps.logAuthEvent(
         adminUserId,
         'admin_password_set',
-        `Password set for user ${targetUser.username} by admin`
+        `Password set for user ${targetUser.username} by admin; all sessions revoked`
       );
 
       this.deps.logger?.info(
