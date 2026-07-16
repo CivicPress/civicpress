@@ -134,12 +134,23 @@ export class GitEngine {
   }
 
   /**
-   * Get commit history
+   * Get commit history. When `pathspec` is given, the log is scoped to that
+   * path (`git log -- <pathspec>`) — the correct way to get a single record's
+   * history. Callers previously substring-matched commit MESSAGES for the
+   * record id, which both missed commits touching the file without naming it
+   * and matched unrelated commits that happened to mention the id.
    */
-  async getHistory(limit?: number): Promise<GitCommit[]> {
+  async getHistory(limit?: number, pathspec?: string): Promise<GitCommit[]> {
     try {
       const git = this.getGit();
-      const options = limit ? ['-n', limit.toString()] : [];
+      const options: Record<string, unknown> = {};
+      if (limit) {
+        options.maxCount = limit;
+      }
+      if (pathspec) {
+        // simple-git scopes the log to this path when `file` is set.
+        options.file = pathspec;
+      }
       const log = await git.log(options);
       return Array.from(log.all);
     } catch (error) {

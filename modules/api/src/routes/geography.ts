@@ -462,18 +462,34 @@ export function createGeographyRouter(
         const page = (req.query.page as unknown as number) || 1;
         const limit = (req.query.limit as unknown as number) || 50;
 
-        // FA-API-014: reuse the shared RecordsService (injected) instead of
-        // constructing one per request, and page the response. The scan stays
-        // bounded by LINKED_RECORDS_SCAN_CAP so a single request can't pull the
-        // whole corpus into memory.
-        const allRecords = await recordsService.listRecords({
-          limit: LINKED_RECORDS_SCAN_CAP,
-        });
-        const linked = allRecords.records.filter((record) => {
-          const links = (record as { linkedGeographyFiles?: Array<{ id: string }> })
-            .linkedGeographyFiles;
-          return links?.some((link) => link.id === id);
-        });
+        // Scan the WHOLE corpus in bounded batches, keeping only the records
+        // that link this geography. The prior implementation capped the scan
+        // at the first 1000 records, silently dropping links on any record
+        // past the cap AND reporting a `total` computed from that truncated
+        // subset. Memory stays proportional to the (small) match set plus one
+        // batch, not the whole corpus (FA-API-014's concern).
+        const linked: unknown[] = [];
+        let scanPage = 1;
+        let scanned = 0;
+        for (;;) {
+          const batch = await recordsService.listRecords({
+            limit: LINKED_RECORDS_SCAN_CAP,
+            page: scanPage,
+          });
+          for (const record of batch.records) {
+            const links = (
+              record as { linkedGeographyFiles?: Array<{ id: string }> }
+            ).linkedGeographyFiles;
+            if (links?.some((link) => link.id === id)) {
+              linked.push(record);
+            }
+          }
+          scanned += batch.records.length;
+          if (batch.records.length === 0 || scanned >= batch.totalCount) {
+            break;
+          }
+          scanPage += 1;
+        }
 
         const total = linked.length;
         const start = (page - 1) * limit;

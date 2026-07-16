@@ -61,13 +61,39 @@ export const historyCommand = (cli: CAC) => {
           process.exit(1);
         }
 
+        // When a record is named, scope the log to its file via a pathspec
+        // (git log -- <path>) instead of ignoring the argument entirely, as
+        // this command used to. Resolve the record's real path through a
+        // CivicPress instance; unresolvable → unscoped history.
+        let pathspec: string | undefined;
+        if (record) {
+          try {
+            const { CivicPress, CentralConfigManager } = await import(
+              '@civicpress/core'
+            );
+            const civic = new CivicPress({
+              dataDir,
+              database: CentralConfigManager.getDatabaseConfig(),
+            });
+            await civic.initialize();
+            try {
+              const rec = await civic.getRecordManager().getRecord(record);
+              pathspec = (rec as { path?: string } | null)?.path;
+            } finally {
+              await civic.shutdown();
+            }
+          } catch {
+            // fall back to unscoped history
+          }
+        }
+
         // Get commit history
         const limit = parseInt(options.limit) || 10;
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         let history: any[] = [];
 
         try {
-          history = await git.getHistory(limit);
+          history = await git.getHistory(limit, pathspec);
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } catch (error: any) {
           // Handle case where there are no commits yet

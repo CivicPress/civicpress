@@ -5,6 +5,7 @@ import {
   requireRecordPermission,
 } from '../middleware/auth.js';
 import { Logger } from '@civicpress/core';
+import type { GitCommit } from '@civicpress/core';
 import {
   sendSuccess,
   handleApiError,
@@ -13,6 +14,43 @@ import {
 } from '../utils/api-logger.js';
 
 const logger = new Logger();
+
+/**
+ * Return commit history scoped to a single record. Resolves the record's
+ * real file path and uses a git pathspec (`git log -- <path>`); only if the
+ * record can't be resolved does it fall back to a commit-message match
+ * (with the id and `<id>.md`, no no-op replace). No record → full history.
+ */
+async function resolveRecordHistory(
+  req: AuthenticatedRequest,
+  gitEngine: {
+    getHistory: (limit?: number, pathspec?: string) => Promise<GitCommit[]>;
+  },
+  record: string | undefined
+): Promise<GitCommit[]> {
+  if (!record) {
+    return gitEngine.getHistory();
+  }
+  try {
+    const rec = await req.civicPress?.getRecordManager().getRecord(record);
+    const recordPath = (rec as { path?: string } | null | undefined)?.path;
+    if (recordPath) {
+      return gitEngine.getHistory(undefined, recordPath);
+    }
+  } catch (error) {
+    logger.warn('Could not resolve record path for history pathspec', {
+      record,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+  // Fallback: message match (id or <id>.md), no no-op replace.
+  const messageNeedle = `${record}.md`;
+  const all = await gitEngine.getHistory();
+  return all.filter(
+    (commit) =>
+      commit.message.includes(record) || commit.message.includes(messageNeedle)
+  );
+}
 
 export function createHistoryRouter() {
   const router = Router();
@@ -88,22 +126,16 @@ export function createHistoryRouter() {
         const historyLimit = parseInt(limit as string) || 10;
         const historyOffset = parseInt(offset as string) || 0;
 
-        // Get all commits first to get accurate total count
-        let history = await gitEngine.getHistory();
-
-        // Filter by record if specified
-        if (record) {
-          const recordPath = `${record}.md`;
-          const recordStr = record as string;
-          history = history.filter((commit) => {
-            // Check if this commit affected the specified record
-            return (
-              commit.message.includes(recordStr) ||
-              commit.message.includes(recordPath) ||
-              commit.message.includes(recordStr.replace('/', '/'))
-            );
-          });
-        }
+        // Scope by record via a git pathspec when one is requested. Resolve
+        // the record's actual file path and let git filter (git log -- path);
+        // fall back to a commit-message match only when the record can't be
+        // resolved. (The old code substring-matched the message with a no-op
+        // `.replace('/','/')`, which both missed and over-matched commits.)
+        let history = await resolveRecordHistory(
+          req,
+          gitEngine,
+          record as string | undefined
+        );
 
         // Filter by author if specified
         if (author) {
@@ -250,19 +282,8 @@ export function createHistoryRouter() {
         const historyLimit = parseInt(limit as string) || 10;
         const historyOffset = parseInt(offset as string) || 0;
 
-        // Get all commits first to get accurate total count
-        let history = await gitEngine.getHistory();
-
-        // Filter by specific record
-        const recordPath = `${record}.md`;
-        history = history.filter((commit) => {
-          // Check if this commit affected the specified record
-          return (
-            commit.message.includes(record) ||
-            commit.message.includes(recordPath) ||
-            commit.message.includes(record.replace('/', '/'))
-          );
-        });
+        // Scope by record via a git pathspec (see the list handler above).
+        let history = await resolveRecordHistory(req, gitEngine, record);
 
         // Filter by author if specified
         if (author) {
