@@ -167,9 +167,13 @@ follow-up. (Storage, config+CLI, API-routes clusters + saga/BB/notifications.)
     `.system-data` users DB across files. Not required for the burn-down (clean
     CI runs pass), but the proper fix is the `CentralConfigManager.reset()` /
     per-test system-data isolation item below.
-  - **DEFERRED defense-in-depth (BB):** `SessionController.startSession` should
-    check the `executeCommand` result's `.success` and NOT flip to `recording`
-    when the send fails (currently a failed send resolves rather than rejects).
+  - **DONE 2026-07-17 (phase-7f), defense-in-depth (BB):** `SessionController.startSession`
+    now inspects the `executeCommand` result's `.success` and fails closed —
+    `executeCommand` RESOLVES with `{success:false}` (it does not throw) on
+    disconnect/timeout/nack, so the session no longer flips to `recording` on an
+    unacked send (the FA-BB-008 invariant). Unit test added for the failure path;
+    the device-ws e2e tests now have the fake device actually ACK commands (they
+    previously relied on the 5s timeout-then-proceed and never confirmed an ack).
 - [ ] `CentralConfigManager.reset()` in setup/teardown (API flakiness root cause; also lets CI drop `--fileParallelism=false`; would fix the shared-`.system-data` cross-file dirty-state 409s the burn-down documented)
 - [x] **Un-skip 8 security-critical auth tests — DONE 2026-07-17.** Un-skipped all
   8 in `security-features.test.ts`; now pass. The "400-vs-403" was real: **4 code
