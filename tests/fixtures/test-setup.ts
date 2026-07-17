@@ -21,7 +21,7 @@ import {
 import { ensureDirSync } from 'fs-extra';
 import { tmpdir } from 'os';
 import yaml from 'js-yaml';
-import { RecordParser, RecordData } from '@civicpress/core';
+import { RecordParser, RecordData, CentralConfigManager } from '@civicpress/core';
 
 // Test configuration
 export interface TestConfig {
@@ -1529,6 +1529,13 @@ export async function createAPITestContext(): Promise<APITestContext> {
   const originalCwd = process.cwd();
   process.chdir(config.testDir);
 
+  // Drop any cached central config (e.g. one the CivicPressAPI constructor or a
+  // prior test resolved while cwd was the repo root — which pins the sqlite DB to
+  // the shared repo-root .system-data/civic.db). Resetting here forces the next
+  // getConfig() to re-resolve from THIS test's .civicrc, so the DB is the isolated
+  // testDir/test.db and users no longer accumulate across files/runs (the 409s).
+  CentralConfigManager.reset();
+
   try {
     // Initialize CivicPress core first, then force reload role config before setting up routes
     await api.initialize(config.dataDir);
@@ -1592,6 +1599,9 @@ export async function cleanupAPITestContext(context: APITestContext) {
   if (existsSync(context.testDir)) {
     rmSync(context.testDir, { recursive: true, force: true });
   }
+  // Clear the cached config so the next context re-resolves against its own
+  // .civicrc rather than inheriting this test's (now-deleted) testDir path.
+  CentralConfigManager.reset();
 }
 
 // Example: Extended API test context with new features
@@ -1608,7 +1618,18 @@ export async function createExtendedAPITestContext(): Promise<APITestContext> {
   // Initialize API with dynamic port
   const { CivicPressAPI } = await import('../../modules/api/src/index.js');
   const api = new CivicPressAPI(port);
-  await api.initialize(config.dataDir);
+
+  // Resolve config against THIS test's .civicrc (isolated testDir/test.db), the
+  // same way createAPITestContext does — this helper previously never chdir'd, so
+  // it always hit the shared repo-root DB.
+  const originalCwd = process.cwd();
+  process.chdir(config.testDir);
+  CentralConfigManager.reset();
+  try {
+    await api.initialize(config.dataDir);
+  } finally {
+    process.chdir(originalCwd);
+  }
 
   return {
     api,
@@ -1662,6 +1683,7 @@ export async function cleanupCoreTestContext(context: CoreTestContext) {
   if (existsSync(context.testDir)) {
     rmSync(context.testDir, { recursive: true, force: true });
   }
+  CentralConfigManager.reset();
 }
 
 // Test utilities
