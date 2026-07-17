@@ -174,7 +174,25 @@ follow-up. (Storage, config+CLI, API-routes clusters + saga/BB/notifications.)
     unacked send (the FA-BB-008 invariant). Unit test added for the failure path;
     the device-ws e2e tests now have the fake device actually ACK commands (they
     previously relied on the 5s timeout-then-proceed and never confirmed an ack).
-- [ ] `CentralConfigManager.reset()` in setup/teardown (API flakiness root cause; also lets CI drop `--fileParallelism=false`; would fix the shared-`.system-data` cross-file dirty-state 409s the burn-down documented)
+- [x] **`CentralConfigManager.reset()` in setup/teardown — DONE 2026-07-17 (phase-7g).**
+  Root cause of the cross-file dirty-state 409s: the repo-root `.civicrc` has no
+  `dataDir`/`database`, so `CentralConfigManager` defaults the sqlite path to the
+  shared `<repo>/.system-data/civic.db`; the cached static singleton was resolved
+  once (cwd = repo root, before a test's temporary chdir) and never reset, so
+  every API test — even across separate `forks` — wrote users into that one
+  on-disk DB and 409'd on re-registration. Fix (`tests/fixtures/test-setup.ts`):
+  import `CentralConfigManager` and `reset()` right after the chdir-into-testDir
+  (so config re-resolves from the per-test `.civicrc` → isolated `testDir/test.db`)
+  and on teardown; `createExtendedAPITestContext` also gained the missing
+  chdir+reset (it never chdir'd, so it always hit the shared DB). Verified: the
+  formerly dirty-sensitive cluster (users/records/security-features/auth/
+  user-management) now passes **twice back-to-back with no cleaning** and the
+  shared repo-root DB is never created; a 12-file parallel probe is likewise
+  clean. **Parallelism (dropping CI `--fileParallelism=false`):** the shared-DB
+  contention that the CI "flakes under load" comment blamed is now gone (`forks`
+  already isolates memory); a broad parallel validation is the gate before
+  flipping the CI flag — leave `--fileParallelism=false` until that full run is
+  green.
 - [x] **Un-skip 8 security-critical auth tests — DONE 2026-07-17.** Un-skipped all
   8 in `security-features.test.ts`; now pass. The "400-vs-403" was real: **4 code
   bugs** (external-auth password rejection returned 400 not 403 across
