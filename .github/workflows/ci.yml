@@ -83,16 +83,18 @@ jobs:
       - name: Registry check
         run: pnpm run registry:check
 
-      # Serialized until the known cross-file DB/auth races are fixed (the
-      # CentralConfigManager static-cache item in the test-health batch);
-      # with fileParallelism the suite flakes tens of files under load.
-      # CIVIC_TEST_QUARANTINE excludes 5 files (11 tests) that fail
-      # deterministically from a clean checkout of main — pre-existing
-      # failures surfaced by standing up CI, quarantined so the gate is
-      # honest-green for everything else. List + burn-down owner:
-      # vitest.config.mjs and docs/backlog/2026-07-post-audit-hardening.md.
-      - name: Root test suite (5 files quarantined — see vitest.config.mjs)
-        run: npx vitest run --fileParallelism=false
+      # Runs in PARALLEL again (phase-7g). The cross-file DB/auth races that
+      # forced --fileParallelism=false are fixed: CentralConfigManager's cached
+      # singleton defaulted every test to the shared repo-root .system-data DB;
+      # each test now resets it and resolves an isolated testDir DB. Validated
+      # green across the full suite in parallel (165 files / 1530 tests, shared
+      # DB never created). Concurrency = the config's fileParallelism:2 on
+      # pool:'forks' (isolate:true). CIVIC_TEST_QUARANTINE is retained but its
+      # list is now EMPTY (burn-down done) — kept only as a hook to park a future
+      # regression WITH a tracker entry. See vitest.config.mjs and
+      # docs/backlog/2026-07-post-audit-hardening.md.
+      - name: Root test suite
+        run: npx vitest run
         env:
           CIVIC_TEST_QUARANTINE: '1'
 
