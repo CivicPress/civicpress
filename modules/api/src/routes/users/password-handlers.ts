@@ -54,6 +54,20 @@ export function registerPasswordRoutes(router: Router): void {
         }
       }
 
+      // External-auth accounts have no local password to verify or replace.
+      // Reject with 403 (an authorization refusal), not the generic 400 that the
+      // core {success:false} result maps to. This is a guard — do not remove it.
+      const targetUser = await authService.getUserById(userId);
+      if (targetUser && !authService.canSetPassword(targetUser)) {
+        const provider = authService.getUserAuthProvider(targetUser);
+        const error = new HttpError(
+          403,
+          `Users authenticated via ${provider} cannot change passwords. Password management is handled by the external authentication.`,
+          'EXTERNAL_AUTH_PASSWORD_FORBIDDEN'
+        );
+        return handleApiError('change_password', error, req, res, error.message);
+      }
+
       // Change password with security guards
       const result = await authService.changePassword(
         userId,
@@ -138,6 +152,27 @@ export function registerPasswordRoutes(router: Router): void {
           res,
           'Admin privileges required to set user passwords'
         );
+      }
+
+      // Existence check (404) — placed AFTER the admin (403) check so a non-admin
+      // can never probe which user ids exist. setUserPassword otherwise throws
+      // 'User not found' inside its try and surfaces as an opaque 500.
+      const targetUser = await authService.getUserById(userId);
+      if (!targetUser) {
+        const error = new HttpError(404, 'User not found', 'USER_NOT_FOUND');
+        return handleApiError('set_password', error, req, res, 'User not found');
+      }
+
+      // External-auth accounts cannot hold a local password. Reject with 403
+      // (not the generic 400 the core result maps to). This is a guard — keep it.
+      if (!authService.canSetPassword(targetUser)) {
+        const provider = authService.getUserAuthProvider(targetUser);
+        const error = new HttpError(
+          403,
+          `Users authenticated via ${provider} cannot set passwords. Password management is handled by the external authentication.`,
+          'EXTERNAL_AUTH_PASSWORD_FORBIDDEN'
+        );
+        return handleApiError('set_password', error, req, res, error.message);
       }
 
       // Set password with security guards

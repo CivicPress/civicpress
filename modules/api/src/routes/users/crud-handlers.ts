@@ -391,8 +391,11 @@ export function registerCrudRoutes(router: Router): void {
         // SECURITY GUARD: Check if user can set password (prevent external auth users)
         if (!authService.canSetPassword(targetUser)) {
           const provider = authService.getUserAuthProvider(targetUser);
-          const error = new HttpError(400, 
-            `Users authenticated via ${provider} cannot set passwords. Password management is handled by the external provider.`
+          // 403 (not 400): this is an authorization refusal, and the error code
+          // literally says FORBIDDEN. "external authentication" wording matches
+          // the change-password / set-password guards and the API docs.
+          const error = new HttpError(403,
+            `Users authenticated via ${provider} cannot set passwords. Password management is handled by the external authentication.`
           , 'EXTERNAL_AUTH_PASSWORD_FORBIDDEN');
           return handleApiError('update_user', error, req, res);
         }
