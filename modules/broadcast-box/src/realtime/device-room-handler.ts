@@ -323,6 +323,18 @@ export class DeviceRoomHandler implements RoomTypeHandler {
         clientId
       );
 
+      // Fail fast any command still awaiting an ack from this device — the socket
+      // is gone, so it can never ack; without this the caller blocks for the full
+      // command timeout on a device that has already left.
+      if (
+        typeof this.config.deviceCommandService?.rejectPendingForDevice ===
+        'function'
+      ) {
+        this.config.deviceCommandService.rejectPendingForDevice(
+          auth.deviceAuth.deviceUuid
+        );
+      }
+
       // Broadcast disconnect to observers
       const disconnectMessage = {
         type: 'control',

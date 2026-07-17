@@ -41,19 +41,35 @@ export function registerCrudRoutes(router: Router): void {
       // Check if user can manage users
       const canManageUsers = await authService.userCan(user, 'users:manage');
       if (!canManageUsers) {
-        // DEBUG: Get user permissions to see what's loaded
-        const userPermissions = await authService.getUserPermissions(user);
-        const error = new HttpError(403, `Insufficient permissions to list users. User ${user.username} (${user.role}) has permissions: ${userPermissions.join(', ')}`, 'INSUFFICIENT_PERMISSIONS');
-    return handleApiError('list_users', error, req, res);
+        // Do NOT echo the caller's resolved permission set — that is an
+        // information-disclosure gift to an attacker probing the boundary.
+        const error = new HttpError(
+          403,
+          'Insufficient permissions to list users',
+          'INSUFFICIENT_PERMISSIONS'
+        );
+        return handleApiError('list_users', error, req, res);
       }
 
-      // Get query parameters
-      const { limit = 50, offset = 0, role, search } = req.query;
+      // Get query parameters. Cap the limit so a caller can't request an
+      // unbounded result set, and coerce junk (NaN / negative) to safe defaults.
+      const { role, search } = req.query;
+      const MAX_USERS_LIMIT = 200;
+      const parsedLimit = Number(req.query.limit ?? 50);
+      const limit =
+        Number.isFinite(parsedLimit) && parsedLimit > 0
+          ? Math.min(Math.floor(parsedLimit), MAX_USERS_LIMIT)
+          : 50;
+      const parsedOffset = Number(req.query.offset ?? 0);
+      const offset =
+        Number.isFinite(parsedOffset) && parsedOffset >= 0
+          ? Math.floor(parsedOffset)
+          : 0;
 
       // Get users from database
       const users = await civicPress.getDatabaseService().listUsers({
-        limit: Number(limit),
-        offset: Number(offset),
+        limit,
+        offset,
         role: role as string,
         search: search as string,
       });
@@ -72,8 +88,8 @@ export function registerCrudRoutes(router: Router): void {
           })),
           pagination: {
             total: users.total,
-            limit: Number(limit),
-            offset: Number(offset),
+            limit,
+            offset,
           },
         },
         req,

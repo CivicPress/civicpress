@@ -108,6 +108,7 @@ export class DeviceCommandService {
       reject: (error: Error) => void;
       timeout: NodeJS.Timeout;
       action?: string; // Track command action for processing ACK responses
+      deviceUuid?: string; // device this command targets — reject on its disconnect
     }
   > = new Map();
 
@@ -419,6 +420,7 @@ export class DeviceCommandService {
         },
         timeout: timeoutHandle,
         action: command.action, // Store action for ACK processing
+        deviceUuid: deviceId, // room key == device UUID; used by reject-on-disconnect
       });
 
       // Send command directly to device only (not to observers)
@@ -490,9 +492,41 @@ export class DeviceCommandService {
         commandId: ack.commandId,
         pendingCommandIds,
         pendingCount: this.pendingCommands.size,
-        ackMessage: JSON.stringify(ack),
+        // Redact before logging — an ack payload can carry a stream_key or other
+        // secret (FA-BB-009), and an unknown/unmatched ack is exactly the path a
+        // malformed or spoofed device frame takes.
+        ackMessage: JSON.stringify(redactSecretFields(ack)),
       });
     }
+  }
+
+  /**
+   * Reject every in-flight command awaiting an ack from `deviceUuid`. Called when
+   * the device's socket drops so callers fail fast (→ {success:false}) instead of
+   * blocking for the full command timeout on a device that is already gone.
+   * Returns the number of commands rejected.
+   */
+  rejectPendingForDevice(deviceUuid: string): number {
+    // Snapshot first — pending.reject() deletes from the map as it runs.
+    const toReject = Array.from(this.pendingCommands.values()).filter(
+      (p) => p.deviceUuid === deviceUuid
+    );
+    for (const pending of toReject) {
+      pending.reject(
+        new BroadcastBoxError(
+          BroadcastBoxErrorCode.DEVICE_NOT_CONNECTED,
+          'Device disconnected before acknowledging the command'
+        )
+      );
+    }
+    if (toReject.length > 0) {
+      coreWarn('Rejected in-flight commands on device disconnect', {
+        operation: 'broadcast-box:command:reject-on-disconnect',
+        deviceUuid,
+        rejected: toReject.length,
+      });
+    }
+    return toReject.length;
   }
 
   /**

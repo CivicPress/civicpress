@@ -74,13 +74,42 @@ follow-up. (Storage, config+CLI, API-routes clusters + saga/BB/notifications.)
 
 ## Tier D — small, batchable
 
-- [ ] Quota check + `acquireLock` TOCTOU
-- [ ] BB in-flight commands rejected on disconnect
-- [ ] BB unknown-ack raw payload → `redactSecretFields`
+- [x] **`acquireLock` TOCTOU — DONE 2026-07-17 (phase-7h).** `DatabaseService.acquireLock`
+  did `DELETE expired → getLock check → INSERT OR REPLACE → return true`, so two
+  concurrent callers both saw "no active lock" and both wrote → two holders of one
+  record lock. Replaced with a single atomic `INSERT … ON CONFLICT(record_id) DO
+  UPDATE … WHERE expires_at <= ?`; `changes` decides the winner. Also fixed a
+  latent bug: expiry is stored as `toISOString()` but was compared to SQLite
+  `CURRENT_TIMESTAMP` (incompatible ordering) — now ISO-to-ISO. Tests
+  (`database-service.test.ts`): 12 concurrent acquirers → exactly 1 wins; held →
+  refuses; expired → re-acquirable (proven to fail on the old code).
+- [ ] **Quota-check TOCTOU (residual, reclassified out of Tier-D):** `QuotaManager.checkQuota`
+  is enforced (storage-001) but is a read-then-decide with no reservation, so N
+  simultaneous uploads to a near-full folder can each pass and jointly exceed the
+  quota by up to N×maxFileSize. Not a security hole (each upload still checks; the
+  overage is bounded and self-corrects once usage is measured). A correct fix needs
+  an in-memory/DB **reservation counter** with leak-proof (TTL) release wired
+  through `upload-ops`/`streaming-ops` — larger than a quick win; deferred.
+- [x] **BB in-flight commands rejected on disconnect — DONE 2026-07-17 (phase-7h).**
+  `DeviceCommandService` now tags each pending command with its `deviceUuid` and
+  exposes `rejectPendingForDevice()`; `DeviceRoomHandler.onDisconnect` calls it, so
+  a command awaiting an ack from a device that just dropped fails fast (→
+  `{success:false}`) instead of blocking for the full command timeout.
+- [x] **BB unknown-ack raw payload redacted — DONE 2026-07-17 (phase-7h).** The
+  `unknown-ack` `coreWarn` logged `JSON.stringify(ack)` raw; now
+  `JSON.stringify(redactSecretFields(ack))` (an unmatched ack is exactly the
+  malformed/spoofed-frame path, and an ack payload can carry a stream_key).
 - [ ] HW QR f-string; `_untrack_pid` Process-vs-pid; subprocess type-hint
 - [ ] HW Wi-Fi PSK off nmcli argv; reject plain-http enrollment
-- [ ] `GET /api/users` limit cap; drop DEBUG perm dump in 403
-- [ ] Backup storage-files helpers DB-connection leak
+- [x] **`GET /api/users` limit cap + no 403 perm dump — DONE 2026-07-17 (phase-7h).**
+  The 403 echoed the caller's full resolved permission set (a "DEBUG"
+  info-disclosure) — now a plain "Insufficient permissions to list users". `limit`
+  was uncapped (`Number(limit)` straight into the query) — now capped at 200 with
+  NaN/negative coercion.
+- [x] **Backup storage-files helpers DB-connection leak — DONE 2026-07-17 (phase-7h).**
+  `exportStorageFilesTable`/`restoreStorageFilesTable` each opened their OWN
+  `DatabaseService` and never closed it (one leaked connection per backup/restore).
+  Both now close in a `finally`.
 - [x] BroadcastBox stray `-` file (botched `uv pip compile -o -` output) removed in CI batch
 
 ## Improvements

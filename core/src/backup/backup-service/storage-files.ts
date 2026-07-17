@@ -45,9 +45,10 @@ export async function exportStorageFilesTable(args: {
 }): Promise<StorageFilesExportResult> {
   const { backupDir, databaseConfig, version, logger } = args;
   const warnings: string[] = [];
+  let dbService: DatabaseService | null = null;
 
   try {
-    const dbService = new DatabaseService(databaseConfig, logger);
+    dbService = new DatabaseService(databaseConfig, logger);
     await dbService.initialize();
     const storageFiles = await dbService.getAllStorageFiles();
 
@@ -89,6 +90,12 @@ export async function exportStorageFilesTable(args: {
     }`;
     warnings.push(message);
     return { exported: false, warnings };
+  } finally {
+    // Always release the connection this helper opened — it creates its OWN
+    // DatabaseService (separate from the app's), which otherwise leaks per backup.
+    if (dbService) {
+      await dbService.close().catch(() => {});
+    }
   }
 }
 
@@ -128,6 +135,7 @@ export async function restoreStorageFilesTable(args: {
     return { warnings };
   }
 
+  let dbService: DatabaseService | null = null;
   try {
     const storageFilesContent = await fs.readFile(storageFilesPath, 'utf8');
     const storageFilesExport = JSON.parse(storageFilesContent) as {
@@ -148,7 +156,7 @@ export async function restoreStorageFilesTable(args: {
       }>;
     };
 
-    const dbService = new DatabaseService(databaseConfig, logger);
+    dbService = new DatabaseService(databaseConfig, logger);
     await dbService.initialize();
 
     // Load storage config to determine correct provider path
@@ -223,6 +231,11 @@ export async function restoreStorageFilesTable(args: {
       error instanceof Error ? error.message : String(error)
     }`;
     warnings.push(message);
+  } finally {
+    // Release the connection this helper opened, on success or failure.
+    if (dbService) {
+      await dbService.close().catch(() => {});
+    }
   }
 
   return { warnings };
