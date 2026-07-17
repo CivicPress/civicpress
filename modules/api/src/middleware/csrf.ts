@@ -30,11 +30,16 @@ export function csrfMiddleware(civicPress: CivicPress) {
     }
 
     // Skip CSRF for the public config-validation endpoint only.
-    // FA-API-018 (re-audit): match req.path (NO query string) against the exact
-    // /config/:type/validate shape. The old substring test on req.originalUrl
-    // matched the query too, so `PUT /config/raw/roles?x=/validate` satisfied
-    // both substrings and skipped CSRF on a config-WRITE route.
-    if (/(^|\/)config\/[^/]+\/validate$/.test(req.path)) {
+    // FA-API-018 (re-audit): match the exact /config/:type/validate shape on a
+    // query-free path. The old substring test on req.originalUrl matched the
+    // query too, so `PUT /config/raw/roles?x=/validate` satisfied both
+    // substrings and skipped CSRF on a config-WRITE route.
+    // NOTE: this middleware is mounted AT apiPath('config'), so Express strips
+    // that base from req.path (it would be just `/:type/validate`, with no
+    // `config/` segment for the regex to anchor on). Reconstruct the full,
+    // still query-free path via req.baseUrl + req.path so the anchor holds
+    // while the query remains excluded.
+    if (/(^|\/)config\/[^/]+\/validate$/.test(req.baseUrl + req.path)) {
       return next();
     }
 

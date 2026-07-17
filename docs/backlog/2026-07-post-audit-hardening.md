@@ -94,8 +94,11 @@ follow-up. (Storage, config+CLI, API-routes clusters + saga/BB/notifications.)
   mid-write copy is fuzzy; checkpoint or `VACUUM INTO` from a live
   connection; UX: self-service password change logs the requester out
   everywhere — mint a fresh session or show a deliberate re-login message;
-  idempotency: include `targetStatus` in derived publish keys (deliberate
-  key rotation, 5-min dedupe gap).
+  ~~idempotency: include `targetStatus` in derived publish keys~~ **DONE
+  2026-07-17 (phase-7e), and superseded:** the publish key is now scoped to the
+  draft's full content + target status (not just user/draftId), so an
+  edit-then-republish within the 5-min dedupe TTL is no longer swallowed as a
+  duplicate — see the QUARANTINE BURN-DOWN entry under Test & CI health.
 - [ ] Enforce-or-delete dead session config (`sessionTimeout`/`maxConcurrentSessions`/`requireHttps`)
 - [ ] Wire the 3 uncalled cleanup sweeps (sessions / email tokens / login_attempts)
 - [ ] Move runtime `ALTER TABLE workflow_state` off the GET path
@@ -126,23 +129,57 @@ follow-up. (Storage, config+CLI, API-routes clusters + saga/BB/notifications.)
   history-pathspec sibling gap IS now covered by
   `core/src/git/__tests__/git-engine-history-pathspec.test.ts`.)
 
-- [ ] **QUARANTINE BURN-DOWN (added with the CI batch — top of this tier):**
-  5 files / 11 tests fail deterministically from a CLEAN checkout of main and
-  are excluded in CI only via `CIVIC_TEST_QUARANTINE=1` (list in
-  vitest.config.mjs): `tests/api/config-validation.test.ts` (public config
-  validation gets 403), `tests/e2e/editor-workflows.test.ts` (5 tests: editor
-  create/edit flows get 403, then 404 follow-ons), `tests/broadcast-box/
-  device-ws-e2e.test.ts` (2 timeouts waiting for start_session at the device),
-  `tests/broadcast-box/upload-e2e.test.ts` (capture null-vs-undefined),
-  `tests/cli/me.test.ts` (2: auth-required message drift). Invisible pre-CI:
-  the suite only ever ran on dirty dev checkouts through a bypassed hook. The
-  403 cluster smells related to the 400-vs-403 skipped-tests item and the
-  quick-start/by-meeting authz follow-up below. Related discovery: several
-  OTHER files (users/records/security-features/auth) fail only on DIRTY
-  checkouts (leftover users → 409s, ambient tokens) — test isolation doesn't
-  clean in-repo state, worth fixing in the same pass.
-- [ ] `CentralConfigManager.reset()` in setup/teardown (API flakiness root cause; also lets CI drop `--fileParallelism=false` and the quarantine's serialization)
-- [ ] Un-skip 8 security-critical auth tests (hides 400-vs-403 bug)
+- [x] **QUARANTINE BURN-DOWN — DONE 2026-07-17 (`refactor/phase-7e-test-health`).**
+  All 5 files now pass individually AND together from a clean checkout; removed
+  from the `CIVIC_TEST_QUARANTINE` list (hook retained empty). The "flaky"
+  cluster was NOT flaky — it surfaced **3 real product bugs** + 1 latent core
+  bug, plus stale test expectations:
+  - **config-validation 403 (REAL bug, FA-API-018 regression):** `csrfMiddleware`
+    is mounted AT `apiPath('config')`, so Express strips the base and `req.path`
+    is `/:type/validate` — the `config/…/validate$` skip-regex never matched, so
+    the *public* validate endpoint always demanded a CSRF token. Fix: match
+    `req.baseUrl + req.path` (query-free full path). Regression test added +
+    proven to catch it; FA-API-018 query-spoof still blocked.
+  - **editor 403×5 (STALE tests):** publish `draft→approved` is correctly blocked
+    by the FA-API-008 review-chain guard; tests now publish to `published`. Fixing
+    the 5th exposed a **REAL core bug:** the publish idempotency key (was
+    `hash(user,recordId,draftId,request)`) omitted draft content + targetStatus,
+    so an edit-then-republish within the ~5-min dedupe TTL returned the prior
+    publish's cached result and silently dropped the edit. Fixed by scoping the
+    key to the draft's content+target in `record-manager.publishDraft` (closes the
+    "include targetStatus in derived publish keys" deferral below, and then some).
+  - **BB 6 failures → 2 REAL bugs + 1 stale test:** (a) `002_enrollment_codes.sql`
+    had a **backwards FK** (`device_uuid REFERENCES broadcast_devices`) — an
+    enrollment code legitimately PRECEDES the device row; inert until Tier-A
+    `foreign_keys=ON` turned it on, then it broke ALL device onboarding in
+    production. Removed the FK (mirrors the 001 no-FK precedent). (b) The
+    ack-gated `start_session` (`device-command-service.ts:258`) forwarded the DB
+    id where the room is keyed by `deviceUuid`, so the command never reached the
+    device yet the session still flipped to `recording` — the exact FA-BB-008
+    phantom-recording mode. Fixed to route on `device.deviceUuid`. (c)
+    upload-e2e `public_file` `toBeUndefined()`→`toBeNull()` (finalize writes null
+    by design to clear stale pointers; still falsy → fail-closed holds).
+  - **cli/me ×2 (STALE tests):** FA-CLI-003 hardened the token-guidance message;
+    updated the two assertions to the current strings.
+  - **STILL OPEN (deeper isolation issue, unchanged):** several files
+    (users/records/security-features/auth) fail only on DIRTY checkouts (leftover
+    users → 409s) because `createAPITestContext` shares a repo-level
+    `.system-data` users DB across files. Not required for the burn-down (clean
+    CI runs pass), but the proper fix is the `CentralConfigManager.reset()` /
+    per-test system-data isolation item below.
+  - **DEFERRED defense-in-depth (BB):** `SessionController.startSession` should
+    check the `executeCommand` result's `.success` and NOT flip to `recording`
+    when the send fails (currently a failed send resolves rather than rejects).
+- [ ] `CentralConfigManager.reset()` in setup/teardown (API flakiness root cause; also lets CI drop `--fileParallelism=false`; would fix the shared-`.system-data` cross-file dirty-state 409s the burn-down documented)
+- [x] **Un-skip 8 security-critical auth tests — DONE 2026-07-17.** Un-skipped all
+  8 in `security-features.test.ts`; now pass. The "400-vs-403" was real: **4 code
+  bugs** (external-auth password rejection returned 400 not 403 across
+  change-password/set-password/PUT-update; non-existent set-password target →
+  500 not 404) fixed in the API handlers WITH the external-auth guards preserved
+  and the admin(403) check kept ahead of the existence(404) check; **4 stale
+  tests** (`password`→`newPassword` field, `body.data.message`/`body.error.message`
+  paths, verify-email token read via raw DB query NOT `getUserById` — that column
+  is a live verification secret).
 - [ ] `isLosslesslyRoundTrippable` tests
 - [ ] FA-BB-002 redaction e2e mandatory in CI (`CIVIC_REQUIRE_FFMPEG=1`)
 - [ ] HW capture-builder tests; frontend tests

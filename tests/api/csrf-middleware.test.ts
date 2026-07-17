@@ -66,3 +66,49 @@ describe('csrfMiddleware (FA-API-018)', () => {
     expect(res.body?.error?.code).toBe('CSRF_TOKEN_MISSING');
   });
 });
+
+// Regression: the middleware runs mounted AT apiPath('config'), so Express
+// strips that base from req.path. The FA-API-018 skip must reconstruct the
+// full path (req.baseUrl + req.path) — matching on the bare, stripped req.path
+// silently made the *public* config-validation endpoint demand a CSRF token
+// (403), while a query-string spoof must still NOT skip CSRF on a write route.
+describe('csrfMiddleware — config-validate skip under the real /api/v1/config mount', () => {
+  let app: express.Express;
+
+  beforeAll(async () => {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'civic-csrf-mount-'));
+    process.env.CIVICPRESS_SECRET = 'a'.repeat(128);
+    const secretsManager = SecretsManager.getInstance(tempDir);
+    await secretsManager.initialize();
+    const fakeCivicPress = {
+      getSecretsManager: () => secretsManager,
+    } as unknown as Parameters<typeof csrfMiddleware>[0];
+
+    // Mirror index.ts: csrfMiddleware is mounted at apiPath('config') in front
+    // of the config router, so req.baseUrl === '/api/v1/config' inside it.
+    const configRouter = express.Router();
+    configRouter.post('/:type/validate', (_req, res) => res.json({ ok: true }));
+    configRouter.put('/raw/:key', (_req, res) => res.json({ wrote: true }));
+
+    app = express();
+    app.use(express.json());
+    app.use('/api/v1/config', csrfMiddleware(fakeCivicPress), configRouter);
+  });
+
+  it('skips CSRF for the public /config/:type/validate route (no token → 200)', async () => {
+    const res = await request(app)
+      .post('/api/v1/config/analytics/validate')
+      .send();
+    expect(res.status).toBe(200);
+    expect(res.body?.ok).toBe(true);
+  });
+
+  it('still enforces CSRF on a config write even with a /validate query spoof', async () => {
+    // FA-API-018: `?x=/validate` must not make the write route look like validate.
+    const res = await request(app)
+      .put('/api/v1/config/raw/roles?x=/validate')
+      .send({});
+    expect(res.status).toBe(403);
+    expect(res.body?.error?.code).toBe('CSRF_TOKEN_MISSING');
+  });
+});

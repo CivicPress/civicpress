@@ -254,9 +254,15 @@ export class DeviceCommandService {
             ? SOURCE_COMMAND_TIMEOUT
             : DEFAULT_COMMAND_TIMEOUT);
 
-      // Send command via WebSocket (using UUID for room lookup)
+      // Send command via WebSocket. The room is keyed by the device UUID, but
+      // callers (e.g. SessionController.startSession) pass request.deviceId as the
+      // DATABASE id — so route on the resolved device.deviceUuid, not the raw
+      // input. Using request.deviceId built a `device:<dbId>` room that never
+      // matched the connected socket (keyed by deviceUuid), so the ack-gated
+      // start_session was never delivered and the session still flipped to
+      // 'recording' — the exact FA-BB-008 phantom-recording failure.
       const ack = await this.sendCommandViaWebSocket(
-        request.deviceId, // UUID for room lookup
+        device.deviceUuid, // room key is always the device UUID
         command,
         commandTimeout
       );

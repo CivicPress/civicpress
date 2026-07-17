@@ -10,6 +10,7 @@ import { CreateRecordRequest, UpdateRecordRequest } from '../civic-core.js';
 import { AuditChannel } from '../audit/audit-channel.js';
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import { createHash } from 'crypto';
 import { RecordParser } from './record-parser.js';
 import { DocumentNumberGenerator } from '../utils/document-number-generator.js';
 import { buildRecordRelativePath } from '../utils/record-paths.js';
@@ -1001,6 +1002,29 @@ export class RecordManager {
       this.dataDir
     );
 
+    // Scope the idempotency key to the draft's actual CONTENT + target status,
+    // not just (user, draftId). The derived key otherwise collapses every
+    // publish of one record by one user onto a single key, so a re-publish
+    // after an edit — same record id, within the dedupe TTL — collides with the
+    // previous publish and is answered with its cached result, silently dropping
+    // the edited draft (the FA-CORE-008 follow-up: "include targetStatus in
+    // derived publish keys"). Hashing the draft body means a TRUE retry
+    // (identical content + target) still maps to the same key and is correctly
+    // deduped, while an edited republish (or a different target) gets a fresh key.
+    const draftForKey = await this.db.getDraft(draftId).catch(() => null);
+    const opDigest = createHash('sha256')
+      .update(
+        JSON.stringify({
+          draftId,
+          targetStatus: targetStatus ?? draftForKey?.status ?? null,
+          title: draftForKey?.title ?? null,
+          status: draftForKey?.status ?? null,
+          markdown_body: draftForKey?.markdown_body ?? null,
+          metadata: draftForKey?.metadata ?? null,
+        })
+      )
+      .digest('hex');
+
     // Create context
     const context = {
       correlationId: correlationId || `publish-${draftId}-${Date.now()}`,
@@ -1008,6 +1032,7 @@ export class RecordManager {
       draftId,
       targetStatus,
       user,
+      idempotencyKey: `publish:${draftId}:${opDigest}`,
       metadata: {
         recordId: draftId,
         draftId,
