@@ -208,4 +208,33 @@ describe('DatabaseService - workflowState Support', () => {
       expect(draft.workflow_state).toBe('ready_for_publication');
     });
   });
+
+  describe('Record lock acquisition (TOCTOU)', () => {
+    const inFive = () => new Date(Date.now() + 5 * 60 * 1000);
+
+    it('grants the lock to exactly one of many concurrent acquirers', async () => {
+      const recordId = getTestId('lock-record');
+      const results = await Promise.all(
+        Array.from({ length: 12 }, (_, i) =>
+          dbService.acquireLock(recordId, `holder-${i}`, inFive())
+        )
+      );
+      // The check-then-insert version let several callers all win here.
+      expect(results.filter((r) => r === true)).toHaveLength(1);
+    });
+
+    it('refuses a second acquirer while the lock is held', async () => {
+      const recordId = getTestId('lock-record');
+      expect(await dbService.acquireLock(recordId, 'a', inFive())).toBe(true);
+      expect(await dbService.acquireLock(recordId, 'b', inFive())).toBe(false);
+    });
+
+    it('allows re-acquiring an already-expired lock', async () => {
+      const recordId = getTestId('lock-record');
+      expect(
+        await dbService.acquireLock(recordId, 'a', new Date(Date.now() - 1000))
+      ).toBe(true);
+      expect(await dbService.acquireLock(recordId, 'b', inFive())).toBe(true);
+    });
+  });
 });
