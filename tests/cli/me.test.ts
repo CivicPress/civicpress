@@ -34,7 +34,9 @@ describe('civic me command', () => {
     } catch (e: any) {
       result = e.stdout || e.message || '';
     }
-    expect(result).toContain('💡 Use --token to provide a session token');
+    expect(result).toContain(
+      '💡 Set CIVIC_TOKEN or write ~/.civicpress/token (preferred), or use --token'
+    );
     expect(result).toContain(
       '💡 Run "civic auth:login" to get a session token'
     );
@@ -53,7 +55,7 @@ describe('civic me command', () => {
     }
     expect(result).toContain('"error": "Authentication required"');
     expect(result).toContain(
-      '"details": "Use --token to provide a session token"'
+      '"details": "Provide a token via CIVIC_TOKEN, ~/.civicpress/token, or --token"'
     );
   });
 
