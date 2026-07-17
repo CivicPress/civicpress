@@ -188,11 +188,13 @@ follow-up. (Storage, config+CLI, API-routes clusters + saga/BB/notifications.)
   formerly dirty-sensitive cluster (users/records/security-features/auth/
   user-management) now passes **twice back-to-back with no cleaning** and the
   shared repo-root DB is never created; a 12-file parallel probe is likewise
-  clean. **Parallelism (dropping CI `--fileParallelism=false`):** the shared-DB
-  contention that the CI "flakes under load" comment blamed is now gone (`forks`
-  already isolates memory); a broad parallel validation is the gate before
-  flipping the CI flag — leave `--fileParallelism=false` until that full run is
-  green.
+  clean. **Parallelism restored — DONE:** the shared-DB contention the CI "flakes
+  under load" comment blamed is gone (`forks` already isolates memory; the shared
+  DB was the only cross-file coupling). The FULL root suite was validated green in
+  parallel (165 files / 1530 tests at `fileParallelism:2`, shared DB never
+  created), so CI dropped `--fileParallelism=false` (`ci.yml`) and the root suite
+  runs in parallel again. The empty `CIVIC_TEST_QUARANTINE` hook is retained for
+  parking a future regression with a tracker entry.
 - [x] **Un-skip 8 security-critical auth tests — DONE 2026-07-17.** Un-skipped all
   8 in `security-features.test.ts`; now pass. The "400-vs-403" was real: **4 code
   bugs** (external-auth password rejection returned 400 not 403 across
