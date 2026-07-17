@@ -245,8 +245,11 @@ describe('HTTP chunked upload → capture block (real storage, mounted module)',
     expect(capture.av_file).toBe(storageFileId);
     expect(capture.device).toBe(device.id);
     // FA-BB-002 fail-closed: the raw is queued for redaction, not published.
+    // finalize deterministically writes public_file: null (a field-merge must
+    // actively CLEAR any prior published pointer on re-record), so assert null —
+    // still falsy, so no unredacted bytes are ever served.
     expect(capture.redaction_status).toBe('pending');
-    expect(capture.public_file).toBeUndefined();
+    expect(capture.public_file).toBeNull();
 
     // The stored A/V is retrievable from storage (what the transcription worker
     // would fetch via capture.av_file)…
