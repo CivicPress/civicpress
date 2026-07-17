@@ -170,6 +170,65 @@ describe('SessionController', () => {
       expect(mockRoom.broadcast).toHaveBeenCalled();
     });
 
+    it('fails the session (never "recording") when the device does not ack start_session (FA-BB-008)', async () => {
+      const deviceId = 'device-id';
+      const civicpressSessionId = 'session-id';
+      const sessionId = 'broadcast-session-id';
+
+      mockDeviceManager.getDevice.mockResolvedValue({
+        id: deviceId,
+        status: 'active',
+      });
+      mockConnectionTracker.isConnected.mockReturnValue(true);
+      mockConnectionTracker.getConnectionState.mockReturnValue({
+        state: { status: 'idle' },
+      });
+      mockRecordManager.getRecord.mockResolvedValue({
+        id: civicpressSessionId,
+        type: 'session',
+      });
+
+      const mockSessionModel = (sessionController as any).sessionModel;
+      mockSessionModel.create.mockResolvedValue({
+        id: sessionId,
+        deviceId,
+        civicpressSessionId,
+        status: 'pending',
+      });
+      mockSessionModel.update.mockResolvedValue({
+        id: sessionId,
+        deviceId,
+        civicpressSessionId,
+        status: 'failed',
+      });
+
+      // executeCommand RESOLVES with { success: false } on disconnect/timeout/nack
+      // — it does NOT throw. The FSM must fail closed, not advance to 'recording'.
+      const executeCommand = vi
+        .fn()
+        .mockResolvedValue({ success: false, error: 'device disconnected' });
+      (sessionController as any).deviceCommandService = { executeCommand };
+
+      await expect(
+        sessionController.startSession({
+          deviceId,
+          civicpressSessionId,
+          metadata: {},
+        })
+      ).rejects.toThrow('device disconnected');
+
+      expect(executeCommand).toHaveBeenCalled();
+      // The row is flipped to 'failed' and NEVER to 'recording'.
+      expect(mockSessionModel.update).toHaveBeenCalledWith(
+        sessionId,
+        expect.objectContaining({ status: 'failed' })
+      );
+      expect(mockSessionModel.update).not.toHaveBeenCalledWith(
+        sessionId,
+        expect.objectContaining({ status: 'recording' })
+      );
+    });
+
     it('should throw error if device not found', async () => {
       mockDeviceManager.getDevice.mockResolvedValue(null);
 
