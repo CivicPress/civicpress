@@ -348,4 +348,169 @@ describe('QuotaManager', () => {
       expect(config.folders.public.limit).toBe(5000);
     });
   });
+
+  /**
+   * checkQuota on its own is a read-then-decide: every concurrent upload awaits
+   * the same usage read, concludes independently that it fits, and is admitted.
+   * N uploads into a near-full folder could therefore overshoot the limit by up
+   * to N x maxFileSize. `reserve()` records the granted headroom in the same
+   * synchronous turn as the decision, so the next caller to resume sees it.
+   */
+  describe('reserve / release — concurrent admission', () => {
+    const tenKbFolder = {
+      enabled: true,
+      folders: { public: { limit: 10000, limitFormatted: '10KB' } },
+    };
+
+    it('admits only as many concurrent uploads as actually fit', async () => {
+      quotaManager = new QuotaManager(
+        usageReporter as any,
+        tenKbFolder,
+        mockLogger
+      );
+      usageReporter.setFolderUsage('public', 0);
+
+      // Three 4KB uploads race into a 10KB folder. Two fit, the third must not.
+      const results = await Promise.allSettled([
+        quotaManager.reserve('public', 4000),
+        quotaManager.reserve('public', 4000),
+        quotaManager.reserve('public', 4000),
+      ]);
+
+      const granted = results.filter((r) => r.status === 'fulfilled');
+      const refused = results.filter((r) => r.status === 'rejected');
+
+      expect(granted).toHaveLength(2);
+      expect(refused).toHaveLength(1);
+      expect((refused[0] as PromiseRejectedResult).reason).toBeInstanceOf(
+        QuotaExceededError
+      );
+    });
+
+    it('does not overshoot the GLOBAL limit under concurrency', async () => {
+      quotaManager = new QuotaManager(
+        usageReporter as any,
+        {
+          enabled: true,
+          global: { limit: 10000, limitFormatted: '10KB' },
+        },
+        mockLogger
+      );
+      usageReporter.setOverallUsage(0);
+
+      const results = await Promise.allSettled([
+        quotaManager.reserve('public', 6000),
+        quotaManager.reserve('other', 6000),
+      ]);
+
+      expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
+      expect(results.filter((r) => r.status === 'rejected')).toHaveLength(1);
+    });
+
+    it('frees the headroom again on release', async () => {
+      quotaManager = new QuotaManager(
+        usageReporter as any,
+        tenKbFolder,
+        mockLogger
+      );
+      usageReporter.setFolderUsage('public', 0);
+
+      const first = await quotaManager.reserve('public', 8000);
+      await expect(quotaManager.reserve('public', 4000)).rejects.toThrow(
+        QuotaExceededError
+      );
+
+      // The upload failed and released its headroom; the next one now fits.
+      quotaManager.release(first);
+      await expect(
+        quotaManager.reserve('public', 4000)
+      ).resolves.toBeTruthy();
+    });
+
+    it('release is safe with null and when called twice', async () => {
+      quotaManager = new QuotaManager(
+        usageReporter as any,
+        tenKbFolder,
+        mockLogger
+      );
+      const reservation = await quotaManager.reserve('public', 1000);
+
+      expect(() => quotaManager.release(null)).not.toThrow();
+      expect(() => quotaManager.release(reservation)).not.toThrow();
+      expect(() => quotaManager.release(reservation)).not.toThrow();
+    });
+
+    it('counts outstanding reservations as used when quota is disabled-safe', async () => {
+      quotaManager = new QuotaManager(
+        usageReporter as any,
+        { ...tenKbFolder, enabled: false },
+        mockLogger
+      );
+
+      // Disabled: no reservation is taken and nothing is refused.
+      await expect(quotaManager.reserve('public', 999999)).resolves.toBeNull();
+    });
+
+    it('reclaims headroom from a reservation that was never released (TTL)', async () => {
+      vi.useFakeTimers();
+      try {
+        quotaManager = new QuotaManager(
+          usageReporter as any,
+          { ...tenKbFolder, reservationTtlMs: 60_000 },
+          mockLogger
+        );
+        usageReporter.setFolderUsage('public', 0);
+
+        // A caller dies between reserve() and release().
+        await quotaManager.reserve('public', 9000);
+        await expect(quotaManager.reserve('public', 4000)).rejects.toThrow(
+          QuotaExceededError
+        );
+
+        // Once the TTL lapses the leaked headroom comes back.
+        vi.setSystemTime(Date.now() + 61_000);
+        await expect(
+          quotaManager.reserve('public', 4000)
+        ).resolves.toBeTruthy();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('demonstrates the race reserve() closes: concurrent checkQuota over-admits', async () => {
+      quotaManager = new QuotaManager(
+        usageReporter as any,
+        tenKbFolder,
+        mockLogger
+      );
+      usageReporter.setFolderUsage('public', 0);
+
+      // checkQuota records nothing, so each concurrent caller decides against
+      // the same pre-upload usage read and ALL are admitted — 12KB into a 10KB
+      // folder. This is why the upload paths call reserve() instead.
+      const results = await Promise.allSettled([
+        quotaManager.checkQuota('public', 4000),
+        quotaManager.checkQuota('public', 4000),
+        quotaManager.checkQuota('public', 4000),
+      ]);
+
+      expect(results.every((r) => r.status === 'fulfilled')).toBe(true);
+    });
+
+    it('checkQuota accounts for headroom already reserved by in-flight uploads', async () => {
+      quotaManager = new QuotaManager(
+        usageReporter as any,
+        tenKbFolder,
+        mockLogger
+      );
+      usageReporter.setFolderUsage('public', 0);
+
+      await quotaManager.reserve('public', 8000);
+
+      // Usage still reads 0, but 8KB is spoken for.
+      await expect(quotaManager.checkQuota('public', 4000)).rejects.toThrow(
+        QuotaExceededError
+      );
+    });
+  });
 });

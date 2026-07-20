@@ -11,7 +11,7 @@ Status legend: `[ ]` open · `[~]` in progress · `[x]` landed+verified · `[-]`
 
 ## DO FIRST
 
-- [~] **Tier A landed on `refactor/phase-7b-tier-a` (`9572520`)** — pragmas +
+- [x] **Tier A landed on `refactor/phase-7b-tier-a` (`9572520`)** — pragmas +
   git mutex + session revocation; see the commit body for the four latent
   bugs FK enforcement exposed. **Audit-trail correction to that commit
   message (skeptic-verified):** the FA-CORE-008 idempotency-key collision it
@@ -20,8 +20,10 @@ Status legend: `[ ]` open · `[~]` in progress · `[x]` landed+verified · `[-]`
   convention) — NOT the API/record-manager publish path, which supplies
   `metadata.draftId` and never collided. Optional follow-up (deliberate
   key-rotation, 5-min dedupe gap): include `targetStatus` in derived publish
-  keys — same-draft publish-vs-archive currently share a key.
-- [~] **CI on both repos** — GH Actions `ci.yml` in monorepo (pnpm frozen
+  keys — same-draft publish-vs-archive currently share a key. **That follow-up
+  is DONE (phase-7e) and superseded** — the publish key is now scoped to the
+  draft's full content + target status; see the Improvements entry below.
+- [x] **CI on both repos** — GH Actions `ci.yml` in monorepo (pnpm frozen
   install → core-first build (core↔storage workspace cycle defeats pnpm's
   topo ordering from clean) → `-r build` → lint → registry:check →
   root(serialized, 5-file quarantine)+UI+storage+broadcast-box+transcription
@@ -39,19 +41,70 @@ Status legend: `[ ]` open · `[~]` in progress · `[x]` landed+verified · `[-]`
   **Remaining:** required-status-checks branch protection needs repo admin
   (current token lacks it) — see PR bodies for the exact `gh api` commands
   (status checks only; requiring PRs would disable Renovate branch automerge).
-- [ ] SQLite pragmas (`foreign_keys=ON`, WAL, `busy_timeout=5000`) on every connection
-- [ ] Serialize git mutations (git mutex / `git:repo` lock) + different-record saga concurrency test
-- [ ] Session revocation (`deleteUserSessions` on logout + password change)
+**Tier A CLOSED 2026-07-20** — the three boxes below were landed by the Tier-A
+commit above and were simply never re-ticked; re-verified from source + green
+tests this session (see per-item notes).
+
+- [x] SQLite pragmas (`foreign_keys=ON`, WAL, `busy_timeout=5000`) on every connection
+  — `core/src/database/__tests__/sqlite-pragmas.test.ts` (4 tests: pragma values,
+  a real orphan-insert rejection, declared ON DELETE CASCADEs firing, and
+  `record_locks` deliberately FK-free so draft ids stay lockable).
+- [x] Serialize git mutations (git mutex / `git:repo` lock) + different-record saga concurrency test
+- [x] Session revocation (`deleteUserSessions` on logout + password change)
+  — `tests/core/session-revocation.test.ts` (7 tests).
+- [ ] **Still open (needs repo admin, not code):** required-status-checks branch
+  protection on both repos — the current token lacks admin. Exact `gh api`
+  commands are in the PR bodies (status checks only; requiring PRs would
+  disable Renovate branch automerge).
 
 ## Tier B — security correctness
 
-- [ ] Password-strength policy dead code → centralize in PasswordOps
-- [ ] OAuth links by username only → match `(auth_provider, provider_user_id)`
-- [ ] Generic-500 branch leaks raw `error.message`; route config.ts/notifications.ts through redacting helper
-- [ ] Role-hierarchy cycle detection (visited set) — circular roles.yml currently denies all perms via swallowed stack overflow
-- [ ] `setMockUser()` backdoor stripped behind `import.meta.dev`
-- [ ] Executable uploads: warning → deny
-- [ ] Realtime: enforce `max_rooms`; set WS `maxPayload`
+**TIER CLOSED 2026-07-20.** All seven were already implemented — they landed
+inside the Tier-A / Tier-C / CI batches without their boxes being re-ticked, so
+this tier read as "7 open" when nothing was. Each was re-verified from source
+this session and its covering test run green; the one genuine gap found (B3 had
+no regression test) was filled.
+
+- [x] Password-strength policy dead code → centralize in PasswordOps
+  — `AuthConfigManager.validatePassword` is the single implementation;
+  `PasswordOps.validatePasswordPolicy` is its only caller and `AuthService`
+  delegates to that. A repo-wide sweep found **no** password validator outside
+  this chokepoint. Covered by `tests/core/password-policy.test.ts` (4) +
+  `tests/api/password-policy-routes.test.ts` (3).
+- [x] OAuth links by username only → match `(auth_provider, provider_user_id)`
+  — `oauth-ops.ts` matches on the stable provider identity via
+  `getUserByProvider`, with legacy same-provider adoption allowed ONLY when the
+  provider supplied a stable id. Covered by `tests/core/oauth-linking.test.ts`
+  (6 tests, incl. "does NOT take over a local password account with the same
+  username" and the no-stable-id refusal).
+- [x] Generic-500 branch leaks raw `error.message`; route config.ts/notifications.ts through redacting helper
+  — every 500 in `config.ts` returns a fixed generic string and `notifications.ts`
+  keeps the SMTP error in the audit record only. **Gap closed 2026-07-20:** this
+  had no regression test, so `tests/api/config-error-redaction.test.ts` (4 tests)
+  now pins the generic bodies and asserts no resolved path / `ENOENT` / stack
+  marker reaches the wire. (The `InvalidConfigTypeError` 400 reflects the
+  caller's OWN input back, which is a controlled validation message, not
+  disclosure — the test asserts that shape deliberately.)
+- [x] Role-hierarchy cycle detection (visited set) — circular roles.yml currently denies all perms via swallowed stack overflow
+  — implemented as an ancestor-**path** set (not a global visited set) plus a
+  memo, so a legal diamond is not mistaken for a cycle. Covered by
+  `tests/core/role-cycle.test.ts` (3 tests, incl. the diamond case).
+- [x] `setMockUser()` backdoor stripped behind `import.meta.dev`
+  — the UI helper was deleted outright and simulated auth is gated by
+  `simulated-auth-policy.ts` (a runtime env policy, which is stronger than the
+  `import.meta.dev` this line proposed). Covered by
+  `core/src/auth/__tests__/simulated-auth-policy.test.ts` (6) +
+  `modules/api/src/__tests__/bypass-auth-guard.test.ts` (5).
+- [x] Executable uploads: warning → deny
+  — `validation.ts` pushes executable extensions to `errors` (→ `valid:false`),
+  so the upload is refused. Covered by the storage characterization test
+  ("REJECTS executable extensions outright (post-audit hardening: was
+  warn-only)"), incl. the wildcard-folder case.
+- [x] Realtime: enforce `max_rooms`; set WS `maxPayload`
+  — `maxPayload: 10 MiB` on the WebSocketServer (the ws default ~100 MiB was a
+  one-message memory-DoS surface) and room creation refused at the cap while
+  joining an EXISTING room still succeeds. Covered by
+  `modules/realtime/src/__tests__/connection-limits.test.ts` (7).
 
 ## Tier C — correctness bugs (SCOUTED 2026-07-16, file:line below)
 
@@ -67,7 +120,35 @@ follow-up. (Storage, config+CLI, API-routes clusters + saga/BB/notifications.)
 - [x] record-history filter: no-op `.replace('/','/')` substring match (`history.ts:103,263`); CLI `civic history` ignores the record arg entirely (`history.ts:70`). Fix = pathspec-scoped `GitEngine.getHistory` (`git-engine.ts:139`)
 - [x] publishDraft ordering (`publish-draft-saga.ts` steps L552-559): DeleteDraftStep (L402) runs after the irreversible CommitToGitStep (L362, isCompensatable=false) with a log-only no-op compensation (L423) → DB hiccup loses a committed record's draft unrecoverably
 - [x] BB device health-monitor + stale-reaper implemented (`device-connection-tracker.ts:304`/`335`) but never started in production; wire at the tracker factory (`broadcast-box-services.ts:294-310`)
-- [ ] UI: `useMarkdown` heading inline formatting; autosave timer unmount; editor host collab-vs-CM latch at mount (NOT in Batch 4 — UI cluster deferred)
+- [x] **UI cluster — DONE 2026-07-20.** All three, each with a regression test
+  proven to fail against the pre-fix source:
+  - **`useMarkdown` heading inline formatting:** `renderer.heading` built the
+    heading body by concatenating each inline token's raw `.text`, so every
+    inline construct inside a heading was silently dropped — `## Budget **2026**`
+    lost its `<strong>`, links lost their `<a>`, code spans their `<code>` — and
+    the raw source was emitted unescaped. Now rendered via
+    `this.parser.parseInline(tokens)` (declared with `function` so `this` binds
+    to the renderer). Also hoisted `marked.use({ renderer })` to module scope: it
+    appends to the extension list on the shared `marked` singleton, so calling it
+    inside the composable re-registered the renderer on **every** component setup
+    and accumulated without bound. +5 tests.
+  - **Autosave timer unmount:** `onUnmounted` called only `stop()`, which
+    detaches the deep watcher and nothing else. The exponential-backoff retry
+    chain (2s/4s/8s) and an already-armed debounced save both survived it, so a
+    save could fire **after** the component unmounted and PUT stale form state
+    over a record the user had navigated away from. Added a tracked timer set +
+    a `disposed` latch checked by every save path, exposed as `dispose()` and
+    wired to `onUnmounted`. +3 tests.
+  - **Editor host collab-vs-CM latch:** this was the serious one. The decision
+    was a live `computed` chained to the content-loss guard over
+    `props.modelValue`, which changes on every keystroke — so typing a construct
+    the schema can't preserve (a raw `<div>`, a footnote) flipped it false
+    MID-SESSION and the `v-if` tore down the mounted collaborative editor,
+    dropping the realtime room, remote cursors and undo history, then swapped
+    back when the character was deleted (flapping as the user typed). The guard's
+    question is "may THIS record be opened collaboratively?", so it is now
+    latched once per record against the content as loaded, re-taken only when
+    `recordId` changes. SSR behaviour unchanged. +4 tests.
 - [ ] HW multi-output ffmpeg filtergraph pad reuse (`[v_wm]` mapped twice) — lives in the separate BroadcastBox HW repo, not this monorepo batch
 - [x] `.npmrc:29` jammed keys (folded into CI batch — trailing `strict-peer-dependencies=false` never parsed; dropped it, preserving effective config)
 - [x] Notifications: empty recipient dispatched silently (`notification-service.ts:278-292` returns '', no guard in sendToChannel L262); SMS/Slack config declared (`notification-config.ts:51-66`) but only email channel implemented → "Channel not found" throw if enabled
@@ -83,13 +164,23 @@ follow-up. (Storage, config+CLI, API-routes clusters + saga/BB/notifications.)
   `CURRENT_TIMESTAMP` (incompatible ordering) — now ISO-to-ISO. Tests
   (`database-service.test.ts`): 12 concurrent acquirers → exactly 1 wins; held →
   refuses; expired → re-acquirable (proven to fail on the old code).
-- [ ] **Quota-check TOCTOU (residual, reclassified out of Tier-D):** `QuotaManager.checkQuota`
-  is enforced (storage-001) but is a read-then-decide with no reservation, so N
-  simultaneous uploads to a near-full folder can each pass and jointly exceed the
-  quota by up to N×maxFileSize. Not a security hole (each upload still checks; the
-  overage is bounded and self-corrects once usage is measured). A correct fix needs
-  an in-memory/DB **reservation counter** with leak-proof (TTL) release wired
-  through `upload-ops`/`streaming-ops` — larger than a quick win; deferred.
+- [x] **Quota-check TOCTOU — DONE 2026-07-20.** `QuotaManager.checkQuota` was
+  enforced (storage-001) but was a read-then-decide with no reservation, so N
+  simultaneous uploads to a near-full folder each passed and jointly exceeded the
+  quota by up to N×maxFileSize. Implemented the deferred **reservation counter**:
+  `reserve()` reads usage (the only awaits) and then runs a **fully synchronous**
+  admit — counting outstanding reservations as used and recording the new one in
+  the SAME event-loop turn as the decision that granted it, so the next caller to
+  resume already sees it. `release()` is called from a `finally` in both
+  `upload-ops` and `streaming-ops`, on the success path *after*
+  `createStorageFile`, so there is no window where bytes are neither reserved nor
+  measured. Leak-proof via a 15-min TTL: a caller that dies between reserve and
+  release has its headroom reclaimed (and the reclaim is logged). `checkQuota` is
+  retained for compatibility and is now reservation-aware, but is documented as
+  the non-reserving path. +8 tests, including 3 concurrent 4KB reserves into a
+  10KB folder admitting exactly 2, the global-limit equivalent, TTL reclamation,
+  and a characterization test showing concurrent `checkQuota` still over-admits
+  (which is *why* the upload paths must reserve).
 - [x] **BB in-flight commands rejected on disconnect — DONE 2026-07-17 (phase-7h).**
   `DeviceCommandService` now tags each pending command with its `deviceUuid` and
   exposes `rejectPendingForDevice()`; `DeviceRoomHandler.onDisconnect` calls it, so

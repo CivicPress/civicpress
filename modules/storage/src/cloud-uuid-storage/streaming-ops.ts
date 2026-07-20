@@ -30,6 +30,7 @@ import {
   writeSidecarManifest,
 } from './internals.js';
 import type { CloudUuidStorageService } from '../cloud-uuid-storage-service.js';
+import type { QuotaReservation } from '../quota/quota-manager.js';
 
 export interface StreamingOpsDeps {
   host: CloudUuidStorageService;
@@ -56,6 +57,7 @@ export class StreamingOps {
         // ignore — best-effort disposal
       }
     };
+    let quotaReservation: QuotaReservation | null = null;
     try {
       if (!host.databaseService) {
         throw new Error('Database service not initialized');
@@ -101,7 +103,13 @@ export class StreamingOps {
       // worse than the current state).
       if (host.quotaManager && host.quotaManager.isEnabled()) {
         if (typeof request.size === 'number' && request.size > 0) {
-          await host.quotaManager.checkQuota(request.folder, request.size);
+          // Reserve (not merely check) so concurrent streams into a
+          // near-full folder cannot each be admitted against the same
+          // pre-upload usage read. Released in the `finally` below.
+          quotaReservation = await host.quotaManager.reserve(
+            request.folder,
+            request.size
+          );
         } else {
           host.logger.warn(
             'Stream upload received with unknown size; quota cannot be enforced upfront. Folder: ' +
@@ -333,6 +341,11 @@ export class StreamingOps {
         success: false,
         error: error instanceof Error ? error.message : 'Stream upload failed',
       };
+    } finally {
+      // Release reserved headroom on every exit path. On success this runs
+      // after createStorageFile, so the streamed bytes are already reflected
+      // in the usage figures before the reservation goes away.
+      host.quotaManager?.release(quotaReservation);
     }
   }
 

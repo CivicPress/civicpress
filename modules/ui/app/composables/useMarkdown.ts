@@ -10,19 +10,28 @@ declare function useRuntimeConfig(): {
 
 const EMPTY_LINE_MARKER = '[[CIVIC_EMPTY_LINE_MARKER]]';
 
+// Configure marked to shift all headings up by 1 level.
+//
+// Registered ONCE at module scope: `marked.use()` appends to the extension
+// list on the shared `marked` singleton, so calling it inside the composable
+// re-registered the renderer on every `useMarkdown()` call (i.e. every
+// component setup) and accumulated indefinitely.
+const renderer = new marked.Renderer();
+// Render the heading's INLINE tokens through the parser instead of
+// concatenating their raw `.text`. Flattening to `.text` dropped every inline
+// construct inside a heading — `## A **bold** title` lost its <strong>, links
+// lost their <a>, code spans lost their <code> — and emitted the raw source
+// unescaped. Declared with `function` (not an arrow) so `this` binds to the
+// renderer, which is where marked exposes `parser`.
+renderer.heading = function ({ tokens, depth }) {
+  const text = this.parser.parseInline(tokens);
+  const newLevel = Math.min(depth + 1, 6); // Shift up by 1, max h6
+  return `<h${newLevel}>${text}</h${newLevel}>`;
+};
+
+marked.use({ renderer });
+
 export const useMarkdown = () => {
-  // Configure marked to shift all headings up by 1 level
-  const renderer = new marked.Renderer();
-  renderer.heading = ({ tokens, depth }) => {
-    const text = tokens
-      .map((token) => (token as { text?: string }).text ?? '')
-      .join('');
-    const newLevel = Math.min(depth + 1, 6); // Shift up by 1, max h6
-    return `<h${newLevel}>${text}</h${newLevel}>`;
-  };
-
-  marked.use({ renderer });
-
   const getApiBaseUrl = (): string => {
     try {
       // useRuntimeConfig will be available in a Nuxt runtime environment
