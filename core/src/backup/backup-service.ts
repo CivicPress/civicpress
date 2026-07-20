@@ -7,6 +7,7 @@ import tar from 'tar';
 import yaml from 'yaml';
 import { Logger } from '../utils/logger.js';
 import { DatabaseConfig } from '../database/database-adapter.js';
+import { checkpointSqliteInDataDir } from './backup-service/sqlite-checkpoint.js';
 import {
   exportStorageFilesTable,
   restoreStorageFilesTable,
@@ -152,6 +153,18 @@ export class BackupService {
     const backupDir = path.join(outputDir, timestamp);
 
     await fs.mkdir(backupDir, { recursive: true });
+
+    // If the SQLite database lives inside the directory we are about to copy
+    // (the CIVIC_DATA_DIR layout), flush its WAL first — otherwise fs.cp walks
+    // civic.db / -wal / -shm at different instants and can capture a torn
+    // database. No-op when the database is elsewhere (the default) and never
+    // fatal. See sqlite-checkpoint.ts for the residual it does not close.
+    const checkpoint = await checkpointSqliteInDataDir({
+      dataDir,
+      databaseConfig: options.databaseConfig,
+      logger,
+    });
+    warnings.push(...checkpoint.warnings);
 
     // Copy data directory (including nested git repo if present)
     const dataTarget = path.join(backupDir, 'data');
