@@ -149,7 +149,20 @@ follow-up. (Storage, config+CLI, API-routes clusters + saga/BB/notifications.)
     question is "may THIS record be opened collaboratively?", so it is now
     latched once per record against the content as loaded, re-taken only when
     `recordId` changes. SSR behaviour unchanged. +4 tests.
-- [ ] HW multi-output ffmpeg filtergraph pad reuse (`[v_wm]` mapped twice) — lives in the separate BroadcastBox HW repo, not this monorepo batch
+- [x] **HW multi-output ffmpeg filtergraph pad reuse (`[v_wm]` mapped twice) — DONE
+  2026-07-20** (in the separate BroadcastBox HW repo). `_build_ffmpeg_command`
+  appended `-map <video_map_label>` for every additional output group; when video
+  comes out of `-filter_complex` (watermark / PiP / VAAPI hwupload) that label is
+  a filter output **pad**, which can only feed one consumer — so any watermarked
+  recording+RTMP capture died at startup with "Output with label 'v_wm' does not
+  exist in any defined filter graph, or was already used elsewhere". The audio
+  side already knew this rule (it maps the raw input for extra groups) but video
+  had no raw equivalent. Fixed by splitting the pad into one branch per output
+  group (`[v_wm]split=2[vout0][vout1]`) and re-pointing the first group's map.
+  Confirmed against real ffmpeg 6.1.1 (old: 0-byte mp4 + hard failure; new: both
+  outputs written). Only affects the multi-output branch — a single output takes
+  the `len(output_list) == 1` path and is untouched. `_build_pip_compositor_command`
+  already split correctly and was left alone.
 - [x] `.npmrc:29` jammed keys (folded into CI batch — trailing `strict-peer-dependencies=false` never parsed; dropped it, preserving effective config)
 - [x] Notifications: empty recipient dispatched silently (`notification-service.ts:278-292` returns '', no guard in sendToChannel L262); SMS/Slack config declared (`notification-config.ts:51-66`) but only email channel implemented → "Channel not found" throw if enabled
 
@@ -190,8 +203,55 @@ follow-up. (Storage, config+CLI, API-routes clusters + saga/BB/notifications.)
   `unknown-ack` `coreWarn` logged `JSON.stringify(ack)` raw; now
   `JSON.stringify(redactSecretFields(ack))` (an unmatched ack is exactly the
   malformed/spoofed-frame path, and an ack payload can carry a stream_key).
-- [ ] HW QR f-string; `_untrack_pid` Process-vs-pid; subprocess type-hint
-- [ ] HW Wi-Fi PSK off nmcli argv; reject plain-http enrollment
+- [x] **HW QR f-string; `_untrack_pid` Process-vs-pid; subprocess type-hint — DONE 2026-07-20.**
+  - **QR "f-string": the bug as written does NOT exist.** An exhaustive `tokenize`
+    scan of every `.py` under `src/` found **zero** non-f-prefixed literals
+    containing `{ident}`, and `git log -S` shows the one QR string has been an
+    f-string since it was introduced. The real defect in that same line was that
+    the QR payload was **hand-rolled JSON built by interpolation**, while the
+    scanner (`QrScanner.vue`) does a bare `JSON.parse` — so an operator-supplied
+    `civicpress_url` containing a `"` or `\` produced a malformed document and
+    every scan failed as "invalid QR code". Replaced with `json.dumps(...,
+    separators=(",", ":"))`; byte-identical for well-formed URLs, so the frontend
+    contract is unchanged. +5 tests.
+  - **`_untrack_pid`:** the preview→recording handoff passed the `Process`
+    **object** where an int pid was expected. `set.discard()` raises nothing on a
+    miss, so it silently did nothing and the dead preview PID stayed in
+    `_child_pids` forever — and that set is `SIGKILL`ed just before `os._exit()`,
+    so a PID the OS had since recycled onto an unrelated process was a standing
+    kill target. The audio sibling two lines below was already correct.
+  - **subprocess type-hint:** five sites annotated the handle from
+    `asyncio.create_subprocess_exec` as `Optional[subprocess.Process]` — the
+    stdlib `subprocess` module has **no** `Process` attribute (it has `Popen`);
+    the correct type is `asyncio.subprocess.Process`. Verified empirically that
+    the annotation is inert at runtime (attribute-target annotations in a
+    function body aren't evaluated), so this was mypy/IDE-only and correctly
+    ships without a test.
+- [x] **HW Wi-Fi PSK off nmcli argv; reject plain-http enrollment — DONE 2026-07-20.**
+  - **Wi-Fi PSK off argv:** `POST /api/network/connect` built
+    `nmcli device wifi connect <ssid> password <psk>`. `/proc/<pid>/cmdline` is
+    world-readable, so any local account (or anything sampling `ps`) could lift
+    the PSK for the duration of the connect. The codebase already refused to
+    *persist* the PSK (FA-HW-011); argv was the remaining leak. Now uses
+    `nmcli --ask` with the secret fed on **stdin**, so it only ever exists in the
+    process pipe. +3 tests asserting the PSK appears in no argv token.
+    **⚠️ NEEDS A BENCH CHECK BEFORE SHIPPING:** `nmcli` is not installed in the
+    dev VM, so it could not be smoke-tested that `--ask` reads the secret from a
+    non-TTY pipe rather than demanding a terminal. This is the standard
+    documented pattern and nmcli uses readline (which accepts non-TTY stdin), but
+    it is unverified on hardware — if `--ask` turns out to require a TTY this
+    would break Wi-Fi onboarding, so verify on a real appliance.
+  - **Reject plain-http enrollment:** enrollment POSTed the one-time pairing code
+    and received the device's long-lived bearer token over whatever scheme was
+    configured, with **no** scheme check — over `http://` both are readable and
+    forgeable on-path. `main.py` already enforced this floor (FA-HW-009) on the
+    **WebSocket** leg; the enrollment leg was simply never covered. Added the gate
+    at the single network choke point (so it covers both the API route and
+    `scripts/configure_device.py`), following the existing carve-out convention
+    exactly: loopback always allowed, remote cleartext only via the explicit
+    `ALLOW_INSECURE_TRANSPORT=true` opt-in (default `False`) — never a blanket
+    bypass. +7 tests, incl. asserting the enrollment code never left the device on
+    the rejected path.
 - [x] **`GET /api/users` limit cap + no 403 perm dump — DONE 2026-07-17 (phase-7h).**
   The 403 echoed the caller's full resolved permission set (a "DEBUG"
   info-disclosure) — now a plain "Insufficient permissions to list users". `limit`
