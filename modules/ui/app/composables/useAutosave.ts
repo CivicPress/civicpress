@@ -36,8 +36,17 @@ export function useAutosave<T>(data: T, options: AutosaveOptions) {
   const retryCount = ref(0);
   const maxRetries = 3;
 
+  // Pending backoff-retry timers, plus a latch marking the composable torn
+  // down. Unmount cleanup previously called stop(), which only detaches the
+  // deep watcher: an in-flight retry chain (2s/4s/8s) and an already-scheduled
+  // debounced save both survived it and could fire AFTER the component was
+  // gone, PUTting stale form state over a record the user had navigated away
+  // from. Every save path now short-circuits once disposed.
+  const retryTimers = new Set<ReturnType<typeof setTimeout>>();
+  let disposed = false;
+
   const save = async (value: T) => {
-    if (!enabled) return;
+    if (!enabled || disposed) return;
 
     isSaving.value = true;
     error.value = null;
@@ -51,12 +60,14 @@ export function useAutosave<T>(data: T, options: AutosaveOptions) {
       error.value = saveError;
 
       // Retry with exponential backoff
-      if (retryCount.value < maxRetries) {
+      if (retryCount.value < maxRetries && !disposed) {
         retryCount.value++;
         const delay = Math.pow(2, retryCount.value) * 1000; // 2s, 4s, 8s
-        setTimeout(() => {
+        const timer = setTimeout(() => {
+          retryTimers.delete(timer);
           save(value);
         }, delay);
+        retryTimers.add(timer);
       } else {
         if (onError) {
           onError(saveError);
@@ -106,12 +117,24 @@ export function useAutosave<T>(data: T, options: AutosaveOptions) {
     await save(data);
   };
 
+  /**
+   * Tear down every scheduled write: detach the watcher, cancel outstanding
+   * backoff retries, and latch `disposed` so a debounced save whose timer has
+   * already elapsed still cannot reach onSave.
+   */
+  const dispose = () => {
+    disposed = true;
+    stop();
+    for (const timer of retryTimers) {
+      clearTimeout(timer);
+    }
+    retryTimers.clear();
+  };
+
   // Cleanup on unmount (only if in component context)
   const instance = getCurrentInstance();
   if (instance) {
-    onUnmounted(() => {
-      stop();
-    });
+    onUnmounted(dispose);
   }
 
   return {
@@ -122,5 +145,6 @@ export function useAutosave<T>(data: T, options: AutosaveOptions) {
     saveOnBlur,
     start,
     stop,
+    dispose,
   };
 }

@@ -224,3 +224,71 @@ describe('useAutosave — collaborativeMode', () => {
     expect(onSave).toHaveBeenCalledTimes(1);
   });
 });
+
+/**
+ * Teardown. `stop()` only detaches the deep watcher — it does not cancel work
+ * that is already scheduled. Unmount cleanup used to call just `stop()`, so an
+ * in-flight exponential-backoff retry chain (2s/4s/8s) or an already-armed
+ * debounced save could still fire after the component was gone and PUT stale
+ * form state over a record the user had navigated away from.
+ */
+describe('useAutosave — teardown cancels scheduled writes', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.useRealTimers();
+  });
+
+  it('cancels pending backoff retries on dispose', async () => {
+    const data = ref({ title: 'Test' });
+    const onSave = vi.fn().mockRejectedValue(new Error('save failed'));
+
+    const { start, dispose } = useAutosave(data, { onSave, debounceMs: 1000 });
+
+    start();
+    data.value = { title: 'Updated' };
+
+    // First attempt runs and fails, arming the 2s backoff retry.
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(onSave).toHaveBeenCalledTimes(1);
+
+    dispose();
+
+    // Before the fix the retry chain kept firing long after teardown.
+    await vi.advanceTimersByTimeAsync(30000);
+    expect(onSave).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not run an already-armed debounced save after dispose', async () => {
+    const data = ref({ title: 'Test' });
+    const onSave = vi.fn().mockResolvedValue(undefined);
+
+    const { start, dispose } = useAutosave(data, { onSave, debounceMs: 1000 });
+
+    start();
+    data.value = { title: 'Updated' };
+
+    // Debounce armed but not yet elapsed when the component goes away.
+    await vi.advanceTimersByTimeAsync(500);
+    dispose();
+    await vi.advanceTimersByTimeAsync(30000);
+
+    expect(onSave).not.toHaveBeenCalled();
+  });
+
+  it('ignores explicit save() calls made after dispose', async () => {
+    const data = ref({ title: 'Test' });
+    const onSave = vi.fn().mockResolvedValue(undefined);
+
+    const { save, saveOnBlur, dispose } = useAutosave(data, { onSave });
+
+    dispose();
+    await save();
+    await saveOnBlur();
+
+    expect(onSave).not.toHaveBeenCalled();
+  });
+});
