@@ -26,9 +26,15 @@ import type { Logger } from '@civicpress/core';
 
 const SYSTEM_USER = { id: 1, username: 'system', role: 'admin' };
 
+/** Rows per listRecords page, and a hard stop on the paging loop. */
+const SCAN_PAGE_SIZE = 200;
+const SCAN_MAX_PAGES = 500;
+
 export interface BackfillRecordStore {
   listRecords(options: {
     type?: string;
+    limit?: number;
+    offset?: number;
   }): Promise<{ records: Array<{ id: string }> }>;
   getRecord(id: string): Promise<Record<string, any> | null>;
   updateRecord(
@@ -99,11 +105,27 @@ export async function backfillPublicRaws(opts: {
   };
 
   // Map every capture reference: av_file → record, public_file → record.
+  //
+  // This map decides whether a file in the PUBLIC folder is a worker-verified
+  // variant (kept) or an unverified raw (moved out + the public object
+  // DELETED), so it must cover EVERY session — core's listRecords always
+  // appends a LIMIT and defaults it to 10, which silently mapped only the 10
+  // newest sessions and would have re-homed (and deleted the public copy of) a
+  // verified variant belonging to any older one. Page explicitly.
   const avFileToRecord = new Map<string, string>();
   const publicFileIds = new Set<string>();
-  const { records: sessionIds } = await records.listRecords({
-    type: 'session',
-  });
+  const sessionIds: Array<{ id: string }> = [];
+  for (let page = 0; page < SCAN_MAX_PAGES; page++) {
+    const rows = (
+      await records.listRecords({
+        type: 'session',
+        limit: SCAN_PAGE_SIZE,
+        offset: page * SCAN_PAGE_SIZE,
+      })
+    ).records;
+    sessionIds.push(...rows);
+    if (rows.length < SCAN_PAGE_SIZE) break;
+  }
   for (const { id } of sessionIds) {
     const rec = await records.getRecord(id);
     if (!rec) continue;
