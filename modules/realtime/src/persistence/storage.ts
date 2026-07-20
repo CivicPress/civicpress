@@ -22,6 +22,15 @@ export interface SnapshotStorage {
   findOlderThan(cutoff: number): Promise<SnapshotRow[]>;
   /** Delete a single (room_id, version) row. */
   deleteRow(roomId: string, version: number): Promise<void>;
+  /**
+   * Version numbers stored for a room, NEWEST (highest) first.
+   *
+   * Feeds retention pruning (SnapshotManager.pruneVersions): version numbers
+   * only ever climb, so a long-lived room accumulates one row per snapshot
+   * interval forever — the TTL sweep never reclaims them because it skips rooms
+   * that are still active. Returning ids (not rows) keeps the blobs off the heap.
+   */
+  listVersions(roomId: string): Promise<number[]>;
 }
 
 /**
@@ -125,6 +134,33 @@ export class DatabaseSnapshotStorage implements SnapshotStorage {
           : 'REALTIME_SNAPSHOT_STORAGE_LOAD_ERROR',
         { error: error instanceof Error ? error.message : String(error) },
         { operation: 'realtime:snapshot:storage:find-older:error' }
+      );
+      throw error;
+    }
+  }
+
+  async listVersions(roomId: string): Promise<number[]> {
+    try {
+      const rows = await this.db.query<{ version: number }>(
+        'SELECT version FROM realtime_snapshots WHERE room_id = ? ORDER BY version DESC',
+        [roomId]
+      );
+      return rows.map((r) => r.version);
+    } catch (error) {
+      coreError(
+        error instanceof Error && isCivicPressError(error)
+          ? error
+          : error instanceof Error
+            ? error
+            : new Error(String(error)),
+        isCivicPressError(error)
+          ? undefined
+          : 'REALTIME_SNAPSHOT_STORAGE_LOAD_ERROR',
+        { error: error instanceof Error ? error.message : String(error) },
+        {
+          operation: 'realtime:snapshot:storage:list-versions:error',
+          roomId,
+        }
       );
       throw error;
     }
@@ -318,6 +354,38 @@ export class FilesystemSnapshotStorage implements SnapshotStorage {
           : 'REALTIME_SNAPSHOT_STORAGE_LOAD_ERROR',
         { error: error instanceof Error ? error.message : String(error) },
         { operation: 'realtime:snapshot:storage:find-older:error' }
+      );
+      throw error;
+    }
+  }
+
+  async listVersions(roomId: string): Promise<number[]> {
+    try {
+      const snapshotDir = path.join(this.basePath, roomId);
+      if (!(await fs.pathExists(snapshotDir))) {
+        return [];
+      }
+      const files = await fs.readdir(snapshotDir);
+      const versions = files
+        .filter((f) => f.endsWith('.snapshot'))
+        .map((f) => this.parseVersion(f.replace('.snapshot', '')));
+      // Descending so callers can `slice(keep)` to get the prunable tail.
+      return Array.from(new Set(versions)).sort((a, b) => b - a);
+    } catch (error) {
+      coreError(
+        error instanceof Error && isCivicPressError(error)
+          ? error
+          : error instanceof Error
+            ? error
+            : new Error(String(error)),
+        isCivicPressError(error)
+          ? undefined
+          : 'REALTIME_SNAPSHOT_STORAGE_LOAD_ERROR',
+        { error: error instanceof Error ? error.message : String(error) },
+        {
+          operation: 'realtime:snapshot:storage:list-versions:error',
+          roomId,
+        }
       );
       throw error;
     }

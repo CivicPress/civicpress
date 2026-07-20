@@ -4,7 +4,8 @@
  * Main exports for the realtime module
  */
 
-export { RealtimeServer } from './realtime-server.js';
+export { RealtimeServer, SESSION_REVOKED_HOOK } from './realtime-server.js';
+export type { SessionRevokedPayload } from './realtime-server.js';
 export { RoomManager } from './rooms/room-manager.js';
 export type { Room, RoomFactory } from './rooms/room-manager.js';
 export { YjsRoom } from './rooms/yjs-room.js';
@@ -22,6 +23,7 @@ export {
   SNAPSHOT_FORMAT_V1,
   MAX_SNAPSHOT_BYTES,
   SNAPSHOT_TTL_MS,
+  MAX_SNAPSHOT_VERSIONS_PER_ROOM,
 } from './persistence/snapshots.js';
 export type {
   SnapshotRow,

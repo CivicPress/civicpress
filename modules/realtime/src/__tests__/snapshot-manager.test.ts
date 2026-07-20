@@ -16,6 +16,7 @@ import {
   SNAPSHOT_FORMAT_V1,
   MAX_SNAPSHOT_BYTES,
   SNAPSHOT_TTL_MS,
+  MAX_SNAPSHOT_VERSIONS_PER_ROOM,
 } from '../persistence/snapshots.js';
 import type { SnapshotRow } from '../persistence/snapshots.js';
 import { DatabaseSnapshotStorage } from '../persistence/storage.js';
@@ -200,6 +201,31 @@ describe('FilesystemSnapshotStorage (W4 row API)', () => {
 
     await storage.deleteRow('records:old', 1);
     expect(await storage.loadLatestRow('records:old')).toBeNull();
+  });
+
+  it('listVersions returns a room-scoped, newest-first version list', async () => {
+    const now = Date.now();
+    await storage.insert(makeRow('records:r1', 1, now - 2000));
+    await storage.insert(makeRow('records:r1', 3, now));
+    await storage.insert(makeRow('records:r1', 2, now - 1000));
+    await storage.insert(makeRow('records:other', 9, now));
+
+    expect(await storage.listVersions('records:r1')).toEqual([3, 2, 1]);
+    expect(await storage.listVersions('records:other')).toEqual([9]);
+    expect(await storage.listVersions('records:nope')).toEqual([]);
+  });
+
+  it('prunes to the newest N on the filesystem backend too', async () => {
+    const mgr = new SnapshotManager(quietLogger(), storage);
+    for (let i = 0; i < MAX_SNAPSHOT_VERSIONS_PER_ROOM + 3; i++) {
+      await mgr.persist({
+        roomId: 'records:fs',
+        blob: new Uint8Array([i, i, i]),
+      });
+    }
+    expect(await storage.listVersions('records:fs')).toHaveLength(
+      MAX_SNAPSHOT_VERSIONS_PER_ROOM
+    );
   });
 });
 
@@ -415,6 +441,30 @@ describe('snapshot TTL cleanup (W4)', () => {
     await ctx.close();
   });
 
+  it('does NOT reclaim rows of an active room, however many pile up', async () => {
+    // The reason retention has to live on the WRITE path: the TTL sweep skips
+    // active rooms by design, so the busiest documents are exactly the ones it
+    // can never reclaim. Retention (below) is what bounds them.
+    const ctx = await createTestPersistence();
+    for (let i = 0; i < 6; i++) {
+      await ctx.snapshotMgr.persist({
+        roomId: 'records:busy',
+        blob: new Uint8Array([i]),
+      });
+    }
+    await ctx.db.run(
+      `UPDATE realtime_snapshots SET created_at = ? WHERE room_id = ?`,
+      expiredAt(),
+      'records:busy'
+    );
+
+    const deleted = await ctx.snapshotMgr.cleanupExpired({
+      activeRoomIds: new Set(['records:busy']),
+    });
+    expect(deleted).toBe(0);
+    await ctx.close();
+  });
+
   it('fires realtime:snapshot:expired hook per deleted row', async () => {
     const ctx = await createTestPersistence();
     const events: Array<{ roomId: string }> = [];
@@ -434,6 +484,183 @@ describe('snapshot TTL cleanup (W4)', () => {
       'records:e1',
       'records:e2',
     ]);
+    await ctx.close();
+  });
+});
+
+// ===========================================================================
+// Snapshot version retention (realtime-005 — "prune versions")
+//
+// persist() only ever INSERTS: `version` climbs monotonically and nothing
+// overwrites. The TTL sweep above cannot bail it out, because it deliberately
+// skips rooms that are still active — so a continuously-edited document
+// accumulated one row (up to MAX_SNAPSHOT_BYTES each) per snapshot interval,
+// forever. Retention on the write path is what bounds it.
+// ===========================================================================
+
+describe('snapshot version retention (realtime-005)', () => {
+  const countRows = async (
+    ctx: TestPersistenceCtx,
+    roomId: string
+  ): Promise<number> => {
+    const rows = await ctx.db.all<{ n: number }>(
+      `SELECT COUNT(*) AS n FROM realtime_snapshots WHERE room_id = ?`,
+      [roomId]
+    );
+    return Number(rows[0]?.n ?? 0);
+  };
+
+  it('keeps only the newest MAX_SNAPSHOT_VERSIONS_PER_ROOM rows per room', async () => {
+    const ctx = await createTestPersistence();
+    const writes = MAX_SNAPSHOT_VERSIONS_PER_ROOM + 5;
+    for (let i = 0; i < writes; i++) {
+      await ctx.snapshotMgr.persist({
+        roomId: 'records:r1',
+        blob: new Uint8Array([i, i, i]),
+      });
+    }
+
+    expect(await countRows(ctx, 'records:r1')).toBe(
+      MAX_SNAPSHOT_VERSIONS_PER_ROOM
+    );
+    await ctx.close();
+  });
+
+  it('keeps the NEWEST rows (the pruned tail is the old ones)', async () => {
+    const ctx = await createTestPersistence();
+    const writes = MAX_SNAPSHOT_VERSIONS_PER_ROOM + 2;
+    for (let i = 0; i < writes; i++) {
+      await ctx.snapshotMgr.persist({
+        roomId: 'records:r1',
+        blob: new Uint8Array([i, i, i]),
+      });
+    }
+
+    const kept = await ctx.db.all<{ version: number }>(
+      `SELECT version FROM realtime_snapshots WHERE room_id = ? ORDER BY version DESC`,
+      ['records:r1']
+    );
+    const expected = Array.from(
+      { length: MAX_SNAPSHOT_VERSIONS_PER_ROOM },
+      (_, i) => writes - i
+    );
+    expect(kept.map((r) => r.version)).toEqual(expected);
+    await ctx.close();
+  });
+
+  it('leaves the surviving latest snapshot verifiable (prune is not corruption)', async () => {
+    const ctx = await createTestPersistence();
+    for (let i = 0; i < MAX_SNAPSHOT_VERSIONS_PER_ROOM + 2; i++) {
+      await ctx.snapshotMgr.persist({
+        roomId: 'records:r1',
+        blob: new Uint8Array([i, i, i]),
+      });
+    }
+
+    const row = await ctx.snapshotMgr.loadLatestVerified('records:r1');
+    expect(row).not.toBeNull();
+    const last = MAX_SNAPSHOT_VERSIONS_PER_ROOM + 1;
+    expect(Array.from(row!.snapshot_data)).toEqual([last, last, last]);
+    await ctx.close();
+  });
+
+  it('is room-scoped (pruning one room never touches another)', async () => {
+    const ctx = await createTestPersistence();
+    await ctx.snapshotMgr.persist({
+      roomId: 'records:quiet',
+      blob: new Uint8Array([1]),
+    });
+    for (let i = 0; i < MAX_SNAPSHOT_VERSIONS_PER_ROOM + 4; i++) {
+      await ctx.snapshotMgr.persist({
+        roomId: 'records:busy',
+        blob: new Uint8Array([i]),
+      });
+    }
+
+    expect(await countRows(ctx, 'records:busy')).toBe(
+      MAX_SNAPSHOT_VERSIONS_PER_ROOM
+    );
+    expect(await countRows(ctx, 'records:quiet')).toBe(1);
+    await ctx.close();
+  });
+
+  it('fires realtime:snapshot:pruned per deleted row', async () => {
+    const ctx = await createTestPersistence();
+    const events: Array<{ roomId: string; version: number; keep: number }> = [];
+    ctx.hookBus.on('realtime:snapshot:pruned', (e) => events.push(e));
+
+    const writes = MAX_SNAPSHOT_VERSIONS_PER_ROOM + 3;
+    for (let i = 0; i < writes; i++) {
+      await ctx.snapshotMgr.persist({
+        roomId: 'records:r1',
+        blob: new Uint8Array([i]),
+      });
+    }
+
+    // One prune per persist once the cap is reached: writes - cap deletions.
+    expect(events).toHaveLength(writes - MAX_SNAPSHOT_VERSIONS_PER_ROOM);
+    expect(events.every((e) => e.roomId === 'records:r1')).toBe(true);
+    expect(events.map((e) => e.version)).toEqual([1, 2, 3]);
+    expect(events[0].keep).toBe(MAX_SNAPSHOT_VERSIONS_PER_ROOM);
+    await ctx.close();
+  });
+
+  it('does not prune below the cap', async () => {
+    const ctx = await createTestPersistence();
+    const events: Array<unknown> = [];
+    ctx.hookBus.on('realtime:snapshot:pruned', (e) => events.push(e));
+
+    for (let i = 0; i < MAX_SNAPSHOT_VERSIONS_PER_ROOM; i++) {
+      await ctx.snapshotMgr.persist({
+        roomId: 'records:r1',
+        blob: new Uint8Array([i]),
+      });
+    }
+
+    expect(events).toHaveLength(0);
+    expect(await countRows(ctx, 'records:r1')).toBe(
+      MAX_SNAPSHOT_VERSIONS_PER_ROOM
+    );
+    await ctx.close();
+  });
+
+  it('honours an explicit keep count', async () => {
+    const ctx = await createTestPersistence();
+    for (let i = 0; i < 5; i++) {
+      await ctx.snapshotMgr.persist({
+        roomId: 'records:r1',
+        blob: new Uint8Array([i]),
+      });
+    }
+
+    expect(await ctx.snapshotMgr.pruneVersions('records:r1', 1)).toBe(
+      MAX_SNAPSHOT_VERSIONS_PER_ROOM - 1
+    );
+    expect(await countRows(ctx, 'records:r1')).toBe(1);
+    await ctx.close();
+  });
+
+  it('a prune failure never fails the snapshot that was just written', async () => {
+    // Losing a snapshot is strictly worse than keeping a stale row, so the
+    // retention sweep is best-effort: persist() must still resolve.
+    const ctx = await createTestPersistence();
+    const logger = quietLogger();
+    const exploding = new DatabaseSnapshotStorage(
+      {
+        query: async (sql: string) => {
+          if (sql.startsWith('SELECT version')) {
+            throw new Error('boom');
+          }
+          return [];
+        },
+      } as unknown as DatabaseService,
+      logger
+    );
+    const mgr = new SnapshotManager(logger, exploding);
+
+    await expect(
+      mgr.persist({ roomId: 'records:r1', blob: new Uint8Array([1]) })
+    ).resolves.toBeUndefined();
     await ctx.close();
   });
 });
