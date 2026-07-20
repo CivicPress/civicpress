@@ -6,6 +6,42 @@ import { useMarkdown } from '../useMarkdown';
 // output with DOMPurify inside useMarkdown.renderMarkdown(). These
 // tests pin the XSS-safe behaviour so a future refactor can't
 // silently reintroduce the vector.
+// The heading renderer shifts levels up by one. It used to build the heading
+// body by concatenating each inline token's raw `.text`, which silently
+// dropped every inline construct inside a heading (bold, links, code spans).
+// These tests pin that the heading body is rendered through the inline parser.
+describe('useMarkdown — heading inline formatting', () => {
+  const { renderMarkdown } = useMarkdown();
+
+  it('preserves bold inside a heading', () => {
+    const result = renderMarkdown('## Budget **2026**');
+    expect(result).toContain('<strong>2026</strong>');
+  });
+
+  it('preserves emphasis and code spans inside a heading', () => {
+    const result = renderMarkdown('### The `civic init` *command*');
+    expect(result).toContain('<code>civic init</code>');
+    expect(result).toContain('<em>command</em>');
+  });
+
+  it('preserves links inside a heading', () => {
+    const result = renderMarkdown('## See [the bylaw](https://example.com/b1)');
+    expect(result).toContain('href="https://example.com/b1"');
+    expect(result).toContain('the bylaw</a>');
+  });
+
+  it('still shifts heading levels up by one, capped at h6', () => {
+    expect(renderMarkdown('# Title')).toContain('<h2>');
+    expect(renderMarkdown('## Title')).toContain('<h3>');
+    expect(renderMarkdown('###### Title')).toContain('<h6>');
+  });
+
+  it('does not emit the raw markdown source for a formatted heading', () => {
+    const result = renderMarkdown('## Budget **2026**');
+    expect(result).not.toContain('**2026**');
+  });
+});
+
 describe('useMarkdown — XSS sanitization (ui-001)', () => {
   const { renderMarkdown } = useMarkdown();
 
