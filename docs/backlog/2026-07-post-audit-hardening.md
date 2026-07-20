@@ -265,7 +265,8 @@ follow-up. (Storage, config+CLI, API-routes clusters + saga/BB/notifications.)
 
 ## Improvements
 
-- [ ] **Tier-A skeptic deferrals (2026-07-16):** realtime/WS connections
+- [x] **Tier-A skeptic deferrals — ALL FOUR CLOSED 2026-07-20** (per-clause
+  notes follow the original text below): realtime/WS connections
   established before a revocation stay live until they reconnect — publish a
   revocation event the realtime server subscribes to (defense-in-depth);
   session-token signatures are optional-if-present (unsigned tokens accepted
@@ -279,17 +280,233 @@ follow-up. (Storage, config+CLI, API-routes clusters + saga/BB/notifications.)
   draft's full content + target status (not just user/draftId), so an
   edit-then-republish within the 5-min dedupe TTL is no longer swallowed as a
   duplicate — see the QUARANTINE BURN-DOWN entry under Test & CI health.
-- [ ] Enforce-or-delete dead session config (`sessionTimeout`/`maxConcurrentSessions`/`requireHttps`)
-- [ ] Wire the 3 uncalled cleanup sweeps (sessions / email tokens / login_attempts)
-- [ ] Move runtime `ALTER TABLE workflow_state` off the GET path
-- [ ] Thread audit channel into create/update/archive/publish
-- [ ] SQL-side pagination (listUnpublishedRecords, git-history, geography linked-records)
-- [ ] BB redaction verify: sample several points per hidden window
-- [ ] BB transcription gateway: stream instead of whole-file Buffer
-- [ ] BB polling workers: status-scoped query
-- [ ] realtime-005 snapshots: cap + hash + tested Markdown recovery; prune versions
-- [ ] Templates route file-watch service per request → singleton
-- [ ] CLI parity (`--no-color`, `view --json` purity, `list` human mode); `users:delete` confirmation
+
+  **Closure notes (2026-07-20):**
+  - **Realtime revocation event — DONE, both halves.** The realtime server now
+    subscribes to `auth:sessions:revoked` and tears down live sockets, and core
+    now EMITS it: `SessionOps.deleteUserSessions` fires the hook after the
+    delete, with an optional `HookSystem` threaded through `AuthService`
+    (`initializeHooks`, mirroring the existing `getSecretsManager` "wired later"
+    idiom rather than changing the constructor) and wired in
+    `civic-core.getAuthService()`. Emission is best-effort: the rows are already
+    gone by then, so a broken listener must not turn a successful revocation
+    into a thrown error at the call site. Two supporting realtime fixes were
+    needed to stop this being cosmetic — `ws.close()` only STARTS a handshake
+    and the peer has ~30s to answer, during which a stalling client could keep
+    pushing Yjs updates, so revocation runs the canonical teardown eagerly and a
+    liveness gate drops frames from de-registered connections.
+  - **Session-token signatures now REQUIRED — DONE, and the same flaw existed
+    for API keys.** `unwrapToken` read `if (secretsManager && token.includes('.'))`
+    and otherwise fell through to `return token`, so while signing was ACTIVE an
+    unsigned token skipped verification entirely — defeating the point of the
+    signature, which is that a raw token leaking by another route (log line, DB
+    row, backup) is not enough on its own. `validateApiKey` had the identical
+    fallthrough, and API keys are long-lived, so that side was worse. Both now
+    require a valid signature when a secretsManager is configured, and still
+    accept unsigned tokens when signing is not configured.
+  - **Backup fidelity under WAL — DONE, with a scoping correction.** The premise
+    needed narrowing: the backup does NOT copy the sqlite file at all in the
+    default layout (the default path is `<projectRoot>/.system-data/civic.db`,
+    outside the copied `dataDir`; records are durable as Markdown-in-Git and the
+    DB is a rebuildable index). But under `CIVIC_DATA_DIR` the file resolves
+    INSIDE `dataDir` and `fs.cp` does copy it live, so the hazard is real there.
+    Added a containment check plus `PRAGMA wal_checkpoint(TRUNCATE)` before the
+    copy, fail-open and never fatal. **Residual, documented not solved:** a
+    checkpoint narrows the window but does not freeze it — writes landing during
+    the copy can still tear. Closing that needs `VACUUM INTO`, which changes
+    what restore consumes.
+  - **Password-change re-login UX — DONE.** The result was a bare "Password
+    successfully changed" and the caller then found itself silently logged out,
+    which reads as a bug. It now says so explicitly and carries a
+    `sessionsRevoked` flag so the API/UI can route to a re-login instead of
+    string-matching the message.
+- [x] **Enforce-or-delete dead session config — DONE 2026-07-20 (all three ENFORCED).**
+  `sessionTimeout` now drives session lifetime (it was a hardcoded 24h);
+  `maxConcurrentSessions` prunes a user's oldest sessions beyond the cap after
+  each mint — ordered by `id`, NOT `created_at`, because that column is a
+  DATETIME with one-second resolution and same-second logins would tie, letting
+  the LIMIT evict the session just handed to the caller; `requireHttps` is
+  enforced by a new middleware that defaults OFF (so a no-op for every existing
+  deployment) and exempts health checks, so a plain-HTTP load-balancer probe
+  cannot mark the instance unhealthy and pull it from rotation.
+- [x] **Wire the 3 uncalled cleanup sweeps — DONE 2026-07-20.** Two existed with
+  no caller; the third did not exist at all. `login_attempts` is consulted on
+  EVERY login and was only ever cleared for users who eventually succeed, so
+  failed/abandoned usernames — notably from account-enumeration scanning —
+  stayed forever; added `LoginThrottle.cleanupStaleAttempts` (ISO-to-ISO
+  comparison, the same trap that bit `acquireLock`). All three are now driven by
+  a new `AuthMaintenanceScheduler`: each sweep individually try/caught so one
+  failure cannot skip the others or reject into the interval callback, and the
+  timer is `unref()`d so it can never hold a CLI or test process open. Wired
+  into the API lifecycle following the existing enrollment-cleanup convention.
+- [-] **Move runtime `ALTER TABLE workflow_state` off the GET path — NOT
+  REPRODUCIBLE (2026-07-20).** `ensureWorkflowStateColumn` is called from the
+  migration sequence inside `SQLiteAdapter.initialize()`, which runs once from
+  `DatabaseService.initialize()` at startup — not from any request path. Nothing
+  to move. Dropped rather than "done": there is no change to make.
+- [x] **Thread audit channel into create/update/archive/publish — DONE 2026-07-20.**
+  The gap was BIGGER than the entry implied: **none of the four** wrote a domain
+  audit row on its primary path. `RecordManager.createRecord`/`.updateRecord`
+  audit only on their LEGACY branches, which are reached solely for drafts /
+  `skipFileGeneration` — any non-draft record is routed to
+  `createRecordSaga`/`updateRecordSaga`, and those sagas write with
+  `db.createRecord(...)`/`db.updateRecord(...)` DIRECTLY (they must; the saga
+  owns the file+git compensation). So creating or editing a *published* record
+  — the case that most needs a trail — was unaudited, archive wrote nothing at
+  all, and publish wrote only `create_record` on the new-record branch and
+  nothing at all when RE-publishing over an existing record. `RecordSagas`
+  already received `writeAudit` in its deps from the Phase-2d decomposition and
+  never once called it. Fixed by emitting `create_record` / `update_record` /
+  `archive_record` in `record-manager/sagas.ts` and `publish_record` in
+  `record-manager.publishDraft`, each after `executor.execute()` resolves (the
+  executor THROWS on step failure/timeout, so reaching the call means the write
+  committed). Covered by `core/src/records/__tests__/record-manager-audit-channel.test.ts`
+  (6 tests) — **all 6 proven to fail against the pre-fix tree.**
+- [x] **SQL-side pagination — DONE 2026-07-20 (all three).**
+  - `listUnpublishedRecords` (`records-service/drafts.ts`): was `SELECT *` of
+    every matching row + JSON-parsing/transforming ALL of them into ApiDrafts
+    before slicing a page out, with `total` = that array's length. Now
+    `COUNT(*)` + a keyset predicate + `LIMIT limit+1` (the extra row IS
+    `hasMore`); only the page is transformed. The sort gained an explicit
+    `id ASC` tiebreak — `updated_at DESC` alone is not a total order, which is
+    already broken for a CURSOR API and load-bearing for keyset. Semantics are
+    unchanged: the 4 new tests in `tests/api/pagination-sql-side.test.ts` pass
+    against BOTH the old JS-slicing implementation and the new one (verified).
+  - geography `/linked-records`: the Tier-C batch scan was correct but hydrated
+    the entire published corpus per request. Added a `linkedGeographyId` option
+    that threads route → `RecordsListing` → `RecordManager` → `RecordStore`
+    (`database-service.ts` needed no edit — it forwards via
+    `Parameters<RecordStore['listRecords']>`) and becomes a `json_each` +
+    `json_extract($.id)` EXISTS predicate, so the DB filters, COUNTs and
+    LIMIT/OFFSETs in one query. Matching the ELEMENT id (not a `LIKE` over the
+    raw JSON) is what makes it exact — `LIKE '%geo-1%'` also matches `geo-10`,
+    and LIKE's `_` wildcard would match unrelated ids. `json_valid()` + the NULL
+    check are load-bearing: `json_each()` raises "malformed JSON" and aborts the
+    WHOLE query, so one bad row would 500 the endpoint for everyone. This also
+    closes the Tier-C skeptic coverage gap below. `LINKED_RECORDS_SCAN_CAP` is
+    gone — there is no scan left to bound.
+  - git-history: a log is not a table, so there is nothing to SQL-paginate — but
+    both handlers called `getHistory()` with NO limit and `.slice()`d a page out
+    of the whole repository log, so per-request memory grew with the age of the
+    repo. Added `getHistory(limit, pathspec, skip)` + `countCommits(pathspec)`
+    (`git rev-list --count`) and split the handler into two regimes: with no
+    author/date filter and no message fallback git returns exactly one page and
+    the true total; otherwise the full log genuinely IS required, because
+    `totalCommits` is defined over the FILTERED set (git's own `--author` was
+    rejected deliberately — it is a case-sensitive regex over "Name <email>",
+    not this endpoint's case-insensitive substring match on name OR email).
+    **Landmine found and fixed by the test:** simple-git's OPTIONS form silently
+    DROPS `--skip` when `file` is set, so a pathspec-scoped page returns the
+    first page every time; the array form is required and is what ships.
+    `core/src/git/__tests__/git-engine-history-pagination.test.ts` (7 tests).
+- [x] **BB redaction verify: sample several points per hidden window — DONE
+  2026-07-20 (this was a real hole, not polish).** `verifyOutput` computed ONE
+  instant per hidden window — the midpoint — and made a single `frameMaxLuma` +
+  `meanVolumeDb` call there, so a window blanked at its midpoint but leaking at
+  its edges passed verification and the variant **was published**. Demonstrated
+  on a real ffmpeg clip whose nominal hidden window `[5,15]` is blanked only
+  over `[8,12]`: `maxluma@10.0 = 0` (old check passes) vs `maxluma@5.25 = 255`
+  and `@14.75 = 255`; the pre-fix run published it (`published: 1`). Now probes
+  start/middle/end, inset from both edges and de-duplicated so a sub-ms window
+  yields one probe rather than three identical decodes. The `volumedetect`
+  width is narrowed at edge probes (`min(1s, 2×distance-to-edge)`) because it
+  centres its window on the probe instant — a fixed 1 s width would spill past
+  the hidden range into legitimately audible public audio and fail a CORRECTLY
+  blanked file.
+- [x] **BB transcription gateway: stream instead of whole-file Buffer — DONE
+  2026-07-20.** `prepareAudio` did `getFileContent(uuid)` into a single Buffer
+  then wrote it out. The upload cap is 16 GiB and Node's max Buffer is ~2 GiB,
+  so a long meeting **could not be transcribed at all**, and shorter ones pinned
+  their full size in RSS per in-flight session. Now pipes provider → temp file
+  via `stream/promises.pipeline`, which destroys both ends on error so a
+  mid-transfer failure cannot leave a silently truncated file that the engine
+  would happily transcribe as a short meeting. `getFileContent` remains the
+  fallback for stores without a streaming path.
+- [x] **BB polling workers: status-scoped query — DONE 2026-07-20, and it
+  exposed a CORE bug worth its own attention.** `record-store.ts` applies
+  `LIMIT` **unconditionally** with `const limit = options.limit || 10`, while
+  `total` comes from a separate `COUNT(*)`. Any caller omitting `limit`
+  therefore gets 10 rows next to a correct-looking total — silent truncation
+  that reads as complete data. All three scans omitted it, so each poll cycle
+  only ever saw the 10 most recently created sessions: past the 10th recording
+  an older `pending` session was never rescanned (its verified variant never
+  published), older sessions were never transcribed, and — worst — the backfill's
+  keep-vs-re-home decision saw only 10 sessions, so a verified variant on an
+  older session would have been re-homed and **its public object deleted**. All
+  three now page with a hard stop + truncation log, and scope on DB `metadata`
+  evidence-gated: a row with absent/unparseable metadata still falls through to
+  the authoritative read, so the filter degrades to a no-op and never to a skip.
+  **Follow-up (not done):** the `|| 10` default in `record-store.ts` is still a
+  footgun for any future caller; every current call site now passes an explicit
+  limit. `upload-processor.ts` already scoped in SQL and was left alone.
+- [x] **realtime-005 snapshots — DONE 2026-07-20.** Cap (`MAX_SNAPSHOT_BYTES`)
+  and the sha256 integrity hash with verify-on-load were ALREADY implemented and
+  tested — confirmed and not redone. The two genuine gaps: **(a) prune versions**
+  — `persist()` only ever INSERTs with a climbing `version`, and the TTL sweep
+  cannot compensate because `cleanupExpired` deliberately skips rooms in
+  `activeRoomIds`, so a continuously-edited document accumulated one row (up to
+  1 MB) per snapshot interval **forever** and the busiest documents were exactly
+  the ones never reclaimed. Added `MAX_SNAPSHOT_VERSIONS_PER_ROOM` +
+  `listVersions()` on both backends + `pruneVersions()` on the write path (never
+  throws — losing a snapshot is worse than keeping a stale row). **(b) Markdown
+  recovery** — the re-seed path existed but had ZERO coverage; nothing ever
+  corrupted a snapshot and then connected. Added a test driving the real path
+  (real SQLite rows corrupted in place, real WebSocket hydration), with a
+  discriminator asserting an intact snapshot still wins.
+- [x] **Templates route file-watch service per request → singleton — DONE
+  2026-07-20, but the stated ROOT CAUSE WAS WRONG.** There was no fd/listener
+  leak: `TemplateCacheAdapter` builds its own `FileWatcherCache` only in the
+  branch taken when NO cacheManager is supplied, and the route always supplies
+  one (`civicPress.getCacheManager()` resolves a container singleton, and
+  `civic-core-services.ts` registers the `templates`/`templateLists` caches), so
+  the adapter borrows the manager's already-watching caches and **no watcher was
+  ever created per request**. The real per-request cost was a fresh
+  TemplateEngine + TemplateValidator on every call plus a `setKeyMapper()` write
+  into the SHARED cache object from inside a request handler on every call.
+  Fixed with a `WeakMap<CivicPress, TemplateService>` (keyed on the instance,
+  since the API test harness builds one CivicPress per test context). **No
+  disposal hook was needed and `modules/api/src/index.ts` was NOT touched** —
+  the watchers belong to the cacheManager, which `CivicPress.shutdown()` already
+  shuts down. `modules/api/src/__tests__/templates-service-singleton.test.ts`
+  (3 tests, proven to fail pre-fix: 5 constructions instead of 1).
+- [x] **CLI parity + `users:delete` confirmation — DONE 2026-07-20.**
+  - `--no-color`: **already implemented**, no change made. `cli/src/index.ts`
+    declares the flag and forwards it to `CentralConfigManager.setLoggerOptions`,
+    `Logger` honours `noColor`, and chalk auto-detects `--no-color` in argv.
+  - `view --json` purity: **REAL BUG, root cause was one line.**
+    `initializeLogger()` was `new Logger()` — no options — so the logger's
+    `json` stayed false no matter what the user passed. `Logger` already
+    suppresses ALL its own output in JSON mode; it was simply never told. Under
+    `--json`, `view` therefore printed banners, separators and the rendered
+    markdown around the JSON blob and stdout did not parse. Two further leaks
+    fixed: `CliOutput.startOperation`'s end-closure logs "CLI operation
+    completed" UNCONDITIONALLY (outside the `if (json)` guards every other
+    method has), and `view`'s catch used `logger.error` — silenced in JSON mode
+    — so a `--json` failure exited 1 with NO output; it now uses `cliError`.
+    **Deeper root cause, also fixed:** `CentralConfigManager.setLoggerOptions()`
+    was **write-only dead state** — the CLI called it at startup and NOTHING
+    ever read it back, so core-side loggers (`getLogger()` in role-manager,
+    secrets.ts, …) kept printing under `--json`. It now publishes process-wide
+    defaults via `setGlobalLoggerDefaults()` in `logger.ts`, resolved LAZILY per
+    call because several of those Loggers are constructed at MODULE level,
+    before any flag is parsed. Explicit constructor options still win.
+  - `list` human mode: the non-JSON path printed ONLY
+    "✅ Successfully listed N records" — the records themselves were never
+    rendered. Now prints a table (+ a by-status summary), guarded on `!json`
+    because `cliTable`/`cliList` would each emit a SECOND `{success:true,…}`
+    blob in JSON mode.
+  - `users:delete` had NO confirmation at all. Now requires interactive
+    confirmation, with `--yes`/`--force` as the scripting bypass (following
+    `init`'s `--yes` and `diagnose`'s `--force`+readline convention), and fails
+    closed under JSON/silent mode or a non-TTY stdin rather than deleting
+    unattended or blocking on a read that will never be answered.
+  - `tests/cli/cli-parity.test.ts` (9 tests) — **8 proven to fail pre-fix**; the
+    9th is the guard test asserting human mode still renders, which correctly
+    passes both before and after. Two stale tests updated: the two existing
+    `users:delete` cases now pass `--yes`, and `security-commands`'s
+    "should support JSON output" fallback asserted on PROSE
+    ("email channel not enabled") that only reached the stream because of the
+    contamination — it now asserts the structured error envelope.
 
 ## Refactors / tech-debt
 
@@ -301,13 +518,16 @@ follow-up. (Storage, config+CLI, API-routes clusters + saga/BB/notifications.)
 
 ## Test & CI health
 
-- [ ] **Tier-C skeptic coverage-gap follow-up:** the geography `/linked-records`
-  batch-scan fix has no test — add one that seeds >`LINKED_RECORDS_SCAN_CAP`
-  (1000) records with a subset linking the geography across multiple pages and
-  asserts the total is correct + no rows past page 1 are dropped. (The fix
-  itself was skeptic-verified correct; termination is safe by inspection. The
-  history-pathspec sibling gap IS now covered by
-  `core/src/git/__tests__/git-engine-history-pathspec.test.ts`.)
+- [x] **Tier-C skeptic coverage-gap follow-up — DONE 2026-07-20.** Covered by
+  `tests/api/pagination-sql-side.test.ts` ("geography linked-records" block, 4
+  tests): rows linking the geography across multiple pages, exact `total` and a
+  consistent `totalPages` on every page, no drops and no duplicates, plus three
+  decoys the old JS scan never had to survive — an id that CONTAINS the target
+  as a prefix (`geo-target-2`), the target string appearing in a `name` field
+  instead of an `id`, and a row whose `linked_geography_files` is malformed
+  JSON. The scan-cap seeding the entry asked for is moot: the endpoint no longer
+  scans at all (see the SQL-side pagination entry above), so the cap is gone and
+  correctness no longer depends on batch-loop termination.
 
 - [x] **QUARANTINE BURN-DOWN — DONE 2026-07-17 (`refactor/phase-7e-test-health`).**
   All 5 files now pass individually AND together from a clean checkout; removed

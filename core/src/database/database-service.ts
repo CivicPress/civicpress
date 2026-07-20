@@ -272,6 +272,12 @@ export class DatabaseService {
     return this.users.cleanupExpiredSessions();
   }
 
+  async pruneUserSessions(
+    ...args: Parameters<UserStore['pruneUserSessions']>
+  ): ReturnType<UserStore['pruneUserSessions']> {
+    return this.users.pruneUserSessions(...args);
+  }
+
   // ---------------------------------------------------------------------------
   // Search index — delegated to RecordStore
   // ---------------------------------------------------------------------------

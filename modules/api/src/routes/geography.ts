@@ -22,9 +22,10 @@ import {
 } from '../utils/api-logger.js';
 import type { RecordsService } from '../services/records-service.js';
 
-// FA-API-014: bound the linked-records scan so a single request can't pull the
-// whole corpus into memory.
-const LINKED_RECORDS_SCAN_CAP = 1000;
+// (FA-API-014's `LINKED_RECORDS_SCAN_CAP` is gone: it bounded the in-JS scan of
+// the record corpus that `/linked-records` used to perform. The endpoint now
+// filters SQL-side and only ever materializes one page, so there is no scan
+// left to bound — the `limit` validator (max 100) is the memory bound.)
 
 export function createGeographyRouter(
   geographyManager: GeographyManager,
@@ -462,48 +463,37 @@ export function createGeographyRouter(
         const page = (req.query.page as unknown as number) || 1;
         const limit = (req.query.limit as unknown as number) || 50;
 
-        // Scan the WHOLE corpus in bounded batches, keeping only the records
-        // that link this geography. The prior implementation capped the scan
-        // at the first 1000 records, silently dropping links on any record
-        // past the cap AND reporting a `total` computed from that truncated
-        // subset. Memory stays proportional to the (small) match set plus one
-        // batch, not the whole corpus (FA-API-014's concern).
-        const linked: unknown[] = [];
-        let scanPage = 1;
-        let scanned = 0;
-        for (;;) {
-          const batch = await recordsService.listRecords({
-            limit: LINKED_RECORDS_SCAN_CAP,
-            page: scanPage,
-          });
-          for (const record of batch.records) {
-            const links = (
-              record as { linkedGeographyFiles?: Array<{ id: string }> }
-            ).linkedGeographyFiles;
-            if (links?.some((link) => link.id === id)) {
-              linked.push(record);
-            }
-          }
-          scanned += batch.records.length;
-          if (batch.records.length === 0 || scanned >= batch.totalCount) {
-            break;
-          }
-          scanPage += 1;
-        }
-
-        const total = linked.length;
-        const start = (page - 1) * limit;
-        const pageItems = linked.slice(start, start + limit);
+        // Filter, count and page in ONE query, SQL-side.
+        //
+        // History of this endpoint: it originally scanned only the first 1000
+        // records, so links on any record past the cap were silently dropped
+        // and `total` was computed from that truncated subset. Tier-C fixed the
+        // correctness by scanning the WHOLE corpus in bounded 1000-row batches
+        // and matching `linkedGeographyFiles` in JS — right answers, but every
+        // request hydrated every published record into an ApiRecord just to
+        // throw nearly all of them away, then sliced the page out in JS.
+        //
+        // `linkedGeographyId` pushes the match down to a `json_each` EXISTS
+        // predicate on `records.linked_geography_files`, so the database does
+        // the filtering, returns the exact COUNT, and applies LIMIT/OFFSET.
+        // Only the requested page is ever materialized, and `total` /
+        // `totalPages` come from that same filtered COUNT — so the numbers mean
+        // exactly what they meant after the Tier-C fix.
+        const result = await recordsService.listRecords({
+          page,
+          limit,
+          linkedGeographyId: id,
+        });
 
         handleSuccess(
           'get_linked_records',
           {
-            records: pageItems,
+            records: result.records,
             pagination: {
               page,
               limit,
-              total,
-              totalPages: Math.ceil(total / limit),
+              total: result.totalCount,
+              totalPages: Math.ceil(result.totalCount / limit),
             },
           },
           res

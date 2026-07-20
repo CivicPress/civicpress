@@ -79,21 +79,28 @@ export class ApiKeyOps {
     try {
       let keyToHash = key;
 
-      // If key is signed, verify and extract raw key
+      // When a secretsManager is configured, every key createApiKey mints is
+      // signed, so an unsigned key is never one of ours and must be refused.
+      //
+      // This previously read `if (secretsManager && key.includes('.'))` with an
+      // inner `parts.length === 2` check and no else — so an UNSIGNED key (or
+      // one with a stray extra `.`) fell straight through to be hashed as-is,
+      // skipping verification entirely while signing was active. API keys are
+      // long-lived credentials, so a raw key that leaks by any other route was
+      // enough on its own; requiring the signature is the whole point of
+      // minting it.
       const secretsManager = this.deps.getSecretsManager();
-      if (secretsManager && key.includes('.')) {
+      if (secretsManager) {
         const parts = key.split('.');
-        if (parts.length === 2) {
-          const [rawKey, signature] = parts;
-          const signingKey = secretsManager.getApiKeySigningKey();
-
-          if (secretsManager.verify(rawKey, signature, signingKey)) {
-            keyToHash = rawKey;
-          } else {
-            // Invalid signature
-            return null;
-          }
+        if (parts.length !== 2) {
+          return null;
         }
+        const [rawKey, signature] = parts;
+        const signingKey = secretsManager.getApiKeySigningKey();
+        if (!secretsManager.verify(rawKey, signature, signingKey)) {
+          return null;
+        }
+        keyToHash = rawKey;
       }
 
       // Hash and lookup in database

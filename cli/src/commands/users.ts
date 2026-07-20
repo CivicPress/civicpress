@@ -1,4 +1,5 @@
 import { CAC } from 'cac';
+import * as readline from 'readline';
 import { CivicPress } from '@civicpress/core';
 import { AuthUtils } from '../utils/auth-utils.js';
 import {
@@ -8,8 +9,43 @@ import {
 import {
   cliSuccess,
   cliError,
+  cliInfo,
+  cliWarn,
   cliStartOperation,
 } from '../utils/cli-output.js';
+
+/**
+ * Interactive "are you sure" for an irreversible user deletion.
+ *
+ * Mirrors the existing destructive-action convention in `diagnose.ts`
+ * (`confirmAutoFix`): a readline yes/no question, with the flag bypass handled
+ * by the caller.
+ */
+function confirmUserDeletion(target: {
+  id: number;
+  username: string;
+  role?: string;
+}): Promise<boolean> {
+  return new Promise((resolve) => {
+    const rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout,
+    });
+
+    cliWarn(
+      `About to permanently delete user "${target.username}" ` +
+        `(id ${target.id}${target.role ? `, role ${target.role}` : ''}). ` +
+        'This cannot be undone.',
+      'users:delete'
+    );
+
+    rl.question('\nDo you want to delete this user? (yes/no): ', (answer) => {
+      rl.close();
+      const normalized = answer.trim().toLowerCase();
+      resolve(normalized === 'yes' || normalized === 'y');
+    });
+  });
+}
 
 export default function setupUsersCommand(cli: CAC) {
   cli
@@ -462,6 +498,11 @@ export default function setupUsersCommand(cli: CAC) {
     .option('--token <token>', 'Session token for authentication')
     .option('--username <username>', 'Username of the user to delete')
     .option('--id <id>', 'User ID to delete')
+    .option(
+      '-y, --yes',
+      'Skip the confirmation prompt (required for non-interactive use)'
+    )
+    .option('--force', 'Alias for --yes')
     .option('--json', 'Output as JSON')
     .option('--silent', 'Suppress output')
     .action(async (options) => {
@@ -518,6 +559,52 @@ export default function setupUsersCommand(cli: CAC) {
           );
           process.exit(1);
         }
+        // Deleting a user is irreversible, and this command previously did it
+        // with no confirmation whatsoever — a mistyped `--username` silently
+        // destroyed the wrong account. Require an explicit confirmation, with
+        // `--yes`/`--force` as the scripting bypass (the repo already uses
+        // `--yes` in `init` and `--force` in `diagnose`; both spellings are
+        // accepted here so neither habit surprises anyone).
+        //
+        // A caller that cannot answer a prompt — JSON/silent mode, or stdin
+        // not a TTY (piped/CI) — must pass the flag: we fail closed rather
+        // than either deleting unattended or blocking forever on a read that
+        // will never be answered. This mirrors `diagnose.ts`'s
+        // "requires --force flag in JSON/silent mode".
+        const preConfirmed = options.yes === true || options.force === true;
+        if (!preConfirmed) {
+          const canPrompt =
+            !globalOptions.json &&
+            !globalOptions.silent &&
+            !globalOptions.quiet &&
+            process.stdin.isTTY === true;
+
+          if (!canPrompt) {
+            cliError(
+              'Refusing to delete a user without confirmation. ' +
+                'Re-run with --yes (or --force) to confirm.',
+              'CONFIRMATION_REQUIRED',
+              {
+                username: targetUser.username,
+                userId: targetUser.id,
+              },
+              'users:delete'
+            );
+            process.exit(1);
+          }
+
+          const confirmed = await confirmUserDeletion({
+            id: targetUser.id,
+            username: targetUser.username,
+            role: targetUser.role,
+          });
+          if (!confirmed) {
+            cliInfo('User deletion cancelled', 'users:delete');
+            await civic.shutdown();
+            return;
+          }
+        }
+
         await dbService.deleteUser(targetUser.id);
         cliSuccess(
           {

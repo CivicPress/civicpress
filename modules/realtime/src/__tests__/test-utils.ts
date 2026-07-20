@@ -206,6 +206,15 @@ export interface ConnectionLimits {
 
 export interface CreateTestServerOptions {
   connectionLimits?: ConnectionLimits;
+  /**
+   * Turn on DB-backed snapshots against a REAL in-memory SQLite
+   * DatabaseService. The default harness DB is a stub that answers every query
+   * with `[]`, which is fine for connection-lifecycle tests but useless to the
+   * persistence/recovery tests — those corrupt real rows and read them back.
+   */
+  snapshots?: boolean;
+  /** Markdown the harness RecordManager returns for every record id. */
+  recordContent?: string;
 }
 
 export interface ClosedSocketInfo {
@@ -220,6 +229,13 @@ export interface TestServerCtx {
   port: number;
   /** The loopback IP the server sees for local test connections. */
   localIp: string;
+  /**
+   * Real SQLite DatabaseService backing snapshots — non-null only when the
+   * harness was created with `{ snapshots: true }`.
+   */
+  db: DatabaseService | null;
+  /** Emit on the harness hook bus, driving the server's OWN subscribers. */
+  emitHook(name: string, data: unknown): Promise<void>;
   /** Mint a token that the harness auth decodes into the given identity. */
   makeToken(identity: { userId: string | number }): string;
   /** Open a connection and resolve once it is OPEN. */
@@ -263,11 +279,13 @@ export async function createTestServer(
         max_rooms: 1000,
         cleanup_timeout: 3600,
       },
-      // Snapshots off: these tests exercise the connection lifecycle, not
-      // persistence, and a record-less in-memory doc is sufficient.
+      // Snapshots off by default: the connection-lifecycle tests exercise the
+      // socket lifecycle, not persistence, and a record-less in-memory doc is
+      // sufficient. `interval: 0` disables the periodic snapshot timer even when
+      // they ARE on, so persistence tests assert against explicit writes only.
       snapshots: {
-        enabled: false,
-        interval: 300,
+        enabled: options.snapshots === true,
+        interval: 0,
         max_updates: 100,
         storage: 'database',
       },
@@ -285,10 +303,29 @@ export async function createTestServer(
   );
 
   const logger = new Logger({ quiet: true });
-  // The server only emits lifecycle hooks; a no-op emitter keeps these
-  // connection-limit tests independent of the hook subsystem.
+  // A minimal but FAITHFUL hook bus. It used to be emit-only, which was enough
+  // while the server merely published lifecycle hooks — but the server now also
+  // SUBSCRIBES (session revocation), and an emit-only stub would silently
+  // disable that path instead of exercising it.
+  const hookListeners = new Map<string, Array<(data: unknown) => void>>();
   const hookSystem = {
-    emit: async () => undefined,
+    emit: async (name: string, data: unknown) => {
+      for (const listener of [...(hookListeners.get(name) ?? [])]) {
+        listener(data);
+      }
+    },
+    registerHook: (name: string, handler: (data: unknown) => void) => {
+      const listeners = hookListeners.get(name) ?? [];
+      listeners.push(handler);
+      hookListeners.set(name, listeners);
+    },
+    removeHook: (name: string, handler: (data: unknown) => void) => {
+      const listeners = hookListeners.get(name) ?? [];
+      const index = listeners.indexOf(handler);
+      if (index > -1) {
+        listeners.splice(index, 1);
+      }
+    },
     on: () => undefined,
     off: () => undefined,
   } as unknown as HookSystem;
@@ -328,21 +365,34 @@ export async function createTestServer(
   } as unknown as AuthService;
 
   // RecordManager: any record id resolves to a minimal published record so the
-  // record-room path (and its permission check) succeeds.
+  // record-room path (and its permission check) succeeds. `content` is the
+  // Markdown the room falls back to when there is no usable snapshot.
   const recordManager = {
     getRecord: async (recordId: string) => ({
       id: recordId,
       title: `Record ${recordId}`,
       type: 'bylaw',
-      content: '# Test\n',
+      content: options.recordContent ?? '# Test\n',
       status: 'published',
     }),
   } as unknown as RecordManager;
 
-  const databaseService = {
-    query: async () => [],
-    execute: async () => undefined,
-  } as unknown as DatabaseService;
+  // Real SQLite only when snapshots are requested — otherwise a stub, so the
+  // lifecycle tests keep paying nothing for a DB they never read.
+  let db: DatabaseService | null = null;
+  if (options.snapshots) {
+    db = new DatabaseService({ type: 'sqlite', sqlite: { file: ':memory:' } });
+    // Connect the adapter directly: only the realtime_snapshots table matters,
+    // and the server's ensureSnapshotTable() creates it — no need for the whole
+    // core schema DatabaseService.initialize() would build.
+    await db.getAdapter().connect();
+  }
+  const databaseService =
+    db ??
+    ({
+      query: async () => [],
+      execute: async () => undefined,
+    } as unknown as DatabaseService);
 
   const configManager = new RealtimeConfigManager(
     path.join(testDir, '.system-data')
@@ -547,16 +597,27 @@ export async function createTestServer(
       // ignore
     }
     try {
+      await db?.getAdapter().close();
+    } catch {
+      // ignore
+    }
+    try {
       await fs.rm(testDir, { recursive: true, force: true });
     } catch {
       // ignore
     }
   };
 
+  const emitHook = async (name: string, data: unknown): Promise<void> => {
+    await hookSystem.emit(name, data);
+  };
+
   return {
     server,
     port,
     localIp,
+    db,
+    emitHook,
     makeToken,
     connect,
     connectExpectingClose,

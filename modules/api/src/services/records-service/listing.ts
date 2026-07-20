@@ -207,6 +207,12 @@ export class RecordsListing {
       limit?: number;
       page?: number;
       sort?: string;
+      /**
+       * Keep only records that link this geography file id. Pushed all the way
+       * down to the SQL so `/geography/:id/linked-records` gets a filtered,
+       * counted, LIMIT/OFFSET page instead of scanning the corpus in JS.
+       */
+      linkedGeographyId?: string;
     } = {},
     user?: AuthUser
   ): Promise<{
@@ -223,6 +229,7 @@ export class RecordsListing {
       limit = 50,
       page = 1,
       sort = 'created_desc',
+      linkedGeographyId,
     } = options;
 
     // Calculate offset from page number (page is 1-based)
@@ -236,6 +243,7 @@ export class RecordsListing {
       limit: limit,
       offset: offset,
       sort: sort,
+      linkedGeographyId,
     });
 
     // Records are already sorted by database (kind priority + user sort)

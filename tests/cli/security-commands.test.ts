@@ -565,13 +565,16 @@ describe('CLI Security Commands', () => {
         expect(output.emailVerified).toBeDefined();
         expect(output.pendingEmailChange).toBeDefined();
       } else {
-        // If it failed, check for expected error (user not found) - this is acceptable in test environment
-        const combinedOutput = (result.stderr + result.stdout).toLowerCase();
-        // User not found is acceptable - the test verifies the command structure works
-        // Also allow for email channel messages that may appear during initialization
-        expect(combinedOutput).toMatch(
-          /user.*not found|invalid authentication|email channel/i
-        );
+        // If it failed, the failure must still be MACHINE-READABLE, because
+        // `--json` was requested. This assertion used to accept prose such as
+        // "Email channel not enabled in configuration" — human log lines that
+        // leaked into the stream because `--json` never actually reached the
+        // Logger instances doing the printing. Now that the flag is honoured
+        // process-wide, the only thing on the stream is the structured error
+        // envelope, which is what a `--json` caller is entitled to.
+        const payload = JSON.parse((result.stderr || result.stdout).trim());
+        expect(payload.success).toBe(false);
+        expect(payload.error.message).toBeTruthy();
       }
     });
 

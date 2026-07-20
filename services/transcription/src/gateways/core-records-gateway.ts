@@ -17,9 +17,11 @@
  * Design: docs/specs/2026-06-20-transcription-service-design.md §10.2 step 3.
  */
 
+import { createWriteStream } from 'node:fs';
 import { mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, basename } from 'node:path';
+import { pipeline } from 'node:stream/promises';
 import type {
   AgendaItem,
   AudioRef,
@@ -42,11 +44,23 @@ export interface CoreRecord {
   [key: string]: unknown;
 }
 
+/**
+ * One row as `RecordManager.listRecords` actually returns it: the raw `records`
+ * table row, whose `metadata` column is the record's frontmatter serialized to
+ * JSON (so it carries `transcript_status` — see findNeedingTranscription).
+ */
+export interface ScannedRecordRow {
+  id: string;
+  metadata?: string | Record<string, unknown> | null;
+}
+
 /** The slice of @civicpress/core's RecordManager this gateway needs. */
 export interface RecordStore {
   listRecords(options: {
     type?: string;
-  }): Promise<{ records: Array<{ id: string }> }>;
+    limit?: number;
+    offset?: number;
+  }): Promise<{ records: ScannedRecordRow[] }>;
   getRecord(id: string): Promise<CoreRecord | null>;
   updateRecord(
     id: string,
@@ -77,6 +91,12 @@ export interface UploadArtifactFile {
 export interface BlobStore {
   getFileContent(id: string): Promise<Buffer | null>;
   /**
+   * Preferred A/V fetch: a byte stream straight from the provider. Matches
+   * CloudUuidStorageService.downloadFileStream. Optional so a small fake (and
+   * any store without a streaming path) still works via getFileContent.
+   */
+  downloadFileStream?(id: string): Promise<NodeJS.ReadableStream | null>;
+  /**
    * Store the rendered transcript artifact. Optional: when absent (or it fails),
    * the worker still writes `media.transcript_data` and just skips the
    * `media.transcript` path. Matches CloudUuidStorageService.uploadFile.
@@ -97,6 +117,29 @@ export interface CoreUser {
 }
 
 const SYSTEM_USER: CoreUser = { id: 1, username: 'system', role: 'admin' };
+
+/** Rows per listRecords page, and a hard stop on the paging loop. */
+const SCAN_PAGE_SIZE = 200;
+const SCAN_MAX_PAGES = 500;
+
+/**
+ * `transcript_status` as carried by a listRecords ROW, or undefined when the
+ * row has no readable metadata. Undefined means "unknown", NOT "not
+ * transcribed" — see findNeedingTranscription.
+ */
+function rowTranscriptStatus(row: ScannedRecordRow): string | undefined {
+  let meta: unknown = row.metadata;
+  if (typeof meta === 'string') {
+    try {
+      meta = JSON.parse(meta);
+    } catch {
+      return undefined;
+    }
+  }
+  const status = (meta as Record<string, unknown> | null | undefined)
+    ?.transcript_status;
+  return typeof status === 'string' ? status : undefined;
+}
 
 export interface CoreRecordsGatewayOptions {
   records: RecordStore;
@@ -203,11 +246,16 @@ export class CoreRecordsGateway implements RecordsGateway {
    * `[]` is UNKNOWN, not all-public — the worker HOLDS on it (FA-BB-002).
    */
   async findNeedingTranscription(): Promise<SessionForTranscription[]> {
-    const { records } = await this.opts.records.listRecords({
-      type: 'session',
-    });
     const out: SessionForTranscription[] = [];
-    for (const row of records) {
+    for (const row of await this.scanSessionRows()) {
+      // Cheap scope first: a row that POSITIVELY reports a transcript_status is
+      // already transcribed and can be dropped without the getSession() below,
+      // which costs a DB read plus a markdown read + YAML parse per session on
+      // every poll cycle. Absence is "unknown", not "not transcribed" — an
+      // un-indexed row still gets the authoritative read (the markdown file is
+      // the source of truth), so this can only ever skip real work, never
+      // invent it.
+      if (rowTranscriptStatus(row)) continue;
       const session = await this.getSession(row.id);
       if (
         session?.capture?.av_file &&
@@ -219,6 +267,29 @@ export class CoreRecordsGateway implements RecordsGateway {
       }
     }
     return out;
+  }
+
+  /**
+   * Page through every `session` row. core's listRecords ALWAYS appends a LIMIT
+   * and DEFAULTS it to 10 (core/src/database/stores/record-store.ts), so the
+   * unpaginated scan this replaces only ever saw the 10 most recent sessions —
+   * past the tenth recording an older un-transcribed session was never picked
+   * up again. Offset paging over a non-unique sort can shift a row across a
+   * page edge under concurrent inserts; both directions are safe here (the
+   * write-back is idempotency-latched, and a missed row returns next cycle).
+   */
+  private async scanSessionRows(): Promise<ScannedRecordRow[]> {
+    const all: ScannedRecordRow[] = [];
+    for (let page = 0; page < SCAN_MAX_PAGES; page++) {
+      const { records } = await this.opts.records.listRecords({
+        type: 'session',
+        limit: SCAN_PAGE_SIZE,
+        offset: page * SCAN_PAGE_SIZE,
+      });
+      all.push(...records);
+      if (records.length < SCAN_PAGE_SIZE) break;
+    }
+    return all;
   }
 
   async getSession(id: string): Promise<SessionForTranscription | null> {
@@ -241,25 +312,51 @@ export class CoreRecordsGateway implements RecordsGateway {
     return normalizeAgenda(field<unknown>(meeting, 'agenda'));
   }
 
-  /** Fetch the A/V blob to a temp file the engine can decode. */
+  /**
+   * Fetch the A/V blob to a temp file the engine can decode.
+   *
+   * STREAMED, not buffered: the payload here is a full council-meeting
+   * recording (single-digit GB is normal, the upload cap is 16 GiB). The
+   * previous `getFileContent()` materialized the whole container as one Buffer
+   * before writing it, which pins that much RSS per in-flight session and hard-
+   * fails past Node's ~2 GiB max Buffer length — a long meeting could not be
+   * transcribed at all. `getFileContent` is kept only as the fallback for a
+   * store with no streaming path (small fakes, tests).
+   */
   async prepareAudio(session: SessionForTranscription): Promise<AudioRef> {
     const uuid = session.capture?.av_file;
     if (!uuid) {
       throw new Error(`session ${session.id} has no capture.av_file`);
     }
-    const buffer = await this.opts.storage.getFileContent(uuid);
+    const { storage } = this.opts;
+    const dir = await mkdtemp(join(tmpdir(), 'transcribe-av-'));
+    // FA-BB-013: `uuid` is capture.av_file — a device-controlled value. Reduce
+    // it to a bare basename so a traversal-laden id (e.g. `../../etc/x`) can
+    // never steer the temp WRITE out of the freshly-created temp dir. (The
+    // fetch below already resolves it as a storage file id, but the write path
+    // is defended independently.)
+    const path = join(dir, basename(uuid)); // raw container; the engine decodes to WAV
+
+    if (storage.downloadFileStream) {
+      const stream = await storage.downloadFileStream(uuid);
+      if (!stream) {
+        throw new Error(
+          `A/V ${uuid} for session ${session.id} not found in storage`
+        );
+      }
+      // pipeline() destroys both ends on failure, so a mid-transfer provider
+      // error can't leak an open handle or leave a silently truncated file
+      // that the engine would happily transcribe as a short meeting.
+      await pipeline(stream, createWriteStream(path));
+      return { path };
+    }
+
+    const buffer = await storage.getFileContent(uuid);
     if (!buffer) {
       throw new Error(
         `A/V ${uuid} for session ${session.id} not found in storage`
       );
     }
-    const dir = await mkdtemp(join(tmpdir(), 'transcribe-av-'));
-    // FA-BB-013: `uuid` is capture.av_file — a device-controlled value. Reduce
-    // it to a bare basename so a traversal-laden id (e.g. `../../etc/x`) can
-    // never steer the temp WRITE out of the freshly-created temp dir. (The
-    // fetch above already resolves it as a storage file id, but the write path
-    // is defended independently.)
-    const path = join(dir, basename(uuid)); // raw container; the engine decodes to WAV
     await writeFile(path, buffer);
     return { path };
   }
