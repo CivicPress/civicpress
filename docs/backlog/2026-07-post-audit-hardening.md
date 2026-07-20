@@ -552,7 +552,38 @@ follow-up. (Storage, config+CLI, API-routes clusters + saga/BB/notifications.)
 
 ## Refactors / tech-debt
 
-- [ ] Migration ledger (`schema_version`, stop swallowing failures)
+- [x] **Migration ledger — DONE 2026-07-20.** Every migration in
+  `core/src/database/schema/migrations.ts` established its idempotency by
+  catching the error a re-run would raise: `catch { debug('column already
+  exists or migration not needed') }`. That cannot tell a duplicate column
+  apart from a locked database, a missing table, or a broken statement, so all
+  of them were swallowed **at debug level** and `initialize()` returned success
+  against a schema the code above it did not have — the failure surfacing much
+  later, elsewhere, as a query against a column that was never added.
+  `ensureWorkflowStateColumn` was worse than the pattern: it logged
+  `coreError` and *returned*, and its post-ALTER verification logged
+  `MIGRATION_VERIFICATION_FAILED` and carried on.
+
+  Idempotency now comes from CHECKING the schema (`PRAGMA table_info` /
+  `sqlite_master`), so nothing needs catching and any error propagates. The
+  four hand-rolled loops collapse into one `ensureColumn` helper — of which
+  only the workflow_state one had bothered to re-read the schema afterwards to
+  confirm the ALTER took effect; everything gets that verification now. A
+  `schema_migrations` ledger records each id with an outcome of `applied` (this
+  DB executed the DDL) or `adopted` (it already had the shape), the split that
+  stops an existing deployment from looking, on its first run after the ledger
+  landed, exactly like a fresh one. Schema state gates the column migrations
+  and the ledger records them; for the `auth_provider` data backfill, which
+  leaves no schema trace, the ledger is the gate instead.
+
+  One deliberate fail-closed change: the unique provider-identity index is
+  already idempotent via `IF NOT EXISTS`, so its catch could only ever hide a
+  real failure — and the realistic one is that the data ALREADY violates the
+  constraint. That index is what stops one OAuth identity from being linked to
+  two accounts, so it now refuses to start and names the duplicate identities
+  rather than continuing without the guarantee the auth code assumes.
+  8 regression tests; the no-swallow ones were confirmed to fail against the
+  old behaviour (`promise resolved "undefined" instead of rejecting`).
 - [ ] `withCli()` wrapper for ~30 commands
 - [ ] Standardize API response/error envelopes
 - [ ] HW `ffmpeg_capture.py` decomposition; `command_handler.py` dispatch table; storage provider Strategy

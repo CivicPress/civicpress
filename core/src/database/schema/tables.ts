@@ -5,6 +5,21 @@
  */
 
 export const CORE_TABLE_STATEMENTS: string[] = [
+  // Migration ledger. First in the list so it is available to Step 2 of
+  // initialize(), which records into it.
+  //
+  // `outcome` distinguishes a migration this database actually executed
+  // ('applied') from one whose shape it already had when the ledger was
+  // introduced ('adopted'). Without that split every pre-existing deployment
+  // would look, on its first run after the ledger landed, exactly like a fresh
+  // database that had just run every migration — which is precisely the kind
+  // of "looks like it worked" answer the ledger exists to stop giving.
+  `CREATE TABLE IF NOT EXISTS schema_migrations (
+    id TEXT PRIMARY KEY,
+    outcome TEXT NOT NULL,
+    applied_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`,
+
   // Users table for API keys and sessions
   `CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
