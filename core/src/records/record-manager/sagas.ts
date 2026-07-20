@@ -107,6 +107,22 @@ export class RecordSagas {
       context
     );
 
+    // Emit the domain audit entry for the update.
+    //
+    // `RecordManager.updateRecord` writes an `update_record` entry on its
+    // LEGACY branch, but that branch only runs for drafts: any record whose
+    // status is not `draft` is routed here, and `UpdateRecordSaga` writes
+    // through `this.db.updateRecord(...)` directly. So in practice edits to
+    // PUBLISHED records — the ones that most need a trail — were unaudited.
+    // See the archive helper below for why this sits after `execute()`.
+    await this.deps.writeAudit({
+      action: 'update_record',
+      resourceType: 'record',
+      resourceId: id,
+      userId: typeof user?.id === 'number' ? user.id : undefined,
+      message: `Updated record ${id}`,
+    });
+
     return result.result;
   }
 
@@ -165,6 +181,27 @@ export class RecordSagas {
       saga,
       context
     );
+
+    // Emit the domain audit entry for the archive.
+    //
+    // Create and update are audited inside `RecordManager.createRecord` /
+    // `.updateRecord`, but archive never reached either: `ArchiveRecordSaga`
+    // flips the status with `this.db.updateRecord(...)` DIRECTLY (it has to —
+    // going through RecordManager.updateRecord would perform the file write the
+    // saga owns and compensates itself), so archiving a record produced NO
+    // audit row at all. `writeAudit` was already threaded into this class's
+    // deps by the Phase-2d decomposition and simply never called.
+    //
+    // Written after `execute()` resolves: the executor THROWS on step failure
+    // or timeout (see saga-executor.ts), so reaching this line means the
+    // archive committed and compensation did not run.
+    await this.deps.writeAudit({
+      action: 'archive_record',
+      resourceType: 'record',
+      resourceId: id,
+      userId: typeof user?.id === 'number' ? user.id : undefined,
+      message: `Archived record ${id}`,
+    });
 
     return result.result;
   }
@@ -244,6 +281,25 @@ export class RecordSagas {
       saga,
       context
     );
+
+    // Emit the domain audit entry for the create.
+    //
+    // Same shape as the update gap: `RecordManager.createRecord` audits on its
+    // LEGACY branch only, and that branch is reached solely for drafts /
+    // `skipFileGeneration` — every PUBLISHED create is routed here, and
+    // `CreateRecordSaga` inserts with `this.db.createRecord(...)` directly. So
+    // creating a published record produced no audit row.
+    //
+    // The id comes from the saga RESULT, not from `effectiveRecordId`: the
+    // latter is a lock placeholder synthesised when the caller supplied none,
+    // while the result carries the id the record was actually stored under.
+    await this.deps.writeAudit({
+      action: 'create_record',
+      resourceType: 'record',
+      resourceId: result.result?.id ?? effectiveRecordId,
+      userId: typeof user?.id === 'number' ? user.id : undefined,
+      message: `Created record ${result.result?.id ?? effectiveRecordId} of type ${request.type}`,
+    });
 
     return result.result;
   }

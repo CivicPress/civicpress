@@ -50,6 +50,19 @@ export class CliOutput {
 
   setOptions(options: CliOutputOptions): void {
     this.options = { ...this.options, ...options };
+    // Rebuild the internal logger with the same flags. It was constructed once
+    // in the private ctor with defaults (`json: false`), and the closure
+    // returned by `startOperation()` calls `this.logger.info('CLI operation
+    // completed: …')` UNCONDITIONALLY — outside the `if (json)` guards every
+    // other method has. So under `--json` that human line was printed to
+    // stdout after the JSON blob had already been written, breaking parsing
+    // for every command that runs `endOperation()` in a `finally`.
+    this.logger = new Logger({
+      json: this.options.json,
+      silent: this.options.silent,
+      verbose: this.options.verbose,
+      noColor: this.options.noColor,
+    });
   }
 
   // Success output with structured formatting

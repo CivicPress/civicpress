@@ -18,6 +18,8 @@ import {
   cliInfo,
   cliWarn,
   cliDebug,
+  cliTable,
+  cliList,
   cliStartOperation,
 } from '../utils/cli-output.js';
 
@@ -184,6 +186,41 @@ export const listCommand = (cli: CAC) => {
           recordTypes: Object.keys(typeCounts),
           statuses: Object.keys(statusCounts),
         });
+
+        // Human mode used to end here, printing ONLY the
+        // "✅ Successfully listed N records" line from cliSuccess — the records
+        // themselves were never rendered, so `civic list` told you how many
+        // records existed but not which ones. Render them for humans.
+        //
+        // Guarded on `!json` deliberately: cliSuccess above has already emitted
+        // the single JSON document, and cliTable/cliList would each emit
+        // ANOTHER `{success:true,…}` blob in JSON mode (see CliOutput.table /
+        // .list, which delegate to .success), breaking parseability. cliTable
+        // and cliList self-suppress under --silent/--quiet.
+        if (!globalOptions.json) {
+          cliTable(
+            records.map((record) => ({
+              title: record.title,
+              type: record.type,
+              status: record.status,
+              author: record.author,
+              updated: record.updated,
+              path: record.relativePath,
+            })),
+            options.all
+              ? ['title', 'type', 'status', 'author', 'updated', 'path']
+              : ['title', 'type', 'status', 'updated'],
+            'list records'
+          );
+
+          cliList(
+            Object.entries(statusCounts).map(
+              ([status, count]) => `${status}: ${count}`
+            ),
+            `\nBy status (${totalRecords} total):`,
+            'list records'
+          );
+        }
 
         endOperation();
       } catch (error) {

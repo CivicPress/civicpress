@@ -197,7 +197,17 @@ export const viewCommand = (cli: CAC) => {
         logger.info('\n' + '='.repeat(60));
         logger.success('✅ Record displayed successfully!');
       } catch (error) {
-        logger.error('❌ Failed to view record:', error);
+        // Report through cliError, not logger.error: Logger suppresses itself
+        // entirely in JSON mode, so routing failures through it made
+        // `view --json` exit 1 with NO output at all. cliError emits the
+        // structured error envelope on stderr under --json and the human
+        // message otherwise.
+        cliError(
+          'Failed to view record',
+          'VIEW_FAILED',
+          { error: error instanceof Error ? error.message : String(error) },
+          'view'
+        );
         process.exit(1);
       } finally {
         endOperation();

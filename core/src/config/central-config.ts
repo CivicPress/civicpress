@@ -1,7 +1,11 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import yaml from 'yaml';
-import { Logger, LoggerOptions } from '../utils/logger.js';
+import {
+  Logger,
+  LoggerOptions,
+  setGlobalLoggerDefaults,
+} from '../utils/logger.js';
 import {
   RecordTypesConfig,
   DEFAULT_RECORD_TYPES,
@@ -130,6 +134,14 @@ export class CentralConfigManager {
   static setLoggerOptions(options: LoggerOptions) {
     this.loggerOptions = options;
     this.logger = new Logger(options);
+    // Publish the flags process-wide. Rebuilding only THIS class's logger left
+    // every other `new Logger()` in the process — including the module-level
+    // ones constructed during import, before any flag is parsed — unaware of
+    // `--json`, so they printed human lines around the CLI's JSON payload and
+    // stdout stopped being parseable. `loggerOptions` was stored here and never
+    // read by anything, which is why the flags appeared to be wired up but had
+    // no effect.
+    setGlobalLoggerDefaults(options);
   }
 
   /**

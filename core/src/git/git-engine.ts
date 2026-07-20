@@ -140,9 +140,37 @@ export class GitEngine {
    * record id, which both missed commits touching the file without naming it
    * and matched unrelated commits that happened to mention the id.
    */
-  async getHistory(limit?: number, pathspec?: string): Promise<GitCommit[]> {
+  async getHistory(
+    limit?: number,
+    pathspec?: string,
+    skip?: number
+  ): Promise<GitCommit[]> {
     try {
       const git = this.getGit();
+
+      if (skip && skip > 0) {
+        // `git log --skip=<n>`: lets a caller page WITHOUT materializing the
+        // whole log first. Callers that paginate by slicing an unbounded
+        // `getHistory()` result read the entire repository history into memory
+        // on every request, which grows without bound as the repo ages.
+        //
+        // The ARRAY form is required here, not the options object: passing
+        // `{ file, '--skip': n }` silently DROPS the skip — simple-git returns
+        // the first page again — so an object-form implementation pages a
+        // pathspec-scoped log by handing back the same commits every time.
+        // Verified against simple-git directly; the array form honours both.
+        const args = ['log'];
+        if (limit) {
+          args.push(`--max-count=${limit}`);
+        }
+        args.push(`--skip=${skip}`);
+        if (pathspec) {
+          args.push('--', pathspec);
+        }
+        const log = await git.log(args.slice(1));
+        return Array.from(log.all);
+      }
+
       const options: Record<string, unknown> = {};
       if (limit) {
         options.maxCount = limit;
@@ -155,6 +183,28 @@ export class GitEngine {
       return Array.from(log.all);
     } catch (error) {
       throw new Error(`Failed to get history: ${error}`);
+    }
+  }
+
+  /**
+   * Total number of commits, optionally scoped to a pathspec
+   * (`git rev-list --count HEAD [-- <pathspec>]`).
+   *
+   * Exists so a paginated caller can report a correct total without pulling
+   * every commit into memory to take `.length` — git counts them itself.
+   */
+  async countCommits(pathspec?: string): Promise<number> {
+    try {
+      const git = this.getGit();
+      const args = ['rev-list', '--count', 'HEAD'];
+      if (pathspec) {
+        args.push('--', pathspec);
+      }
+      const out = await git.raw(args);
+      const parsed = Number.parseInt(out.trim(), 10);
+      return Number.isFinite(parsed) ? parsed : 0;
+    } catch (error) {
+      throw new Error(`Failed to count commits: ${error}`);
     }
   }
 

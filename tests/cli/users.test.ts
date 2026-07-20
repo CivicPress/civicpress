@@ -396,8 +396,11 @@ describe('CLI User Management', () => {
         return;
       }
 
+      // `--yes` is now REQUIRED for a non-interactive delete: `users:delete`
+      // is destructive and irreversible, so it refuses to run unattended
+      // without an explicit confirmation flag (see tests/cli/cli-parity.test.ts).
       const result = execSync(
-        `cd ${context.testDir} && node ${context.cliPath} users:delete --username testdelete --token ${adminToken}`,
+        `cd ${context.testDir} && node ${context.cliPath} users:delete --username testdelete --token ${adminToken} --yes`,
         { encoding: 'utf8' }
       );
 
@@ -426,7 +429,7 @@ describe('CLI User Management', () => {
       }
 
       const result = execSync(
-        `cd ${context.testDir} && node ${context.cliPath} users:delete --username testdelete --token ${adminToken} --json`,
+        `cd ${context.testDir} && node ${context.cliPath} users:delete --username testdelete --token ${adminToken} --json --yes`,
         { encoding: 'utf8' }
       );
 

@@ -448,6 +448,13 @@ export class RecordStore {
       limit?: number;
       offset?: number;
       sort?: string;
+      /**
+       * Keep only records that link the given geography file id. Exists so the
+       * geography `/linked-records` endpoint can filter + count + page in ONE
+       * query instead of scanning the whole corpus in 1000-row batches and
+       * matching `linkedGeographyFiles` in JS.
+       */
+      linkedGeographyId?: string;
     } = {}
   ): Promise<{ records: RecordRow[]; total: number }> {
     let sql = 'SELECT * FROM records WHERE 1=1';
@@ -482,6 +489,30 @@ export class RecordStore {
         sql += ` AND status IN (${placeholders})`;
         params.push(...statusFilters);
       }
+    }
+
+    // Linked-geography filter.
+    //
+    // `linked_geography_files` holds a JSON array of `{id,name,description}`,
+    // so the match has to look INSIDE the document — hence json_each + a
+    // json_extract on each element's `$.id`. Matching on the element id (not a
+    // LIKE over the raw text) is what makes it exact: a `LIKE '%geo-1%'` would
+    // also match `geo-10`, and LIKE's `_` wildcard would make an id containing
+    // an underscore match unrelated rows.
+    //
+    // The two guards are load-bearing, not defensive noise: `json_each()`
+    // raises "malformed JSON" and aborts the whole query on any row whose
+    // column is not valid JSON, so one bad row would 500 the endpoint for
+    // everyone. `json_valid()` (plus the NULL check, since most records link no
+    // geography at all) skips those rows the same way the previous JS
+    // `parseJsonArray` did.
+    if (options.linkedGeographyId) {
+      sql +=
+        ' AND linked_geography_files IS NOT NULL' +
+        ' AND json_valid(linked_geography_files)' +
+        ' AND EXISTS (SELECT 1 FROM json_each(records.linked_geography_files)' +
+        " WHERE json_extract(json_each.value, '$.id') = ?)";
+      params.push(options.linkedGeographyId);
     }
 
     // Get total count

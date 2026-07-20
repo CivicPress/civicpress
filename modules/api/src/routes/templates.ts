@@ -21,11 +21,39 @@ import {
   handleValidationError,
 } from '../utils/api-logger.js';
 
+/**
+ * One TemplateService per CivicPress instance, reused across requests.
+ *
+ * A plain module-level singleton would be wrong: TemplateService is built from
+ * the CivicPress instance's `dataDir` + `cacheManager`, and a single process can
+ * host more than one instance (the API test harness builds one per test
+ * context). Keying on the CivicPress object itself keeps them separate, and a
+ * WeakMap means a discarded instance takes its TemplateService with it.
+ *
+ * Correction to the backlog framing of this item: the "a new fs watcher per
+ * HTTP request, never disposed" leak it describes does NOT occur on this path.
+ * `civicPress.getCacheManager()` always resolves the shared manager (it is a
+ * container singleton registered in `civic-core-services.ts`, which also
+ * registers the `templates` / `templateLists` caches), and
+ * `TemplateCacheAdapter` only constructs its OWN FileWatcherCache in the
+ * `else` branch taken when NO cacheManager is supplied. With one supplied it
+ * borrows the manager's already-watching caches, so no watcher was ever created
+ * per request. What per-request construction really cost is a fresh
+ * TemplateEngine + TemplateValidator on every call plus a `setKeyMapper()`
+ * write into the SHARED cache object from inside a request handler on every
+ * call; reusing one instance removes both.
+ *
+ * Disposal therefore needs no new shutdown hook: the file watchers belong to
+ * the cacheManager, and `CivicPress.shutdown()` already shuts that down.
+ */
+const templateServicesByInstance = new WeakMap<object, TemplateService>();
+
 export function createTemplatesRouter() {
   const router = Router();
 
   /**
-   * Get TemplateService instance from request
+   * Get the TemplateService for this request's CivicPress instance,
+   * constructing it once and reusing it for every subsequent request.
    */
   function getTemplateService(req: AuthenticatedRequest): TemplateService {
     const civicPress = req.civicPress;
@@ -33,13 +61,20 @@ export function createTemplatesRouter() {
       throw new Error('CivicPress not initialized');
     }
 
+    const cached = templateServicesByInstance.get(civicPress);
+    if (cached) {
+      return cached;
+    }
+
     const dataDir = civicPress.getDataDir();
-    return new TemplateService({
+    const service = new TemplateService({
       dataDir,
       enableCache: true,
       enableWatching: true,
       cacheManager: civicPress.getCacheManager(),
     });
+    templateServicesByInstance.set(civicPress, service);
+    return service;
   }
 
   /**

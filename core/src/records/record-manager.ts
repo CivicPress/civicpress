@@ -932,6 +932,8 @@ export class RecordManager {
       limit?: number;
       offset?: number;
       sort?: string;
+      /** Pass-through to RecordStore: keep only records linking this geography id. */
+      linkedGeographyId?: string;
     } = {}
   ): Promise<{ records: RecordRow[]; total: number }> {
     const result = await this.db.listRecords(options);
@@ -1044,6 +1046,30 @@ export class RecordManager {
       saga,
       context
     );
+
+    // Emit the domain audit entry for the publish.
+    //
+    // `PublishDraftSaga` has two branches and only one of them audited:
+    // publishing a draft whose record does NOT yet exist goes through
+    // `RecordManager.createRecordWithId`, which writes a `create_record` entry,
+    // while RE-publishing over an existing record writes the row with
+    // `this.db.updateRecord(...)` directly and produced no audit row at all.
+    // So the audit trail silently lost every republish — exactly the edit path
+    // most worth auditing. Emitting `publish_record` here covers both branches
+    // uniformly (the create branch keeps its `create_record` entry too, which
+    // is correct: the record really was created).
+    //
+    // Written after `execute()` resolves: the executor THROWS on step failure
+    // or timeout, so reaching this line means the publish committed.
+    await this.writeAudit({
+      action: 'publish_record',
+      resourceType: 'record',
+      resourceId: draftId,
+      userId: typeof user?.id === 'number' ? user.id : undefined,
+      message: `Published draft ${draftId}${
+        targetStatus ? ` as ${targetStatus}` : ''
+      }`,
+    });
 
     return result.result;
   }
