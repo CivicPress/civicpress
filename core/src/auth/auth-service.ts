@@ -9,6 +9,7 @@ import {
 } from './email-validation-service.js';
 import { SecretsManager } from '../security/secrets.js';
 import { AuditChannel } from '../audit/audit-channel.js';
+import type { HookSystem } from '../hooks/hook-system.js';
 import { UserOps } from './auth-service/user-ops.js';
 import { ApiKeyOps } from './auth-service/api-key-ops.js';
 import { SessionOps } from './auth-service/session-ops.js';
@@ -64,6 +65,8 @@ export class AuthService {
   private emailValidationService: EmailValidationService;
   private secretsManager?: SecretsManager;
   private auditChannel?: AuditChannel;
+  /** Hook bus for broadcasting session revocation; wired by initializeHooks. */
+  private hookSystem?: HookSystem;
 
   // Collaborators (instantiated in constructor with bound deps).
   private userOps: UserOps;
@@ -115,6 +118,9 @@ export class AuthService {
       logger,
       writeAudit,
       getSecretsManager,
+      // Getter, not a value: the hook bus is wired after construction (see
+      // initializeHooks), exactly like secretsManager above.
+      getHooks: () => this.hookSystem,
     });
 
     // Bind the now-extracted user/session methods so collaborators that depend
@@ -195,6 +201,23 @@ export class AuthService {
   /**
    * Initialize secrets manager for token signing
    */
+  /**
+   * Wire the hook bus so session revocation can be broadcast.
+   *
+   * Revoking sessions in the database does not close connections that were
+   * already authenticated — the realtime WebSocket checks the session once, at
+   * upgrade time, and never again. So a logout-everywhere or password change
+   * left any live collaborative socket editing happily until it happened to
+   * reconnect. Emitting on revocation lets the realtime server (which
+   * subscribes to `auth:sessions:revoked`) tear those sockets down promptly.
+   *
+   * Optional and wired post-construction, so an AuthService built without a
+   * hook bus (CLI, tests) behaves exactly as before.
+   */
+  initializeHooks(hookSystem: HookSystem): void {
+    this.hookSystem = hookSystem;
+  }
+
   initializeSecrets(secretsManager: SecretsManager): void {
     this.secretsManager = secretsManager;
   }
@@ -344,6 +367,11 @@ export class AuthService {
 
   async cleanupExpiredSessions(): Promise<void> {
     return this.sessionOps.cleanupExpiredSessions();
+  }
+
+  /** Maintenance sweep over `login_attempts` (see AuthMaintenanceScheduler). */
+  async cleanupStaleLoginAttempts(): Promise<number> {
+    return this.passwordOps.cleanupStaleLoginAttempts();
   }
 
   // ===============================

@@ -363,4 +363,28 @@ export class UserStore {
       new Date().toISOString(),
     ]);
   }
+
+  /**
+   * Enforce `security.maxConcurrentSessions`: drop a user's oldest sessions
+   * beyond the newest `keep`. Returns how many rows were removed.
+   *
+   * Ordered by `id` (monotonic) rather than `created_at`, because created_at is
+   * a DATETIME with one-second resolution — several logins inside the same
+   * second would tie and the LIMIT would then keep an arbitrary subset,
+   * potentially evicting the session that was just minted.
+   */
+  async pruneUserSessions(userId: number, keep: number): Promise<number> {
+    if (!Number.isFinite(keep) || keep <= 0) {
+      return 0;
+    }
+    const result = await this.adapter.execute(
+      `DELETE FROM sessions
+        WHERE user_id = ?
+          AND id NOT IN (
+            SELECT id FROM sessions WHERE user_id = ? ORDER BY id DESC LIMIT ?
+          )`,
+      [userId, userId, keep]
+    );
+    return (result as { changes?: number } | undefined)?.changes ?? 0;
+  }
 }

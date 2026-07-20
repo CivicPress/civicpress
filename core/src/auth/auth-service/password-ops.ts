@@ -64,6 +64,14 @@ export class PasswordOps {
     return new LoginThrottle(this.deps.db, { maxAttempts, lockoutMs });
   }
 
+  /**
+   * Maintenance sweep over `login_attempts`. Built from the same config as the
+   * live throttle so the retention window matches the configured lockout.
+   */
+  async cleanupStaleLoginAttempts(): Promise<number> {
+    return this.getThrottle().cleanupStaleAttempts();
+  }
+
   async authenticateWithPassword(
     username: string,
     password: string
@@ -140,11 +148,26 @@ export class PasswordOps {
     return AuthConfigManager.getInstance().validatePassword(password);
   }
 
+  /**
+   * Self-service password change.
+   *
+   * Succeeds by revoking EVERY session the user holds, including the one that
+   * made this request — that is deliberate (see the revoke-first comment
+   * below), but it used to be invisible: the caller got a bare "Password
+   * successfully changed" and then found itself silently logged out on the
+   * next request, which reads as a bug. The result now says so explicitly and
+   * carries a machine-readable `sessionsRevoked` flag so the API/UI can route
+   * the user to a re-login instead of string-matching the message.
+   */
   async changePassword(
     userId: number,
     newPassword: string,
     currentPassword?: string
-  ): Promise<{ success: boolean; message: string }> {
+  ): Promise<{
+    success: boolean;
+    message: string;
+    sessionsRevoked?: boolean;
+  }> {
     try {
       // Get current user to check authentication provider
       const currentUser = await this.deps.db.getUserById(userId);
@@ -244,7 +267,11 @@ export class PasswordOps {
 
       return {
         success: true,
-        message: 'Password successfully changed',
+        sessionsRevoked: true,
+        message:
+          'Password successfully changed. For your security you have been ' +
+          'signed out on every device, including this one — please sign in ' +
+          'again with your new password.',
       };
     } catch (error) {
       this.deps.logger?.error('Password change failed:', error);

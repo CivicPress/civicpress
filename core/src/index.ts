@@ -133,6 +133,11 @@ export {
   AccountLockedError,
   parseDurationMs,
 } from './auth/login-throttle.js';
+export {
+  AuthMaintenanceScheduler,
+  DEFAULT_AUTH_MAINTENANCE_INTERVAL_MS,
+  type AuthMaintenanceDeps,
+} from './auth/auth-maintenance.js';
 export { RoleManager } from './auth/role-manager.js';
 export {
   EmailValidationService,

@@ -311,6 +311,18 @@ export class CivicPress {
   getAuthService(): AuthService {
     if (!this._authService) {
       this._authService = this.container.resolve<AuthService>('auth');
+      // Wire the hook bus so revoking sessions is broadcast to listeners — the
+      // realtime server subscribes and closes sockets that were authenticated
+      // before the revocation (a WS validates its session only at upgrade).
+      // Done here rather than in the container factory because AuthService is
+      // resolved lazily; this is the first point where both certainly exist.
+      // Best-effort: no hook bus simply means no broadcast, never a failure to
+      // authenticate.
+      try {
+        this._authService.initializeHooks(this.getHookSystem());
+      } catch {
+        // No hook system configured — revocation still happens in the DB.
+      }
     }
     return this._authService;
   }

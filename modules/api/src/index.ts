@@ -11,6 +11,7 @@ import {
   Logger,
   CentralConfigManager,
   GeographyManager,
+  AuthMaintenanceScheduler,
 } from '@civicpress/core';
 
 const logger = new Logger();
@@ -56,6 +57,7 @@ import {
   requestIdMiddleware,
 } from './middleware/error-handler.js';
 import { notFoundHandler } from './middleware/not-found.js';
+import { requireHttpsMiddleware } from './middleware/require-https.js';
 import {
   apiLoggingMiddleware,
   authLoggingMiddleware,
@@ -107,6 +109,11 @@ export class CivicPressAPI {
   // is not in config `modules:` / disabled / failed. Its stop() halts the
   // enrollment-cleanup timer on shutdown.
   private broadcastBox: BroadcastBoxStartResult | null = null;
+  // Periodic auth-table maintenance (expired sessions / email tokens / stale
+  // login-throttle rows). Those sweeps existed but nothing called them, so the
+  // tables grew for the life of the deployment. Null until start() wires it;
+  // stopped on shutdown.
+  private authMaintenance: AuthMaintenanceScheduler | null = null;
 
   constructor(port: number = 3000) {
     this.port = port;
@@ -152,6 +159,13 @@ export class CivicPressAPI {
         process.env.TRUST_PROXY === 'true' ? 1 : process.env.TRUST_PROXY
       );
     }
+
+    // Enforce security.requireHttps (default OFF, so a no-op unless an
+    // operator deliberately enables it). Mounted before everything else so an
+    // insecure request is refused before any handler touches it. Registered
+    // after `trust proxy` above, which is what makes req.secure meaningful
+    // behind a reverse proxy.
+    this.app.use(requireHttpsMiddleware(apiPath('health')));
 
     // Security headers. CORP must allow cross-origin: the UI runs on a
     // different origin (dev :3030, prod its own host) and embeds API-served
@@ -611,7 +625,14 @@ export class CivicPressAPI {
     //    after listen() still serve subsequent requests.
     await this.startBroadcastBox();
 
-    // 5. Error-handling middleware — registered LAST, after EVERY router
+    // 5. Start periodic auth-table maintenance. The three sweeps it drives all
+    //    existed already but had no caller, so `sessions`, `email_verifications`
+    //    and `login_attempts` accumulated dead rows — including expired
+    //    credentials and a permanent record of attempted usernames — forever.
+    //    Best-effort: a maintenance failure must never affect serving.
+    this.startAuthMaintenance();
+
+    // 6. Error-handling middleware — registered LAST, after EVERY router
     //    (including the post-listen broadcast-box mount) so the catch-all 404
     //    never shadows a late-added route. Express matches middleware in
     //    registration order, so these must come after startBroadcastBox().
@@ -700,6 +721,35 @@ export class CivicPressAPI {
   }
 
   /**
+   * Wire the periodic auth-table maintenance sweeps.
+   *
+   * Never throws — maintenance is best-effort background hygiene, so a failure
+   * here must not take down (or block) the API, exactly like the realtime and
+   * broadcast-box starts above.
+   */
+  private startAuthMaintenance(): void {
+    if (!this.civicPress || this.authMaintenance) {
+      return;
+    }
+    try {
+      const authService = this.civicPress.getAuthService();
+      this.authMaintenance = new AuthMaintenanceScheduler({
+        cleanupExpiredSessions: () => authService.cleanupExpiredSessions(),
+        cleanupExpiredEmailTokens: () =>
+          authService.cleanupExpiredEmailTokens(),
+        cleanupStaleLoginAttempts: () =>
+          authService.cleanupStaleLoginAttempts(),
+        logger,
+      });
+      this.authMaintenance.start();
+      logger.info('Auth maintenance sweeps scheduled');
+    } catch (error) {
+      logger.warn('Could not start auth maintenance sweeps:', error);
+      this.authMaintenance = null;
+    }
+  }
+
+  /**
    * Resolve the realtime server for the records router's snapshot route.
    *
    * Returns (in priority order): the test override, else the real in-process
@@ -759,6 +809,17 @@ export class CivicPressAPI {
         logger.warn('Error stopping broadcast-box:', error);
       }
       this.broadcastBox = null;
+    }
+
+    // Stop the auth maintenance interval before core's database closes, so a
+    // sweep can never fire against a closed connection.
+    if (this.authMaintenance) {
+      try {
+        this.authMaintenance.stop();
+      } catch (error) {
+        logger.warn('Error stopping auth maintenance:', error);
+      }
+      this.authMaintenance = null;
     }
 
     if (this.civicPress) {
