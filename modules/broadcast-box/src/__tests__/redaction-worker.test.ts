@@ -60,16 +60,30 @@ function fakeStorage(rawPath: string) {
 function fakeRecords(records: Record<string, any>[]) {
   const byId = new Map(records.map((r) => [r.id, r]));
   return {
-    // Mirrors core's listRecords contract, INCLUDING the trap it sets: a LIMIT
-    // is always applied and DEFAULTS TO 10 (record-store.ts). A fake that
-    // returned everything would hide the truncation the paged scan fixes.
+    // Mirrors core's listRecords contract (record-store.ts): `limit` is a page
+    // size or 'all', and omitting it means 'all'.
+    //
+    // This fake used to reproduce the OLD contract's trap on purpose — a LIMIT
+    // always applied, silently defaulting to 10 — because the worker escaped it
+    // by hand-rolling offset paging, and a fake that returned everything would
+    // have hidden the truncation that paging fixed. The trap is gone at the
+    // source now, so the fake models the real thing; the vi.fn spy is what
+    // keeps the worker's end of the bargain testable.
     listRecords: vi.fn(
-      async (options: { limit?: number; offset?: number } = {}) => ({
-        records: records
-          .slice(options.offset ?? 0, (options.offset ?? 0) + (options.limit ?? 10))
-          // The row is the raw DB row: metadata is the frontmatter as JSON.
-          .map((r) => ({ id: r.id, metadata: JSON.stringify(r.metadata ?? {}) })),
-      })
+      async (options: { limit?: number | 'all'; offset?: number } = {}) => {
+        const offset = options.offset ?? 0;
+        const limit = options.limit ?? 'all';
+        const end = limit === 'all' ? records.length : offset + limit;
+        return {
+          records: records
+            .slice(offset, end)
+            // The row is the raw DB row: metadata is the frontmatter as JSON.
+            .map((r) => ({
+              id: r.id,
+              metadata: JSON.stringify(r.metadata ?? {}),
+            })),
+        };
+      }
     ),
     getRecord: vi.fn(async (id: string) => byId.get(id) ?? null),
     // Mirrors RecordManager.mergeCapture semantics (field merge + precondition
@@ -461,13 +475,14 @@ describe('RedactionWorker', () => {
   });
 
   // ---------------------------------------------------------------------------
-  // Scan scoping: core's listRecords always applies a LIMIT (default 10), so an
-  // unpaginated scan silently stopped at the 10 newest sessions.
+  // Scan completeness: core's listRecords used to apply a silent LIMIT 10, so
+  // an unpaginated scan stopped at the 10 newest sessions and an older pending
+  // one never published — no error, just a recording stuck forever.
   // ---------------------------------------------------------------------------
 
-  it('scans PAST the 10-row listRecords default — an old pending session still publishes', async () => {
+  it('scans PAST the first 10 rows — an old pending session still publishes', async () => {
     // 24 completed sessions (newest first, as core sorts) then the pending one:
-    // it sits at offset 24, far outside the default LIMIT 10 page.
+    // it sits at offset 24, far outside what the old default page would return.
     const done = Array.from({ length: 24 }, (_, i) =>
       sessionRecord(
         {
@@ -491,6 +506,11 @@ describe('RedactionWorker', () => {
     expect(summary).toEqual({ published: 1, held: 0, failed: 0 });
     expect(pending.metadata.capture.redaction_status).toBe('complete');
     expect(pending.metadata.capture.public_file).toBe('public-uuid-1');
+    // Pin the mechanism, not just the outcome: a numeric page size here would
+    // reintroduce the truncation the moment a deployment outgrew it.
+    expect(records.listRecords).toHaveBeenCalledWith(
+      expect.objectContaining({ limit: 'all' })
+    );
   });
 
   it('scopes the scan by status: terminal rows are never read from disk', async () => {

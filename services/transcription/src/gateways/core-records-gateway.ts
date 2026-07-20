@@ -58,7 +58,7 @@ export interface ScannedRecordRow {
 export interface RecordStore {
   listRecords(options: {
     type?: string;
-    limit?: number;
+    limit?: number | 'all';
     offset?: number;
   }): Promise<{ records: ScannedRecordRow[] }>;
   getRecord(id: string): Promise<CoreRecord | null>;
@@ -117,10 +117,6 @@ export interface CoreUser {
 }
 
 const SYSTEM_USER: CoreUser = { id: 1, username: 'system', role: 'admin' };
-
-/** Rows per listRecords page, and a hard stop on the paging loop. */
-const SCAN_PAGE_SIZE = 200;
-const SCAN_MAX_PAGES = 500;
 
 /**
  * `transcript_status` as carried by a listRecords ROW, or undefined when the
@@ -270,26 +266,21 @@ export class CoreRecordsGateway implements RecordsGateway {
   }
 
   /**
-   * Page through every `session` row. core's listRecords ALWAYS appends a LIMIT
-   * and DEFAULTS it to 10 (core/src/database/stores/record-store.ts), so the
-   * unpaginated scan this replaces only ever saw the 10 most recent sessions —
-   * past the tenth recording an older un-transcribed session was never picked
-   * up again. Offset paging over a non-unique sort can shift a row across a
-   * page edge under concurrent inserts; both directions are safe here (the
-   * write-back is idempotency-latched, and a missed row returns next cycle).
+   * Every `session` row. `limit: 'all'` is load-bearing: core's listRecords
+   * used to append a silent `LIMIT 10`, so the unpaginated scan this replaces
+   * only ever saw the 10 most recent sessions — past the tenth recording an
+   * older un-transcribed session was never picked up again. The hand-rolled
+   * offset paging that first fixed that is gone: the store now answers "all"
+   * in one query, which also drops the page-edge race it carried (offset
+   * paging over a non-unique sort can shift a row across an edge under a
+   * concurrent insert).
    */
   private async scanSessionRows(): Promise<ScannedRecordRow[]> {
-    const all: ScannedRecordRow[] = [];
-    for (let page = 0; page < SCAN_MAX_PAGES; page++) {
-      const { records } = await this.opts.records.listRecords({
-        type: 'session',
-        limit: SCAN_PAGE_SIZE,
-        offset: page * SCAN_PAGE_SIZE,
-      });
-      all.push(...records);
-      if (records.length < SCAN_PAGE_SIZE) break;
-    }
-    return all;
+    const { records } = await this.opts.records.listRecords({
+      type: 'session',
+      limit: 'all',
+    });
+    return records;
   }
 
   async getSession(id: string): Promise<SessionForTranscription | null> {

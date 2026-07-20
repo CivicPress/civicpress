@@ -18,19 +18,33 @@ function fakeStore(records: CoreRecord[]): {
   store: RecordStore;
   updates: Array<{ id: string; request: any; user: any }>;
   reads: string[];
+  listCalls: Array<{ limit?: number | 'all'; offset?: number }>;
 } {
   const updates: Array<{ id: string; request: any; user: any }> = [];
   const reads: string[] = [];
+  const listCalls: Array<{ limit?: number | 'all'; offset?: number }> = [];
   const byId = new Map(records.map((r) => [r.id, r]));
   const store: RecordStore = {
-    // Mirrors core's listRecords contract INCLUDING the trap it sets: a LIMIT
-    // is always applied and DEFAULTS TO 10 (record-store.ts). A fake that
-    // returned everything would hide the truncation the paged scan fixes.
-    async listRecords(options: { limit?: number; offset?: number } = {}) {
+    // Mirrors core's listRecords contract (record-store.ts): `limit` is a page
+    // size or 'all', and omitting it means 'all'.
+    //
+    // This fake used to reproduce the OLD contract's trap on purpose — a LIMIT
+    // always applied, silently defaulting to 10 — because the gateway escaped
+    // it by hand-rolling offset paging, and a fake that returned everything
+    // would have hidden the truncation that paging fixed. The trap is gone at
+    // the source now, so the fake models the real thing. `listCalls` keeps the
+    // guarantee testable from this side: the gateway must still ASK for the
+    // complete set.
+    async listRecords(
+      options: { limit?: number | 'all'; offset?: number } = {}
+    ) {
+      listCalls.push(options);
       const offset = options.offset ?? 0;
+      const limit = options.limit ?? 'all';
+      const end = limit === 'all' ? records.length : offset + limit;
       return {
         records: records
-          .slice(offset, offset + (options.limit ?? 10))
+          .slice(offset, end)
           // The row is the raw DB row: metadata is the frontmatter as JSON.
           .map((r) => ({ id: r.id, metadata: JSON.stringify(r.metadata ?? {}) })),
       };
@@ -44,7 +58,7 @@ function fakeStore(records: CoreRecord[]): {
       return null;
     },
   };
-  return { store, updates, reads };
+  return { store, updates, reads, listCalls };
 }
 
 const TRANSCRIPT: TranscriptResult = {
@@ -80,10 +94,10 @@ describe('CoreRecordsGateway.findNeedingTranscription', () => {
     expect(result.map((s) => s.id)).toEqual(['needs']);
   });
 
-  // core's listRecords always applies a LIMIT and defaults it to 10, so the
-  // unpaginated scan this replaces stopped at the 10 newest sessions — past the
-  // tenth recording, an older un-transcribed session was never seen again.
-  it('scans PAST the 10-row listRecords default', async () => {
+  // The 25th session is the one that needs work. Under the store's old silent
+  // `LIMIT 10` an unpaged scan stopped at row 10 and 'stale' was never
+  // transcribed — no error, just a session that quietly never finished.
+  it('scans PAST the first 10 rows, asking the store for the complete set', async () => {
     const done = Array.from({ length: 24 }, (_, i) => ({
       id: `old-${i}`,
       metadata: {
@@ -91,7 +105,7 @@ describe('CoreRecordsGateway.findNeedingTranscription', () => {
         transcript_status: 'automated',
       },
     }));
-    const { store } = fakeStore([
+    const { store, listCalls } = fakeStore([
       ...done,
       {
         id: 'stale',
@@ -105,6 +119,9 @@ describe('CoreRecordsGateway.findNeedingTranscription', () => {
     expect((await gw.findNeedingTranscription()).map((s) => s.id)).toEqual([
       'stale',
     ]);
+    // Pin the mechanism, not just the outcome: a numeric page size here would
+    // reintroduce the truncation the moment a deployment outgrew it.
+    expect(listCalls.every((c) => c.limit === 'all')).toBe(true);
   });
 
   it('scopes the scan by status: already-transcribed rows are never read from disk', async () => {

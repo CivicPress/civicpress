@@ -26,14 +26,10 @@ import type { Logger } from '@civicpress/core';
 
 const SYSTEM_USER = { id: 1, username: 'system', role: 'admin' };
 
-/** Rows per listRecords page, and a hard stop on the paging loop. */
-const SCAN_PAGE_SIZE = 200;
-const SCAN_MAX_PAGES = 500;
-
 export interface BackfillRecordStore {
   listRecords(options: {
     type?: string;
-    limit?: number;
+    limit?: number | 'all';
     offset?: number;
   }): Promise<{ records: Array<{ id: string }> }>;
   getRecord(id: string): Promise<Record<string, any> | null>;
@@ -108,24 +104,20 @@ export async function backfillPublicRaws(opts: {
   //
   // This map decides whether a file in the PUBLIC folder is a worker-verified
   // variant (kept) or an unverified raw (moved out + the public object
-  // DELETED), so it must cover EVERY session — core's listRecords always
-  // appends a LIMIT and defaults it to 10, which silently mapped only the 10
-  // newest sessions and would have re-homed (and deleted the public copy of) a
-  // verified variant belonging to any older one. Page explicitly.
+  // DELETED), so it must cover EVERY session. `limit: 'all'` is what makes
+  // that true, and it is the whole reason the store's limit contract is
+  // explicit: listRecords used to append a silent `LIMIT 10`, which mapped
+  // only the 10 newest sessions and would have re-homed — and deleted the
+  // published copy of — a verified variant belonging to any older one. A short
+  // read here is indistinguishable from "this file belongs to no session",
+  // which is precisely the input that makes this loop delete public bytes, so
+  // an oversized corpus must throw rather than truncate.
   const avFileToRecord = new Map<string, string>();
   const publicFileIds = new Set<string>();
-  const sessionIds: Array<{ id: string }> = [];
-  for (let page = 0; page < SCAN_MAX_PAGES; page++) {
-    const rows = (
-      await records.listRecords({
-        type: 'session',
-        limit: SCAN_PAGE_SIZE,
-        offset: page * SCAN_PAGE_SIZE,
-      })
-    ).records;
-    sessionIds.push(...rows);
-    if (rows.length < SCAN_PAGE_SIZE) break;
-  }
+  const { records: sessionIds } = await records.listRecords({
+    type: 'session',
+    limit: 'all',
+  });
   for (const { id } of sessionIds) {
     const rec = await records.getRecord(id);
     if (!rec) continue;

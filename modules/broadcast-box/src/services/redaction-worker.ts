@@ -147,7 +147,7 @@ export interface ScannedRecordRow {
 export interface RedactionRecordStore {
   listRecords(options: {
     type?: string;
-    limit?: number;
+    limit?: number | 'all';
     offset?: number;
   }): Promise<{ records: ScannedRecordRow[] }>;
   getRecord(id: string): Promise<Record<string, any> | null>;
@@ -216,10 +216,6 @@ export interface RedactionRunSummary {
 }
 
 const SYSTEM_USER = { id: 1, username: 'system', role: 'admin' };
-
-/** Rows per listRecords page, and a hard stop on the paging loop. */
-const SCAN_PAGE_SIZE = 200;
-const SCAN_MAX_PAGES = 500;
 
 /** Capture states that can never become work for this worker again. */
 const TERMINAL_REDACTION_STATUS = new Set(['complete', 'awaiting_visibility']);
@@ -327,56 +323,46 @@ export class RedactionWorker {
   }
 
   /**
-   * The candidate scan. `listRecords({ type: 'session' })` had two problems:
+   * The candidate scan.
    *
-   *  1. core's listRecords ALWAYS appends a LIMIT and DEFAULTS it to 10
-   *     (core/src/database/stores/record-store.ts), so a poll only ever saw the
-   *     10 most recent sessions. Past the tenth recording, an older still-
-   *     `pending` session was never scanned again and its verified variant
-   *     would never publish. Page explicitly until a short page comes back.
-   *  2. Every returned id was then fetched with getRecord() — a DB read PLUS a
-   *     markdown read + YAML parse per session, every poll cycle — only to
-   *     discard the non-pending ones in JS. Scope on the status the row already
-   *     carries: the `records.metadata` column is the frontmatter as JSON, so a
-   *     row that positively reports a TERMINAL redaction_status is dropped
-   *     without touching the disk.
+   * `limit: 'all'` is load-bearing. core's listRecords used to default to a
+   * silent `LIMIT 10`, so a poll only ever saw the 10 most recent sessions:
+   * past the tenth recording an older still-`pending` session was never
+   * scanned again and its verified variant would never publish. This method
+   * hand-rolled offset paging to escape that. The store now takes `'all'`
+   * directly, which additionally retires two properties of that loop — its
+   * silent truncation at the page cap, and the page-edge race it carried
+   * (offset paging over a non-unique sort can shift a row across an edge under
+   * a concurrent insert).
+   *
+   * Every returned id would otherwise be fetched with getRecord() — a DB read
+   * PLUS a markdown read + YAML parse per session, every poll cycle — only to
+   * discard the non-pending ones in JS. Scope on the status the row already
+   * carries: the `records.metadata` column is the frontmatter as JSON, so a row
+   * that positively reports a TERMINAL redaction_status is dropped without
+   * touching the disk.
    *
    * The scoping is deliberately evidence-gated: a row we cannot read a status
    * from (no capture in the indexed metadata, unparseable JSON) still gets the
    * authoritative getRecord(). The markdown file is the source of truth, so the
    * cheap filter may only discard on POSITIVE evidence, never on absence —
    * otherwise an un-reindexed capture would stall unpublished forever.
-   *
-   * Paging is offset-based over a non-unique sort, so a concurrent insert can
-   * shift a row across a page edge. Both directions are safe: a duplicate id is
-   * idempotent (the mergeCapture preconditions decline), and a missed id is
-   * picked up on the next poll.
    */
   private async scanPendingSessionIds(): Promise<string[]> {
-    const { records, logger } = this.opts;
+    const { records } = this.opts;
     const ids: string[] = [];
-    for (let page = 0; page < SCAN_MAX_PAGES; page++) {
-      if (this.stopRequested) break;
-      const rows = (
-        await records.listRecords({
-          type: 'session',
-          limit: SCAN_PAGE_SIZE,
-          offset: page * SCAN_PAGE_SIZE,
-        })
-      ).records;
-      for (const row of rows) {
-        const status = rowRedactionStatus(row);
-        if (status !== undefined && TERMINAL_REDACTION_STATUS.has(status)) {
-          continue;
-        }
-        ids.push(row.id);
-      }
-      if (rows.length < SCAN_PAGE_SIZE) return ids;
-    }
-    logger.warn('redaction: session scan hit the page cap — truncated', {
-      operation: 'broadcast-box:redaction:scan-truncated',
-      scanned: SCAN_MAX_PAGES * SCAN_PAGE_SIZE,
+    const { records: rows } = await records.listRecords({
+      type: 'session',
+      limit: 'all',
     });
+    for (const row of rows) {
+      if (this.stopRequested) break;
+      const status = rowRedactionStatus(row);
+      if (status !== undefined && TERMINAL_REDACTION_STATUS.has(status)) {
+        continue;
+      }
+      ids.push(row.id);
+    }
     return ids;
   }
 

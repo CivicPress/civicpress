@@ -436,9 +436,51 @@ follow-up. (Storage, config+CLI, API-routes clusters + saga/BB/notifications.)
   three now page with a hard stop + truncation log, and scope on DB `metadata`
   evidence-gated: a row with absent/unparseable metadata still falls through to
   the authoritative read, so the filter degrades to a no-op and never to a skip.
-  **Follow-up (not done):** the `|| 10` default in `record-store.ts` is still a
-  footgun for any future caller; every current call site now passes an explicit
-  limit. `upload-processor.ts` already scoped in SQL and was left alone.
+  **Follow-up — DONE 2026-07-20, root-caused in `record-store.ts`.** Patching
+  the three call sites left the trap armed for the next caller, and one caller
+  was already in it: `cli/src/commands/auto-index.ts` called `listRecords()`
+  bare, printing `total` alongside 10 rows. `limit` is now `number | 'all'` and
+  **omitting it means `'all'`**, so the default is the complete, correct answer
+  rather than a silent page. An oversized corpus throws against
+  `ALL_ROWS_HARD_CAP` (100k, matching the ceiling the three hand-rolled loops
+  already accepted) instead of truncating — checked against the `COUNT(*)` this
+  method already runs, so the guard is free. `??` also stops an explicit
+  `limit: 0` from being coerced to 10.
+
+  Because a first-class "give me everything" now exists, the three duplicated
+  scan loops collapse to one call each: three copies of one workaround was a
+  missing primitive, not three bugs. That also retires their silent truncation
+  at the page cap and the page-edge race they shared (offset paging over a
+  non-unique sort can shift a row across an edge under a concurrent insert).
+  `searchRecords` in the same file got the identical treatment, and it turned
+  out to be the worse of the two. First the consistency fix: its FTS path
+  defaulted to 20 while its LIKE fallback applied no limit at all and silently
+  dropped `offset` unless a limit came with it, so the same query returned a
+  different result set depending on whether the search service was up — and a
+  fallback is exactly when nobody is looking. Then the same `number | 'all'`
+  contract, omission meaning `'all'`, guarded by the shared
+  `ALL_ROWS_HARD_CAP`; since there is no COUNT to check against on this path it
+  asks the engine for cap+1 rows and throws if that extra row arrives.
+
+  **The reason it needed more than consistency:** `searchRecords` returned a
+  bare array with no `total`, so truncation here was not merely easy to miss
+  but undetectable — a caller holding 20 rows had nothing to compare them
+  against. The layer above filled that vacuum with a fabrication:
+  `record-manager/search.ts` returned `total: resultRecords.length` under a
+  `// Approximate total` comment. That is the page size relabelled as the
+  corpus count, and the API divides it by the page size — so **whenever the FTS
+  service was down, a search matching 500 records told the client there were 20
+  of them in exactly one page**, with no error anywhere. The store now returns a
+  real COUNT over all matches and the manager forwards it. The two `|| 20`
+  defaults in that passthrough are gone as well: a middle layer inventing its
+  own page size hid the store's contract from everyone above it.
+
+  Deliberately left alone: `getSearchSuggestions`' `|| 10` (a genuine top-N
+  autocomplete default), `SqliteSearchService`'s internal `limit = 20` (the
+  engine's own contract, and the store now always passes an explicit value),
+  the API layer's numeric-only `limit` (an HTTP endpoint should always page —
+  `'all'` stops at the service boundary by design), and `upload-processor.ts`
+  (already scoped in SQL).
 - [x] **realtime-005 snapshots — DONE 2026-07-20.** Cap (`MAX_SNAPSHOT_BYTES`)
   and the sha256 integrity hash with verify-on-load were ALREADY implemented and
   tested — confirmed and not redone. The two genuine gaps: **(a) prune versions**

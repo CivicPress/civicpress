@@ -923,13 +923,17 @@ export class RecordManager {
   }
 
   /**
-   * List records with optional filtering and sorting
+   * List records with optional filtering and sorting.
+   *
+   * `limit` is a page size, or `'all'` for the complete set (the default). See
+   * RecordStore.listRecords for why omitting it must not mean a silent page.
    */
   async listRecords(
     options: {
       type?: string;
       status?: string;
-      limit?: number;
+      /** Page size, or `'all'` for the complete set. Defaults to `'all'`. */
+      limit?: number | 'all';
       offset?: number;
       sort?: string;
       /** Pass-through to RecordStore: keep only records linking this geography id. */

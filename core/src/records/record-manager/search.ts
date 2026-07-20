@@ -14,6 +14,7 @@ import type { ICacheStrategy, CacheConfig } from '../../cache/types.js';
 import { UnifiedCacheManager } from '../../cache/unified-cache-manager.js';
 import { MemoryCache } from '../../cache/strategies/memory-cache.js';
 import type { RecordRow } from '../../database/types/row-types.js';
+import { ALL_ROWS_HARD_CAP } from '../../database/stores/record-store.js';
 
 const logger = new Logger();
 
@@ -61,18 +62,25 @@ export class RecordSearch {
   }
 
   /**
-   * Search records with pagination, filtering, and sorting
+   * Search records with pagination, filtering, and sorting.
+   *
+   * `limit` is a page size or `'all'` (the default), matching RecordStore. The
+   * `|| 20` defaults this used to apply at both call sites are gone: a
+   * passthrough layer inventing its own page size hid the store's contract from
+   * every caller above it, and `||` additionally read an explicit `limit: 0` as
+   * "unset".
    */
   async searchRecords(
     query: string,
     options: {
       type?: string;
       status?: string;
-      limit?: number;
+      limit?: number | 'all';
       offset?: number;
       sort?: string;
     } = {}
   ): Promise<{ records: Array<RecordRow & Record<string, unknown>>; total: number }> {
+    const limit = options.limit ?? 'all';
     // Use search service if available (includes pagination and relevance ranking)
     const searchService = this.deps.db.getSearchService();
     if (searchService) {
@@ -80,7 +88,8 @@ export class RecordSearch {
         const searchResult = await searchService.search(query, {
           type: options.type,
           status: options.status,
-          limit: options.limit || 20,
+          // The engine takes a number; 'all' means "up to the shared cap".
+          limit: limit === 'all' ? ALL_ROWS_HARD_CAP : limit,
           offset: options.offset || 0,
           sort: options.sort,
         });
@@ -125,16 +134,19 @@ export class RecordSearch {
     }
 
     // Fallback: Old method (with N+1 fix)
-    const searchResults = await this.deps.db.searchRecords(query, {
-      type: options.type,
-      status: options.status,
-      limit: options.limit || 20,
-      offset: options.offset || 0,
-      sort: options.sort,
-    });
+    const { results: searchResults, total } = await this.deps.db.searchRecords(
+      query,
+      {
+        type: options.type,
+        status: options.status,
+        limit,
+        offset: options.offset || 0,
+        sort: options.sort,
+      }
+    );
 
     if (searchResults.length === 0) {
-      return { records: [], total: 0 };
+      return { records: [], total };
     }
 
     // Batch fetch records (no N+1 queries!)
@@ -153,7 +165,11 @@ export class RecordSearch {
 
     return {
       records: resultRecords,
-      total: resultRecords.length, // Approximate total
+      // The store's COUNT over all matches, NOT `resultRecords.length`. That
+      // used to be labelled "approximate total"; it was the page size, so the
+      // API divided it by the page size and told every client there was
+      // exactly one page of results no matter how many matched.
+      total,
     };
   }
 
