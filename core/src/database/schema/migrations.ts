@@ -246,17 +246,21 @@ export async function ensureRecordLocksWithoutFk(
  * MIGRATION_VERIFICATION_FAILED and carried on. Both now throw, via the shared
  * ensureColumn path.
  */
+const workflowStateMigration = (
+  tableName: 'records' | 'record_drafts'
+): ColumnMigration => ({
+  id: `${tableName}.workflow_state`,
+  table: tableName,
+  column: 'workflow_state',
+  ddl: `ALTER TABLE ${tableName} ADD COLUMN workflow_state TEXT DEFAULT 'draft'`,
+  description: 'Workflow state tracking',
+});
+
 export async function ensureWorkflowStateColumn(
   exec: DDLExecutor,
   tableName: 'records' | 'record_drafts'
 ): Promise<void> {
-  await ensureColumn(exec, {
-    id: `${tableName}.workflow_state`,
-    table: tableName,
-    column: 'workflow_state',
-    ddl: `ALTER TABLE ${tableName} ADD COLUMN workflow_state TEXT DEFAULT 'draft'`,
-    description: 'Workflow state tracking',
-  });
+  await ensureColumn(exec, workflowStateMigration(tableName));
 }
 
 const USER_SECURITY_MIGRATIONS: ColumnMigration[] = [
@@ -398,6 +402,23 @@ export async function migrateSearchIndexColumns(
 ): Promise<void> {
   await ensureColumns(exec, SEARCH_INDEX_MIGRATIONS);
 }
+
+/**
+ * Ledger ids of every migration that adds a COLUMN — as opposed to the data
+ * backfill and the index, which have no schema state to re-derive and so
+ * legitimately report `applied` on a database that has only just been created.
+ *
+ * Exported for the drift guard in the tests: `schema/tables.ts` must declare
+ * every column named here, so a brand-new database should never actually have
+ * to run one of these. See the invariant documented at the top of that file.
+ */
+export const COLUMN_MIGRATION_IDS: readonly string[] = [
+  ...RECORD_COLUMN_MIGRATIONS,
+  ...USER_SECURITY_MIGRATIONS,
+  ...SEARCH_INDEX_MIGRATIONS,
+  workflowStateMigration('records'),
+  workflowStateMigration('record_drafts'),
+].map((migration) => migration.id);
 
 /**
  * The ledger, newest first. Exposed for operators and tests: "what did this
