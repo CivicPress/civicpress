@@ -1,16 +1,8 @@
 import { CAC } from 'cac';
 import { CivicPress } from '@civicpress/core';
-import {
-  getGlobalOptionsFromArgs,
-  initializeCliOutput,
-} from '../utils/global-options.js';
-import {
-  cliSuccess,
-  cliError,
-  cliInfo,
-  cliWarn,
-  cliStartOperation,
-} from '../utils/cli-output.js';
+import { withCli } from '../utils/with-cli.js';
+import { getGlobalOptionsFromArgs } from '../utils/global-options.js';
+import { cliSuccess, cliError, cliInfo, cliWarn } from '../utils/cli-output.js';
 
 export const indexCommand = (cli: CAC) => {
   cli
@@ -31,51 +23,44 @@ export const indexCommand = (cli: CAC) => {
     .option('--json', 'Output in JSON format')
     .option('--silent', 'Suppress output')
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .action(async (options: any) => {
-      const globalOptions = getGlobalOptionsFromArgs();
-      initializeCliOutput(globalOptions);
-
-      const endOperation = cliStartOperation('index');
-
-      try {
-        // Initialize CivicPress
-        const civicPress = new CivicPress({
-          dataDir: 'data',
-        });
-
-        await civicPress.initialize();
-
-        const indexingService = civicPress.getIndexingService();
-
-        // Handle different sub-commands based on options
-        if (options.search) {
-          await handleSearch(indexingService, options.search, options);
-        } else if (options.list) {
-          await handleList(indexingService, options);
-        } else if (options.validate) {
-          await handleValidate(indexingService, options);
-        } else {
-          await handleGenerate(indexingService, options);
-        }
-
-        await civicPress.shutdown();
-
-        // Explicitly exit to ensure process terminates
-        process.exit(0);
-      } catch (error) {
-        cliError(
-          'Index command failed',
-          'INDEX_COMMAND_FAILED',
-          {
+    .action(
+      withCli<[any]>(
+        {
+          operation: 'index',
+          errorMessage: 'Index command failed',
+          errorCode: 'INDEX_COMMAND_FAILED',
+          details: (error, options) => ({
             error: error instanceof Error ? error.message : String(error),
-          },
-          'index'
-        );
-        process.exit(1);
-      } finally {
-        endOperation();
-      }
-    });
+          }),
+        },
+        async ({ globalOptions }, options: any) => {
+          // Initialize CivicPress
+          const civicPress = new CivicPress({
+            dataDir: 'data',
+          });
+
+          await civicPress.initialize();
+
+          const indexingService = civicPress.getIndexingService();
+
+          // Handle different sub-commands based on options
+          if (options.search) {
+            await handleSearch(indexingService, options.search, options);
+          } else if (options.list) {
+            await handleList(indexingService, options);
+          } else if (options.validate) {
+            await handleValidate(indexingService, options);
+          } else {
+            await handleGenerate(indexingService, options);
+          }
+
+          await civicPress.shutdown();
+
+          // Explicitly exit to ensure process terminates
+          process.exit(0);
+        }
+      )
+    );
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

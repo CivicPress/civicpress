@@ -4,17 +4,13 @@ import { join, extname, dirname, resolve } from 'path';
 import { loadConfig } from '@civicpress/core';
 import * as fs from 'fs';
 import { glob } from 'glob';
-import {
-  getGlobalOptionsFromArgs,
-  initializeCliOutput,
-} from '../utils/global-options.js';
+import { withCli } from '../utils/with-cli.js';
 import {
   cliSuccess,
   cliError,
   cliInfo,
   cliWarn,
   cliDebug,
-  cliStartOperation,
 } from '../utils/cli-output.js';
 import {
   TemplateEngine,
@@ -57,76 +53,68 @@ export function registerValidateCommand(cli: CAC) {
     .option('-s, --strict', 'Treat warnings as errors')
     .option('--format <format>', 'Output format', { default: 'human' })
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .action(async (record: string, options: any) => {
-      // Initialize CLI output with global options
-      const globalOptions = getGlobalOptionsFromArgs();
-      initializeCliOutput(globalOptions);
-
-      const endOperation = cliStartOperation('validate');
-
-      try {
-        const config = await loadConfig();
-        if (!config) {
-          cliError(
-            'No CivicPress configuration found. Run "civic init" first.',
-            'NOT_INITIALIZED',
-            undefined,
-            'validate'
-          );
-          process.exit(1);
-        }
-
-        const validateOptions = {
-          fix: options.fix || false,
-          strict: options.strict || false,
-          format: options.format || 'human',
-        };
-
-        if (!config.dataDir) {
-          throw new Error('dataDir is not configured');
-        }
-
-        if (options.all) {
-          await validateAllRecords(config.dataDir, validateOptions);
-        } else if (record) {
-          await validateSingleRecord(config.dataDir, record, validateOptions);
-        } else {
-          cliInfo('📋 Validation Commands:', 'validate');
-          cliInfo(
-            '  civic validate <record>              # Validate a single record',
-            'validate'
-          );
-          cliInfo(
-            '  civic validate --all                 # Validate all records',
-            'validate'
-          );
-          cliInfo(
-            '  civic validate --all --fix           # Auto-fix validation issues',
-            'validate'
-          );
-          cliInfo(
-            '  civic validate --all --strict        # Treat warnings as errors',
-            'validate'
-          );
-          cliInfo(
-            '  civic validate --all --json          # JSON output',
-            'validate'
-          );
-        }
-      } catch (error) {
-        cliError(
-          'Validation failed',
-          'VALIDATION_FAILED',
-          {
+    .action(
+      withCli<[any, any]>(
+        {
+          operation: 'validate',
+          errorMessage: 'Validation failed',
+          errorCode: 'VALIDATION_FAILED',
+          details: (error, record, options) => ({
             error: error instanceof Error ? error.message : String(error),
-          },
-          'validate'
-        );
-        process.exit(1);
-      } finally {
-        endOperation();
-      }
-    });
+          }),
+        },
+        async ({ globalOptions }, record: any, options: any) => {
+          const config = await loadConfig();
+          if (!config) {
+            cliError(
+              'No CivicPress configuration found. Run "civic init" first.',
+              'NOT_INITIALIZED',
+              undefined,
+              'validate'
+            );
+            process.exit(1);
+          }
+
+          const validateOptions = {
+            fix: options.fix || false,
+            strict: options.strict || false,
+            format: options.format || 'human',
+          };
+
+          if (!config.dataDir) {
+            throw new Error('dataDir is not configured');
+          }
+
+          if (options.all) {
+            await validateAllRecords(config.dataDir, validateOptions);
+          } else if (record) {
+            await validateSingleRecord(config.dataDir, record, validateOptions);
+          } else {
+            cliInfo('📋 Validation Commands:', 'validate');
+            cliInfo(
+              '  civic validate <record>              # Validate a single record',
+              'validate'
+            );
+            cliInfo(
+              '  civic validate --all                 # Validate all records',
+              'validate'
+            );
+            cliInfo(
+              '  civic validate --all --fix           # Auto-fix validation issues',
+              'validate'
+            );
+            cliInfo(
+              '  civic validate --all --strict        # Treat warnings as errors',
+              'validate'
+            );
+            cliInfo(
+              '  civic validate --all --json          # JSON output',
+              'validate'
+            );
+          }
+        }
+      )
+    );
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -545,7 +533,6 @@ function validateMarkdownLinks(
     });
   }
 }
-
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function displayValidationResults(results: ValidationResult[], _options: any) {
