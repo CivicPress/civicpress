@@ -191,15 +191,6 @@ export class SagaExecutor {
     let lock = null;
 
     try {
-      // Acquire resource lock
-      if (resourceKey) {
-        lock = await this.lockManager.acquireLock(
-          resourceKey,
-          sagaId,
-          this.config.lockTimeout
-        );
-      }
-
       // Create initial state
       const initialState: SagaState = {
         id: sagaId,
@@ -214,9 +205,45 @@ export class SagaExecutor {
         correlationId: context.correlationId,
       };
 
-      // Persist initial state. The idempotency key column is UNIQUE, so a
-      // prior run (expired, failed, or abandoned) that still owns this key
-      // must give it up before this run can register it (FA-CORE-008).
+      // Persist the parent row BEFORE taking the lock:
+      // saga_resource_locks.saga_id carries an enforced FK to saga_states.id,
+      // so the lock INSERT needs this row to exist first. The idempotency
+      // key is deliberately NOT claimed yet — only the lock winner may steal
+      // a prior run's key (FA-CORE-008) — so the row is saved keyless and
+      // the key is set once the lock is held.
+      const needsParentRow = this.config.persistState || Boolean(resourceKey);
+      if (needsParentRow) {
+        await this.stateStore.saveState({
+          ...initialState,
+          idempotencyKey: undefined,
+        });
+      }
+
+      // Acquire resource lock
+      if (resourceKey) {
+        try {
+          lock = await this.lockManager.acquireLock(
+            resourceKey,
+            sagaId,
+            this.config.lockTimeout
+          );
+        } catch (lockError) {
+          // The saga never ran — don't leave a phantom 'executing' row.
+          if (needsParentRow) {
+            try {
+              await this.stateStore.deleteState(sagaId);
+            } catch {
+              // best effort: the stub is keyless and harmless if it lingers
+            }
+          }
+          throw lockError;
+        }
+      }
+
+      // Claim the idempotency key now that the lock is held. The column is
+      // UNIQUE, so a prior run (expired, failed, or abandoned) that still
+      // owns this key must give it up before this run can register it
+      // (FA-CORE-008).
       if (this.config.persistState) {
         if (context.idempotencyKey) {
           await this.stateStore.clearIdempotencyKey(context.idempotencyKey);
@@ -346,6 +373,18 @@ export class SagaExecutor {
             sagaId,
             error: error instanceof Error ? error.message : String(error),
           });
+        }
+      }
+
+      // A resource-keyed saga with persistence disabled still wrote the
+      // keyless parent stub (the lock row's FK needs it). Remove it here —
+      // otherwise it lingers as a phantom 'executing' row that the recovery
+      // scanner would eventually "fail" and try to reconcile.
+      if (!this.config.persistState && resourceKey) {
+        try {
+          await this.stateStore.deleteState(sagaId);
+        } catch {
+          // best effort — recovery handles a lingering stub
         }
       }
     }

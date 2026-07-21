@@ -419,8 +419,40 @@ export class RoleManager {
     return false;
   }
 
-  private getRolePermissions(role: string, config: RolesConfig): string[] {
+  private getRolePermissions(
+    role: string,
+    config: RolesConfig,
+    // `path` is the ANCESTOR chain on the current DFS branch, not every role
+    // ever visited. Tracking the path (not a global visited-set) distinguishes
+    // a real CYCLE — a back-edge to an ancestor, e.g. admin → clerk → admin —
+    // from a legal DIAMOND — admin → [clerk, public] plus clerk → public —
+    // which the default roles.yml has. A global visited-set flagged the
+    // diamond as a spurious cycle; the path set only fires on true cycles.
+    path: Set<string> = new Set(),
+    // Memo of FULLY-resolved roles within this call. Restores O(V+E): a
+    // diamond node reached by a second path returns its cached union instead
+    // of re-walking its subtree (which is exponential on nested diamonds
+    // without this). Only complete resolutions are memoized — a cycle-broken
+    // `[]` is never cached, so it can't poison a legitimate resolution.
+    memo: Map<string, string[]> = new Map()
+  ): string[] {
+    const cached = memo.get(role);
+    if (cached) {
+      return cached;
+    }
+
     const permissions = new Set<string>();
+
+    // Cycle guard: a circular role_hierarchy used to recurse to stack
+    // overflow, which userCan then swallowed as `false` — silently denying
+    // EVERY permission with no diagnosable error.
+    if (path.has(role)) {
+      logger.warn(
+        `[RoleManager] Circular role inheritance detected at '${role}' (chain: ${[...path, role].join(' → ')}) — check role_hierarchy in roles.yml`
+      );
+      return [];
+    }
+    path.add(role);
 
     logger.debug(`[RoleManager] Getting permissions for role: ${role}`);
 
@@ -511,7 +543,9 @@ export class RoleManager {
       for (const inheritedRole of inheritedRoles) {
         const inheritedPermissions = this.getRolePermissions(
           inheritedRole,
-          config
+          config,
+          path,
+          memo
         );
         inheritedPermissions.forEach((p) => permissions.add(p));
       }
@@ -577,6 +611,12 @@ export class RoleManager {
       logger.debug(
         `[RoleManager] Final permissions for role ${role}`
       );
+
+      // Backtrack: leave the DFS path so a sibling branch that reaches this
+      // same role (a legal diamond) is not mistaken for a cycle.
+      path.delete(role);
+      // Memoize the fully-resolved union so a later diamond path reuses it.
+      memo.set(role, finalPermissions);
 
       return finalPermissions;
     } catch (error) {

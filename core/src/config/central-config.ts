@@ -1,7 +1,11 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import yaml from 'yaml';
-import { Logger, LoggerOptions } from '../utils/logger.js';
+import {
+  Logger,
+  LoggerOptions,
+  setGlobalLoggerDefaults,
+} from '../utils/logger.js';
 import {
   RecordTypesConfig,
   DEFAULT_RECORD_TYPES,
@@ -130,6 +134,14 @@ export class CentralConfigManager {
   static setLoggerOptions(options: LoggerOptions) {
     this.loggerOptions = options;
     this.logger = new Logger(options);
+    // Publish the flags process-wide. Rebuilding only THIS class's logger left
+    // every other `new Logger()` in the process — including the module-level
+    // ones constructed during import, before any flag is parsed — unaware of
+    // `--json`, so they printed human lines around the CLI's JSON payload and
+    // stdout stopped being parseable. `loggerOptions` was stored here and never
+    // read by anything, which is why the flags appeared to be wired up but had
+    // no effect.
+    setGlobalLoggerDefaults(options);
   }
 
   /**
@@ -140,20 +152,13 @@ export class CentralConfigManager {
       return this.config;
     }
 
-    // Check environment variable first
+    // CIVIC_DATA_DIR overrides ONLY the data directory (applied after the
+    // merge below). It used to early-return a minimal {dataDir, sqlite}
+    // config, which silently dropped the entire .civicrc — auth config,
+    // a postgres/custom database block, everything — whenever the env var
+    // was set. Now .civicrc is still loaded and merged; the env var just
+    // wins for dataDir.
     const envDataDir = process.env.CIVIC_DATA_DIR;
-    if (envDataDir) {
-      this.config = {
-        dataDir: envDataDir,
-        database: {
-          type: 'sqlite',
-          sqlite: {
-            file: path.join(envDataDir, 'civic.db'),
-          },
-        },
-      };
-      return this.config;
-    }
 
     // Find .civicrc file
     const configPath = this.findConfigFile();
@@ -204,6 +209,20 @@ export class CentralConfigManager {
 
     // Merge configs (fallback fills missing fields)
     const mergedConfig = { ...fallbackConfig, ...mainConfig };
+
+    // CIVIC_DATA_DIR override: force the data directory, but keep everything
+    // else the merged .civicrc provided. If .civicrc named no database, fall
+    // back to a sqlite file under the env data dir (the old behavior) — but a
+    // database block from .civicrc (postgres, custom sqlite path) is honored.
+    if (envDataDir) {
+      mergedConfig.dataDir = path.resolve(envDataDir);
+      if (!mergedConfig.database) {
+        mergedConfig.database = {
+          type: 'sqlite',
+          sqlite: { file: path.join(path.resolve(envDataDir), 'civic.db') },
+        };
+      }
+    }
 
     // Check for missing required fields and warn if fallback was used
     const requiredFields = ['dataDir', 'database'] as const;

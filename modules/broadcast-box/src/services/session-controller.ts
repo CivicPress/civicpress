@@ -270,14 +270,22 @@ export class SessionController {
 
     try {
       if (this.deviceCommandService) {
-        // executeCommand resolves ONLY on a successful device ack and rejects
-        // on disconnect / timeout / nack.
-        await this.deviceCommandService.executeCommand({
+        // executeCommand does NOT throw on a failed send — on disconnect /
+        // timeout / nack it RESOLVES with { success: false, error }. Inspect the
+        // result and fail closed: a false ack must never advance the FSM to
+        // 'recording' (the FA-BB-008 invariant — otherwise the row lies about
+        // the device's real state).
+        const result = await this.deviceCommandService.executeCommand({
           deviceId: request.deviceId,
           action: 'start_session',
           payload: startPayload,
           source: { type: 'api' },
         });
+        if (!result?.success) {
+          throw new Error(
+            result?.error || 'Device did not acknowledge start_session'
+          );
+        }
       } else {
         // Legacy path (no command service injected): best-effort delivery.
         const command = this.protocol.createCommand(

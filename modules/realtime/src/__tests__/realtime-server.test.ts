@@ -99,6 +99,10 @@ describe('RealtimeServer', () => {
 
     mockHookSystem = {
       emit: vi.fn().mockResolvedValue(undefined), // Return Promise for async handling
+      // registerHook/removeHook: the server subscribes to the core
+      // session-revocation hook at initialize() and detaches at shutdown().
+      registerHook: vi.fn(),
+      removeHook: vi.fn(),
       on: vi.fn(),
       off: vi.fn(),
     } as any;

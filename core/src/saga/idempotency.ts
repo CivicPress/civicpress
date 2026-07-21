@@ -158,12 +158,21 @@ export class IdempotencyManager {
     // caller-chosen create id).
     const ctx = context as SagaContext & {
       recordId?: string;
+      draftId?: string;
       request?: unknown;
     };
     const stable = {
       user: userId,
       recordId: ctx.recordId ?? null,
-      draftId: (context.metadata?.draftId as string | undefined) ?? null,
+      // PublishDraftContext carries the target as a top-level draftId;
+      // reading only metadata.draftId (which publish contexts don't set)
+      // collapsed every keyless publish by one user onto ONE key, so a
+      // second publish of a DIFFERENT draft was treated as a duplicate and
+      // answered with the first draft's cached result.
+      draftId:
+        ctx.draftId ??
+        (context.metadata?.draftId as string | undefined) ??
+        null,
       request: ctx.request ?? null,
     };
     const digest = createHash('sha256')

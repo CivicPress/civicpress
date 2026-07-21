@@ -51,6 +51,62 @@ import { YjsRoom } from './rooms/yjs-room.js';
 import { dispatchYjsBinaryFrame, setupYjsConnection } from './yjs-sync.js';
 import * as Y from 'yjs';
 
+/**
+ * Hook name announcing that a user's server-side sessions were revoked
+ * (logout-everywhere, password change — `AuthService.deleteUserSessions`).
+ *
+ * WHY the realtime server cares: WebSocket authentication is a CONNECT-TIME
+ * check only — `validateSession` runs once during the upgrade and nothing
+ * re-validates on subsequent frames. So a session revoked server-side leaves any
+ * ALREADY-ESTABLISHED socket for that user fully live (still reading the room,
+ * still writing edits) until it happens to reconnect. Subscribing to this hook
+ * is the defense-in-depth that closes that window.
+ *
+ * STATUS (2026-07-20): nothing in core EMITS this yet. `SessionOps
+ * .deleteUserSessions` (core/src/auth/auth-service/session-ops.ts) deletes the
+ * rows and returns, and `AuthService` holds no HookSystem at all — so the
+ * subscriber below is dormant until core adds the emission. It is wired now
+ * (rather than after) because the in-process host can already drive the same
+ * teardown directly via `revokeUserConnections()`, which needs no core change.
+ */
+export const SESSION_REVOKED_HOOK = 'auth:sessions:revoked';
+
+/** Payload contract for {@link SESSION_REVOKED_HOOK}. */
+export interface SessionRevokedPayload {
+  /** User whose sessions were revoked (numeric id, or its string form). */
+  userId: number | string;
+  /** Optional cause, surfaced to the client in the close frame. */
+  reason?: string;
+}
+
+/** The handler shape `HookSystem.registerHook` accepts (core exports no alias). */
+type CoreHookHandler = Parameters<HookSystem['registerHook']>[1];
+
+/**
+ * Narrow an untyped hook payload to {@link SessionRevokedPayload}.
+ *
+ * HookSystem payloads are `unknown` by design and the bus is shared with every
+ * other module, so a malformed/foreign payload must be IGNORED — never coerced
+ * into a truthy key (`String(undefined)` would be a live map key) and never
+ * thrown back into the bus.
+ */
+function readSessionRevokedPayload(
+  data: unknown
+): { userId: string; reason?: string } | null {
+  if (!data || typeof data !== 'object') {
+    return null;
+  }
+  const { userId, reason } = data as { userId?: unknown; reason?: unknown };
+  if (typeof userId !== 'string' && typeof userId !== 'number') {
+    return null;
+  }
+  const key = String(userId);
+  if (key.length === 0) {
+    return null;
+  }
+  return { userId: key, reason: typeof reason === 'string' ? reason : undefined };
+}
+
 /** The connection identity used for limits, per-user tracking, and metadata. */
 interface ConnectionIdentity {
   /** Stable id for metadata (numeric user id, or the device id string). */
@@ -124,6 +180,15 @@ export class RealtimeServer {
   // handleConnectionWithHandler (register) + handleDisconnect (release).
   private connectionCounts: Map<string, number> = new Map(); // IP -> open count
   private userConnections: Map<string, Set<string>> = new Map(); // userId -> clientIds
+  // clientId -> that connection's canonical teardown closure (the SAME one its
+  // socket 'close' listener runs). Lets an OUT-OF-BAND event — session
+  // revocation — run the single disconnect path immediately instead of waiting
+  // for the close handshake to round-trip. Written next to the 'close' wiring,
+  // erased in handleDisconnect (the write/erase pairing, as with the count maps).
+  private clientDisconnectors: Map<string, () => void> = new Map();
+  // Bound session-revocation subscriber; non-null only while subscribed, so
+  // shutdown() can detach it from the (process-wide) core hook bus.
+  private sessionRevokedListener: CoreHookHandler | null = null;
   private realtimeConfig: RealtimeConfig | null = null;
   private initialized: boolean = false;
   private snapshotInterval: NodeJS.Timeout | null = null;
@@ -253,6 +318,11 @@ export class RealtimeServer {
       );
     }
 
+    // Defense-in-depth (Tier-A skeptic deferral, 2026-07-16): WS auth is a
+    // connect-time check, so sockets established BEFORE a revocation would stay
+    // live until they reconnect. Subscribe before the server accepts anything.
+    this.subscribeSessionRevocation();
+
     // Start WebSocket server
     await this.startServer();
 
@@ -269,6 +339,129 @@ export class RealtimeServer {
         path: this.realtimeConfig.path,
       }
     );
+  }
+
+  /**
+   * Subscribe to {@link SESSION_REVOKED_HOOK} on the core hook bus. Idempotent.
+   *
+   * Capability-checked rather than assumed: some hosts (and the standalone
+   * runner) inject an emit-only hook stub, and an absent `registerHook` must
+   * degrade to a loud warning — not crash server startup. The degradation is
+   * logged because it silently disables a security control.
+   */
+  private subscribeSessionRevocation(): void {
+    if (this.sessionRevokedListener) {
+      return;
+    }
+    if (typeof this.hookSystem?.registerHook !== 'function') {
+      coreWarn(
+        'Hook bus cannot register listeners; session-revocation teardown is OFF',
+        {
+          operation: 'realtime:server:session-revoked:unavailable',
+          hook: SESSION_REVOKED_HOOK,
+        }
+      );
+      return;
+    }
+
+    const listener: CoreHookHandler = (data) => {
+      const payload = readSessionRevokedPayload(data);
+      if (!payload) {
+        coreWarn('Ignoring malformed session-revocation event', {
+          operation: 'realtime:server:session-revoked:malformed',
+          hook: SESSION_REVOKED_HOOK,
+        });
+        return;
+      }
+      this.revokeUserConnections(payload.userId, payload.reason);
+    };
+
+    this.hookSystem.registerHook(SESSION_REVOKED_HOOK, listener);
+    this.sessionRevokedListener = listener;
+  }
+
+  /** Detach the session-revocation subscriber (idempotent). */
+  private unsubscribeSessionRevocation(): void {
+    if (!this.sessionRevokedListener) {
+      return;
+    }
+    if (typeof this.hookSystem?.removeHook === 'function') {
+      this.hookSystem.removeHook(
+        SESSION_REVOKED_HOOK,
+        this.sessionRevokedListener
+      );
+    }
+    this.sessionRevokedListener = null;
+  }
+
+  /**
+   * Close every live socket belonging to `userId` (session revocation).
+   *
+   * A WebSocket is authenticated ONCE, during the upgrade; no later frame is
+   * re-checked. So when the sessions behind those sockets are revoked, closing
+   * them is the only thing that actually ends the user's access — hence this
+   * out-of-band kill switch, reachable from the core hook (see
+   * {@link SESSION_REVOKED_HOOK}) or called directly by an in-process host.
+   *
+   * Order matters: the canonical teardown runs FIRST, before the close frame.
+   * `ws.close()` only starts a handshake — the `ws` library will wait for the
+   * peer's reply (≈30s) before destroying the socket, and a client that simply
+   * never replies could keep pushing Yjs updates into the room for that whole
+   * window. Running the disconnect path up front drops the connection out of
+   * `connections`, which the message handler's liveness gate treats as dead.
+   *
+   * Matching is on the per-user tracking key — `String(user.id)` for
+   * session-authenticated users. Device connections are keyed `device:<id>`, so
+   * a USER session revocation can never collaterally kill a device.
+   *
+   * @returns how many connections were closed.
+   */
+  revokeUserConnections(userId: number | string, reason?: string): number {
+    const userKey = String(userId);
+    // Snapshot first: the teardown below mutates this very set (and deletes the
+    // map entry once it empties), so iterating it live would skip clients.
+    const clientIds = Array.from(this.userConnections.get(userKey) ?? []);
+    let closed = 0;
+
+    for (const clientId of clientIds) {
+      const ws = this.connections.get(clientId);
+      this.clientDisconnectors.get(clientId)?.();
+      if (!ws) {
+        continue;
+      }
+      try {
+        if (ws.readyState === WebSocket.OPEN) {
+          // Tell the client WHY, so the UI can prompt a re-login instead of
+          // silently retrying into a rejected reconnect loop.
+          ws.send(
+            JSON.stringify({
+              type: MessageType.CONTROL,
+              event: 'session.revoked',
+              reason: reason ?? 'session_revoked',
+            })
+          );
+        }
+      } catch {
+        // Best-effort notice; the close below is what enforces the revocation.
+      }
+      this.closeWithCode(
+        ws,
+        4001,
+        'SESSION_REVOKED',
+        reason ? { reason } : {}
+      );
+      closed++;
+    }
+
+    if (closed > 0) {
+      coreWarn('Closed realtime connections for a revoked session', {
+        operation: 'realtime:server:session-revoked',
+        userId: userKey,
+        connectionsClosed: closed,
+        reason,
+      });
+    }
+    return closed;
   }
 
   /** Start WebSocket server. */
@@ -290,6 +483,10 @@ export class RealtimeServer {
       this.server = new WebSocketServer({
         port: this.realtimeConfig.port,
         host: this.realtimeConfig.host,
+        // Cap per-message size — the ws default (~100 MiB) is a one-message
+        // memory-DoS surface. 10 MiB comfortably covers Yjs document
+        // updates while bounding the damage.
+        maxPayload: 10 * 1024 * 1024,
         // Use verifyClient to ensure path starts with /realtime
         verifyClient: (info: {
           origin: string;
@@ -700,9 +897,26 @@ export class RealtimeServer {
       yjsUpdateCleanup = null;
     };
     ws.once('close', runDisconnect);
+    // Also index it so an out-of-band kill (revokeUserConnections) can run the
+    // SAME path without waiting for the close handshake. handleDisconnect is
+    // idempotent, so the later 'close' is a no-op.
+    this.clientDisconnectors.set(clientId, runDisconnect);
 
     if (!this.roomManager) {
       throw new Error('Room manager not initialized');
+    }
+
+    // Enforce rooms.max_rooms — previously only reported in health metrics
+    // while room creation stayed unbounded (memory DoS via unique room ids).
+    // Joining an EXISTING room is always allowed at the cap.
+    const maxRooms = this.realtimeConfig?.rooms.max_rooms || 100;
+    if (
+      !this.roomManager.getRoom(fullRoomId) &&
+      this.roomManager.getRoomCount() >= maxRooms
+    ) {
+      throw new Error(
+        `Room limit reached (${maxRooms}); cannot create room ${fullRoomId}`
+      );
     }
 
     room = this.roomManager.getOrCreateRoom(fullRoomId, roomInfo.roomType, {});
@@ -771,6 +985,14 @@ export class RealtimeServer {
     }
 
     ws.on('message', async (data: Buffer) => {
+      // Liveness gate. Presence in `connections` is what handleDisconnect
+      // clears, and that can run BEFORE the socket finishes closing — notably on
+      // session revocation, where the peer may sit on the close handshake (ws
+      // waits ~30s before destroying the socket) and keep sending. Without this,
+      // a revoked client's Yjs updates would still be applied to the room.
+      if (!this.connections.has(clientId)) {
+        return;
+      }
       try {
         // Binary y-protocols frames are routed first; ping/control fall through.
         if (
@@ -941,6 +1163,7 @@ export class RealtimeServer {
     }
     this.connections.delete(clientId);
     this.clientToDevice.delete(clientId);
+    this.clientDisconnectors.delete(clientId);
 
     // Yjs fan-out teardown — null if the socket closed before fan-out was wired.
     if (yjsUpdateCleanup) {
@@ -1393,6 +1616,10 @@ export class RealtimeServer {
       operation: 'realtime:server:shutdown',
     });
 
+    // Detach from the (process-wide) core hook bus first: a listener left behind
+    // would keep this dead server — and every map it owns — reachable forever.
+    this.unsubscribeSessionRevocation();
+
     // Stop snapshot intervals (periodic snapshot + manager-owned TTL cleanup).
     if (this.snapshotInterval) {
       clearInterval(this.snapshotInterval);
@@ -1419,6 +1646,7 @@ export class RealtimeServer {
       ws.close();
     }
     this.connections.clear();
+    this.clientDisconnectors.clear();
     this.messageRateLimits.clear();
     // Release connection-limit bookkeeping too, for symmetry with the maps
     // above (a fresh server must start with empty count state).

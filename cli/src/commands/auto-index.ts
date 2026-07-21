@@ -240,7 +240,13 @@ async function listRecords(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   logger: any
 ) {
-  const result = await civicPress.getRecordManager().listRecords();
+  // Explicitly the complete set: this prints one line per record and reports
+  // `result.total` alongside, so a page would have it claim N records and then
+  // list 10 of them. (That is exactly what a bare listRecords() used to do,
+  // back when the store defaulted to a silent LIMIT 10.)
+  const result = await civicPress
+    .getRecordManager()
+    .listRecords({ limit: 'all' });
 
   cliSuccess(result, 'Records listed', {
     operation: 'auto-index',

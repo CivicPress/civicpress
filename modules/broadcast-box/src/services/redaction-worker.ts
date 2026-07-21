@@ -40,12 +40,116 @@ const MAX_BLACK_LUMA = 48;
 const MAX_SILENT_DB = -70;
 const DURATION_TOLERANCE_S = 1.5;
 
+/**
+ * Post-encode probing (see verifyOutput + hiddenWindowProbes): how far inside a
+ * hidden window the edge probes sit, the nominal volumedetect width, and how
+ * far back from the output's EOF the last decodable instant is assumed to be.
+ */
+const PROBE_EDGE_INSET_S = 0.25;
+const AUDIO_PROBE_WINDOW_S = 1;
+/**
+ * How far inside a hidden window an audio measurement must stay, to clear the
+ * partly-silenced codec frame that straddles the boundary. See
+ * audioProbeWidthS for the measured justification.
+ */
+const AUDIO_EDGE_MARGIN_S = 0.05;
+const EOF_GUARD_S = 0.1;
+
+/**
+ * The instants to verify inside ONE hidden window.
+ *
+ * Verification used to decode a SINGLE frame at the window's midpoint. That
+ * only ever proved the window was blanked AT THAT INSTANT: a partially-blanked
+ * window — the `drawbox`/`volume` enable expression true at the midpoint but
+ * false near an edge (an off-by-a-frame `between()` boundary, a filter re-init
+ * after a keyframe, a container whose timeline drifts from the filter clock) —
+ * passed verification and PUBLISHED in-camera content at the window edges.
+ * Sample near the start, the middle AND the end instead; verifyOutput fails on
+ * the first probe that is not black/silent, so nothing publishes.
+ *
+ * Robustness rules, in order:
+ *  - the window is first clamped to the decodable part of the OUTPUT (a window
+ *    running past EOF yields no probes, matching the old clamp behaviour);
+ *  - probes are inset from both edges — never the boundary frame itself, which
+ *    an encoder may legitimately render either way — by at most a QUARTER of
+ *    the window, so a sub-second window still produces usable probes;
+ *  - instants are de-duplicated at millisecond resolution, so a very short
+ *    window yields ONE probe instead of three identical decodes.
+ */
+export function hiddenWindowProbes(
+  range: TimeRange,
+  outDurationS: number
+): number[] {
+  const end = Math.min(range.end, outDurationS - EOF_GUARD_S);
+  if (!(end > range.start)) return []; // window fell past EOF (clamped away)
+  const inset = Math.min(PROBE_EDGE_INSET_S, (end - range.start) / 4);
+  const first = range.start + inset;
+  const last = end - inset;
+  const seen = new Set<string>();
+  const points: number[] = [];
+  for (const t of [first, (first + last) / 2, last]) {
+    const key = t.toFixed(3);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    points.push(t);
+  }
+  return points;
+}
+
+/**
+ * Width of the volumedetect measurement at `atS`, never wider than the part of
+ * the hidden window surrounding it. meanVolumeDb() CENTRES its window on `atS`,
+ * so a fixed 1 s width at an edge probe would spill past the (already
+ * skew-padded) hidden range into legitimately audible public audio and fail a
+ * correctly-blanked recording.
+ *
+ * The window must also stay strictly INSIDE the range, clear of the boundary by
+ * more than one codec frame. `volume=0` is applied with an
+ * `enable=between(t,start,end)` expression, but the encoder emits fixed-size
+ * frames (1024 samples ≈ 21 ms for AAC at 48 kHz) that do not align to the
+ * window edges — so the single frame straddling a boundary is only PARTLY
+ * silenced. Measured against the real pipeline: a window starting exactly at
+ * the boundary reads −31.9 dB, while one starting 20 ms later reads −91 dB.
+ * A measurement that merely touches the edge therefore reports a leak on a
+ * correctly blanked file. The margin below is ~2.4 AAC frames, and the spill it
+ * excludes lies inside the clock-skew padding that surrounds the real in-camera
+ * range — it is never in-camera content.
+ *
+ * Returns 0 when `atS` is too close to an edge to measure anything meaningful;
+ * the caller skips that probe and fails closed if NO probe in the range was
+ * measurable.
+ */
+function audioProbeWidthS(
+  range: TimeRange,
+  atS: number,
+  outDurationS: number
+): number {
+  const end = Math.min(range.end, outDurationS - EOF_GUARD_S);
+  const halfInside =
+    Math.min(atS - range.start, end - atS) - AUDIO_EDGE_MARGIN_S;
+  if (halfInside <= 0) {
+    return 0;
+  }
+  return Math.min(AUDIO_PROBE_WINDOW_S, 2 * halfInside);
+}
+
+/**
+ * One row as `RecordManager.listRecords` actually returns it: the raw `records`
+ * table row, whose `metadata` column is the record's frontmatter serialized to
+ * JSON (so it carries `capture.redaction_status` — see scanPendingSessionIds).
+ */
+export interface ScannedRecordRow {
+  id: string;
+  metadata?: string | Record<string, unknown> | null;
+}
+
 /** The narrow record-manager slice the worker needs (structurally satisfied). */
 export interface RedactionRecordStore {
   listRecords(options: {
     type?: string;
-    limit?: number;
-  }): Promise<{ records: Array<{ id: string }> }>;
+    limit?: number | 'all';
+    offset?: number;
+  }): Promise<{ records: ScannedRecordRow[] }>;
   getRecord(id: string): Promise<Record<string, any> | null>;
   /**
    * Concurrency-safe field-level capture merge (RecordManager.mergeCapture,
@@ -113,9 +217,31 @@ export interface RedactionRunSummary {
 
 const SYSTEM_USER = { id: 1, username: 'system', role: 'admin' };
 
+/** Capture states that can never become work for this worker again. */
+const TERMINAL_REDACTION_STATUS = new Set(['complete', 'awaiting_visibility']);
+
 /** Read a field that may live under `metadata` or be lifted top-level. */
 function field<T>(record: Record<string, any>, key: string): T | undefined {
   return (record.metadata?.[key] ?? record[key]) as T | undefined;
+}
+
+/**
+ * `capture.redaction_status` as carried by a listRecords ROW, or undefined when
+ * the row has no readable capture block (metadata absent, unparseable, or the
+ * record predates the capture block). Undefined means "unknown", NOT "done".
+ */
+function rowRedactionStatus(row: ScannedRecordRow): string | undefined {
+  let meta: unknown = row.metadata;
+  if (typeof meta === 'string') {
+    try {
+      meta = JSON.parse(meta);
+    } catch {
+      return undefined;
+    }
+  }
+  const capture = (meta as Record<string, any> | null | undefined)?.capture;
+  const status = capture?.redaction_status;
+  return typeof status === 'string' ? status : undefined;
 }
 
 export class RedactionWorker {
@@ -145,9 +271,9 @@ export class RedactionWorker {
     }
     this.warnedUnavailable = false;
 
-    let ids: Array<{ id: string }>;
+    let ids: string[];
     try {
-      ids = (await records.listRecords({ type: 'session' })).records;
+      ids = await this.scanPendingSessionIds();
     } catch (error) {
       logger.error('redaction: session scan failed', {
         operation: 'broadcast-box:redaction:scan-error',
@@ -156,7 +282,7 @@ export class RedactionWorker {
       return summary;
     }
 
-    for (const { id } of ids) {
+    for (const id of ids) {
       if (this.stopRequested) break;
       let record: Record<string, any> | null = null;
       try {
@@ -194,6 +320,50 @@ export class RedactionWorker {
       });
     }
     return summary;
+  }
+
+  /**
+   * The candidate scan.
+   *
+   * `limit: 'all'` is load-bearing. core's listRecords used to default to a
+   * silent `LIMIT 10`, so a poll only ever saw the 10 most recent sessions:
+   * past the tenth recording an older still-`pending` session was never
+   * scanned again and its verified variant would never publish. This method
+   * hand-rolled offset paging to escape that. The store now takes `'all'`
+   * directly, which additionally retires two properties of that loop — its
+   * silent truncation at the page cap, and the page-edge race it carried
+   * (offset paging over a non-unique sort can shift a row across an edge under
+   * a concurrent insert).
+   *
+   * Every returned id would otherwise be fetched with getRecord() — a DB read
+   * PLUS a markdown read + YAML parse per session, every poll cycle — only to
+   * discard the non-pending ones in JS. Scope on the status the row already
+   * carries: the `records.metadata` column is the frontmatter as JSON, so a row
+   * that positively reports a TERMINAL redaction_status is dropped without
+   * touching the disk.
+   *
+   * The scoping is deliberately evidence-gated: a row we cannot read a status
+   * from (no capture in the indexed metadata, unparseable JSON) still gets the
+   * authoritative getRecord(). The markdown file is the source of truth, so the
+   * cheap filter may only discard on POSITIVE evidence, never on absence —
+   * otherwise an un-reindexed capture would stall unpublished forever.
+   */
+  private async scanPendingSessionIds(): Promise<string[]> {
+    const { records } = this.opts;
+    const ids: string[] = [];
+    const { records: rows } = await records.listRecords({
+      type: 'session',
+      limit: 'all',
+    });
+    for (const row of rows) {
+      if (this.stopRequested) break;
+      const status = rowRedactionStatus(row);
+      if (status !== undefined && TERMINAL_REDACTION_STATUS.has(status)) {
+        continue;
+      }
+      ids.push(row.id);
+    }
+    return ids;
   }
 
   private async processSession(
@@ -373,8 +543,10 @@ export class RedactionWorker {
 
   /**
    * Post-encode verification — the encode's exit code is NOT trusted. Decode a
-   * frame at the midpoint of EVERY hidden window (must be black) and measure
-   * the audio there (must be silent). Any miss throws → nothing publishes.
+   * frame at SEVERAL points across EVERY hidden window (each must be black) and
+   * measure the audio at each (each must be silent). Any miss throws → nothing
+   * publishes. See hiddenWindowProbes for why one midpoint sample was not
+   * enough.
    */
   private async verifyOutput(
     outPath: string,
@@ -392,26 +564,43 @@ export class RedactionWorker {
       throw new Error('verification failed: audio stream lost in redaction');
     }
     for (const range of hiddenRanges) {
-      const mid = Math.min(
-        (range.start + range.end) / 2,
-        outProbe.durationS - 0.1
-      );
-      if (mid <= range.start) continue; // window fell past EOF (clamped away)
-      if (rawProbe.hasVideo) {
-        const maxLuma = await media.frameMaxLuma(outPath, mid);
-        if (maxLuma > MAX_BLACK_LUMA) {
-          throw new Error(
-            `verification failed: frame at ${mid.toFixed(1)}s inside a hidden window is not black (max luma ${maxLuma})`
-          );
+      const probes = hiddenWindowProbes(range, outProbe.durationS);
+      let audioMeasured = false;
+
+      for (const at of probes) {
+        if (rawProbe.hasVideo) {
+          const maxLuma = await media.frameMaxLuma(outPath, at);
+          if (maxLuma > MAX_BLACK_LUMA) {
+            throw new Error(
+              `verification failed: frame at ${at.toFixed(1)}s inside a hidden window is not black (max luma ${maxLuma})`
+            );
+          }
+        }
+        if (rawProbe.hasAudio) {
+          const width = audioProbeWidthS(range, at, outProbe.durationS);
+          // width 0 means this probe sits within the codec-frame margin of an
+          // edge, where a measurement would read the partly-silenced straddling
+          // frame. Skip it — the other probes in this range still cover audio.
+          if (width > 0) {
+            audioMeasured = true;
+            const meanDb = await media.meanVolumeDb(outPath, at, width);
+            if (meanDb > MAX_SILENT_DB) {
+              throw new Error(
+                `verification failed: audio at ${at.toFixed(1)}s inside a hidden window is not silent (${meanDb} dB)`
+              );
+            }
+          }
         }
       }
-      if (rawProbe.hasAudio) {
-        const meanDb = await media.meanVolumeDb(outPath, mid, 1);
-        if (meanDb > MAX_SILENT_DB) {
-          throw new Error(
-            `verification failed: audio at ${mid.toFixed(1)}s inside a hidden window is not silent (${meanDb} dB)`
-          );
-        }
+
+      // Fail CLOSED. If the window yielded probes but none of them could be
+      // measured for audio, we have NOT verified silence — never publish on an
+      // unverified window. (No probes at all means the window was clamped away
+      // past EOF, so there is genuinely nothing in the file to verify.)
+      if (rawProbe.hasAudio && probes.length > 0 && !audioMeasured) {
+        throw new Error(
+          `verification failed: hidden window ${range.start}-${range.end}s is too short to verify audio silence`
+        );
       }
     }
   }

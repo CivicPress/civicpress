@@ -309,6 +309,25 @@ export async function registerBroadcastBoxServices(
     }
   );
 
+  // Start the connection tracker's health monitor + stale-connection reaper.
+  // The singleton is lazy, so resolve it here to bring it (and its timers)
+  // to life; without this a device that dropped uncleanly stayed
+  // connected=true and blocked new sessions. stopBroadcastBox() stops it.
+  try {
+    const tracker = container.resolve<DeviceConnectionTracker>(
+      'broadcastBoxConnectionTracker'
+    );
+    tracker.start();
+    logger.info('Device connection tracker started (health monitor + reaper)', {
+      operation: 'broadcast-box:connection:tracker:started',
+    });
+  } catch (error) {
+    logger.warn('Failed to start device connection tracker', {
+      operation: 'broadcast-box:connection:tracker:start',
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+
   // Register ProtocolHandler as singleton
   container.singleton('broadcastBoxProtocol', (c: ServiceContainer) => {
     const logger = c.resolve<Logger>('logger');

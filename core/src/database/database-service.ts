@@ -188,6 +188,12 @@ export class DatabaseService {
     return this.users.getUserByEmail(...args);
   }
 
+  async getUserByProvider(
+    ...args: Parameters<UserStore['getUserByProvider']>
+  ): ReturnType<UserStore['getUserByProvider']> {
+    return this.users.getUserByProvider(...args);
+  }
+
   async getUserWithPassword(
     ...args: Parameters<UserStore['getUserWithPassword']>
   ): ReturnType<UserStore['getUserWithPassword']> {
@@ -256,8 +262,20 @@ export class DatabaseService {
     return this.users.deleteSession(...args);
   }
 
+  async deleteUserSessions(
+    ...args: Parameters<UserStore['deleteUserSessions']>
+  ): Promise<void> {
+    return this.users.deleteUserSessions(...args);
+  }
+
   async cleanupExpiredSessions(): Promise<void> {
     return this.users.cleanupExpiredSessions();
+  }
+
+  async pruneUserSessions(
+    ...args: Parameters<UserStore['pruneUserSessions']>
+  ): ReturnType<UserStore['pruneUserSessions']> {
+    return this.users.pruneUserSessions(...args);
   }
 
   // ---------------------------------------------------------------------------
@@ -359,29 +377,27 @@ export class DatabaseService {
     lockedBy: string,
     expiresAt: Date
   ): Promise<boolean> {
-    // First, clean up expired locks for this record
-    await this.adapter.execute(
-      'DELETE FROM record_locks WHERE record_id = ? AND expires_at < CURRENT_TIMESTAMP',
-      [recordId]
+    // Atomic acquire in ONE statement — this closes the check-then-insert TOCTOU
+    // where two callers both saw "no active lock" (getLock) and both wrote
+    // (INSERT OR REPLACE), ending up with two holders of the same record lock.
+    // The row is (re)written only when it does not yet exist OR the existing lock
+    // has already expired; SQLite's `changes` then tells us whether WE won.
+    // Compare expiry ISO-to-ISO — expires_at is stored via toISOString(), and
+    // SQLite's CURRENT_TIMESTAMP ('YYYY-MM-DD HH:MM:SS') does NOT order correctly
+    // against the 'T'/'Z' ISO form (the old DELETE-by-CURRENT_TIMESTAMP was a
+    // latent no-op for that reason).
+    const nowIso = new Date().toISOString();
+    const result = await this.adapter.execute(
+      `INSERT INTO record_locks (record_id, locked_by, expires_at)
+       VALUES (?, ?, ?)
+       ON CONFLICT(record_id) DO UPDATE SET
+         locked_by = excluded.locked_by,
+         expires_at = excluded.expires_at
+       WHERE record_locks.expires_at <= ?`,
+      [recordId, lockedBy, expiresAt.toISOString(), nowIso]
     );
 
-    // Check if record is already locked
-    const existingLock = await this.getLock(recordId);
-    if (
-      existingLock?.expires_at &&
-      existingLock.expires_at > new Date().toISOString()
-    ) {
-      // Lock exists and is not expired
-      return false;
-    }
-
-    // Acquire lock (INSERT OR REPLACE to handle existing expired locks)
-    await this.adapter.execute(
-      'INSERT OR REPLACE INTO record_locks (record_id, locked_by, expires_at) VALUES (?, ?, ?)',
-      [recordId, lockedBy, expiresAt.toISOString()]
-    );
-
-    return true;
+    return (result.changes ?? 0) > 0;
   }
 
   async releaseLock(recordId: string, lockedBy: string): Promise<boolean> {
@@ -505,17 +521,38 @@ export class DatabaseService {
     details?: string;
     ipAddress?: string;
   }): Promise<void> {
-    await this.adapter.execute(
-      'INSERT INTO audit_logs (user_id, action, resource_type, resource_id, details, ip_address) VALUES (?, ?, ?, ?, ?, ?)',
-      [
-        auditData.userId,
-        auditData.action,
-        auditData.resourceType,
-        auditData.resourceId,
-        auditData.details,
-        auditData.ipAddress,
-      ]
-    );
+    const insert = (userId: number | null, details?: string) =>
+      this.adapter.execute(
+        'INSERT INTO audit_logs (user_id, action, resource_type, resource_id, details, ip_address) VALUES (?, ?, ?, ?, ?, ?)',
+        [
+          userId,
+          auditData.action,
+          auditData.resourceType,
+          auditData.resourceId,
+          details,
+          auditData.ipAddress,
+        ]
+      );
+
+    try {
+      await insert(auditData.userId ?? null, auditData.details);
+    } catch (error) {
+      // audit_logs is append-only history; its user_id FK (declared with no
+      // ON DELETE action, and unchangeable on existing databases without a
+      // table rebuild) must not abort the business operation or lose the
+      // audit row when the actor's user row is absent — a user deleted
+      // mid-flight, or a synthetic actor in tests. Keep the row, detach the
+      // reference, and preserve the numeric attribution in details.
+      const message = error instanceof Error ? error.message : String(error);
+      if (auditData.userId != null && /FOREIGN KEY/i.test(message)) {
+        await insert(
+          null,
+          `${auditData.details ?? ''} [detached user_id=${auditData.userId}: not in users]`.trim()
+        );
+        return;
+      }
+      throw error;
+    }
   }
 
   async getAuditLogs(

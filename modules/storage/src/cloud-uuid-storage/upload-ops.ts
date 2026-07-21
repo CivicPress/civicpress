@@ -33,6 +33,7 @@ import {
   writeSidecarManifest,
 } from './internals.js';
 import type { CloudUuidStorageService } from '../cloud-uuid-storage-service.js';
+import type { QuotaReservation } from '../quota/quota-manager.js';
 
 export interface UploadOpsDeps {
   host: CloudUuidStorageService;
@@ -66,6 +67,7 @@ export class UploadOps {
     let provider: string | undefined;
     let error: string | undefined;
     let fileData: MulterFile | undefined;
+    let quotaReservation: QuotaReservation | null = null;
 
     try {
       if (!host.databaseService) {
@@ -98,11 +100,20 @@ export class UploadOps {
       // storage-001 (Critical) — enforce quota BEFORE accepting the
       // upload. Previously QuotaManager.checkQuota was wired up but
       // never called from any upload path, so configured quotas were
-      // never enforced. checkQuota throws QuotaExceededError on
-      // rejection (caught by the outer try/catch and returned as
+      // never enforced. It throws QuotaExceededError on rejection
+      // (caught by the outer try/catch and returned as
       // { success: false, error: ... } to the caller).
+      //
+      // RESERVE rather than merely check: a plain check is a
+      // read-then-decide, so concurrent uploads into a near-full folder
+      // each saw the same pre-upload usage and were all admitted,
+      // jointly overshooting the limit. The reservation is released in
+      // the `finally` below.
       if (host.quotaManager && host.quotaManager.isEnabled()) {
-        await host.quotaManager.checkQuota(request.folder, fileData.size);
+        quotaReservation = await host.quotaManager.reserve(
+          request.folder,
+          fileData.size
+        );
       }
 
       // Generate UUID and filename
@@ -279,6 +290,12 @@ export class UploadOps {
       }
 
       return result;
+    } finally {
+      // Release the reserved headroom whether the upload landed or failed. On
+      // the success path this runs after createStorageFile, so the bytes are
+      // already counted by the usage reporter — there is no window in which
+      // they are neither reserved nor measured.
+      host.quotaManager?.release(quotaReservation);
     }
   }
 

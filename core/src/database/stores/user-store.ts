@@ -33,10 +33,11 @@ export class UserStore {
     name?: string;
     avatar_url?: string;
     auth_provider?: string;
+    provider_user_id?: string;
     email_verified?: boolean;
   }): Promise<number> {
     await this.adapter.execute(
-      'INSERT INTO users (username, role, email, name, avatar_url, auth_provider, email_verified) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      'INSERT INTO users (username, role, email, name, avatar_url, auth_provider, provider_user_id, email_verified) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
       [
         userData.username,
         userData.role,
@@ -44,6 +45,7 @@ export class UserStore {
         userData.name,
         userData.avatar_url,
         userData.auth_provider || 'password',
+        userData.provider_user_id ?? null,
         userData.email_verified || false,
       ]
     );
@@ -67,6 +69,22 @@ export class UserStore {
     const rows = await this.adapter.query<UserRow>(
       'SELECT * FROM users WHERE id = ?',
       [id]
+    );
+    return rows.length > 0 ? rows[0] : null;
+  }
+
+  /**
+   * Look up a user by stable OAuth identity. THIS — never username — is how
+   * OAuth logins must match accounts: provider usernames are attacker-
+   * choosable, provider user ids are not.
+   */
+  async getUserByProvider(
+    provider: string,
+    providerUserId: string
+  ): Promise<UserRow | null> {
+    const rows = await this.adapter.query<UserRow>(
+      'SELECT * FROM users WHERE auth_provider = ? AND provider_user_id = ?',
+      [provider, providerUserId]
     );
     return rows.length > 0 ? rows[0] : null;
   }
@@ -143,6 +161,7 @@ export class UserStore {
       passwordHash?: string;
       avatar_url?: string;
       auth_provider?: string;
+      provider_user_id?: string;
       email_verified?: boolean;
       pending_email?: string;
       pending_email_token?: string;
@@ -171,6 +190,10 @@ export class UserStore {
     if (userData.avatar_url !== undefined) {
       updates.push('avatar_url = ?');
       values.push(userData.avatar_url);
+    }
+    if (userData.provider_user_id !== undefined) {
+      updates.push('provider_user_id = ?');
+      values.push(userData.provider_user_id);
     }
     if (userData.auth_provider !== undefined) {
       updates.push('auth_provider = ?');
@@ -206,6 +229,22 @@ export class UserStore {
   }
 
   async deleteUser(userId: number): Promise<void> {
+    // Application-level cascade: with PRAGMA foreign_keys=ON a bare user
+    // DELETE fails while sessions/api_keys/audit_logs rows reference the
+    // user — their FKs are declared without ON DELETE actions, and existing
+    // databases can't be re-declared without a table-rebuild migration.
+    // Sessions and API keys die with the account; audit rows are history,
+    // so they are kept and detached (SET NULL semantics).
+    await this.adapter.execute('DELETE FROM sessions WHERE user_id = ?', [
+      userId,
+    ]);
+    await this.adapter.execute('DELETE FROM api_keys WHERE user_id = ?', [
+      userId,
+    ]);
+    await this.adapter.execute(
+      'UPDATE audit_logs SET user_id = NULL WHERE user_id = ?',
+      [userId]
+    );
     await this.adapter.execute('DELETE FROM users WHERE id = ?', [userId]);
   }
 
@@ -312,9 +351,40 @@ export class UserStore {
     await this.adapter.execute('DELETE FROM sessions WHERE id = ?', [id]);
   }
 
+  /** Revoke every session a user holds (logout-everywhere, password change). */
+  async deleteUserSessions(userId: number): Promise<void> {
+    await this.adapter.execute('DELETE FROM sessions WHERE user_id = ?', [
+      userId,
+    ]);
+  }
+
   async cleanupExpiredSessions(): Promise<void> {
     await this.adapter.execute('DELETE FROM sessions WHERE expires_at <= ?', [
       new Date().toISOString(),
     ]);
+  }
+
+  /**
+   * Enforce `security.maxConcurrentSessions`: drop a user's oldest sessions
+   * beyond the newest `keep`. Returns how many rows were removed.
+   *
+   * Ordered by `id` (monotonic) rather than `created_at`, because created_at is
+   * a DATETIME with one-second resolution — several logins inside the same
+   * second would tie and the LIMIT would then keep an arbitrary subset,
+   * potentially evicting the session that was just minted.
+   */
+  async pruneUserSessions(userId: number, keep: number): Promise<number> {
+    if (!Number.isFinite(keep) || keep <= 0) {
+      return 0;
+    }
+    const result = await this.adapter.execute(
+      `DELETE FROM sessions
+        WHERE user_id = ?
+          AND id NOT IN (
+            SELECT id FROM sessions WHERE user_id = ? ORDER BY id DESC LIMIT ?
+          )`,
+      [userId, userId, keep]
+    );
+    return (result as { changes?: number } | undefined)?.changes ?? 0;
   }
 }

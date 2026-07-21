@@ -11,7 +11,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { RedactionWorker } from '../services/redaction-worker.js';
+import {
+  RedactionWorker,
+  hiddenWindowProbes,
+} from '../services/redaction-worker.js';
 import type { MediaProcessor, MediaProbe } from '../services/redaction-ffmpeg.js';
 
 const silentLogger = {
@@ -57,9 +60,31 @@ function fakeStorage(rawPath: string) {
 function fakeRecords(records: Record<string, any>[]) {
   const byId = new Map(records.map((r) => [r.id, r]));
   return {
-    listRecords: vi.fn(async () => ({
-      records: records.map((r) => ({ id: r.id })),
-    })),
+    // Mirrors core's listRecords contract (record-store.ts): `limit` is a page
+    // size or 'all', and omitting it means 'all'.
+    //
+    // This fake used to reproduce the OLD contract's trap on purpose — a LIMIT
+    // always applied, silently defaulting to 10 — because the worker escaped it
+    // by hand-rolling offset paging, and a fake that returned everything would
+    // have hidden the truncation that paging fixed. The trap is gone at the
+    // source now, so the fake models the real thing; the vi.fn spy is what
+    // keeps the worker's end of the bargain testable.
+    listRecords: vi.fn(
+      async (options: { limit?: number | 'all'; offset?: number } = {}) => {
+        const offset = options.offset ?? 0;
+        const limit = options.limit ?? 'all';
+        const end = limit === 'all' ? records.length : offset + limit;
+        return {
+          records: records
+            .slice(offset, end)
+            // The row is the raw DB row: metadata is the frontmatter as JSON.
+            .map((r) => ({
+              id: r.id,
+              metadata: JSON.stringify(r.metadata ?? {}),
+            })),
+        };
+      }
+    ),
     getRecord: vi.fn(async (id: string) => byId.get(id) ?? null),
     // Mirrors RecordManager.mergeCapture semantics (field merge + precondition
     // + attached_files append), minus the DB lock.
@@ -91,9 +116,12 @@ const PARTIAL_SEGMENTS = [
   { start: 40, end: 60, visibility: 'public' },
 ];
 
-function sessionRecord(capture: Record<string, unknown>): Record<string, any> {
+function sessionRecord(
+  capture: Record<string, unknown>,
+  id = 'pv-1'
+): Record<string, any> {
   return {
-    id: 'pv-1',
+    id,
     type: 'session',
     attachedFiles: [],
     metadata: { capture: { device: 'bb-001', av_file: 'raw-uuid-1', ...capture } },
@@ -160,6 +188,81 @@ describe('RedactionWorker', () => {
     // One padded hidden window [17,45] → its midpoint is checked on both tracks.
     expect(media.frameMaxLuma).toHaveBeenCalledWith(expect.any(String), 31);
     expect(media.meanVolumeDb).toHaveBeenCalledWith(expect.any(String), 31, 1);
+  });
+
+  it('probes the START, MIDDLE and END of each hidden window — not just the midpoint', async () => {
+    const rec = sessionRecord({
+      redaction_status: 'pending',
+      duration_s: 60,
+      segments: PARTIAL_SEGMENTS,
+    });
+    const media = fakeMedia();
+    const { worker } = makeWorker(fakeRecords([rec]), media);
+
+    await worker.runOnce();
+
+    // Padded hidden window [17,45] → probes inset from both edges.
+    const videoAt = (media.frameMaxLuma as any).mock.calls.map(
+      (c: any[]) => c[1]
+    );
+    expect(videoAt).toEqual([17.25, 31, 44.75]);
+    // Every probe sits strictly INSIDE the window (never on a boundary frame).
+    for (const t of videoAt) {
+      expect(t).toBeGreaterThan(17);
+      expect(t).toBeLessThan(45);
+    }
+    const audioAt = (media.meanVolumeDb as any).mock.calls.map(
+      (c: any[]) => c[1]
+    );
+    expect(audioAt).toEqual([17.25, 31, 44.75]);
+    // …and the volumedetect width never spills outside the window either.
+    for (const [, at, width] of (media.meanVolumeDb as any).mock.calls) {
+      expect(at - width / 2).toBeGreaterThanOrEqual(17);
+      expect(at + width / 2).toBeLessThanOrEqual(45);
+    }
+  });
+
+  // The regression the single-midpoint probe missed: a window blanked at its
+  // midpoint but LEAKING at its edges used to pass verification and publish.
+  it('does NOT publish when only the hidden-window EDGES leak (midpoint is black)', async () => {
+    const rec = sessionRecord({
+      redaction_status: 'pending',
+      duration_s: 60,
+      segments: PARTIAL_SEGMENTS,
+    });
+    const media = fakeMedia({
+      frameMaxLuma: vi.fn(async (_path: string, atS: number) =>
+        atS > 18 && atS < 44 ? 16 : 200
+      ),
+    });
+    const { worker, storage } = makeWorker(fakeRecords([rec]), media);
+
+    const summary = await worker.runOnce();
+
+    expect(summary).toEqual({ published: 0, held: 0, failed: 1 });
+    expect(storage.uploadFileStream).not.toHaveBeenCalled();
+    expect(rec.metadata.capture.public_file).toBeUndefined();
+    expect(rec.metadata.capture.redaction_status).toBe('pending');
+  });
+
+  it('does NOT publish when audio leaks only at the END of a hidden window', async () => {
+    const rec = sessionRecord({
+      redaction_status: 'pending',
+      duration_s: 60,
+      segments: PARTIAL_SEGMENTS,
+    });
+    const media = fakeMedia({
+      meanVolumeDb: vi.fn(async (_path: string, atS: number) =>
+        atS > 40 ? -12 : -91
+      ),
+    });
+    const { worker, storage } = makeWorker(fakeRecords([rec]), media);
+
+    const summary = await worker.runOnce();
+
+    expect(summary.failed).toBe(1);
+    expect(storage.uploadFileStream).not.toHaveBeenCalled();
+    expect(rec.metadata.capture.public_file).toBeUndefined();
   });
 
   it('does NOT publish when a hidden-window frame is not black (verification gate)', async () => {
@@ -371,6 +474,88 @@ describe('RedactionWorker', () => {
     expect(rec.metadata.capture.public_file).toBeUndefined(); // never published
   });
 
+  // ---------------------------------------------------------------------------
+  // Scan completeness: core's listRecords used to apply a silent LIMIT 10, so
+  // an unpaginated scan stopped at the 10 newest sessions and an older pending
+  // one never published — no error, just a recording stuck forever.
+  // ---------------------------------------------------------------------------
+
+  it('scans PAST the first 10 rows — an old pending session still publishes', async () => {
+    // 24 completed sessions (newest first, as core sorts) then the pending one:
+    // it sits at offset 24, far outside what the old default page would return.
+    const done = Array.from({ length: 24 }, (_, i) =>
+      sessionRecord(
+        {
+          redaction_status: 'complete',
+          public_file: `pub-${i}`,
+          segments: PARTIAL_SEGMENTS,
+        },
+        `old-${i}`
+      )
+    );
+    const pending = sessionRecord(
+      { redaction_status: 'pending', duration_s: 60, segments: PARTIAL_SEGMENTS },
+      'stale-pending'
+    );
+    const records = fakeRecords([...done, pending]);
+    const media = fakeMedia();
+    const { worker } = makeWorker(records, media);
+
+    const summary = await worker.runOnce();
+
+    expect(summary).toEqual({ published: 1, held: 0, failed: 0 });
+    expect(pending.metadata.capture.redaction_status).toBe('complete');
+    expect(pending.metadata.capture.public_file).toBe('public-uuid-1');
+    // Pin the mechanism, not just the outcome: a numeric page size here would
+    // reintroduce the truncation the moment a deployment outgrew it.
+    expect(records.listRecords).toHaveBeenCalledWith(
+      expect.objectContaining({ limit: 'all' })
+    );
+  });
+
+  it('scopes the scan by status: terminal rows are never read from disk', async () => {
+    const done = sessionRecord(
+      { redaction_status: 'complete', public_file: 'pub' },
+      'done-1'
+    );
+    const escalated = sessionRecord(
+      { redaction_status: 'awaiting_visibility' },
+      'await-1'
+    );
+    const pending = sessionRecord(
+      { redaction_status: 'pending', duration_s: 60, segments: PARTIAL_SEGMENTS },
+      'pending-1'
+    );
+    const records = fakeRecords([done, escalated, pending]);
+    const { worker } = makeWorker(records, fakeMedia());
+
+    await worker.runOnce();
+
+    // getRecord() is a DB read PLUS a markdown read + YAML parse — only the
+    // session that can still be work should pay for it.
+    expect(records.getRecord.mock.calls.map((c) => c[0])).toEqual(['pending-1']);
+  });
+
+  it('still reads a row authoritatively when its indexed metadata carries no status', async () => {
+    const pending = sessionRecord(
+      { redaction_status: 'pending', duration_s: 60, segments: PARTIAL_SEGMENTS },
+      'unindexed'
+    );
+    const records = fakeRecords([pending]);
+    // The row's metadata is missing/unparseable (record written before the
+    // capture block, or a reindex that has not landed) — absence must NOT be
+    // read as "done", the markdown file is the source of truth.
+    records.listRecords.mockResolvedValue({
+      records: [{ id: 'unindexed', metadata: 'not-json{' }],
+    } as any);
+    const { worker } = makeWorker(records, fakeMedia());
+
+    const summary = await worker.runOnce();
+
+    expect(records.getRecord).toHaveBeenCalledWith('unindexed');
+    expect(summary.published).toBe(1);
+  });
+
   it('leaves the session pending when the public upload fails', async () => {
     const rec = sessionRecord({
       redaction_status: 'pending',
@@ -390,5 +575,46 @@ describe('RedactionWorker', () => {
     expect(summary.failed).toBe(1);
     expect(rec.metadata.capture.public_file).toBeUndefined();
     expect(rec.metadata.capture.redaction_status).toBe('pending');
+  });
+});
+
+describe('hiddenWindowProbes', () => {
+  it('returns start / middle / end probes strictly inside the window', () => {
+    expect(hiddenWindowProbes({ start: 10, end: 30 }, 60)).toEqual([
+      10.25, 20, 29.75,
+    ]);
+  });
+
+  it('insets by at most a quarter of a SHORT window (probes stay inside)', () => {
+    const probes = hiddenWindowProbes({ start: 5, end: 5.4 }, 60);
+    expect(probes).toHaveLength(3);
+    for (const t of probes) {
+      expect(t).toBeGreaterThan(5);
+      expect(t).toBeLessThan(5.4);
+    }
+    expect([...probes].sort((a, b) => a - b)).toEqual(probes);
+  });
+
+  it('never emits duplicate decodes — a sub-millisecond window yields one probe', () => {
+    expect(hiddenWindowProbes({ start: 5, end: 5.0002 }, 60)).toHaveLength(1);
+    // Whatever the width, no two probes round to the same ffmpeg -ss instant
+    // (ms resolution), so we never pay for the same decode twice.
+    for (const end of [5.0002, 5.001, 5.02, 5.4, 9, 40]) {
+      const probes = hiddenWindowProbes({ start: 5, end }, 60);
+      expect(new Set(probes.map((t) => t.toFixed(3))).size).toBe(probes.length);
+    }
+  });
+
+  it('clamps to the decodable part of the output near EOF', () => {
+    // Window runs to 60s but the output only decodes to 59.9s.
+    for (const t of hiddenWindowProbes({ start: 55, end: 60 }, 60)) {
+      expect(t).toBeLessThanOrEqual(59.9);
+      expect(t).toBeGreaterThan(55);
+    }
+  });
+
+  it('returns no probes for a window that fell entirely past EOF', () => {
+    expect(hiddenWindowProbes({ start: 61, end: 70 }, 60)).toEqual([]);
+    expect(hiddenWindowProbes({ start: 59.95, end: 70 }, 60)).toEqual([]);
   });
 });

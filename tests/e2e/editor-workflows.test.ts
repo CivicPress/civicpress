@@ -122,7 +122,7 @@ describe('Editor E2E Workflows', () => {
         .post(`/api/v1/records/${recordId}/publish`)
         .set('Authorization', `Bearer ${adminToken}`)
         .send({
-          status: 'approved',
+          status: 'published',
         });
 
       expect([200, 201]).toContain(publishResponse.status);
@@ -135,7 +135,7 @@ describe('Editor E2E Workflows', () => {
 
       expect(publishedResponse.status).toBe(200);
       expect(publishedResponse.body.data.isDraft).toBe(false);
-      expect(publishedResponse.body.data.status).toBe('approved');
+      expect(publishedResponse.body.data.status).toBe('published');
     });
   });
 
@@ -159,7 +159,7 @@ describe('Editor E2E Workflows', () => {
       await request(context.api.getApp())
         .post(`/api/v1/records/${publishedRecordId}/publish`)
         .set('Authorization', `Bearer ${adminToken}`)
-        .send({ status: 'approved' });
+        .send({ status: 'published' });
     });
 
     it('should complete edit existing record workflow', async () => {
@@ -189,7 +189,7 @@ describe('Editor E2E Workflows', () => {
         .send({
           title: 'Record to Edit',
           type: 'bylaw',
-          status: 'approved',
+          status: 'published',
           markdownBody: draftContent,
         });
 
@@ -232,7 +232,7 @@ describe('Editor E2E Workflows', () => {
         .send({
           title: 'Record to Edit',
           type: 'bylaw',
-          status: 'approved',
+          status: 'published',
           markdownBody: '# Record to Edit\n\nFinal edited content.',
         });
 
@@ -241,7 +241,7 @@ describe('Editor E2E Workflows', () => {
         .post(`/api/v1/records/${publishedRecordId}/publish`)
         .set('Authorization', `Bearer ${adminToken}`)
         .send({
-          status: 'approved',
+          status: 'published',
         });
 
       expect([200, 201]).toContain(publishResponse.status);
@@ -266,7 +266,7 @@ describe('Editor E2E Workflows', () => {
         .send({
           title: 'Record to Edit',
           type: 'bylaw',
-          status: 'approved',
+          status: 'published',
           markdownBody: '# Record to Edit\n\nContent to be deleted.',
         });
 
@@ -581,7 +581,7 @@ describe('Editor E2E Workflows', () => {
       const publishResponse = await request(context.api.getApp())
         .post(`/api/v1/records/${recordId}/publish`)
         .set('Authorization', `Bearer ${adminToken}`)
-        .send({ status: 'approved' });
+        .send({ status: 'published' });
 
       expect([200, 201]).toContain(publishResponse.status);
 
@@ -600,7 +600,7 @@ describe('Editor E2E Workflows', () => {
         .send({
           title: 'Complete Workflow Test',
           type: 'policy',
-          status: 'approved',
+          status: 'published',
           markdownBody: '# Complete Workflow\n\nStep 5: Post-publication edit.',
         });
 

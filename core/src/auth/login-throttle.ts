@@ -130,6 +130,42 @@ export class LoginThrottle {
     }
   }
 
+  /**
+   * Drop rows that can no longer affect a decision: not currently locked, and
+   * whose last failure is older than the retention window.
+   *
+   * Nothing else ever removes them. `recordSuccess` only clears the row for a
+   * user who eventually logs in successfully, so every username that was typed
+   * wrong and then abandoned — typos, and especially a scanner enumerating
+   * accounts — leaves a row behind for the life of the deployment. That is
+   * unbounded growth on a table consulted on every single login, and it
+   * retains a list of attempted usernames indefinitely.
+   *
+   * Timestamps in this table are ISO-8601 strings (see recordFailure), so the
+   * comparison is deliberately ISO-to-ISO; comparing them against SQLite's
+   * `CURRENT_TIMESTAMP` format would order incorrectly.
+   *
+   * Fails OPEN and returns 0 — a maintenance sweep must never break login.
+   */
+  async cleanupStaleAttempts(
+    nowMs: number = Date.now(),
+    retentionMs: number = this.opts.lockoutMs
+  ): Promise<number> {
+    const nowIso = new Date(nowMs).toISOString();
+    const cutoffIso = new Date(nowMs - retentionMs).toISOString();
+    try {
+      const result = await this.db.getAdapter().execute(
+        `DELETE FROM login_attempts
+          WHERE (locked_until IS NULL OR locked_until <= ?)
+            AND (last_failed_at IS NULL OR last_failed_at <= ?)`,
+        [nowIso, cutoffIso]
+      );
+      return (result as { changes?: number } | undefined)?.changes ?? 0;
+    } catch {
+      return 0;
+    }
+  }
+
   /** Clear the counter after a successful login. */
   async recordSuccess(username: string): Promise<void> {
     try {

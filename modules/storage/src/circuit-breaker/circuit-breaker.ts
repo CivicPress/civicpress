@@ -44,9 +44,18 @@ export class CircuitBreaker {
   }
 
   /**
-   * Execute operation with circuit breaker protection
+   * Execute operation with circuit breaker protection.
+   *
+   * `isExpectedError` marks an error as NOT a provider fault — it rethrows
+   * (so the caller still sees it) but does not count toward the failure
+   * threshold. A storage read that finds the object ABSENT (404) is the
+   * motivating case: the provider responded fine, so five missing-object
+   * reads must not trip the breaker OPEN and knock a healthy provider out.
    */
-  async execute<T>(operation: () => Promise<T>): Promise<T> {
+  async execute<T>(
+    operation: () => Promise<T>,
+    isExpectedError?: (error: unknown) => boolean
+  ): Promise<T> {
     // Check if circuit should transition from open to half-open
     if (this.state === 'open') {
       if (this.shouldAttemptHalfOpen()) {
@@ -76,6 +85,11 @@ export class CircuitBreaker {
       this.onSuccess();
       return result;
     } catch (error) {
+      // An expected error (e.g. object-not-found) is not a provider fault —
+      // rethrow without counting it against the breaker.
+      if (isExpectedError?.(error)) {
+        throw error;
+      }
       // Failure - handle based on state
       this.onFailure();
       throw error;

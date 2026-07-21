@@ -69,6 +69,28 @@ export class GitEngine {
   }
 
   /**
+   * All index mutations funnel through this promise chain. `git add` +
+   * `git commit` are two steps against ONE shared .git/index, so two
+   * concurrent operations — even on different records, each holding its own
+   * per-record saga lock — interleave staging and commit each other's files
+   * (git/DB divergence). In-process serialization is sufficient for a given
+   * CivicPress instance because every writer (sagas AND the record-manager
+   * file-ops direct path, which bypasses saga locks entirely) shares this
+   * one GitEngine via DI; concurrent WRITES from a second process are not
+   * covered, but there git's own index.lock fails the loser loudly instead
+   * of interleaving silently.
+   */
+  private mutationChain: Promise<unknown> = Promise.resolve();
+
+  private serializeMutation<T>(fn: () => Promise<T>): Promise<T> {
+    const run = this.mutationChain.then(fn, fn);
+    // Keep the chain alive whether fn resolved or rejected; the caller still
+    // sees the original rejection through `run`.
+    this.mutationChain = run.catch(() => {});
+    return run;
+  }
+
+  /**
    * Create a role-based commit
    */
   async commit(message: string, files?: string[]): Promise<string> {
@@ -84,40 +106,105 @@ export class GitEngine {
       return 'dev-skip-commit';
     }
 
-    try {
-      const git = this.getGit();
+    return this.serializeMutation(async () => {
+      try {
+        const git = this.getGit();
 
-      // Stage files if provided
-      if (files && files.length > 0) {
-        await git.add(files);
-      } else {
-        await git.add('.');
+        // Stage files if provided
+        if (files && files.length > 0) {
+          await git.add(files);
+        } else {
+          await git.add('.');
+        }
+
+        // Create role-based commit message
+        const rolePrefix = this.currentRole
+          ? `feat(${this.currentRole}): `
+          : '';
+        const commitMessage = `${rolePrefix}${message}`;
+
+        // Create commit
+        const result = await git.commit(commitMessage);
+
+        return result.commit;
+      } catch (error) {
+        throw new Error(`Failed to create commit: ${error}`);
       }
-
-      // Create role-based commit message
-      const rolePrefix = this.currentRole ? `feat(${this.currentRole}): ` : '';
-      const commitMessage = `${rolePrefix}${message}`;
-
-      // Create commit
-      const result = await git.commit(commitMessage);
-
-      return result.commit;
-    } catch (error) {
-      throw new Error(`Failed to create commit: ${error}`);
-    }
+    });
   }
 
   /**
-   * Get commit history
+   * Get commit history. When `pathspec` is given, the log is scoped to that
+   * path (`git log -- <pathspec>`) — the correct way to get a single record's
+   * history. Callers previously substring-matched commit MESSAGES for the
+   * record id, which both missed commits touching the file without naming it
+   * and matched unrelated commits that happened to mention the id.
    */
-  async getHistory(limit?: number): Promise<GitCommit[]> {
+  async getHistory(
+    limit?: number,
+    pathspec?: string,
+    skip?: number
+  ): Promise<GitCommit[]> {
     try {
       const git = this.getGit();
-      const options = limit ? ['-n', limit.toString()] : [];
+
+      if (skip && skip > 0) {
+        // `git log --skip=<n>`: lets a caller page WITHOUT materializing the
+        // whole log first. Callers that paginate by slicing an unbounded
+        // `getHistory()` result read the entire repository history into memory
+        // on every request, which grows without bound as the repo ages.
+        //
+        // The ARRAY form is required here, not the options object: passing
+        // `{ file, '--skip': n }` silently DROPS the skip — simple-git returns
+        // the first page again — so an object-form implementation pages a
+        // pathspec-scoped log by handing back the same commits every time.
+        // Verified against simple-git directly; the array form honours both.
+        const args = ['log'];
+        if (limit) {
+          args.push(`--max-count=${limit}`);
+        }
+        args.push(`--skip=${skip}`);
+        if (pathspec) {
+          args.push('--', pathspec);
+        }
+        const log = await git.log(args.slice(1));
+        return Array.from(log.all);
+      }
+
+      const options: Record<string, unknown> = {};
+      if (limit) {
+        options.maxCount = limit;
+      }
+      if (pathspec) {
+        // simple-git scopes the log to this path when `file` is set.
+        options.file = pathspec;
+      }
       const log = await git.log(options);
       return Array.from(log.all);
     } catch (error) {
       throw new Error(`Failed to get history: ${error}`);
+    }
+  }
+
+  /**
+   * Total number of commits, optionally scoped to a pathspec
+   * (`git rev-list --count HEAD [-- <pathspec>]`).
+   *
+   * Exists so a paginated caller can report a correct total without pulling
+   * every commit into memory to take `.length` — git counts them itself.
+   */
+  async countCommits(pathspec?: string): Promise<number> {
+    try {
+      const git = this.getGit();
+      const args = ['rev-list', '--count', 'HEAD'];
+      if (pathspec) {
+        args.push('--', pathspec);
+      }
+      const out = await git.raw(args);
+      const parsed = Number.parseInt(out.trim(), 10);
+      return Number.isFinite(parsed) ? parsed : 0;
+    } catch (error) {
+      throw new Error(`Failed to count commits: ${error}`);
     }
   }
 

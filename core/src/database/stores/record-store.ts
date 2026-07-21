@@ -18,6 +18,21 @@ import type {
   SearchIndexRow,
 } from '../types/row-types.js';
 
+/**
+ * How many rows `limit: 'all'` will materialize before it refuses to run.
+ *
+ * `'all'` exists so callers that need a COMPLETE set can say so instead of
+ * guessing a page size, but "complete" still has to fit in memory. Rather than
+ * quietly clipping the result — the exact failure this contract was written to
+ * kill — a corpus past this cap throws and names the paging escape hatch. The
+ * value matches the ceiling the three former hand-rolled scan loops already
+ * accepted (200 rows x 500 pages) and sits far above any realistic municipal
+ * corpus, so crossing it means something is wrong, not merely large.
+ *
+ * Shared by `listRecords` and `searchRecords` so "all" means one thing here.
+ */
+export const ALL_ROWS_HARD_CAP = 100_000;
+
 export class RecordStore {
   private adapter: DatabaseAdapter;
   private searchService?: SearchService;
@@ -98,32 +113,75 @@ export class RecordStore {
     );
   }
 
+  /**
+   * Search the index, most relevant first.
+   *
+   * Same limit contract as {@link RecordStore.listRecords}: a page size, or
+   * `'all'` for every match, and omitting it means `'all'`.
+   *
+   * It returns `total` — the count of ALL matches, not of the page — for the
+   * same reason. This used to hand back a bare array with a silent default of
+   * 20, which made truncation not merely easy to miss but genuinely
+   * undetectable: with no total, a caller holding 20 rows had nothing to
+   * compare them against. The layer above filled that vacuum by reporting
+   * `total: resultRecords.length` — the page size relabelled as the corpus
+   * count — so a search matching 500 records told the user there were 20, in
+   * one page, whenever the FTS service was down.
+   */
   async searchRecords(
     query: string,
     options?: {
       type?: string;
       status?: string;
-      limit?: number;
+      /** Page size, or `'all'` for every match. Defaults to `'all'`. */
+      limit?: number | 'all';
       offset?: number;
       sort?: string;
     }
-  ): Promise<Array<{ record_id: string }>> {
+  ): Promise<{ results: Array<{ record_id: string }>; total: number }> {
+    // Resolve the window ONCE, for both paths. They used to disagree: the FTS
+    // path defaulted to 20 while the LIKE fallback below applied no limit at
+    // all and silently dropped `offset` unless a limit came with it. So the
+    // same query returned a different result set depending on whether the
+    // search service happened to be up — and a fallback is exactly when nobody
+    // is looking. `??` keeps an explicit `limit: 0` from being re-read as
+    // "unset".
+    const limit = options?.limit ?? 'all';
+    const offset = options?.offset ?? 0;
+    // The engines below take a number. Asking for one row MORE than the cap is
+    // what makes `'all'` honest without a second COUNT: if that extra row comes
+    // back, the result set was larger than we promised to return and we throw
+    // instead of handing over a quietly clipped page.
+    const sqlLimit = limit === 'all' ? ALL_ROWS_HARD_CAP + 1 : limit;
+
     // Use search service if available (FTS search)
     if (this.searchService) {
+      // The result is checked and returned OUTSIDE the catch on purpose. The
+      // over-cap guard below throws, and a throw raised inside this try would
+      // be swallowed by the fallback handler — turning "this result set is too
+      // big to return honestly" into a silent downgrade to LIKE search, which
+      // is the failure mode this whole contract exists to prevent. Only a
+      // genuine search-service fault may fall through.
+      let ftsResult:
+        | { results: Array<{ record_id: string }>; total: number }
+        | undefined;
       try {
-        const result = await this.searchService.search(query, {
+        ftsResult = await this.searchService.search(query, {
           type: options?.type,
           status: options?.status,
-          limit: options?.limit || 20,
-          offset: options?.offset || 0,
+          limit: sqlLimit,
+          offset,
           sort: options?.sort,
         });
-        return result.results;
       } catch (error) {
         // Fall back to old method if search service fails
         this.logger.warn('Search service failed, falling back to LIKE search', {
           error: error instanceof Error ? error.message : String(error),
         });
+      }
+      if (ftsResult) {
+        this.assertNotOverCap(limit, ftsResult.results.length);
+        return { results: ftsResult.results, total: ftsResult.total };
       }
     }
 
@@ -159,6 +217,14 @@ export class RecordStore {
       params.push(options.status);
     }
 
+    // Count ALL matches before the window narrows the query. Captured here,
+    // after every filter is in `sql` but before ORDER BY / LIMIT, so it counts
+    // the same rows the page is drawn from. Without this the layer above had
+    // nothing to report but the page size, which it did.
+    const countSql = sql.replace('SELECT si.*', 'SELECT COUNT(*) as count');
+    const countResult = await this.adapter.query<CountRow>(countSql, params);
+    const total = countResult[0].count;
+
     // Apply ordering with kind priority and user sort
     const sortOption = options?.sort || 'updated_desc';
     const kindPriority = `CASE
@@ -185,16 +251,29 @@ export class RecordStore {
     }
     sql += ` ORDER BY ${kindPriority} ASC, ${userSort}`;
 
-    if (options?.limit) {
-      sql += ' LIMIT ?';
-      params.push(options.limit);
-      if (options.offset) {
-        sql += ' OFFSET ?';
-        params.push(options.offset);
-      }
-    }
+    sql += ' LIMIT ? OFFSET ?';
+    params.push(sqlLimit, offset);
 
-    return await this.adapter.query<SearchIndexRow>(sql, params);
+    const results = await this.adapter.query<SearchIndexRow>(sql, params);
+    this.assertNotOverCap(limit, results.length);
+
+    return { results, total };
+  }
+
+  /**
+   * Guard for `limit: 'all'`: the query asked for one row past the cap, so
+   * receiving that row proves the honest answer is bigger than we agreed to
+   * materialize. Refuse loudly instead of returning the clipped set, which
+   * would be indistinguishable from a complete one.
+   */
+  private assertNotOverCap(limit: number | 'all', received: number): void {
+    if (limit === 'all' && received > ALL_ROWS_HARD_CAP) {
+      throw new Error(
+        `searchRecords: refusing to materialize more than ${ALL_ROWS_HARD_CAP} ` +
+          `rows for limit:'all'. Pass an explicit numeric limit and page ` +
+          `through the results instead.`
+      );
+    }
   }
 
   async removeRecordFromIndex(
@@ -395,6 +474,12 @@ export class RecordStore {
   }
 
   async deleteRecord(id: string): Promise<void> {
+    // record_locks intentionally has no FK/cascade (locks are taken on
+    // drafts too, which have no records row) — clean up explicitly.
+    await this.adapter.execute(
+      'DELETE FROM record_locks WHERE record_id = ?',
+      [id]
+    );
     await this.adapter.execute('DELETE FROM records WHERE id = ?', [id]);
     await this.removeRecordFromIndex(id, '');
   }
@@ -435,13 +520,42 @@ export class RecordStore {
     return `ORDER BY ${kindPriority} ASC, ${userSort}`;
   }
 
+  /**
+   * List records, newest first by default.
+   *
+   * `limit` is deliberately explicit — either a page size, or `'all'` for the
+   * complete set. Omitting it means `'all'`.
+   *
+   * It used to mean `LIMIT 10`. That default was silent and it was wrong in the
+   * one way a list can be catastrophically wrong: a caller that omitted `limit`
+   * got the 10 newest rows in a shape indistinguishable from "these are all the
+   * rows". Three separate consumers (the BroadcastBox redaction worker, the
+   * recordings backfill, the transcription gateway) independently discovered
+   * this and each hand-rolled the same offset-paging loop to escape it; the
+   * backfill's map decides which files in the PUBLIC folder are unverified and
+   * get DELETED, so a truncated scan there would have deleted the published
+   * copy of a verified recording belonging to any but the 10 newest sessions.
+   * Three copies of one workaround is a missing primitive, not three bugs.
+   *
+   * So the default now errs toward the complete, correct answer, and the
+   * failure mode for an oversized corpus is a loud throw ({@link
+   * ALL_ROWS_HARD_CAP}) rather than a plausible-looking short array.
+   */
   async listRecords(
     options: {
       type?: string;
       status?: string; // Deprecated: All records in this table are published by definition
-      limit?: number;
+      /** Page size, or `'all'` for the complete set. Defaults to `'all'`. */
+      limit?: number | 'all';
       offset?: number;
       sort?: string;
+      /**
+       * Keep only records that link the given geography file id. Exists so the
+       * geography `/linked-records` endpoint can filter + count + page in ONE
+       * query instead of scanning the whole corpus in 1000-row batches and
+       * matching `linkedGeographyFiles` in JS.
+       */
+      linkedGeographyId?: string;
     } = {}
   ): Promise<{ records: RecordRow[]; total: number }> {
     let sql = 'SELECT * FROM records WHERE 1=1';
@@ -478,6 +592,30 @@ export class RecordStore {
       }
     }
 
+    // Linked-geography filter.
+    //
+    // `linked_geography_files` holds a JSON array of `{id,name,description}`,
+    // so the match has to look INSIDE the document — hence json_each + a
+    // json_extract on each element's `$.id`. Matching on the element id (not a
+    // LIKE over the raw text) is what makes it exact: a `LIKE '%geo-1%'` would
+    // also match `geo-10`, and LIKE's `_` wildcard would make an id containing
+    // an underscore match unrelated rows.
+    //
+    // The two guards are load-bearing, not defensive noise: `json_each()`
+    // raises "malformed JSON" and aborts the whole query on any row whose
+    // column is not valid JSON, so one bad row would 500 the endpoint for
+    // everyone. `json_valid()` (plus the NULL check, since most records link no
+    // geography at all) skips those rows the same way the previous JS
+    // `parseJsonArray` did.
+    if (options.linkedGeographyId) {
+      sql +=
+        ' AND linked_geography_files IS NOT NULL' +
+        ' AND json_valid(linked_geography_files)' +
+        ' AND EXISTS (SELECT 1 FROM json_each(records.linked_geography_files)' +
+        " WHERE json_extract(json_each.value, '$.id') = ?)";
+      params.push(options.linkedGeographyId);
+    }
+
     // Get total count
     const countSql = sql.replace('SELECT *', 'SELECT COUNT(*) as count');
     const countResult = await this.adapter.query<CountRow>(countSql, params);
@@ -487,14 +625,39 @@ export class RecordStore {
     const sortOption = options.sort || 'created_desc';
     sql += ' ' + this.buildOrderByClause(sortOption);
 
-    // Always apply limit (default to 10 if not provided)
-    const limit = options.limit || 10;
-    sql += ' LIMIT ?';
-    params.push(limit);
+    // `??`, not `||`: an explicit `limit: 0` is a real request (count-only) and
+    // must not be re-read as "no limit given". The old `||` silently turned it
+    // into 10 rows.
+    const limit = options.limit ?? 'all';
 
-    if (options.offset) {
-      sql += ' OFFSET ?';
-      params.push(options.offset);
+    if (limit === 'all') {
+      // Refuse rather than truncate. `total` is the count computed above, so
+      // this guard costs no extra query. It is checked before the offset is
+      // applied, which makes it a conservative upper bound on what we return.
+      if (total > ALL_ROWS_HARD_CAP) {
+        throw new Error(
+          `listRecords: refusing to materialize ${total} rows for limit:'all' ` +
+            `(cap ${ALL_ROWS_HARD_CAP}). Pass an explicit numeric limit and page ` +
+            `through the results instead.`
+        );
+      }
+      // No LIMIT clause at all for the common no-offset case. When an offset IS
+      // present a limit is syntactically required before it, so bound it with
+      // the cap — provably not truncating, since total <= cap was just checked.
+      // (A dialect-specific unbounded form like SQLite's `LIMIT -1` would not
+      // survive the Postgres adapter.)
+      if (options.offset) {
+        sql += ' LIMIT ? OFFSET ?';
+        params.push(ALL_ROWS_HARD_CAP, options.offset);
+      }
+    } else {
+      sql += ' LIMIT ?';
+      params.push(limit);
+
+      if (options.offset) {
+        sql += ' OFFSET ?';
+        params.push(options.offset);
+      }
     }
 
     const records = await this.adapter.query<RecordRow>(sql, params);

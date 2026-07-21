@@ -11,7 +11,7 @@ import fs from 'fs-extra';
 import path from 'path';
 import mime from 'mime-types';
 import { v4 as uuidv4 } from 'uuid';
-import { Readable } from 'stream';
+import { Readable, Transform } from 'stream';
 import { pipeline as streamPipeline } from 'node:stream/promises';
 import { loadAwsS3Sdk } from './sdk-loader.js';
 import type {
@@ -30,6 +30,7 @@ import {
   writeSidecarManifest,
 } from './internals.js';
 import type { CloudUuidStorageService } from '../cloud-uuid-storage-service.js';
+import type { QuotaReservation } from '../quota/quota-manager.js';
 
 export interface StreamingOpsDeps {
   host: CloudUuidStorageService;
@@ -56,6 +57,7 @@ export class StreamingOps {
         // ignore — best-effort disposal
       }
     };
+    let quotaReservation: QuotaReservation | null = null;
     try {
       if (!host.databaseService) {
         throw new Error('Database service not initialized');
@@ -101,7 +103,13 @@ export class StreamingOps {
       // worse than the current state).
       if (host.quotaManager && host.quotaManager.isEnabled()) {
         if (typeof request.size === 'number' && request.size > 0) {
-          await host.quotaManager.checkQuota(request.folder, request.size);
+          // Reserve (not merely check) so concurrent streams into a
+          // near-full folder cannot each be admitted against the same
+          // pre-upload usage read. Released in the `finally` below.
+          quotaReservation = await host.quotaManager.reserve(
+            request.folder,
+            request.size
+          );
         } else {
           host.logger.warn(
             'Stream upload received with unknown size; quota cannot be enforced upfront. Folder: ' +
@@ -132,51 +140,128 @@ export class StreamingOps {
 
       let providerPath: string;
       let actualSize = request.size || 0;
+      const startTime = Date.now();
 
       // Validation + quota have passed — now (and only now) open the source.
       if (!sourceStream) {
         sourceStream = fs.createReadStream(request.filePath as string);
       }
 
-      // Upload to provider using stream
-      switch (provider.type) {
-        case 'local': {
-          providerPath = await this.uploadStreamToLocal(
-            sourceStream,
-            relativePath
-          );
-          // Get actual file size
-          const fullPath = path.join(getLocalStoragePath(host), relativePath);
-          const stats = await fs.stat(fullPath);
-          actualSize = stats.size;
-          break;
+      // For REMOTE providers, count bytes as they flow so the DB row records
+      // the real size — streamed S3/Azure uploads without a Content-Length
+      // used to persist size=0 ("provider will set size" — it never did),
+      // silently breaking quota. The counter is an in-band Transform (not a
+      // 'data' listener, which would be a second consumer racing the pipe).
+      // The LOCAL path deliberately does NOT use the counter: its size comes
+      // from an authoritative fs.stat, and inserting a second pipe stage
+      // there only added a stream-error-propagation hazard for no benefit.
+      const makeCountedStream = (): {
+        stream: Readable;
+        getSize: () => number;
+      } => {
+        let byteCount = 0;
+        const counter = new Transform({
+          transform(chunk: Buffer, _enc, cb) {
+            byteCount += chunk.length;
+            cb(null, chunk);
+          },
+        });
+        const piped = sourceStream!.pipe(counter);
+        // .pipe() doesn't forward source errors — destroy the counter so the
+        // provider's consumption rejects instead of hanging.
+        sourceStream!.once('error', (err) => counter.destroy(err));
+        return { stream: piped, getSize: () => byteCount };
+      };
+
+      try {
+        // Upload to provider using stream
+        switch (provider.type) {
+          case 'local': {
+            providerPath = await this.uploadStreamToLocal(
+              sourceStream,
+              relativePath
+            );
+            // Authoritative on-disk size.
+            const fullPath = path.join(
+              getLocalStoragePath(host),
+              relativePath
+            );
+            const stats = await fs.stat(fullPath);
+            actualSize = stats.size;
+            break;
+          }
+          case 's3': {
+            const counted = makeCountedStream();
+            providerPath = await this.uploadStreamToS3(
+              counted.stream,
+              relativePath,
+              provider,
+              request.contentType ||
+                mime.lookup(request.filename) ||
+                'application/octet-stream',
+              request.options?.metadata
+            );
+            actualSize = counted.getSize();
+            break;
+          }
+          case 'azure': {
+            const counted = makeCountedStream();
+            providerPath = await this.uploadStreamToAzure(
+              counted.stream,
+              relativePath,
+              provider,
+              request.contentType ||
+                mime.lookup(request.filename) ||
+                'application/octet-stream',
+              request.options?.metadata
+            );
+            actualSize = counted.getSize();
+            break;
+          }
+          case 'gcs': {
+            const counted = makeCountedStream();
+            providerPath = await this.uploadStreamToGCS(
+              counted.stream,
+              relativePath,
+              provider,
+              request.contentType ||
+                mime.lookup(request.filename) ||
+                'application/octet-stream',
+              request.options?.metadata
+            );
+            actualSize = counted.getSize();
+            break;
+          }
+          default:
+            throw new Error(`Unsupported provider type: ${provider.type}`);
         }
-        case 's3':
-          providerPath = await this.uploadStreamToS3(
-            sourceStream,
-            relativePath,
-            provider,
-            request.contentType ||
-              mime.lookup(request.filename) ||
-              'application/octet-stream',
-            request.options?.metadata
+      } catch (uploadErr) {
+        // Record the failure in the same metrics the buffer path uses — the
+        // streaming path previously reported nothing.
+        if (host.metricsCollector) {
+          const errorCode =
+            uploadErr instanceof Error &&
+            (uploadErr as Error & { code?: string }).code
+              ? (uploadErr as Error & { code?: string }).code
+              : 'UNKNOWN_ERROR';
+          host.metricsCollector.recordUpload(
+            false,
+            request.size || 0,
+            Date.now() - startTime,
+            activeProvider,
+            errorCode
           );
-          actualSize = request.size || 0; // S3 will set size
-          break;
-        case 'azure':
-          providerPath = await this.uploadStreamToAzure(
-            sourceStream,
-            relativePath,
-            provider,
-            request.contentType ||
-              mime.lookup(request.filename) ||
-              'application/octet-stream',
-            request.options?.metadata
-          );
-          actualSize = request.size || 0; // Azure will set size
-          break;
-        default:
-          throw new Error(`Unsupported provider type: ${provider.type}`);
+        }
+        throw uploadErr;
+      }
+
+      if (host.metricsCollector) {
+        host.metricsCollector.recordUpload(
+          true,
+          actualSize,
+          Date.now() - startTime,
+          activeProvider
+        );
       }
 
       // Create storage file record
@@ -256,6 +341,11 @@ export class StreamingOps {
         success: false,
         error: error instanceof Error ? error.message : 'Stream upload failed',
       };
+    } finally {
+      // Release reserved headroom on every exit path. On success this runs
+      // after createStorageFile, so the streamed bytes are already reflected
+      // in the usage figures before the reservation goes away.
+      host.quotaManager?.release(quotaReservation);
     }
   }
 
@@ -419,6 +509,44 @@ export class StreamingOps {
     });
 
     return `azure://${provider.account_name}/${provider.container_name}/${blobName}`;
+  }
+
+  /**
+   * Upload stream to Google Cloud Storage. The buffer path supported GCS but
+   * the streaming switch omitted it, so any GCS deployment threw "Unsupported
+   * provider type" on every streamed upload.
+   */
+  private async uploadStreamToGCS(
+    stream: Readable,
+    relativePath: string,
+    provider: StorageProvider,
+    contentType: string,
+    metadata?: Record<string, string>
+  ): Promise<string> {
+    const host = this.deps.host;
+    if (!host.gcsBucket) {
+      throw new Error('GCS bucket not initialized');
+    }
+
+    const fileName = provider.prefix
+      ? `${provider.prefix}/${relativePath}`
+      : relativePath;
+
+    const gcsFile = host.gcsBucket.file(fileName);
+    const writeStream = gcsFile.createWriteStream({
+      resumable: false,
+      metadata: {
+        contentType,
+        metadata: {
+          originalName: path.basename(relativePath),
+          uploadedAt: new Date().toISOString(),
+          ...metadata,
+        },
+      },
+    });
+    await streamPipeline(stream, writeStream);
+
+    return `gs://${provider.bucket}/${fileName}`;
   }
 
   /**

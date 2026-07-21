@@ -9,6 +9,7 @@ import {
 } from './email-validation-service.js';
 import { SecretsManager } from '../security/secrets.js';
 import { AuditChannel } from '../audit/audit-channel.js';
+import type { HookSystem } from '../hooks/hook-system.js';
 import { UserOps } from './auth-service/user-ops.js';
 import { ApiKeyOps } from './auth-service/api-key-ops.js';
 import { SessionOps } from './auth-service/session-ops.js';
@@ -64,6 +65,8 @@ export class AuthService {
   private emailValidationService: EmailValidationService;
   private secretsManager?: SecretsManager;
   private auditChannel?: AuditChannel;
+  /** Hook bus for broadcasting session revocation; wired by initializeHooks. */
+  private hookSystem?: HookSystem;
 
   // Collaborators (instantiated in constructor with bound deps).
   private userOps: UserOps;
@@ -115,6 +118,9 @@ export class AuthService {
       logger,
       writeAudit,
       getSecretsManager,
+      // Getter, not a value: the hook bus is wired after construction (see
+      // initializeHooks), exactly like secretsManager above.
+      getHooks: () => this.hookSystem,
     });
 
     // Bind the now-extracted user/session methods so collaborators that depend
@@ -151,6 +157,8 @@ export class AuthService {
       emailValidationService: this.emailValidationService,
       logAuthEvent,
       createSession,
+      deleteUserSessions: (userId: number) =>
+        this.sessionOps.deleteUserSessions(userId),
       canSetPassword,
       getUserAuthProvider,
     });
@@ -193,6 +201,23 @@ export class AuthService {
   /**
    * Initialize secrets manager for token signing
    */
+  /**
+   * Wire the hook bus so session revocation can be broadcast.
+   *
+   * Revoking sessions in the database does not close connections that were
+   * already authenticated — the realtime WebSocket checks the session once, at
+   * upgrade time, and never again. So a logout-everywhere or password change
+   * left any live collaborative socket editing happily until it happened to
+   * reconnect. Emitting on revocation lets the realtime server (which
+   * subscribes to `auth:sessions:revoked`) tear those sockets down promptly.
+   *
+   * Optional and wired post-construction, so an AuthService built without a
+   * hook bus (CLI, tests) behaves exactly as before.
+   */
+  initializeHooks(hookSystem: HookSystem): void {
+    this.hookSystem = hookSystem;
+  }
+
   initializeSecrets(secretsManager: SecretsManager): void {
     this.secretsManager = secretsManager;
   }
@@ -328,8 +353,25 @@ export class AuthService {
     return this.sessionOps.deleteSession(...args);
   }
 
+  async deleteUserSessions(
+    ...args: Parameters<SessionOps['deleteUserSessions']>
+  ): ReturnType<SessionOps['deleteUserSessions']> {
+    return this.sessionOps.deleteUserSessions(...args);
+  }
+
+  async revokeSessionByToken(
+    ...args: Parameters<SessionOps['revokeSessionByToken']>
+  ): ReturnType<SessionOps['revokeSessionByToken']> {
+    return this.sessionOps.revokeSessionByToken(...args);
+  }
+
   async cleanupExpiredSessions(): Promise<void> {
     return this.sessionOps.cleanupExpiredSessions();
+  }
+
+  /** Maintenance sweep over `login_attempts` (see AuthMaintenanceScheduler). */
+  async cleanupStaleLoginAttempts(): Promise<number> {
+    return this.passwordOps.cleanupStaleLoginAttempts();
   }
 
   // ===============================
@@ -455,10 +497,18 @@ export class AuthService {
     return this.oauthOps.authenticateWithSimulatedAccount(...args);
   }
 
-  async logout(): Promise<void> {
-    // This would typically invalidate the current session
-    // For now, we'll just log the event
-    await this.logAuthEvent(undefined, 'logout', 'User logged out');
+  async logout(token?: string): Promise<void> {
+    // Revoke the presented session server-side. Logout used to be a no-op —
+    // the token stayed valid for its full 24h lifetime after "logging out".
+    let revoked = false;
+    if (token) {
+      revoked = await this.sessionOps.revokeSessionByToken(token);
+    }
+    await this.logAuthEvent(
+      undefined,
+      'logout',
+      revoked ? 'User logged out (session revoked)' : 'User logged out'
+    );
   }
 
   async getCurrentUser(): Promise<AuthUser | null> {
@@ -611,6 +661,13 @@ export class AuthService {
   // ===============================
   // SECURE PASSWORD MANAGEMENT (delegated to PasswordOps)
   // ===============================
+
+  /** Single password-policy chokepoint (see PasswordOps). */
+  validatePasswordPolicy(
+    ...args: Parameters<PasswordOps['validatePasswordPolicy']>
+  ): ReturnType<PasswordOps['validatePasswordPolicy']> {
+    return this.passwordOps.validatePasswordPolicy(...args);
+  }
 
   /**
    * Change user password with security guards

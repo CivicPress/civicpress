@@ -12,6 +12,7 @@ import { coreError, coreDebug } from '../utils/core-output.js';
 import { CORE_TABLE_STATEMENTS } from './schema/tables.js';
 import {
   runSimpleColumnMigrations,
+  ensureRecordLocksWithoutFk,
   ensureWorkflowStateColumn,
   runUserSecurityMigrations,
   migrateSearchIndexColumns,
@@ -100,13 +101,32 @@ export class SQLiteAdapter implements DatabaseAdapter {
       }
 
       const sqlite = sqlite3.verbose();
-      this.db = new sqlite.Database(dbPath, (err) => {
+      const db = new sqlite.Database(dbPath, (err) => {
         if (err) {
           reject(err);
-        } else {
-          resolve();
+          return;
         }
+        // Connection-mode pragmas — sqlite scopes these to the connection
+        // (WAL sticks to the file, but a new first writer still has to set
+        // it), so they run on EVERY connect:
+        //   foreign_keys  — the schema's FK/ON DELETE CASCADE clauses are
+        //                   inert without it (orphaned locks/sessions);
+        //   journal_mode  — WAL lets the API and background workers hit one
+        //                   DB concurrently (readers don't block the writer);
+        //   busy_timeout  — a locked DB waits up to 5s instead of failing
+        //                   the query with SQLITE_BUSY outright.
+        db.exec(
+          'PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL; PRAGMA busy_timeout = 5000;',
+          (pragmaErr) => {
+            if (pragmaErr) {
+              reject(pragmaErr);
+            } else {
+              resolve();
+            }
+          }
+        );
       });
+      this.db = db;
     });
   }
 
@@ -191,6 +211,10 @@ export class SQLiteAdapter implements DatabaseAdapter {
 
     // Step 2: simple ALTER TABLE column migrations (idempotent)
     await runSimpleColumnMigrations(exec);
+
+    // Step 2b: rebuild record_locks without its records(id) FK — draft
+    // locking is impossible with it under enforced foreign keys.
+    await ensureRecordLocksWithoutFk(exec);
 
     // Step 3: saga-related indexes (run before workflow_state migrations
     // so the orchestrator's prior behavior is preserved — the original

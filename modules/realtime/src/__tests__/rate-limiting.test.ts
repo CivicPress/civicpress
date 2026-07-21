@@ -31,6 +31,10 @@ describe('Rate Limiting', () => {
 
     mockHookSystem = {
       emit: vi.fn(),
+      // registerHook/removeHook: the server subscribes to the core
+      // session-revocation hook at initialize() and detaches at shutdown().
+      registerHook: vi.fn(),
+      removeHook: vi.fn(),
       on: vi.fn(),
       off: vi.fn(),
     } as any;

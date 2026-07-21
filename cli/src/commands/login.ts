@@ -2,6 +2,7 @@ import { CAC } from 'cac';
 import { CivicPress } from '@civicpress/core';
 import * as fs from 'fs';
 import inquirer from 'inquirer';
+import { AuthUtils } from '../utils/auth-utils.js';
 import {
   getGlobalOptionsFromArgs,
   initializeCliOutput,
@@ -67,7 +68,7 @@ export const loginCommand = (cli: CAC) => {
 
         if (options.logout) {
           // Handle logout
-          await handleLogout(civic);
+          await handleLogout(civic, options.token);
         } else if (options.status) {
           // Handle status check
           await handleStatus(civic);
@@ -160,6 +161,12 @@ async function handleLogin(civic: CivicPress, options: any): Promise<void> {
       session = await authService.authenticateWithPassword(username, password);
     }
 
+    // Persist the token where resolveToken() reads it, so the very next
+    // command is authenticated without re-passing it. Previously login only
+    // emitted the token in the --json payload (never in human mode and never
+    // to disk), so the login→command loop was broken.
+    const tokenFile = AuthUtils.saveToken(session.token);
+
     cliSuccess(
       {
         session: {
@@ -167,8 +174,9 @@ async function handleLogin(civic: CivicPress, options: any): Promise<void> {
           user: session.user,
           expiresAt: session.expiresAt,
         },
+        tokenFile,
       },
-      `Successfully authenticated as ${session.user.username}`,
+      `Successfully authenticated as ${session.user.username} (session saved to ${tokenFile})`,
       {
         operation: 'login',
         username: session.user.username,
@@ -189,10 +197,18 @@ async function handleLogin(civic: CivicPress, options: any): Promise<void> {
   }
 }
 
-async function handleLogout(civic: CivicPress): Promise<void> {
+async function handleLogout(
+  civic: CivicPress,
+  flagToken?: string
+): Promise<void> {
   try {
     const authService = civic.getAuthService();
-    await authService.logout();
+    // Revoke the presented session server-side (Tier-A session revocation
+    // wired to the CLI), then drop the locally-persisted token so the next
+    // command is no longer authenticated.
+    const token = AuthUtils.getResolvedToken(flagToken);
+    await authService.logout(token);
+    AuthUtils.clearToken();
 
     cliSuccess({ success: true }, 'Successfully logged out', {
       operation: 'logout',

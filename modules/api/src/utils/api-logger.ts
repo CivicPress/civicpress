@@ -291,22 +291,38 @@ export class ApiLogger {
         statusCode?: number;
         code?: string;
       };
+      const statusCode = legacy.statusCode ?? 500;
+      // A 5xx from an untyped third-party error (AWS SDK, HTTP clients) can
+      // carry hosts/paths — redact its message like the generic-500 branch.
+      // 4xx messages are caller-facing and safe to pass through.
+      const isServerError = statusCode >= 500;
       return {
-        statusCode: legacy.statusCode ?? 500,
+        statusCode,
         success: false,
         error: {
-          message: error.message,
+          message:
+            isServerError && process.env.NODE_ENV !== 'development'
+              ? defaultMessage
+              : error.message,
           code: legacy.code ?? 'API_ERROR',
         },
       };
     }
 
+    // Unexpected error: never leak the raw message to the client — it can
+    // carry paths, SQL fragments, or config values. Full detail stays in the
+    // server-side log (handleError logs before responding); clients get it
+    // only in development.
     return {
       statusCode: 500,
       success: false,
       error: {
         message: defaultMessage,
-        details: error instanceof Error ? error.message : 'Unknown error',
+        ...(process.env.NODE_ENV === 'development'
+          ? {
+              details: error instanceof Error ? error.message : String(error),
+            }
+          : {}),
       },
     };
   }

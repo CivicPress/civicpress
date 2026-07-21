@@ -30,7 +30,7 @@ describe('API Security Features', () => {
         .send({
           username: 'passworduser',
           email: 'password@example.com',
-          password: 'currentpass123',
+          password: 'Currentpass!123',
           name: 'Password User',
         });
       passwordUserId = passwordUserResponse.body.data.user.id;
@@ -54,10 +54,12 @@ describe('API Security Features', () => {
     });
 
     describe('POST /api/v1/users/:id/change-password', () => {
-      it.skip('should allow password change for password-authenticated user', async () => {
-        // TODO: Fix password change logic - simulated auth users don't have real passwords
-        // Issue: Test expects 400/401 but gets 200 (password change succeeds unexpectedly)
-        // First get user token
+      it('should allow password change for password-authenticated user', async () => {
+        // 'passworduser' was registered with a real bcrypt password (role public).
+        // Logging in via simulated auth resolves to that SAME registered user, so a
+        // self password-change with the correct current password legitimately
+        // succeeds (200) — the prior [400,401] expectation was based on the false
+        // premise that the simulated login is a passwordless user.
         const userResponse = await request(context.api.getApp())
           .post('/api/v1/auth/simulated')
           .send({ username: 'passworduser', role: 'public' });
@@ -68,21 +70,15 @@ describe('API Security Features', () => {
           .post(`/api/v1/users/${simulatedUserId}/change-password`)
           .set('Authorization', `Bearer ${userToken}`)
           .send({
-            currentPassword: 'currentpass123',
-            newPassword: 'newpass123',
+            currentPassword: 'Currentpass!123',
+            newPassword: 'Newpass!123',
           });
 
-        // Note: This will fail because simulated auth doesn't have actual password
-        // but it should fail with password verification, not external auth error
-        expect([400, 401]).toContain(response.status);
-        if (response.status === 400) {
-          expect(response.body.error.message).not.toContain(
-            'external authentication'
-          );
-        }
+        expect(response.status).toBe(200);
+        expect(response.body.success).toBe(true);
       });
 
-      it.skip('should prevent password change for external auth user', async () => {
+      it('should prevent password change for external auth user', async () => {
         // TODO: Fix external auth user password change - getting 400 instead of 403
         // Issue: GitHub user password change should return 403 (Forbidden) not 400 (Bad Request)
         // Test with admin token (admin can attempt to change any user's password)
@@ -91,7 +87,7 @@ describe('API Security Features', () => {
           .set('Authorization', `Bearer ${adminToken}`)
           .send({
             currentPassword: 'anypassword',
-            newPassword: 'newpass123',
+            newPassword: 'Newpass!123',
           });
 
         expect(response.status).toBe(403);
@@ -104,8 +100,8 @@ describe('API Security Features', () => {
         const response = await request(context.api.getApp())
           .post(`/api/v1/users/${passwordUserId}/change-password`)
           .send({
-            currentPassword: 'currentpass123',
-            newPassword: 'newpass123',
+            currentPassword: 'Currentpass!123',
+            newPassword: 'Newpass!123',
           });
 
         expect(response.status).toBe(401);
@@ -129,29 +125,27 @@ describe('API Security Features', () => {
     });
 
     describe('POST /api/v1/users/:id/set-password', () => {
-      it.skip('should allow admin to set password for password-authenticated user', async () => {
-        // TODO: Fix admin password setting - getting 400 instead of 200
-        // Issue: Admin should be able to set password for password users but validation is failing
+      it('should allow admin to set password for password-authenticated user', async () => {
+        // The route (and the real UI client) use `newPassword`; the success
+        // payload is nested under `data` by sendSuccess.
         const response = await request(context.api.getApp())
           .post(`/api/v1/users/${passwordUserId}/set-password`)
           .set('Authorization', `Bearer ${adminToken}`)
           .send({
-            password: 'adminsetpass123',
+            newPassword: 'Adminsetpass!123',
           });
 
         expect(response.status).toBe(200);
         expect(response.body.success).toBe(true);
-        expect(response.body.message).toContain('Password set successfully');
+        expect(response.body.data.message).toContain('Password set successfully');
       });
 
-      it.skip('should prevent admin from setting password for external auth user', async () => {
-        // TODO: Fix external auth password setting - getting 400 instead of 403
-        // Issue: Admin should get 403 (Forbidden) when trying to set password for external auth users
+      it('should prevent admin from setting password for external auth user', async () => {
         const response = await request(context.api.getApp())
           .post(`/api/v1/users/${githubUserId}/set-password`)
           .set('Authorization', `Bearer ${adminToken}`)
           .send({
-            password: 'adminsetpass123',
+            newPassword: 'Adminsetpass!123',
           });
 
         expect(response.status).toBe(403);
@@ -160,9 +154,7 @@ describe('API Security Features', () => {
         );
       });
 
-      it.skip('should require admin privileges', async () => {
-        // TODO: Fix admin privilege validation - getting 400 instead of 403
-        // Issue: Non-admin users should get 403 (Forbidden) not 400 (Bad Request)
+      it('should require admin privileges', async () => {
         const userResponse = await request(context.api.getApp())
           .post('/api/v1/auth/simulated')
           .send({ username: 'passworduser', role: 'public' });
@@ -172,21 +164,19 @@ describe('API Security Features', () => {
           .post(`/api/v1/users/${passwordUserId}/set-password`)
           .set('Authorization', `Bearer ${userToken}`)
           .send({
-            password: 'usersetpass123',
+            newPassword: 'Usersetpass!123',
           });
 
         expect(response.status).toBe(403);
-        expect(response.body.message).toContain('Admin privileges required');
+        expect(response.body.error.message).toContain('Insufficient permissions');
       });
 
-      it.skip('should return 404 for non-existent user', async () => {
-        // TODO: Fix non-existent user handling - getting 400 instead of 404
-        // Issue: API should return 404 (Not Found) for non-existent users, not 400 (Bad Request)
+      it('should return 404 for non-existent user', async () => {
         const response = await request(context.api.getApp())
           .post('/api/v1/users/99999/set-password')
           .set('Authorization', `Bearer ${adminToken}`)
           .send({
-            password: 'adminsetpass123',
+            newPassword: 'Adminsetpass!123',
           });
 
         expect(response.status).toBe(404);
@@ -206,7 +196,7 @@ describe('API Security Features', () => {
         .send({
           username: 'emailtestuser',
           email: 'emailtest@example.com',
-          password: 'password123',
+          password: 'Passw0rd!123',
           name: 'Email Test User',
         });
       testUserId = userResponse.body.data.user.id;
@@ -260,7 +250,7 @@ describe('API Security Features', () => {
           .send({
             username: 'existinguser',
             email: 'existing@example.com',
-            password: 'password123',
+            password: 'Passw0rd!123',
             name: 'Existing User',
           });
 
@@ -294,7 +284,7 @@ describe('API Security Features', () => {
           .send({
             username: 'otheruser',
             email: 'other@example.com',
-            password: 'password123',
+            password: 'Passw0rd!123',
             name: 'Other User',
           });
         const otherUserId = otherUserResponse.body.data.user.id;
@@ -325,15 +315,19 @@ describe('API Security Features', () => {
             newEmail: 'verify@example.com',
           });
 
-        // Extract token from database (in real app, this would come from email)
-        const authService = context.civic.getAuthService();
-        const user = await authService.getUserById(testUserId);
-        verificationToken = user?.pending_email_token || '';
+        // Extract token from the DB directly. AuthService.getUserById deliberately
+        // does NOT expose pending_email_token (it is a live verification secret), so
+        // read the column via a raw query rather than widening getUserById.
+        const rows = await context.civic
+          .getDatabaseService()
+          .query<{ pending_email_token?: string }>(
+            'SELECT pending_email_token FROM users WHERE id = ?',
+            [testUserId]
+          );
+        verificationToken = rows?.[0]?.pending_email_token || '';
       });
 
-      it.skip('should verify email change with valid token', async () => {
-        // TODO: Fix email change verification - getting 400 instead of 200
-        // Issue: Email change verification should succeed with valid token but validation is failing
+      it('should verify email change with valid token', async () => {
         const response = await request(context.api.getApp())
           .post('/api/v1/users/verify-email-change')
           .send({
@@ -342,7 +336,7 @@ describe('API Security Features', () => {
 
         expect(response.status).toBe(200);
         expect(response.body.success).toBe(true);
-        expect(response.body.message).toContain('verified successfully');
+        expect(response.body.data.message).toContain('successfully updated');
       });
 
       it('should reject invalid token', async () => {
@@ -457,7 +451,7 @@ describe('API Security Features', () => {
           .send({
             username: 'securityother',
             email: 'securityother@example.com',
-            password: 'password123',
+            password: 'Passw0rd!123',
             name: 'Security Other User',
           });
         const otherUserId = otherUserResponse.body.data.user.id;
@@ -494,7 +488,7 @@ describe('API Security Features', () => {
         .send({
           username: 'updatepassworduser',
           email: 'updatepassword@example.com',
-          password: 'password123',
+          password: 'Passw0rd!123',
           name: 'Update Password User',
         });
       passwordUserId = passwordUserResponse.body.data.user.id;
@@ -531,7 +525,7 @@ describe('API Security Features', () => {
         expect(response.body.success).toBe(true);
       });
 
-      it.skip('should prevent password updates for external auth users', async () => {
+      it('should prevent password updates for external auth users', async () => {
         // TODO: Fix external auth user update - getting 500 instead of 403
         // Issue: External auth users should get 403 (Forbidden) not 500 (Internal Server Error)
         const response = await request(context.api.getApp())
@@ -539,7 +533,7 @@ describe('API Security Features', () => {
           .set('Authorization', `Bearer ${adminToken}`)
           .send({
             name: 'Updated GitHub User',
-            password: 'newpassword123',
+            password: 'Newpassword!123',
           });
 
         expect(response.status).toBe(403);
@@ -554,7 +548,7 @@ describe('API Security Features', () => {
           .set('Authorization', `Bearer ${adminToken}`)
           .send({
             name: 'Updated Password User',
-            password: 'newpassword123',
+            password: 'Newpassword!123',
           });
 
         expect(response.status).toBe(200);

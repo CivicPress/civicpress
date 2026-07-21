@@ -352,7 +352,17 @@ describe('device WebSocket → session.manifest (real realtime + mounted module)
       `ws://127.0.0.1:${port}/realtime/devices/${device.deviceUuid}`,
       { headers: { Authorization: `Bearer ${token}` } }
     );
-    ws.on('message', (d) => inbound.push(JSON.parse(d.toString())));
+    ws.on('message', (d) => {
+      const m = JSON.parse(d.toString());
+      inbound.push(m);
+      // A real device ACKs commands, which is what the ack-gated executeCommand
+      // waits on (FA-BB-008: the session only advances to 'recording' on a
+      // confirmed device ack). Without this the send times out and the session
+      // correctly fails.
+      if (m.type === 'command' && m.id) {
+        ws.send(JSON.stringify({ type: 'ack', commandId: m.id, success: true }));
+      }
+    });
     ws.on('error', () => {});
 
     const waitFor = async (
@@ -444,7 +454,17 @@ describe('device WebSocket → session.manifest (real realtime + mounted module)
       `ws://127.0.0.1:${port}/realtime/devices/${device.deviceUuid}`,
       { headers: { Authorization: `Bearer ${token}` } }
     );
-    ws.on('message', (d) => inbound.push(JSON.parse(d.toString())));
+    ws.on('message', (d) => {
+      const m = JSON.parse(d.toString());
+      inbound.push(m);
+      // A real device ACKs commands, which is what the ack-gated executeCommand
+      // waits on (FA-BB-008: the session only advances to 'recording' on a
+      // confirmed device ack). Without this the send times out and the session
+      // correctly fails.
+      if (m.type === 'command' && m.id) {
+        ws.send(JSON.stringify({ type: 'ack', commandId: m.id, success: true }));
+      }
+    });
     ws.on('error', () => {});
     const waitFor = async (pred: (m: any) => boolean, ms: number, what: string) => {
       const deadline = Date.now() + ms;

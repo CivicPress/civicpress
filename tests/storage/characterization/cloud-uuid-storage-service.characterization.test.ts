@@ -349,13 +349,22 @@ describe('StorageValidation — validateFile (W2-T18 characterization)', () => {
     expect(result.errors.some((e) => /exceeds limit/.test(e))).toBe(true);
   });
 
-  it('emits a warning (not an error) for executable extensions', () => {
-    const result = validation.validateFile(
-      makeFile({ originalname: 'install.exe' }),
-      makeFolder({ allowed_types: ['*'] })
-    );
-    expect(result.valid).toBe(true);
-    expect(result.warnings.some((w) => /executable/i.test(w))).toBe(true);
+  it('REJECTS executable extensions outright (post-audit hardening: was warn-only)', () => {
+    for (const name of [
+      'install.exe',
+      'run.bat',
+      'go.cmd',
+      'script.sh',
+      'evil.ps1',
+    ]) {
+      const result = validation.validateFile(
+        makeFile({ originalname: name }),
+        // Even a wildcard folder must not accept executables.
+        makeFolder({ allowed_types: ['*'] })
+      );
+      expect(result.valid).toBe(false);
+      expect(result.errors.some((e) => /executable/i.test(e))).toBe(true);
+    }
   });
 
   it('extension matching is case-insensitive (.PDF accepted when "pdf" allowed)', () => {

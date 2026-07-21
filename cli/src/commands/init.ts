@@ -567,6 +567,19 @@ export const initCommand = (cli: CAC) => {
             try {
               const authService = civic.getAuthService();
 
+              // Enforce the password policy on the bootstrap admin — the
+              // inline min-6 prompt check above is weaker than the policy
+              // (default: 8 + upper/lower/number/special).
+              const policy = authService.validatePasswordPolicy(
+                adminDetails.password
+              );
+              if (!policy.valid) {
+                logger.error(
+                  `Admin password does not meet requirements: ${policy.errors.join('; ')}`
+                );
+                process.exit(1);
+              }
+
               // Hash the password
               const bcrypt = await import('bcrypt');
               const passwordHash = await bcrypt.hash(adminDetails.password, 12);

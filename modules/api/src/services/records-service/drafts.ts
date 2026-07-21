@@ -631,29 +631,83 @@ export class RecordsDrafts {
       'ready_for_publication',
     ];
 
-    // Query records table with workflowState filter
+    // Query records table with workflowState filter.
+    //
+    // Pagination is done SQL-side (COUNT + keyset + LIMIT). This method used to
+    // `SELECT *` EVERY matching row, JSON-parse and transform all of them into
+    // ApiDraft objects, then `.slice()` a `limit`-sized window out of the
+    // result — so requesting 20 drafts parsed the entire unpublished corpus on
+    // every call, and `total` was just `records.length` of that fully
+    // materialized array.
     const db = this.deps.civicPress.getDatabaseService();
-    let query = `
-      SELECT * FROM records
-      WHERE workflow_state IN (${unpublishedWorkflowStates
-        .map(() => '?')
-        .join(',')})
-    `;
-    const params: SqlParam[] = [...unpublishedWorkflowStates];
+
+    // One shared predicate for the count, the cursor lookup and the page query,
+    // so the three can never disagree about what "matching" means.
+    let where = `workflow_state IN (${unpublishedWorkflowStates
+      .map(() => '?')
+      .join(',')})`;
+    const whereParams: SqlParam[] = [...unpublishedWorkflowStates];
 
     if (type) {
       const types = type.split(',').map((t) => t.trim());
-      query += ` AND type IN (${types.map(() => '?').join(',')})`;
-      params.push(...types);
+      where += ` AND type IN (${types.map(() => '?').join(',')})`;
+      whereParams.push(...types);
     }
 
-    // Order by updated_at descending
-    query += ' ORDER BY updated_at DESC';
+    // `total` is the count of ALL matching rows (unchanged meaning — it was
+    // never the page size), now from COUNT(*) instead of an array length.
+    const countRows = await db.query<{ total: number }>(
+      `SELECT COUNT(*) AS total FROM records WHERE ${where}`,
+      whereParams
+    );
+    const total = Number(countRows[0]?.total ?? 0);
 
-    const allRecords = await db.query<RecordRow>(query, params);
+    // The sort gains an explicit `id ASC` tiebreak. `ORDER BY updated_at DESC`
+    // alone is not a total order — records sharing a timestamp came back in
+    // whatever order the engine chose, which differs between queries. That was
+    // already latent breakage for a CURSOR-based API (the cursor is a row id
+    // whose position has to be stable between the call that returned it and the
+    // call that spends it); keyset pagination makes it load-bearing, so the
+    // order is pinned rather than left to the engine.
+    const orderBy = 'ORDER BY updated_at DESC, id ASC';
 
-    // Transform records
-    const records: ApiDraft[] = allRecords.map((record) => ({
+    // Resolve the cursor to its sort position. The cursor is a record id, so we
+    // need that row's `updated_at` to build the keyset predicate. Looking it up
+    // through the SAME predicate preserves the old behaviour exactly: the JS
+    // version ran `records.findIndex(...)` over the already-FILTERED list, so a
+    // cursor naming a row that no longer exists — or that does not match the
+    // current filter — yielded -1 and fell through to `startIndex = 0`, i.e.
+    // the first page. A null lookup here does the same.
+    let cursorUpdatedAt: string | null = null;
+    if (cursor) {
+      const cursorRows = await db.query<{ updated_at: string }>(
+        `SELECT updated_at FROM records WHERE ${where} AND id = ?`,
+        [...whereParams, cursor]
+      );
+      cursorUpdatedAt = cursorRows[0]?.updated_at ?? null;
+    }
+
+    const pageParams: SqlParam[] = [...whereParams];
+    let keyset = '';
+    if (cursorUpdatedAt !== null) {
+      // "Strictly after the cursor" under `updated_at DESC, id ASC`.
+      keyset = ' AND (updated_at < ? OR (updated_at = ? AND id > ?))';
+      pageParams.push(cursorUpdatedAt, cursorUpdatedAt, cursor as string);
+    }
+    // Fetch one row more than asked for: its presence IS `hasMore`, which the
+    // old code derived from `endIndex < records.length` after loading the lot.
+    pageParams.push(limit + 1);
+
+    const pageRows = await db.query<RecordRow>(
+      `SELECT * FROM records WHERE ${where}${keyset} ${orderBy} LIMIT ?`,
+      pageParams
+    );
+
+    const hasMore = pageRows.length > limit;
+    const windowRows = hasMore ? pageRows.slice(0, limit) : pageRows;
+
+    // Transform only the page, not the whole corpus
+    const paginatedRecords: ApiDraft[] = windowRows.map((record) => ({
       id: record.id,
       title: record.title,
       type: record.type,
@@ -675,21 +729,6 @@ export class RecordsDrafts {
       isUnpublished: true,
     }));
 
-    // Find starting index based on cursor
-    let startIndex = 0;
-    if (cursor) {
-      const cursorIndex = records.findIndex((record) => record.id === cursor);
-      if (cursorIndex !== -1) {
-        startIndex = cursorIndex + 1;
-      }
-    }
-
-    // Get requested number of records
-    const endIndex = startIndex + limit;
-    const paginatedRecords = records.slice(startIndex, endIndex);
-
-    // Determine if there are more records
-    const hasMore = endIndex < records.length;
     const nextCursor = hasMore
       ? paginatedRecords[paginatedRecords.length - 1]?.id || null
       : null;
@@ -698,7 +737,7 @@ export class RecordsDrafts {
       records: paginatedRecords,
       nextCursor,
       hasMore,
-      total: records.length,
+      total,
     };
   }
 

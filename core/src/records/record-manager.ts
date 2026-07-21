@@ -10,6 +10,7 @@ import { CreateRecordRequest, UpdateRecordRequest } from '../civic-core.js';
 import { AuditChannel } from '../audit/audit-channel.js';
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import { createHash } from 'crypto';
 import { RecordParser } from './record-parser.js';
 import { DocumentNumberGenerator } from '../utils/document-number-generator.js';
 import { buildRecordRelativePath } from '../utils/record-paths.js';
@@ -688,12 +689,17 @@ export class RecordManager {
       .toString(36)
       .slice(2)}`;
 
-    // Bounded acquire: capture merges are short (one record update), so a
-    // held lock clears quickly; give up loudly rather than write unlocked.
-    const maxAttempts = 20;
+    // Bounded acquire: capture merges are one record update each, but that
+    // update commits through the serialized git index, so N racing writers
+    // legitimately queue for N full update durations (seconds each under
+    // load). Budget generously and still give up loudly rather than write
+    // unlocked.
+    const maxAttempts = 60;
     for (let attempt = 1; ; attempt++) {
       try {
-        await lockManager.acquireLock(lockKey, holderId, 30_000);
+        // External (non-saga) acquisition: writes the saga_states stub the
+        // lock row's enforced FK requires.
+        await lockManager.acquireExternalLock(lockKey, holderId, 30_000);
         break;
       } catch (error) {
         if (error instanceof SagaLockError && attempt < maxAttempts) {
@@ -712,7 +718,7 @@ export class RecordManager {
       // Extension fields may surface top-level after parse.
       const existing: Record<string, unknown> =
         (record.metadata?.capture as Record<string, unknown> | undefined) ??
-        ((record as Record<string, any>).capture as
+        ((record as unknown as Record<string, unknown>).capture as
           | Record<string, unknown>
           | undefined) ??
         {};
@@ -737,7 +743,7 @@ export class RecordManager {
       await this.updateRecord(id, request, user);
       return merged;
     } finally {
-      await lockManager.releaseLock(lockKey, holderId).catch(() => {});
+      await lockManager.releaseExternalLock(lockKey, holderId).catch(() => {});
     }
   }
 
@@ -917,15 +923,21 @@ export class RecordManager {
   }
 
   /**
-   * List records with optional filtering and sorting
+   * List records with optional filtering and sorting.
+   *
+   * `limit` is a page size, or `'all'` for the complete set (the default). See
+   * RecordStore.listRecords for why omitting it must not mean a silent page.
    */
   async listRecords(
     options: {
       type?: string;
       status?: string;
-      limit?: number;
+      /** Page size, or `'all'` for the complete set. Defaults to `'all'`. */
+      limit?: number | 'all';
       offset?: number;
       sort?: string;
+      /** Pass-through to RecordStore: keep only records linking this geography id. */
+      linkedGeographyId?: string;
     } = {}
   ): Promise<{ records: RecordRow[]; total: number }> {
     const result = await this.db.listRecords(options);
@@ -996,6 +1008,29 @@ export class RecordManager {
       this.dataDir
     );
 
+    // Scope the idempotency key to the draft's actual CONTENT + target status,
+    // not just (user, draftId). The derived key otherwise collapses every
+    // publish of one record by one user onto a single key, so a re-publish
+    // after an edit — same record id, within the dedupe TTL — collides with the
+    // previous publish and is answered with its cached result, silently dropping
+    // the edited draft (the FA-CORE-008 follow-up: "include targetStatus in
+    // derived publish keys"). Hashing the draft body means a TRUE retry
+    // (identical content + target) still maps to the same key and is correctly
+    // deduped, while an edited republish (or a different target) gets a fresh key.
+    const draftForKey = await this.db.getDraft(draftId).catch(() => null);
+    const opDigest = createHash('sha256')
+      .update(
+        JSON.stringify({
+          draftId,
+          targetStatus: targetStatus ?? draftForKey?.status ?? null,
+          title: draftForKey?.title ?? null,
+          status: draftForKey?.status ?? null,
+          markdown_body: draftForKey?.markdown_body ?? null,
+          metadata: draftForKey?.metadata ?? null,
+        })
+      )
+      .digest('hex');
+
     // Create context
     const context = {
       correlationId: correlationId || `publish-${draftId}-${Date.now()}`,
@@ -1003,6 +1038,7 @@ export class RecordManager {
       draftId,
       targetStatus,
       user,
+      idempotencyKey: `publish:${draftId}:${opDigest}`,
       metadata: {
         recordId: draftId,
         draftId,
@@ -1014,6 +1050,30 @@ export class RecordManager {
       saga,
       context
     );
+
+    // Emit the domain audit entry for the publish.
+    //
+    // `PublishDraftSaga` has two branches and only one of them audited:
+    // publishing a draft whose record does NOT yet exist goes through
+    // `RecordManager.createRecordWithId`, which writes a `create_record` entry,
+    // while RE-publishing over an existing record writes the row with
+    // `this.db.updateRecord(...)` directly and produced no audit row at all.
+    // So the audit trail silently lost every republish — exactly the edit path
+    // most worth auditing. Emitting `publish_record` here covers both branches
+    // uniformly (the create branch keeps its `create_record` entry too, which
+    // is correct: the record really was created).
+    //
+    // Written after `execute()` resolves: the executor THROWS on step failure
+    // or timeout, so reaching this line means the publish committed.
+    await this.writeAudit({
+      action: 'publish_record',
+      resourceType: 'record',
+      resourceId: draftId,
+      userId: typeof user?.id === 'number' ? user.id : undefined,
+      message: `Published draft ${draftId}${
+        targetStatus ? ` as ${targetStatus}` : ''
+      }`,
+    });
 
     return result.result;
   }

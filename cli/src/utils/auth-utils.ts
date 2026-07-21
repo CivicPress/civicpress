@@ -2,13 +2,45 @@ import { CivicPress } from '@civicpress/core';
 import { Logger } from '@civicpress/core';
 import * as path from 'path';
 import * as os from 'os';
-import { readFileSync } from 'fs';
+import { readFileSync, writeFileSync, mkdirSync, rmSync } from 'fs';
 
 /**
  * Authentication utilities for CLI commands
  */
 export class AuthUtils {
   private static logger = new Logger();
+
+  /** The file `resolveToken` reads and `login`/`logout` write. */
+  static tokenFilePath(): string {
+    return path.join(os.homedir(), '.civicpress', 'token');
+  }
+
+  /**
+   * Persist a session token so subsequent commands resolve it without a
+   * flag or env var. Written 0600 (owner-only) — the whole point of the
+   * file (vs `--token`) is to keep the token OUT of shell history and
+   * process listings, so it must not be world-readable either.
+   */
+  static saveToken(token: string): string {
+    const file = this.tokenFilePath();
+    mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 });
+    writeFileSync(file, token, { encoding: 'utf-8', mode: 0o600 });
+    return file;
+  }
+
+  /** Remove the persisted token (logout). Idempotent. */
+  static clearToken(): void {
+    try {
+      rmSync(this.tokenFilePath(), { force: true });
+    } catch {
+      // best-effort — nothing to clear
+    }
+  }
+
+  /** Public token resolution (flag → CIVIC_TOKEN → token file). */
+  static getResolvedToken(flagToken?: string): string | undefined {
+    return this.resolveToken(flagToken).token;
+  }
 
   /**
    * FA-CLI-003: a token passed on the command line (`--token`) is visible in

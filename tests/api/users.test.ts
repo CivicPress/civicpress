@@ -23,7 +23,7 @@ describe('API User Management', () => {
       const userData = {
         username: 'newuser',
         email: 'newuser@example.com',
-        password: 'password123',
+        password: 'Passw0rd!123',
         name: 'New User',
       };
 
@@ -43,7 +43,7 @@ describe('API User Management', () => {
     it('should fail registration with missing username', async () => {
       const userData = {
         email: 'test@example.com',
-        password: 'password123',
+        password: 'Passw0rd!123',
         name: 'Test User',
       };
 
@@ -75,7 +75,7 @@ describe('API User Management', () => {
     it('should fail registration with missing email', async () => {
       const userData = {
         username: 'testuser',
-        password: 'password123',
+        password: 'Passw0rd!123',
         name: 'Test User',
       };
 
@@ -92,14 +92,14 @@ describe('API User Management', () => {
       const userData1 = {
         username: 'duplicateuser',
         email: 'duplicate1@example.com',
-        password: 'password123',
+        password: 'Passw0rd!123',
         name: 'First User',
       };
 
       const userData2 = {
         username: 'duplicateuser', // Same username
         email: 'duplicate2@example.com',
-        password: 'password123',
+        password: 'Passw0rd!123',
         name: 'Second User',
       };
 
@@ -133,7 +133,7 @@ describe('API User Management', () => {
         const userData = {
           username: `testuser_${Date.now()}_${Math.random()}`,
           email: email,
-          password: 'password123',
+          password: 'Passw0rd!123',
           name: 'Test User',
         };
 
@@ -152,14 +152,14 @@ describe('API User Management', () => {
       const userData1 = {
         username: 'user1',
         email: 'duplicate@example.com',
-        password: 'password123',
+        password: 'Passw0rd!123',
         name: 'First User',
       };
 
       const userData2 = {
         username: 'user2', // Different username
         email: 'duplicate@example.com', // Same email
-        password: 'password123',
+        password: 'Passw0rd!123',
         name: 'Second User',
       };
 
@@ -185,7 +185,7 @@ describe('API User Management', () => {
       const userData = {
         username: 'emailtest',
         email: 'TestUser@Example.COM', // Mixed case email
-        password: 'password123',
+        password: 'Passw0rd!123',
         name: 'Test User',
       };
 
@@ -203,7 +203,7 @@ describe('API User Management', () => {
       const userData = {
         username: 'roleattempt',
         email: 'roleattempt@example.com',
-        password: 'password123',
+        password: 'Passw0rd!123',
         name: 'Role Attempt',
         role: 'admin', // Attempt to set admin role
       };
@@ -223,14 +223,14 @@ describe('API User Management', () => {
       const userData1 = {
         username: 'caseuser1',
         email: 'CaseTest@Example.com',
-        password: 'password123',
+        password: 'Passw0rd!123',
         name: 'First User',
       };
 
       const userData2 = {
         username: 'caseuser2',
         email: 'casetest@example.com', // Same email, different case
-        password: 'password123',
+        password: 'Passw0rd!123',
         name: 'Second User',
       };
 
@@ -260,7 +260,7 @@ describe('API User Management', () => {
       const userData = {
         username: 'authuser',
         email: 'authuser@example.com',
-        password: 'password123',
+        password: 'Passw0rd!123',
         name: 'Auth User',
       };
 
@@ -271,7 +271,7 @@ describe('API User Management', () => {
       // Then authenticate
       const authData = {
         username: 'authuser',
-        password: 'password123',
+        password: 'Passw0rd!123',
       };
 
       const response = await request(context.api.getApp())
@@ -290,7 +290,7 @@ describe('API User Management', () => {
       const userData = {
         username: 'wrongpassuser',
         email: 'wrongpass@example.com',
-        password: 'password123',
+        password: 'Passw0rd!123',
         name: 'Wrong Pass User',
       };
 
@@ -315,7 +315,7 @@ describe('API User Management', () => {
     it('should fail authentication with non-existent user', async () => {
       const authData = {
         username: 'nonexistent',
-        password: 'password123',
+        password: 'Passw0rd!123',
       };
 
       const response = await request(context.api.getApp())

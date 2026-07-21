@@ -196,25 +196,207 @@ describe('Database Integration', () => {
       });
 
       // Search for records
-      const results = await dbService.searchRecords('parking', {});
+      const { results, total } = await dbService.searchRecords('parking', {});
       expect(results.length).toBeGreaterThanOrEqual(1);
       expect(results[0].record_id).toBe('bylaw-001');
       expect(results[0].title).toBe('Test Bylaw');
+      // `total` counts all matches, so it is never smaller than the page.
+      expect(total).toBeGreaterThanOrEqual(results.length);
 
       // Search by type
-      const bylawResults = await dbService.searchRecords('parking', {
-        type: 'bylaw',
-      });
+      const bylawResults = (
+        await dbService.searchRecords('parking', {
+          type: 'bylaw',
+        })
+      ).results;
       if (bylawResults.length > 0) {
         expect(bylawResults[0].record_type).toBe('bylaw');
       }
 
       // Remove from index
       await dbService.removeRecordFromIndex('bylaw-001', 'bylaw');
-      const emptyResults = await dbService.searchRecords('parking', {});
+      const emptyResults = (await dbService.searchRecords('parking', {}))
+        .results;
       expect(
         emptyResults.filter((r) => r.record_id === 'bylaw-001').length
       ).toBe(0);
+    });
+  });
+
+  // searchRecords had the same silent-default bug as listRecords (20 rather
+  // than 10) plus a worse twist: it returned a bare array with no total, so a
+  // caller holding a clipped page had nothing to compare it against. The layer
+  // above papered over that by reporting the page size AS the total.
+  describe('searchRecords limit contract', () => {
+    const seedIndexed = async (count: number) => {
+      for (let i = 0; i < count; i++) {
+        const id = `bylaw-${String(i).padStart(3, '0')}`;
+        await dbService.createRecord({
+          id,
+          title: `Parking Bylaw ${i}`,
+          type: 'bylaw',
+          status: 'adopted',
+          content: 'A bylaw about parking regulations.',
+          author: 'council',
+        });
+        await dbService.indexRecord({
+          recordId: id,
+          recordType: 'bylaw',
+          title: `Parking Bylaw ${i}`,
+          content: 'A bylaw about parking regulations.',
+          tags: 'parking',
+          metadata: JSON.stringify({ status: 'adopted' }),
+        });
+      }
+    };
+
+    it('returns EVERY match when limit is omitted — never a silent 20', async () => {
+      await seedIndexed(25);
+
+      const { results, total } = await dbService.searchRecords('parking');
+
+      expect(results).toHaveLength(25);
+      expect(total).toBe(25);
+    });
+
+    it('reports the total of ALL matches, not the size of the page', async () => {
+      await seedIndexed(25);
+
+      const { results, total } = await dbService.searchRecords('parking', {
+        limit: 5,
+      });
+
+      expect(results).toHaveLength(5);
+      // The bug this pins: `total` used to come back as 5, so the API computed
+      // totalPages = ceil(5/5) = 1 and told the client there was nothing more.
+      expect(total).toBe(25);
+    });
+
+    it('applies offset as a real window into the match set', async () => {
+      await seedIndexed(25);
+
+      const all = await dbService.searchRecords('parking', { limit: 'all' });
+      const page = await dbService.searchRecords('parking', {
+        limit: 5,
+        offset: 20,
+      });
+
+      expect(page.results).toHaveLength(5);
+      expect(page.total).toBe(25);
+      expect(page.results.map((r: any) => r.record_id)).toEqual(
+        all.results.slice(20).map((r: any) => r.record_id)
+      );
+    });
+
+    it('treats limit:0 as a real request, not as "unset"', async () => {
+      await seedIndexed(12);
+
+      const { results, total } = await dbService.searchRecords('parking', {
+        limit: 0,
+      });
+
+      expect(results).toHaveLength(0);
+      // Still an honest count of what matched, which is what makes a
+      // zero-length page distinguishable from "nothing matched".
+      expect(total).toBe(12);
+    });
+  });
+
+  // listRecords used to append `LIMIT ?` with `options.limit || 10`, so a
+  // caller that omitted `limit` got the 10 newest rows in a shape
+  // indistinguishable from the complete set. Three consumers hand-rolled
+  // offset paging to escape it, and the one that didn't — the recordings
+  // backfill, which treats "no session references this file" as authority to
+  // DELETE a published object — was one code path away from deleting verified
+  // public recordings. `limit` is now a page size or 'all', and omission means
+  // 'all'.
+  describe('listRecords limit contract', () => {
+    const seed = async (count: number) => {
+      for (let i = 0; i < count; i++) {
+        await dbService.createRecord({
+          id: `bylaw-${String(i).padStart(3, '0')}`,
+          title: `Bylaw ${i}`,
+          type: 'bylaw',
+          status: 'adopted',
+          author: 'council',
+        });
+      }
+    };
+
+    it('returns EVERY row when limit is omitted — never a silent page', async () => {
+      await seed(25);
+
+      const result = await dbService.listRecords();
+
+      expect(result.total).toBe(25);
+      // The assertion that would have failed before: exactly 10 came back.
+      expect(result.records).toHaveLength(25);
+    });
+
+    it("returns every row for an explicit limit:'all'", async () => {
+      await seed(25);
+
+      const result = await dbService.listRecords({ limit: 'all' });
+
+      expect(result.records).toHaveLength(25);
+      expect(result.total).toBe(25);
+    });
+
+    it('honours a numeric limit as a page, and reports the unpaged total', async () => {
+      await seed(25);
+
+      const result = await dbService.listRecords({ limit: 10 });
+
+      expect(result.records).toHaveLength(10);
+      // `total` is the whole corpus, not the page — that is what makes a
+      // truncated read detectable by a caller who bothers to look.
+      expect(result.total).toBe(25);
+    });
+
+    it("applies an offset alongside limit:'all' instead of dropping it", async () => {
+      await seed(25);
+
+      const all = await dbService.listRecords({ limit: 'all' });
+      const offset = await dbService.listRecords({ limit: 'all', offset: 20 });
+
+      // OFFSET is only valid after a LIMIT, so 'all' + offset has to synthesize
+      // one. Getting that wrong silently returns the FIRST rows instead of the
+      // ones asked for, so compare identities, not just the count.
+      expect(offset.records).toHaveLength(5);
+      expect(offset.records.map((r: any) => r.id)).toEqual(
+        all.records.slice(20).map((r: any) => r.id)
+      );
+    });
+
+    it('treats limit:0 as a real request, not as "unset"', async () => {
+      await seed(12);
+
+      const result = await dbService.listRecords({ limit: 0 });
+
+      // The old `||` coerced 0 to 10. `??` keeps it meaning "count only".
+      expect(result.records).toHaveLength(0);
+      expect(result.total).toBe(12);
+    });
+
+    it('THROWS rather than truncating when the corpus outgrows the all-cap', async () => {
+      await seed(3);
+
+      // The cap is 100k, which is impractical to seed. Drive the same guard by
+      // asking the store to certify a corpus larger than a cap of 2.
+      const store: any = (dbService as any).records;
+      const realQuery = store.adapter.query.bind(store.adapter);
+      store.adapter.query = async (sql: string, params: any[]) =>
+        sql.includes('COUNT(*)')
+          ? [{ count: 100_001 }]
+          : realQuery(sql, params);
+
+      try {
+        await expect(dbService.listRecords({ limit: 'all' })).rejects.toThrow(
+          /refusing to materialize 100001 rows/
+        );
+      } finally {
+        store.adapter.query = realQuery;
+      }
     });
   });
 

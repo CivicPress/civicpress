@@ -80,6 +80,18 @@ export default defineConfig({
       '**/cli/node_modules/**',    // Skip CLI dependencies
       '**/core/node_modules/**',   // Skip core dependencies
       'tests/ui/**',               // Exclude UI tests (use vitest.config.ui.mjs with happy-dom)
+      // QUARANTINE — BURNED DOWN 2026-07-17 (phase-7e test-health). The 5 files
+      // that formerly failed deterministically from a clean checkout are fixed
+      // and now pass individually AND together from clean; they run in CI again.
+      // The root causes were NOT flaky tests — they surfaced 3 real product bugs
+      // (CSRF base-path regression on public config-validation; a backwards
+      // enrollment_codes→devices FK that PRAGMA foreign_keys=ON broke; the
+      // ack-gated start_session mis-keying the device room by DB id) plus a
+      // publish-idempotency collision and stale test expectations. The
+      // CIVIC_TEST_QUARANTINE env hook is retained (empty) so a future
+      // regression can be parked here WITH a tracker entry — do not add files
+      // without one.
+      ...(process.env.CIVIC_TEST_QUARANTINE === '1' ? [] : []),
     ],
     // Be very strict about what we include
     testNamePattern: undefined,

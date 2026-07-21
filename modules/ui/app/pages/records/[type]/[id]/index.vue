@@ -52,12 +52,16 @@ const {
 
 // BroadcastBox session media: the transcript artifact URL + its verification label
 // (top-level frontmatter on a `session` record: `media.transcript`, `transcript_status`).
-const transcriptSrc = computed(
-  () => (record.value?.metadata as any)?.media?.transcript as string | undefined
+type SessionMediaMetadata = {
+  media?: { transcript?: string };
+  transcript_status?: string;
+};
+const sessionMetadata = computed(
+  () => record.value?.metadata as SessionMediaMetadata | undefined
 );
+const transcriptSrc = computed(() => sessionMetadata.value?.media?.transcript);
 const transcriptStatus = computed(
-  () =>
-    (record.value?.metadata as any)?.transcript_status as string | undefined
+  () => sessionMetadata.value?.transcript_status
 );
 </script>
 

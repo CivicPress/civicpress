@@ -16,6 +16,12 @@
  *       fire a hook but still persist (dropping a snapshot is worse).
  *   (d) TTL-cleaned — cleanupExpired() deletes rows older than SNAPSHOT_TTL_MS
  *       whose room is NOT currently active.
+ *   (e) version-bounded — persist() keeps only the newest
+ *       MAX_SNAPSHOT_VERSIONS_PER_ROOM rows per room. Without this a room
+ *       accumulates one row per snapshot interval FOREVER: versions only climb,
+ *       nothing overwrites, and the (d) TTL sweep deliberately skips rooms that
+ *       are still active — so the busiest documents are exactly the ones that
+ *       never get reclaimed.
  */
 
 import { createHash } from 'node:crypto';
@@ -35,6 +41,16 @@ export const SNAPSHOT_FORMAT_V1 = 1;
 export const MAX_SNAPSHOT_BYTES = 1 * 1024 * 1024; // 1 MB
 /** Rows older than this whose room is inactive are eligible for cleanup. */
 export const SNAPSHOT_TTL_MS = 48 * 60 * 60 * 1000; // 48h
+/**
+ * Retention: how many snapshot rows to keep per room (newest wins).
+ *
+ * Only the newest row is ever READ (loadLatestVerified); on corruption the
+ * documented recovery is a Markdown re-seed, not a walk back through older
+ * versions. The extra rows exist purely as an operator-facing forensic hedge,
+ * so a small constant is enough — and 3 × MAX_SNAPSHOT_BYTES caps a single
+ * room's worst-case footprint at ~3 MB instead of unbounded growth.
+ */
+export const MAX_SNAPSHOT_VERSIONS_PER_ROOM = 3;
 
 /** Caller-facing persist payload (W4 API). */
 export interface PersistRequest {
@@ -74,6 +90,11 @@ export interface SnapshotHookEvents {
     roomId: string;
     version: number;
     ageMs: number;
+  };
+  'realtime:snapshot:pruned': {
+    roomId: string;
+    version: number;
+    keep: number;
   };
 }
 
@@ -188,6 +209,11 @@ export class SnapshotManager {
         version: nextVersion,
         byteSize,
       });
+      // Retention runs on the WRITE path, not the TTL sweep: the sweep skips
+      // active rooms by design, so a room that is continuously edited would
+      // otherwise never shed a single row. Best-effort — a prune failure must
+      // never fail (or roll back) the snapshot that was just written.
+      await this.pruneVersions(roomId);
     } catch (error) {
       coreError(
         error instanceof Error && isCivicPressError(error)
@@ -204,6 +230,50 @@ export class SnapshotManager {
       );
       throw error;
     }
+  }
+
+  /**
+   * Drop all but the newest {@link MAX_SNAPSHOT_VERSIONS_PER_ROOM} rows of a room.
+   *
+   * Called from persist() (the only place rows are created). NEVER throws: the
+   * snapshot has already been written at that point, and failing the caller
+   * because a *cleanup* failed would turn a disk-space nuisance into lost
+   * persistence. Returns the number of rows deleted; fires
+   * realtime:snapshot:pruned per deleted row.
+   */
+  async pruneVersions(
+    roomId: string,
+    keep = MAX_SNAPSHOT_VERSIONS_PER_ROOM
+  ): Promise<number> {
+    let deleted = 0;
+    try {
+      // Newest-first, so everything past `keep` is the prunable tail.
+      const versions = await this.storage.listVersions(roomId);
+      for (const version of versions.slice(Math.max(0, keep))) {
+        await this.storage.deleteRow(roomId, version);
+        this.hookBus.emit('realtime:snapshot:pruned', {
+          roomId,
+          version,
+          keep,
+        });
+        deleted++;
+      }
+      if (deleted > 0) {
+        coreInfo(`Snapshot retention pruned ${deleted} old versions`, {
+          operation: 'realtime:snapshot:pruned',
+          roomId,
+          deleted,
+          keep,
+        });
+      }
+    } catch (error) {
+      coreWarn('Snapshot retention prune failed; rows retained for next pass', {
+        operation: 'realtime:snapshot:prune:error',
+        roomId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+    return deleted;
   }
 
   /**

@@ -267,32 +267,11 @@ export const useAuthStore = defineStore('auth', {
       }
     },
 
-    // Development method to set mock user
-    setMockUser() {
-      const mockUser: User = {
-        id: 1,
-        username: 'admin',
-        email: 'admin@example.com',
-        name: 'Admin User',
-        role: 'admin',
-        permissions: [
-          'records:create',
-          'records:edit',
-          'records:delete',
-          'records:view',
-        ],
-      };
-
-      this.user = mockUser;
-      this.isAuthenticated = true;
-      this.token = 'mock-token';
-      this.sessionExpiresAt = new Date(
-        Date.now() + 24 * 60 * 60 * 1000
-      ).toISOString();
-      this.saveAuthState();
-
-      console.log('Mock user set:', mockUser);
-    },
+    // NOTE: the old setMockUser() dev helper was deleted (post-audit
+    // hardening): it shipped in the production bundle as a zero-caller
+    // console-invocable action that flipped the store to an admin user.
+    // Client state is not a security boundary — the API re-authorizes every
+    // request — but a one-call admin-UI escalation is not something to ship.
 
     // Validate token and refresh user data
     async validateToken() {

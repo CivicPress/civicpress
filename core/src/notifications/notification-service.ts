@@ -247,6 +247,15 @@ export class NotificationService {
     const channel = this.channels.get(channelName);
 
     if (!channel) {
+      // sms/slack are declared in the config schema (with defaults + rate
+      // limits) but no channel implementation was ever built — only email
+      // exists. Say so plainly rather than a generic "not found", so an
+      // operator who enables them isn't left guessing.
+      if (channelName === 'sms' || channelName === 'slack') {
+        throw new Error(
+          `Channel '${channelName}' is configurable but not implemented (only 'email' is available)`
+        );
+      }
       throw new Error(`Channel not found: ${channelName}`);
     }
 
@@ -257,6 +266,21 @@ export class NotificationService {
     }
 
     const recipient = this.getChannelRecipient(request, channelName);
+
+    // A blank recipient used to be dispatched anyway (getChannelRecipient
+    // returns '' for a missing address) and logged as "sent successfully".
+    // Fail loudly instead — a notification to nobody is never a success.
+    if (!recipient || !recipient.trim()) {
+      throw new Error(
+        `No recipient for channel '${channelName}' (missing ${
+          channelName === 'sms'
+            ? 'phone'
+            : channelName === 'slack'
+              ? 'userId'
+              : 'email'
+        })`
+      );
+    }
 
     // Send via channel
     await channel.send({

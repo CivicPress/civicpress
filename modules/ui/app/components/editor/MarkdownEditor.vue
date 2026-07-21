@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import CodeMirrorEditor from './CodeMirrorEditor.vue';
 import CollaborativeMarkdownEditor from './CollaborativeMarkdownEditor.vue';
 import { isLosslesslyRoundTrippable } from '~/utils/content-loss-guard';
@@ -58,22 +58,54 @@ const collabRequested = computed(
   () => props.collaborativeMode && props.recordId.length > 0
 );
 
-/** Whether the current content can be edited collaboratively without loss. */
-const contentRoundTrips = computed(() =>
-  isLosslesslyRoundTrippable(props.modelValue)
+/**
+ * The collab-vs-CodeMirror decision is LATCHED per record, not evaluated live.
+ *
+ * The content-loss guard reads props.modelValue, which changes on every
+ * keystroke. Evaluated live, typing a construct the schema cannot preserve (a
+ * raw <div>, a footnote) flipped the decision to false MID-SESSION: the v-if
+ * tore down the mounted collaborative editor — dropping the realtime room,
+ * remote cursors and undo history — and swapped it back the moment the
+ * character was deleted, flapping between surfaces as the user typed. The
+ * guard's question is "may THIS record be opened collaboratively?", so it is
+ * answered once per record, against the content as loaded, then frozen for the
+ * rest of that editing session.
+ *
+ * The decision is (re-)taken only when collab becomes requestable or the
+ * recordId changes (the host is reused across records). props.modelValue is
+ * read inside the callback and NOT in the watch source, so keystrokes cannot
+ * retrigger it.
+ *
+ * SSR safety is unchanged: `collabRequested` needs a non-empty recordId, and
+ * the host (RecordForm) only populates the record id in onMounted
+ * (client-side) — so during SSR nothing is latched and CodeMirror renders.
+ */
+const latchedRecordId = ref<string | null>(null);
+const latchedRoundTrips = ref(false);
+
+watch(
+  [collabRequested, () => props.recordId],
+  ([requested, id]) => {
+    if (!requested) return;
+    if (latchedRecordId.value === id) return;
+    latchedRecordId.value = id;
+    latchedRoundTrips.value = isLosslesslyRoundTrippable(props.modelValue);
+  },
+  { immediate: true }
 );
 
 /**
- * Use the collaborative editor only when requested AND content round-trips.
- *
- * SSR safety: the collaborative editor opens a WebSocket and builds a
- * ProseMirror EditorView (client-only). It never enters setup on the server
- * because `collabRequested` needs a non-empty recordId, and the host
- * (RecordForm) only populates the record id in onMounted (client-side) — so
- * during SSR `collabRequested` is false and the CodeMirror surface renders.
+ * A decision has been latched for the record currently being edited. Until it
+ * has, the surface stays on CodeMirror — the fail-safe direction, since
+ * CodeMirror edits the raw Markdown and never drops content.
  */
+const decided = computed(
+  () => collabRequested.value && latchedRecordId.value === props.recordId
+);
+
+/** Use the collaborative editor only when the latched decision allows it. */
 const useCollaborative = computed(
-  () => collabRequested.value && contentRoundTrips.value
+  () => decided.value && latchedRoundTrips.value
 );
 
 /**
@@ -82,7 +114,7 @@ const useCollaborative = computed(
  * recordId was supplied (those are not user-visible downgrades).
  */
 const showFallbackNotice = computed(
-  () => collabRequested.value && !contentRoundTrips.value
+  () => decided.value && !latchedRoundTrips.value
 );
 
 // Forward exposed methods to whichever surface is active so RecordForm's

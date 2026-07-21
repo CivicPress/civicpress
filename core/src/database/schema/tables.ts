@@ -5,6 +5,21 @@
  */
 
 export const CORE_TABLE_STATEMENTS: string[] = [
+  // Migration ledger. First in the list so it is available to Step 2 of
+  // initialize(), which records into it.
+  //
+  // `outcome` distinguishes a migration this database actually executed
+  // ('applied') from one whose shape it already had when the ledger was
+  // introduced ('adopted'). Without that split every pre-existing deployment
+  // would look, on its first run after the ledger landed, exactly like a fresh
+  // database that had just run every migration — which is precisely the kind
+  // of "looks like it worked" answer the ledger exists to stop giving.
+  `CREATE TABLE IF NOT EXISTS schema_migrations (
+    id TEXT PRIMARY KEY,
+    outcome TEXT NOT NULL,
+    applied_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`,
+
   // Users table for API keys and sessions
   `CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -15,6 +30,7 @@ export const CORE_TABLE_STATEMENTS: string[] = [
     avatar_url TEXT,
     password_hash TEXT,
     auth_provider TEXT DEFAULT 'password',
+    provider_user_id TEXT,
     email_verified BOOLEAN DEFAULT FALSE,
     pending_email TEXT,
     pending_email_token TEXT,
@@ -157,13 +173,17 @@ export const CORE_TABLE_STATEMENTS: string[] = [
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
   )`,
 
-  // Record locks table (temporary until v3 collaboration)
+  // Record locks table (temporary until v3 collaboration). Deliberately NO
+  // FK to records(id): editing locks are taken on DRAFTS, whose id exists
+  // only in record_drafts until publish, so an enforced FK made draft
+  // locking impossible. The table is ephemeral (locks expire); deleteRecord
+  // cleans up explicitly. Existing databases are rebuilt to this shape by
+  // ensureRecordLocksWithoutFk in schema/migrations.ts.
   `CREATE TABLE IF NOT EXISTS record_locks (
     record_id TEXT PRIMARY KEY,
     locked_by TEXT NOT NULL,
     locked_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    expires_at DATETIME,
-    FOREIGN KEY (record_id) REFERENCES records(id) ON DELETE CASCADE
+    expires_at DATETIME
   )`,
 
   // Saga states table for saga pattern persistence and recovery

@@ -4,8 +4,9 @@
  * in the monorepo `tests/` suite.
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { readFile } from 'node:fs/promises';
+import { Readable } from 'node:stream';
 import {
   CoreRecordsGateway,
   type CoreRecord,
@@ -16,14 +17,40 @@ import type { TranscriptResult } from '../types.js';
 function fakeStore(records: CoreRecord[]): {
   store: RecordStore;
   updates: Array<{ id: string; request: any; user: any }>;
+  reads: string[];
+  listCalls: Array<{ limit?: number | 'all'; offset?: number }>;
 } {
   const updates: Array<{ id: string; request: any; user: any }> = [];
+  const reads: string[] = [];
+  const listCalls: Array<{ limit?: number | 'all'; offset?: number }> = [];
   const byId = new Map(records.map((r) => [r.id, r]));
   const store: RecordStore = {
-    async listRecords() {
-      return { records: records.map((r) => ({ id: r.id })) };
+    // Mirrors core's listRecords contract (record-store.ts): `limit` is a page
+    // size or 'all', and omitting it means 'all'.
+    //
+    // This fake used to reproduce the OLD contract's trap on purpose — a LIMIT
+    // always applied, silently defaulting to 10 — because the gateway escaped
+    // it by hand-rolling offset paging, and a fake that returned everything
+    // would have hidden the truncation that paging fixed. The trap is gone at
+    // the source now, so the fake models the real thing. `listCalls` keeps the
+    // guarantee testable from this side: the gateway must still ASK for the
+    // complete set.
+    async listRecords(
+      options: { limit?: number | 'all'; offset?: number } = {}
+    ) {
+      listCalls.push(options);
+      const offset = options.offset ?? 0;
+      const limit = options.limit ?? 'all';
+      const end = limit === 'all' ? records.length : offset + limit;
+      return {
+        records: records
+          .slice(offset, end)
+          // The row is the raw DB row: metadata is the frontmatter as JSON.
+          .map((r) => ({ id: r.id, metadata: JSON.stringify(r.metadata ?? {}) })),
+      };
     },
     async getRecord(id: string) {
+      reads.push(id);
       return byId.get(id) ?? null;
     },
     async updateRecord(id, request, user) {
@@ -31,7 +58,7 @@ function fakeStore(records: CoreRecord[]): {
       return null;
     },
   };
-  return { store, updates };
+  return { store, updates, reads, listCalls };
 }
 
 const TRANSCRIPT: TranscriptResult = {
@@ -67,6 +94,85 @@ describe('CoreRecordsGateway.findNeedingTranscription', () => {
     expect(result.map((s) => s.id)).toEqual(['needs']);
   });
 
+  // The 25th session is the one that needs work. Under the store's old silent
+  // `LIMIT 10` an unpaged scan stopped at row 10 and 'stale' was never
+  // transcribed — no error, just a session that quietly never finished.
+  it('scans PAST the first 10 rows, asking the store for the complete set', async () => {
+    const done = Array.from({ length: 24 }, (_, i) => ({
+      id: `old-${i}`,
+      metadata: {
+        capture: { device: 'bb', av_file: `uuid-${i}`, segments: [] },
+        transcript_status: 'automated',
+      },
+    }));
+    const { store, listCalls } = fakeStore([
+      ...done,
+      {
+        id: 'stale',
+        metadata: { capture: { device: 'bb', av_file: 'uuid-x', segments: [] } },
+      },
+    ]);
+    const gw = new CoreRecordsGateway({
+      records: store,
+      storage: { async getFileContent() { return null; } },
+    });
+    expect((await gw.findNeedingTranscription()).map((s) => s.id)).toEqual([
+      'stale',
+    ]);
+    // Pin the mechanism, not just the outcome: a numeric page size here would
+    // reintroduce the truncation the moment a deployment outgrew it.
+    expect(listCalls.every((c) => c.limit === 'all')).toBe(true);
+  });
+
+  it('scopes the scan by status: already-transcribed rows are never read from disk', async () => {
+    const { store, reads } = fakeStore([
+      {
+        id: 'done',
+        metadata: {
+          capture: { device: 'bb', av_file: 'uuid-2', segments: [] },
+          transcript_status: 'automated',
+        },
+      },
+      {
+        id: 'needs',
+        metadata: { capture: { device: 'bb', av_file: 'uuid-1', segments: [] } },
+      },
+    ]);
+    const gw = new CoreRecordsGateway({
+      records: store,
+      storage: { async getFileContent() { return null; } },
+    });
+
+    expect((await gw.findNeedingTranscription()).map((s) => s.id)).toEqual([
+      'needs',
+    ]);
+    // getRecord() is a DB read PLUS a markdown read + YAML parse per session.
+    expect(reads).toEqual(['needs']);
+  });
+
+  it('still reads a row authoritatively when its indexed metadata is unreadable', async () => {
+    const { store, reads } = fakeStore([
+      {
+        id: 'needs',
+        metadata: { capture: { device: 'bb', av_file: 'uuid-1', segments: [] } },
+      },
+    ]);
+    // Absence of a status in the row must NOT be read as "already transcribed";
+    // the markdown file is the source of truth.
+    store.listRecords = async () => ({
+      records: [{ id: 'needs', metadata: 'not-json{' }],
+    });
+    const gw = new CoreRecordsGateway({
+      records: store,
+      storage: { async getFileContent() { return null; } },
+    });
+
+    expect((await gw.findNeedingTranscription()).map((s) => s.id)).toEqual([
+      'needs',
+    ]);
+    expect(reads).toEqual(['needs']);
+  });
+
   it('reads fields lifted to TOP-LEVEL (not nested under metadata)', async () => {
     const { store } = fakeStore([
       { id: 'top', capture: { device: 'bb', av_file: 'uuid-3' }, visibility: 'public' },
@@ -82,7 +188,81 @@ describe('CoreRecordsGateway.findNeedingTranscription', () => {
 });
 
 describe('CoreRecordsGateway.prepareAudio', () => {
-  it('writes the fetched blob to a temp file', async () => {
+  // A meeting recording is single-digit GB (the upload cap is 16 GiB), so the
+  // whole-file getFileContent() Buffer this replaces pinned that much RSS and
+  // hard-failed past Node's ~2 GiB max Buffer length.
+  it('STREAMS the A/V to the temp file — never materializes it as a Buffer', async () => {
+    const getFileContent = vi.fn(async () => {
+      throw new Error('whole-file buffer read must not happen');
+    });
+    const gw = new CoreRecordsGateway({
+      records: fakeStore([]).store,
+      storage: {
+        getFileContent: getFileContent as any,
+        async downloadFileStream() {
+          return Readable.from([Buffer.from('CHUNK-1'), Buffer.from('CHUNK-2')]);
+        },
+      },
+    });
+
+    const ref = await gw.prepareAudio({ id: 's1', capture: { av_file: 'uuid-x' } });
+
+    expect(await readFile(ref.path, 'utf-8')).toBe('CHUNK-1CHUNK-2');
+    expect(getFileContent).not.toHaveBeenCalled();
+  });
+
+  it('throws (leaving the session for the next cycle) when the stream is missing', async () => {
+    const gw = new CoreRecordsGateway({
+      records: fakeStore([]).store,
+      storage: {
+        async getFileContent() { return Buffer.from('never'); },
+        async downloadFileStream() { return null; },
+      },
+    });
+    await expect(
+      gw.prepareAudio({ id: 's1', capture: { av_file: 'gone' } })
+    ).rejects.toThrow(/not found in storage/);
+  });
+
+  it('propagates a mid-transfer stream failure instead of writing a truncated file', async () => {
+    const gw = new CoreRecordsGateway({
+      records: fakeStore([]).store,
+      storage: {
+        async getFileContent() { return null; },
+        async downloadFileStream() {
+          return new Readable({
+            read() {
+              this.push(Buffer.from('HEAD'));
+              this.destroy(new Error('provider connection reset'));
+            },
+          });
+        },
+      },
+    });
+    await expect(
+      gw.prepareAudio({ id: 's1', capture: { av_file: 'uuid-x' } })
+    ).rejects.toThrow(/provider connection reset/);
+  });
+
+  // FA-BB-013 must hold on the streaming path too.
+  it('sanitizes a path-traversal av_file on the STREAMING path', async () => {
+    const gw = new CoreRecordsGateway({
+      records: fakeStore([]).store,
+      storage: {
+        async getFileContent() { return null; },
+        async downloadFileStream() { return Readable.from([Buffer.from('X')]); },
+      },
+    });
+    const ref = await gw.prepareAudio({
+      id: 's1',
+      capture: { av_file: '../../../../etc/passwd' },
+    });
+    expect(ref.path).not.toContain('..');
+    expect(ref.path).toContain('transcribe-av-');
+    expect(await readFile(ref.path, 'utf-8')).toBe('X');
+  });
+
+  it('falls back to the buffered fetch for a store with no streaming path', async () => {
     const bytes = Buffer.from('FAKE-AV-BYTES');
     const gw = new CoreRecordsGateway({
       records: fakeStore([]).store,

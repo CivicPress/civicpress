@@ -5,6 +5,7 @@ import {
   requireRecordPermission,
 } from '../middleware/auth.js';
 import { Logger } from '@civicpress/core';
+import type { GitCommit } from '@civicpress/core';
 import {
   sendSuccess,
   handleApiError,
@@ -13,6 +14,140 @@ import {
 } from '../utils/api-logger.js';
 
 const logger = new Logger();
+
+/** Minimal shape of the GitEngine this router needs (keeps it test-fakeable). */
+interface HistoryGitEngine {
+  getHistory: (
+    limit?: number,
+    pathspec?: string,
+    skip?: number
+  ) => Promise<GitCommit[]>;
+  countCommits: (pathspec?: string) => Promise<number>;
+}
+
+/**
+ * Resolve the requested record to a git pathspec.
+ *
+ * Returns the record's real file path so the log can be scoped with
+ * `git log -- <path>`. When the record can't be resolved, signals that the
+ * caller must fall back to the commit-MESSAGE match, which git cannot express
+ * and therefore has to happen in JS over the full log.
+ */
+async function resolveRecordPathspec(
+  req: AuthenticatedRequest,
+  record: string | undefined
+): Promise<{ pathspec?: string; messageFallback: boolean }> {
+  if (!record) {
+    return { messageFallback: false };
+  }
+  try {
+    const rec = await req.civicPress?.getRecordManager().getRecord(record);
+    const recordPath = (rec as { path?: string } | null | undefined)?.path;
+    if (recordPath) {
+      return { pathspec: recordPath, messageFallback: false };
+    }
+  } catch (error) {
+    logger.warn('Could not resolve record path for history pathspec', {
+      record,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+  return { messageFallback: true };
+}
+
+/** Fallback: message match (id or `<id>.md`), no no-op replace. */
+function filterByMessage(history: GitCommit[], record: string): GitCommit[] {
+  const messageNeedle = `${record}.md`;
+  return history.filter(
+    (commit) =>
+      commit.message.includes(record) || commit.message.includes(messageNeedle)
+  );
+}
+
+/**
+ * Fetch ONE page of commit history plus the total for the requested filters.
+ *
+ * Git history is a log, not a table — there is nothing to SQL-paginate here.
+ * What it CAN do is stop over-fetching: both handlers below used to call
+ * `getHistory()` with no limit on every request, pulling the repository's
+ * ENTIRE commit log into memory just to `.slice()` ten commits out of it, so
+ * per-request memory grew with the age of the repo.
+ *
+ * Two regimes, because `totalCommits` is defined over the FILTERED set:
+ *
+ *  - No author/date filter and no message fallback: git can do the whole job.
+ *    `--skip`/`--max-count` return exactly one page and `rev-list --count`
+ *    returns the true total, so nothing beyond the page is ever materialized.
+ *
+ *  - Otherwise: the author/date predicates and the commit-MESSAGE fallback are
+ *    applied in JS, and a correct total requires counting the whole filtered
+ *    set — so the full log genuinely IS needed, and is fetched exactly as
+ *    before. Narrowing it with git's own `--author`/`--since` was rejected
+ *    deliberately: git's `--author` is a case-sensitive regex over
+ *    "Name <email>", while this endpoint does a case-insensitive substring
+ *    match against name OR email, and swapping them would silently change
+ *    which commits callers get back.
+ */
+async function fetchHistoryPage(
+  req: AuthenticatedRequest,
+  gitEngine: HistoryGitEngine,
+  params: {
+    record?: string;
+    limit: number;
+    offset: number;
+    author?: string;
+    since?: string;
+    until?: string;
+  }
+): Promise<{ commits: GitCommit[]; total: number }> {
+  const { record, limit, offset, author, since, until } = params;
+
+  const scope = await resolveRecordPathspec(req, record);
+
+  const needsInMemoryFilter = Boolean(
+    author || since || until || scope.messageFallback
+  );
+
+  if (!needsInMemoryFilter) {
+    const [commits, total] = await Promise.all([
+      gitEngine.getHistory(limit, scope.pathspec, offset),
+      gitEngine.countCommits(scope.pathspec),
+    ]);
+    return { commits, total };
+  }
+
+  let history = await gitEngine.getHistory(undefined, scope.pathspec);
+
+  if (scope.messageFallback && record) {
+    history = filterByMessage(history, record);
+  }
+
+  if (author) {
+    const needle = author.toLowerCase();
+    history = history.filter(
+      (commit) =>
+        commit.author_name?.toLowerCase().includes(needle) ||
+        commit.author_email?.toLowerCase().includes(needle)
+    );
+  }
+
+  if (since || until) {
+    const sinceDate = since ? new Date(since) : null;
+    const untilDate = until ? new Date(until) : null;
+
+    history = history.filter((commit) => {
+      const commitDate = new Date(commit.date);
+      if (sinceDate && commitDate < sinceDate) return false;
+      if (untilDate && commitDate > untilDate) return false;
+      return true;
+    });
+  }
+
+  return {
+    commits: history.slice(offset, offset + limit),
+    total: history.length,
+  };
+}
 
 export function createHistoryRouter() {
   const router = Router();
@@ -84,58 +219,23 @@ export function createHistoryRouter() {
         // Get Git engine from CivicPress
         const gitEngine = civicPress.getGitEngine();
 
-        // Get commit history - get all commits first, then filter and paginate
         const historyLimit = parseInt(limit as string) || 10;
         const historyOffset = parseInt(offset as string) || 0;
 
-        // Get all commits first to get accurate total count
-        let history = await gitEngine.getHistory();
-
-        // Filter by record if specified
-        if (record) {
-          const recordPath = `${record}.md`;
-          const recordStr = record as string;
-          history = history.filter((commit) => {
-            // Check if this commit affected the specified record
-            return (
-              commit.message.includes(recordStr) ||
-              commit.message.includes(recordPath) ||
-              commit.message.includes(recordStr.replace('/', '/'))
-            );
+        // Scope by record via a git pathspec when one is requested. Resolve
+        // the record's actual file path and let git filter (git log -- path);
+        // fall back to a commit-message match only when the record can't be
+        // resolved. (The old code substring-matched the message with a no-op
+        // `.replace('/','/')`, which both missed and over-matched commits.)
+        const { commits: paginatedHistory, total: totalCommits } =
+          await fetchHistoryPage(req, gitEngine, {
+            record: record as string | undefined,
+            limit: historyLimit,
+            offset: historyOffset,
+            author: author as string | undefined,
+            since: since as string | undefined,
+            until: until as string | undefined,
           });
-        }
-
-        // Filter by author if specified
-        if (author) {
-          history = history.filter(
-            (commit) =>
-              commit.author_name
-                ?.toLowerCase()
-                .includes((author as string).toLowerCase()) ||
-              commit.author_email
-                ?.toLowerCase()
-                .includes((author as string).toLowerCase())
-          );
-        }
-
-        // Filter by date range if specified
-        if (since || until) {
-          const sinceDate = since ? new Date(since as string) : null;
-          const untilDate = until ? new Date(until as string) : null;
-
-          history = history.filter((commit) => {
-            const commitDate = new Date(commit.date);
-            if (sinceDate && commitDate < sinceDate) return false;
-            if (untilDate && commitDate > untilDate) return false;
-            return true;
-          });
-        }
-
-        // Apply pagination
-        const paginatedHistory = history.slice(
-          historyOffset,
-          historyOffset + historyLimit
-        );
 
         // Transform commit data for API response
         const transformedHistory = paginatedHistory.map((commit) => ({
@@ -152,7 +252,7 @@ export function createHistoryRouter() {
         const response = {
           history: transformedHistory,
           summary: {
-            totalCommits: history.length,
+            totalCommits,
             returnedCommits: transformedHistory.length,
             limit: historyLimit,
             offset: historyOffset,
@@ -166,7 +266,7 @@ export function createHistoryRouter() {
         };
 
         logger.info('History retrieved successfully', {
-          totalCommits: history.length,
+          totalCommits,
           returnedCommits: transformedHistory.length,
           requestId: req.requestId,
         });
@@ -174,7 +274,7 @@ export function createHistoryRouter() {
         sendSuccess(response, req, res, {
           operation: 'get_history',
           meta: {
-            totalCommits: history.length,
+            totalCommits,
             returnedCommits: transformedHistory.length,
           },
         });
@@ -246,55 +346,20 @@ export function createHistoryRouter() {
         // Get Git engine from CivicPress
         const gitEngine = civicPress.getGitEngine();
 
-        // Get commit history for specific record - get all commits first, then filter and paginate
         const historyLimit = parseInt(limit as string) || 10;
         const historyOffset = parseInt(offset as string) || 0;
 
-        // Get all commits first to get accurate total count
-        let history = await gitEngine.getHistory();
-
-        // Filter by specific record
-        const recordPath = `${record}.md`;
-        history = history.filter((commit) => {
-          // Check if this commit affected the specified record
-          return (
-            commit.message.includes(record) ||
-            commit.message.includes(recordPath) ||
-            commit.message.includes(record.replace('/', '/'))
-          );
-        });
-
-        // Filter by author if specified
-        if (author) {
-          history = history.filter(
-            (commit) =>
-              commit.author_name
-                ?.toLowerCase()
-                .includes((author as string).toLowerCase()) ||
-              commit.author_email
-                ?.toLowerCase()
-                .includes((author as string).toLowerCase())
-          );
-        }
-
-        // Filter by date range if specified
-        if (since || until) {
-          const sinceDate = since ? new Date(since as string) : null;
-          const untilDate = until ? new Date(until as string) : null;
-
-          history = history.filter((commit) => {
-            const commitDate = new Date(commit.date);
-            if (sinceDate && commitDate < sinceDate) return false;
-            if (untilDate && commitDate > untilDate) return false;
-            return true;
+        // Scope by record via a git pathspec (see `fetchHistoryPage`, which
+        // also explains why only the unfiltered case can be paged by git).
+        const { commits: paginatedHistory, total: totalCommits } =
+          await fetchHistoryPage(req, gitEngine, {
+            record,
+            limit: historyLimit,
+            offset: historyOffset,
+            author: author as string | undefined,
+            since: since as string | undefined,
+            until: until as string | undefined,
           });
-        }
-
-        // Apply pagination
-        const paginatedHistory = history.slice(
-          historyOffset,
-          historyOffset + historyLimit
-        );
 
         // Transform commit data for API response
         const transformedHistory = paginatedHistory.map((commit) => ({
@@ -311,7 +376,7 @@ export function createHistoryRouter() {
         const response = {
           history: transformedHistory,
           summary: {
-            totalCommits: history.length,
+            totalCommits,
             returnedCommits: transformedHistory.length,
             limit: historyLimit,
             offset: historyOffset,
@@ -326,7 +391,7 @@ export function createHistoryRouter() {
 
         logger.info('Record history retrieved successfully', {
           record,
-          totalCommits: history.length,
+          totalCommits,
           returnedCommits: transformedHistory.length,
           requestId: req.requestId,
         });
@@ -335,7 +400,7 @@ export function createHistoryRouter() {
           operation: 'get_record_history',
           meta: {
             record,
-            totalCommits: history.length,
+            totalCommits,
             returnedCommits: transformedHistory.length,
           },
         });
