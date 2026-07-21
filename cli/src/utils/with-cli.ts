@@ -45,7 +45,7 @@ export interface CliContext {
   logger: Logger;
 }
 
-export interface WithCliSpec {
+export interface WithCliSpec<A extends unknown[] = unknown[]> {
   /** Operation name for `cliStartOperation` and the error envelope, e.g. `view`. */
   operation: string;
   /** Human failure message, e.g. `Failed to view record`. */
@@ -55,8 +55,14 @@ export interface WithCliSpec {
   /**
    * Extra fields to attach to the error envelope. Merged over the default
    * `{ error: <message> }`, so a spec can add context without losing it.
+   *
+   * Receives the command's own arguments alongside the error. The spec object
+   * is a sibling of the handler, not nested inside it, so it cannot close over
+   * them — and several commands report the subject of the failure (`username`,
+   * a record id) in their envelope. Passing them through keeps that detail
+   * instead of quietly dropping it.
    */
-  details?: (error: unknown) => Record<string, unknown>;
+  details?: (error: unknown, ...args: A) => Record<string, unknown>;
 }
 
 /**
@@ -68,7 +74,7 @@ export interface WithCliSpec {
  * is the intended guard.)
  */
 export function withCli<A extends unknown[]>(
-  spec: WithCliSpec,
+  spec: WithCliSpec<A>,
   handler: (ctx: CliContext, ...args: A) => Promise<void>
 ): (...args: A) => Promise<void> {
   return async (...args: A): Promise<void> => {
@@ -92,7 +98,7 @@ export function withCli<A extends unknown[]>(
         spec.errorCode,
         {
           error: error instanceof Error ? error.message : String(error),
-          ...(spec.details ? spec.details(error) : {}),
+          ...(spec.details ? spec.details(error, ...args) : {}),
         },
         spec.operation
       );
