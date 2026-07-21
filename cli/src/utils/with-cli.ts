@@ -48,8 +48,14 @@ export interface CliContext {
 export interface WithCliSpec<A extends unknown[] = unknown[]> {
   /** Operation name for `cliStartOperation` and the error envelope, e.g. `view`. */
   operation: string;
-  /** Human failure message, e.g. `Failed to view record`. */
-  errorMessage: string;
+  /**
+   * Human failure message, e.g. `Failed to view record`.
+   *
+   * May be a function of the command's arguments: several messages interpolate
+   * the subject of the failure (`Failed to save configuration '<type>'`), and
+   * the spec cannot close over the handler's parameters.
+   */
+  errorMessage: string | ((...args: A) => string);
   /** Stable machine code, e.g. `VIEW_FAILED`. */
   errorCode: string;
   /**
@@ -94,7 +100,9 @@ export function withCli<A extends unknown[]>(
       // cliError writes the structured envelope to stderr, keeping stdout a
       // clean single JSON document.
       cliError(
-        spec.errorMessage,
+        typeof spec.errorMessage === 'function'
+          ? spec.errorMessage(...args)
+          : spec.errorMessage,
         spec.errorCode,
         {
           error: error instanceof Error ? error.message : String(error),
