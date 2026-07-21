@@ -1,4 +1,3 @@
-import { ConfigDiscovery } from './config/config-discovery.js';
 import { WorkflowEngine } from './workflows/workflow-engine.js';
 import { GitEngine } from './git/git-engine.js';
 import { HookSystem } from './hooks/hook-system.js';
@@ -160,7 +159,6 @@ export class CivicPress {
   private logger: Logger;
 
   // Keep private properties for backward compatibility
-  private _configDiscovery?: ConfigDiscovery;
   private _workflowEngine?: WorkflowEngine;
   private _gitEngine?: GitEngine;
   private _hookSystem?: HookSystem;
@@ -345,14 +343,6 @@ export class CivicPress {
   }
 
   // Existing services
-  getConfigDiscovery(): ConfigDiscovery {
-    if (!this._configDiscovery) {
-      this._configDiscovery =
-        this.container.resolve<ConfigDiscovery>('configDiscovery');
-    }
-    return this._configDiscovery;
-  }
-
   getWorkflowEngine(): WorkflowEngine {
     if (!this._workflowEngine) {
       this._workflowEngine = this.container.resolve<WorkflowEngine>('workflow');

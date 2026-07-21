@@ -168,7 +168,6 @@ export type { GitCommit } from './git/git-engine.js';
 export { HookSystem } from './hooks/hook-system.js';
 export { WorkflowEngine } from './workflows/workflow-engine.js';
 export { WorkflowConfigManager } from './config/workflow-config.js';
-export { ConfigDiscovery } from './config/config-discovery.js';
 export { Logger } from './utils/logger.js';
 export { TemplateEngine } from './utils/template-engine.js';
 // Export unified cache system

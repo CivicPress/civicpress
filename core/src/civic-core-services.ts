@@ -12,7 +12,6 @@ import { CivicPressConfig } from './civic-core.js';
 import { Logger } from './utils/logger.js';
 import { DatabaseService } from './database/database-service.js';
 import { AuthService } from './auth/auth-service.js';
-import { ConfigDiscovery } from './config/config-discovery.js';
 import { WorkflowEngine } from './workflows/workflow-engine.js';
 import { GitEngine } from './git/git-engine.js';
 import { HookSystem } from './hooks/hook-system.js';
@@ -136,7 +135,6 @@ export function registerCivicPressServices(
   initializeRoleManager(config.dataDir);
 
   // Step 6: Register services with no dependencies
-  container.singleton('configDiscovery', () => new ConfigDiscovery());
   container.singleton('workflow', () => {
     return new WorkflowEngine();
   });
