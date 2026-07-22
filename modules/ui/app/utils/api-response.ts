@@ -10,32 +10,24 @@ export interface ApiResponse<T = any> {
   success: boolean;
   data: T;
   /**
-   * The API now emits ONE error shape everywhere (the envelope
-   * standardization): the structured object below. `requestId`, when present,
-   * comes from the uncaught-error fallback for support-ticket correlation.
-   *
-   * The bare-`string` arm is retained only so the extract* helpers keep
-   * compiling against historical call sites; the server no longer sends it,
-   * and it can be dropped once a full `nuxt typecheck` confirms no consumer
-   * still reads `response.error` as a string.
+   * The canonical error shape — ONE object everywhere (the envelope
+   * standardization). `requestId`, when present, comes from the uncaught-error
+   * fallback for support-ticket correlation. The bare-`string` arm and the
+   * top-level index signature that used to sit here are gone: the server emits
+   * neither a string error nor a top-level payload (every response wraps its
+   * body in `.data`), and a full `nuxt typecheck` confirms no consumer relies
+   * on them.
    */
-  error?:
-    | string
-    | {
-        message: string;
-        code?: string;
-        details?: unknown[];
-        correlationId?: string;
-        requestId?: string;
-      };
-  /**
-   * Retained for the same reason as the string-error arm: some call sites
-   * still access fields directly off the response. Every endpoint now wraps
-   * its payload in `.data` (including `/info`, the last top-level holdout), so
-   * this is legacy tolerance, not a live pattern. Field types are `unknown`,
-   * so call sites must narrow before use.
-   */
-  [key: string]: unknown;
+  error?: {
+    message: string;
+    code?: string;
+    details?: unknown[];
+    correlationId?: string;
+    requestId?: string;
+  };
+  // Canonical success envelope also carries these at the top level.
+  message?: string;
+  meta?: Record<string, unknown>;
 }
 
 /**
