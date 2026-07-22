@@ -10,9 +10,14 @@ export interface ApiResponse<T = any> {
   success: boolean;
   data: T;
   /**
-   * Server-side errors use the structured object form; a small number
-   * of UI-side helpers historically expected a bare string (the `as any`
-   * casts hid the mismatch). Accept both for backward compat.
+   * The API now emits ONE error shape everywhere (the envelope
+   * standardization): the structured object below. `requestId`, when present,
+   * comes from the uncaught-error fallback for support-ticket correlation.
+   *
+   * The bare-`string` arm is retained only so the extract* helpers keep
+   * compiling against historical call sites; the server no longer sends it,
+   * and it can be dropped once a full `nuxt typecheck` confirms no consumer
+   * still reads `response.error` as a string.
    */
   error?:
     | string
@@ -21,17 +26,14 @@ export interface ApiResponse<T = any> {
         code?: string;
         details?: unknown[];
         correlationId?: string;
+        requestId?: string;
       };
-  timestamp?: string;
-  path?: string;
-  method?: string;
-  requestId?: string;
   /**
-   * A handful of legacy endpoints return data at the top level instead
-   * of wrapping it in `.data`. The index signature preserves that
-   * access pattern (`response.organization`, `response.message`, etc.)
-   * without re-introducing `as any`. Field types are `unknown`, so
-   * call sites must narrow before use.
+   * Retained for the same reason as the string-error arm: some call sites
+   * still access fields directly off the response. Every endpoint now wraps
+   * its payload in `.data` (including `/info`, the last top-level holdout), so
+   * this is legacy tolerance, not a live pattern. Field types are `unknown`,
+   * so call sites must narrow before use.
    */
   [key: string]: unknown;
 }
