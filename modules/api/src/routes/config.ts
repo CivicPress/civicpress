@@ -50,7 +50,7 @@ router.get('/attachment-types', async (req, res) => {
     logApiError('config', error, req);
     res.status(500).json({
       success: false,
-      error: 'Failed to get attachment types',
+      error: { message: 'Failed to get attachment types', code: 'FAILED_TO_GET_ATTACHMENT_TYPES' },
     });
   }
 });
@@ -71,7 +71,7 @@ router.get('/link-categories', async (req, res) => {
     logApiError('config', error, req);
     res.status(500).json({
       success: false,
-      error: 'Failed to get link categories',
+      error: { message: 'Failed to get link categories', code: 'FAILED_TO_GET_LINK_CATEGORIES' },
     });
   }
 });
@@ -155,7 +155,7 @@ router.post(
       logApiError('config', error, req);
       res.status(500).json({
         success: false,
-        error: 'Failed to validate configuration',
+        error: { message: 'Failed to validate configuration', code: 'FAILED_TO_VALIDATE_CONFIGURATION' },
       });
     }
   }
@@ -184,7 +184,7 @@ router.get('/list', async (req, res) => {
     logApiError('config', error, req);
     res.status(500).json({
       success: false,
-      error: 'Failed to get configuration list',
+      error: { message: 'Failed to get configuration list', code: 'FAILED_TO_GET_CONFIGURATION_LIST' },
     });
   }
 });
@@ -207,7 +207,7 @@ router.get('/metadata/:type', async (req, res) => {
     logApiError('config', error, req);
     res.status(404).json({
       success: false,
-      error: 'Configuration metadata not found',
+      error: { message: 'Configuration metadata not found', code: 'CONFIGURATION_METADATA_NOT_FOUND' },
     });
   }
 });
@@ -257,12 +257,12 @@ router.get('/raw/:type', async (req, res) => {
     res.status(200).send(yaml);
   } catch (error) {
     if (error instanceof InvalidConfigTypeError) {
-      return res.status(400).json({ success: false, error: error.message });
+      return res.status(400).json({ success: false, error: { message: error.message, code: 'INVALID_CONFIG_TYPE' } });
     }
     logApiError('config', error, req);
     res.status(404).json({
       success: false,
-      error: 'Raw configuration not found',
+      error: { message: 'Raw configuration not found', code: 'RAW_CONFIGURATION_NOT_FOUND' },
     });
   }
 });
@@ -281,7 +281,7 @@ router.put(
       if (!yamlContent) {
         return res
           .status(400)
-          .json({ success: false, error: 'YAML content is required' });
+          .json({ success: false, error: { message: 'YAML content is required', code: 'YAML_CONTENT_IS_REQUIRED' } });
       }
 
       const { userPath } = resolveRawPaths(type);
@@ -314,12 +314,12 @@ router.put(
         message: String(error),
       });
       if (error instanceof InvalidConfigTypeError) {
-        return res.status(400).json({ success: false, error: error.message });
+        return res.status(400).json({ success: false, error: { message: error.message, code: 'INVALID_CONFIG_TYPE' } });
       }
       logApiError('config', error, req);
       res.status(500).json({
         success: false,
-        error: 'Failed to save raw configuration',
+        error: { message: 'Failed to save raw configuration', code: 'FAILED_TO_SAVE_RAW_CONFIGURATION' },
       });
     }
   }
@@ -340,7 +340,7 @@ router.get('/status', async (req, res) => {
     logApiError('config', error, req);
     res.status(500).json({
       success: false,
-      error: 'Failed to get configuration status',
+      error: { message: 'Failed to get configuration status', code: 'FAILED_TO_GET_CONFIGURATION_STATUS' },
     });
   }
 });
@@ -362,7 +362,7 @@ router.get('/:type', async (req, res) => {
     logApiError('config', error, req);
     res.status(404).json({
       success: false,
-      error: 'Configuration not found',
+      error: { message: 'Configuration not found', code: 'CONFIGURATION_NOT_FOUND' },
     });
   }
 });
@@ -405,7 +405,7 @@ router.put('/:type', async (req, res) => {
     logApiError('config', error, req);
     res.status(500).json({
       success: false,
-      error: 'Failed to save configuration',
+      error: { message: 'Failed to save configuration', code: 'FAILED_TO_SAVE_CONFIGURATION' },
     });
   }
 });
@@ -447,7 +447,7 @@ router.post('/:type/reset', async (req, res) => {
     logApiError('config', error, req);
     res.status(500).json({
       success: false,
-      error: 'Failed to reset configuration',
+      error: { message: 'Failed to reset configuration', code: 'FAILED_TO_RESET_CONFIGURATION' },
     });
   }
 });
@@ -489,7 +489,7 @@ router.get('/validate/all', async (req, res) => {
     logApiError('config', error, req);
     res.status(500).json({
       success: false,
-      error: 'Failed to validate configurations',
+      error: { message: 'Failed to validate configurations', code: 'FAILED_TO_VALIDATE_CONFIGURATIONS' },
     });
   }
 });
