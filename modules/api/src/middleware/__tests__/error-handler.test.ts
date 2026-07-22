@@ -128,10 +128,12 @@ describe('errorHandler', () => {
       expect(callArgs.error.message).toBe('Test error');
       expect(callArgs.error.code).toBe('VALIDATION_ERROR');
       expect(callArgs.error.correlationId).toBe(error.correlationId);
-      expect(callArgs.requestId).toBeDefined();
-      expect(callArgs.path).toBe('/api/v1/test');
-      expect(callArgs.method).toBe('GET');
-      expect(callArgs.timestamp).toBeDefined();
+      // Canonical envelope: requestId now lives INSIDE error; the pure-debug
+      // path/method/timestamp are no longer echoed onto the wire.
+      expect(callArgs.error.requestId).toBeDefined();
+      expect(callArgs.path).toBeUndefined();
+      expect(callArgs.method).toBeUndefined();
+      expect(callArgs.timestamp).toBeUndefined();
     } finally {
       process.env.NODE_ENV = originalEnv;
     }
@@ -258,7 +260,7 @@ describe('errorHandler', () => {
     }
   });
 
-  it('should include request context in error response', () => {
+  it('carries the requestId inside error for support-ticket correlation', () => {
     const error = new ValidationError('Test error');
     errorHandler(
       error as any,
@@ -267,13 +269,10 @@ describe('errorHandler', () => {
       mockNext
     );
 
-    expect(mockResponse.json).toHaveBeenCalledWith(
-      expect.objectContaining({
-        requestId: expect.any(String),
-        timestamp: expect.any(String),
-        path: '/api/v1/test',
-        method: 'GET',
-      })
-    );
+    // Canonical envelope: the body is exactly { success, error }; requestId is
+    // nested in error, and the pure-debug path/method/timestamp are gone.
+    const callArgs = (mockResponse.json as any).mock.calls[0][0];
+    expect(Object.keys(callArgs).sort()).toEqual(['error', 'success']);
+    expect(callArgs.error.requestId).toEqual(expect.any(String));
   });
 });

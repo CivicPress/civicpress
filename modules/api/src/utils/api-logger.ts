@@ -318,6 +318,10 @@ export class ApiLogger {
       success: false,
       error: {
         message: defaultMessage,
+        // `code` is now part of the canonical error envelope — always present,
+        // so a client can branch on it without a fallback. This was the one
+        // branch that omitted it.
+        code: 'INTERNAL_ERROR',
         ...(process.env.NODE_ENV === 'development'
           ? {
               details: error instanceof Error ? error.message : String(error),
@@ -337,8 +341,15 @@ export class ApiLogger {
   ): void {
     this.logError(operation, error, req);
 
-    const errorResponse = this.createErrorResponse(error, req, defaultMessage);
-    res.status(errorResponse.statusCode).json(errorResponse);
+    const { statusCode, ...body } = this.createErrorResponse(
+      error,
+      req,
+      defaultMessage
+    );
+    // `statusCode` drives the HTTP status line; it is NOT echoed into the body.
+    // The body is the canonical envelope — `{ success:false, error:{...} }` —
+    // matching handleValidationError, so every error response has one shape.
+    res.status(statusCode).json(body);
   }
 
   // Handle validation errors
@@ -354,6 +365,7 @@ export class ApiLogger {
       success: false,
       error: {
         message: 'Invalid request data',
+        code: 'VALIDATION_ERROR',
         details: errors,
       },
     });
