@@ -7,7 +7,6 @@ export interface StorageSuccessResponse {
   success: boolean;
   data: unknown;
   message?: string;
-  timestamp: string;
 }
 
 export interface StorageErrorResponse {
@@ -17,7 +16,6 @@ export interface StorageErrorResponse {
     code: string;
     details?: unknown;
   };
-  timestamp: string;
 }
 
 /**
@@ -34,7 +32,6 @@ export const handleStorageSuccess = (
     success: true,
     data,
     message,
-    timestamp: new Date().toISOString(),
   };
 
   logger.info(`Storage operation '${operation}' completed successfully`, {
@@ -59,7 +56,9 @@ export const handleStorageError = (
 ): Response => {
   // Narrow `unknown` to the Error shape the storage error helpers expect.
   const errorObj =
-    error instanceof Error ? error : new Error(String(error ?? 'Unknown error'));
+    error instanceof Error
+      ? error
+      : new Error(String(error ?? 'Unknown error'));
   const errorCode = getStorageErrorCode(errorObj);
 
   // Automatically determine status code based on error code if not provided
@@ -95,9 +94,9 @@ export const handleStorageError = (
     error: {
       message: errorObj.message || 'Storage operation failed',
       code: errorCode,
-      details: process.env.NODE_ENV === 'development' ? errorObj.stack : undefined,
+      details:
+        process.env.NODE_ENV === 'development' ? errorObj.stack : undefined,
     },
-    timestamp: new Date().toISOString(),
   };
 
   logger.error(`Storage operation '${operation}' failed`, {
@@ -138,7 +137,6 @@ export const handleStorageValidationError = (
         value: err.value,
       })),
     },
-    timestamp: new Date().toISOString(),
   };
 
   logger.warn(`Storage operation '${operation}' validation failed`, {

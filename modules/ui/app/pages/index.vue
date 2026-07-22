@@ -147,8 +147,9 @@ const handleClickOutside = (event: Event) => {
 const fetchOrganizationInfo = async () => {
   try {
     const response = (await $civicApi('/api/v1/info')) as ApiResponse;
+    // /info now returns the canonical envelope: fields under `data`.
     if (response.success) {
-      organizationInfo.value = response.organization;
+      organizationInfo.value = response.data?.organization;
     }
   } catch (err: unknown) {
     console.error('Error fetching organization info:', err);
