@@ -170,3 +170,25 @@ describe('known oddity: hook swallows an unknown action', () => {
     expect(stderr.trim()).toBe('');
   });
 });
+
+/**
+ * cache:* had no behavioural coverage. The withCli migration also normalized
+ * its non-standard error reporting — `cliError(msg, undefined, rawError)`,
+ * whose envelope had no code and serialized an Error to `{}` — to the standard
+ * coded envelope (verified by hand: a cache:metrics failure now carries
+ * `code: 'CACHE_METRICS_FAILED'` and the real cause under `details.error`,
+ * where before it was empty).
+ *
+ * This pins the deterministic half — the success path in a configured
+ * workspace — so the migration provably did not break the command that runs.
+ */
+describe('cache: after withCli', () => {
+  it('cache:metrics --json still emits one parseable success document', () => {
+    const { stdout, code } = run('cache:metrics --json');
+
+    expect(code).toBe(0);
+    const body = JSON.parse(stdout.trim());
+    expect(body.success).toBe(true);
+    expect(body.data).toBeDefined();
+  });
+});
