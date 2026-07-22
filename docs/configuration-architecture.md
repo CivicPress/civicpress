@@ -67,10 +67,27 @@ description: A modern civic technology platform
 #### Contents
 
 - `civic.db` - SQLite database files
+- `secrets.yml` - the persisted `CIVICPRESS_SECRET` root key
+- Storage provider credentials, realtime snapshots, BroadcastBox data
 - User sessions and authentication tokens
-- Sensitive operational configurations
-- Internal system settings
-- Temporary files and caches
+- Internal system settings, temporary files and caches
+
+#### Location (anchored to `.civicrc`, not `dataDir`)
+
+`.system-data/` sits at the **project root** — the directory containing
+`.civicrc` — regardless of where `dataDir` points. It is NOT derived by
+stripping a segment off `dataDir`.
+
+This matters when `dataDir` is anything other than `<root>/data` (e.g. a nested
+`var/records`, or an absolute `CIVIC_DATA_DIR` outside the repo): the DB, the
+secret, and the storage credentials must all resolve to the SAME
+`.system-data/`. Anchoring to `dataDir` instead would split them — the app would
+initialize its database in one directory and look for its secret in another.
+
+`CentralConfigManager` resolves this once (into `config.systemDataDir`, exposed
+via `getSystemDataDir()`); code reads it through `resolveSystemDataDir(config)`
+rather than recomputing a path. `CIVIC_DATA_DIR` overrides only the data
+directory — the DB still lands in `<projectRoot>/.system-data/civic.db`.
 
 ## Configuration Lifecycle
 

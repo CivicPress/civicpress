@@ -78,14 +78,15 @@ export function createGeographyRouter(
   };
 
   const handleValidationError = (
-    operation: string,
+    // `_operation` is unused (the canonical validation message is fixed) but
+    // kept positional so the call sites read the same as the other helpers.
+    _operation: string,
     errors: unknown[],
     res: Response
   ) => {
     // Canonical envelope — matches the shared handleValidationError. Was the
     // outlier `{ error: 'Validation failed', message, details }` (error as a
     // STRING); now `error` is the standard object with a code.
-    void operation;
     res.status(400).json({
       success: false,
       error: {
