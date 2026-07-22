@@ -41,6 +41,51 @@ function createConfigService(): ConfigurationService {
   });
 }
 
+/**
+ * Derive a human error string from whatever config:init's `resetToDefaults`
+ * threw. Extracted verbatim from the old catch so the withCli details thunk
+ * reports exactly what it used to: message, then a non-`[object Object]`
+ * toString, then the first stack line, and — when all of those are empty —
+ * the structured fields (name/code/path/syscall/errno) as a last resort.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function describeInitError(err: any): string {
+  let errorMessage = 'Unknown error';
+  if (err?.message && err.message.trim()) {
+    errorMessage = err.message;
+  } else if (typeof err === 'string' && err.trim()) {
+    errorMessage = err;
+  } else if (
+    err?.toString &&
+    err.toString() !== '[object Object]' &&
+    err.toString().trim()
+  ) {
+    errorMessage = err.toString();
+  } else if (err?.stack) {
+    errorMessage = err.stack.split('\n')[0];
+  }
+
+  if (
+    errorMessage === 'Unknown error' ||
+    !errorMessage.trim() ||
+    errorMessage === 'Error'
+  ) {
+    const parts: string[] = [];
+    if (err?.name) parts.push(`Error type: ${err.name}`);
+    if (err?.code) parts.push(`Code: ${err.code}`);
+    if (err?.path) parts.push(`Path: ${err.path}`);
+    if (err?.syscall) parts.push(`Syscall: ${err.syscall}`);
+    if (err?.errno) parts.push(`Errno: ${err.errno}`);
+
+    errorMessage =
+      parts.length > 0
+        ? parts.join(', ')
+        : 'Error occurred during initialization (no error details available)';
+  }
+
+  return errorMessage;
+}
+
 export function registerConfigCommands(cli: CAC) {
   // Status of configurations (user/default/missing)
   cli
@@ -682,167 +727,124 @@ export function registerConfigCommands(cli: CAC) {
       'Create user configs from defaults if missing'
     )
     .option('--all', 'Initialize all configurations')
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .action(async (type: string | undefined, options: any) => {
-      const globalOptions = getGlobalOptionsFromArgs();
-      initializeCliOutput(globalOptions);
-
-      const endOperation = cliStartOperation('config:init');
-
-      try {
-        let service;
-        try {
-          service = createConfigService();
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        } catch (serviceError: any) {
-          const serviceErrMsg =
-            serviceError?.message ||
-            serviceError?.toString() ||
-            String(serviceError) ||
-            'Unknown error';
-          throw new Error(
-            `Failed to create configuration service: ${serviceErrMsg}`
-          );
-        }
-
-        let status;
-        try {
-          status = await service.getConfigurationStatus();
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        } catch (statusError: any) {
-          const statusErrMsg =
-            statusError?.message ||
-            statusError?.toString() ||
-            String(statusError) ||
-            'Unknown error';
-          throw new Error(
-            `Failed to get configuration status: ${statusErrMsg}`
-          );
-        }
-
-        const initOne = async (t: string) => {
-          try {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const state = (status as any)[t];
-            if (state === 'user') return { type: t, created: false };
-            await service.resetToDefaults(t);
-            return { type: t, created: true };
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          } catch (innerError: any) {
-            const innerMsg =
-              innerError?.message ||
-              innerError?.toString() ||
-              String(innerError) ||
-              'Unknown inner error';
-            throw new Error(
-              `Failed to reset config ${t} to defaults: ${innerMsg}`
-            );
-          }
-        };
-
-        const types = options.all ? Object.keys(status) : type ? [type] : [];
-        if (types.length === 0) {
-          cliError(
-            'Specify a type or use --all',
-            'VALIDATION_ERROR',
-            undefined,
-            'config:init'
-          );
-          process.exit(1);
-        }
-
-        const results: Array<{ type: string; created: boolean }> = [];
-        for (const t of types) {
-          try {
-            results.push(await initOne(t));
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          } catch (initError: any) {
-            let initErrMsg = 'Unknown error';
-            if (initError?.message && initError.message.trim()) {
-              initErrMsg = initError.message;
-            } else if (typeof initError === 'string' && initError.trim()) {
-              initErrMsg = initError;
-            } else if (
-              initError?.toString &&
-              initError.toString() !== '[object Object]' &&
-              initError.toString().trim()
-            ) {
-              initErrMsg = initError.toString();
-            } else if (initError?.stack) {
-              initErrMsg = initError.stack.split('\n')[0];
-            } else if (initError?.code) {
-              initErrMsg = `Error code: ${initError.code}`;
-            } else if (initError?.name) {
-              initErrMsg = `Error: ${initError.name}`;
-            }
-            throw new Error(
-              `Failed to initialize configuration ${t}: ${initErrMsg}`
-            );
-          }
-        }
-
-        const createdCount = results.filter((r) => r.created).length;
-        const skippedCount = results.length - createdCount;
-        const message =
-          createdCount > 0
-            ? `Initialized ${createdCount} configuration${createdCount === 1 ? '' : 's'}${skippedCount > 0 ? `, skipped ${skippedCount}` : ''}`
-            : `All ${results.length} configuration${results.length === 1 ? '' : 's'} already exist`;
-
-        cliSuccess({ results }, message, {
+    .action(
+      withCli<[string | undefined, any]>(
+        {
           operation: 'config:init',
-          totalCount: results.length,
-          createdCount,
-          skippedCount,
-        });
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      } catch (err: any) {
-        let errorMessage = 'Unknown error';
-        if (err?.message && err.message.trim()) {
-          errorMessage = err.message;
-        } else if (typeof err === 'string' && err.trim()) {
-          errorMessage = err;
-        } else if (
-          err?.toString &&
-          err.toString() !== '[object Object]' &&
-          err.toString().trim()
-        ) {
-          errorMessage = err.toString();
-        } else if (err?.stack) {
-          errorMessage = err.stack.split('\n')[0];
-        }
-
-        if (
-          errorMessage === 'Unknown error' ||
-          !errorMessage.trim() ||
-          errorMessage === 'Error'
-        ) {
-          const parts: string[] = [];
-          if (err?.name) parts.push(`Error type: ${err.name}`);
-          if (err?.code) parts.push(`Code: ${err.code}`);
-          if (err?.path) parts.push(`Path: ${err.path}`);
-          if (err?.syscall) parts.push(`Syscall: ${err.syscall}`);
-          if (err?.errno) parts.push(`Errno: ${err.errno}`);
-
-          if (parts.length > 0) {
-            errorMessage = parts.join(', ');
-          } else {
-            errorMessage =
-              'Error occurred during initialization (no error details available)';
+          errorMessage: 'Configuration initialization failed',
+          errorCode: 'INIT_CONFIG_FAILED',
+          details: (error) => ({
+            error: describeInitError(error),
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            stack: (error as any)?.stack,
+          }),
+        },
+        async ({ globalOptions }, type: string | undefined, options: any) => {
+          let service;
+          try {
+            service = createConfigService();
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          } catch (serviceError: any) {
+            const serviceErrMsg =
+              serviceError?.message ||
+              serviceError?.toString() ||
+              String(serviceError) ||
+              'Unknown error';
+            throw new Error(
+              `Failed to create configuration service: ${serviceErrMsg}`
+            );
           }
-        }
 
-        cliError(
-          'Configuration initialization failed',
-          'INIT_CONFIG_FAILED',
-          {
-            error: errorMessage,
-            stack: err?.stack,
-          },
-          'config:init'
-        );
-        process.exit(1);
-      } finally {
-        endOperation();
-      }
-    });
+          let status;
+          try {
+            status = await service.getConfigurationStatus();
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          } catch (statusError: any) {
+            const statusErrMsg =
+              statusError?.message ||
+              statusError?.toString() ||
+              String(statusError) ||
+              'Unknown error';
+            throw new Error(
+              `Failed to get configuration status: ${statusErrMsg}`
+            );
+          }
+
+          const initOne = async (t: string) => {
+            try {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const state = (status as any)[t];
+              if (state === 'user') return { type: t, created: false };
+              await service.resetToDefaults(t);
+              return { type: t, created: true };
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            } catch (innerError: any) {
+              const innerMsg =
+                innerError?.message ||
+                innerError?.toString() ||
+                String(innerError) ||
+                'Unknown inner error';
+              throw new Error(
+                `Failed to reset config ${t} to defaults: ${innerMsg}`
+              );
+            }
+          };
+
+          const types = options.all ? Object.keys(status) : type ? [type] : [];
+          if (types.length === 0) {
+            cliError(
+              'Specify a type or use --all',
+              'VALIDATION_ERROR',
+              undefined,
+              'config:init'
+            );
+            process.exit(1);
+          }
+
+          const results: Array<{ type: string; created: boolean }> = [];
+          for (const t of types) {
+            try {
+              results.push(await initOne(t));
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            } catch (initError: any) {
+              let initErrMsg = 'Unknown error';
+              if (initError?.message && initError.message.trim()) {
+                initErrMsg = initError.message;
+              } else if (typeof initError === 'string' && initError.trim()) {
+                initErrMsg = initError;
+              } else if (
+                initError?.toString &&
+                initError.toString() !== '[object Object]' &&
+                initError.toString().trim()
+              ) {
+                initErrMsg = initError.toString();
+              } else if (initError?.stack) {
+                initErrMsg = initError.stack.split('\n')[0];
+              } else if (initError?.code) {
+                initErrMsg = `Error code: ${initError.code}`;
+              } else if (initError?.name) {
+                initErrMsg = `Error: ${initError.name}`;
+              }
+              throw new Error(
+                `Failed to initialize configuration ${t}: ${initErrMsg}`
+              );
+            }
+          }
+
+          const createdCount = results.filter((r) => r.created).length;
+          const skippedCount = results.length - createdCount;
+          const message =
+            createdCount > 0
+              ? `Initialized ${createdCount} configuration${createdCount === 1 ? '' : 's'}${skippedCount > 0 ? `, skipped ${skippedCount}` : ''}`
+              : `All ${results.length} configuration${results.length === 1 ? '' : 's'} already exist`;
+
+          cliSuccess({ results }, message, {
+            operation: 'config:init',
+            totalCount: results.length,
+            createdCount,
+            skippedCount,
+          });
+        }
+      )
+    );
 }
