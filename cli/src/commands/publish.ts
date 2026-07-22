@@ -14,15 +14,8 @@
  */
 import { CAC } from 'cac';
 import { AuthUtils } from '../utils/auth-utils.js';
-import {
-  getGlobalOptionsFromArgs,
-  initializeCliOutput,
-} from '../utils/global-options.js';
-import {
-  cliSuccess,
-  cliError,
-  cliStartOperation,
-} from '../utils/cli-output.js';
+import { withCli } from '../utils/with-cli.js';
+import { cliSuccess } from '../utils/cli-output.js';
 
 export const publishCommand = (cli: CAC) => {
   cli
@@ -38,91 +31,89 @@ export const publishCommand = (cli: CAC) => {
       'Override target status (default: draft status, typically "published")'
     )
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .action(async (draftId: string, options: any) => {
-      // Initialize CLI output with global options
-      const globalOptions = getGlobalOptionsFromArgs();
-      initializeCliOutput(globalOptions);
-
-      const endOperation = cliStartOperation('publish');
-
-      // Validate authentication and get civic instance
-      const { civic, user } = await AuthUtils.requireAuthWithCivic(
-        options.token,
-        globalOptions.json
-      );
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const coreMod: any = await import('@civicpress/core');
-      const audit = new coreMod.AuditLogger();
-
-      try {
-        const recordManager = civic.getRecordManager();
-        const indexingService = civic.getIndexingService();
-
-        // Run saga via RecordManager.publishDraft. The saga handles:
-        //   1. Move draft → records table (ACID)
-        //   2. Create/update file on disk
-        //   3. Commit to git (authoritative)
-        //   4. Delete from record_drafts (ACID)
-        //   5. Queue indexing (derived, fire-and-forget)
-        //   6. Emit record:published hook (derived, fire-and-forget)
-        const record = await recordManager.publishDraft(
-          draftId,
-          user,
-          options.targetStatus,
-          undefined, // sagaExecutor — let RecordManager construct one
-          indexingService
-        );
-
-        cliSuccess(
-          {
-            draftId,
-            recordId: record.id,
-            recordTitle: record.title,
-            recordType: record.type,
-            status: record.status,
-            path: record.path,
-          },
-          `Published draft ${draftId} as record "${record.title}" (status: ${record.status})`,
-          {
-            operation: 'publish',
-            draftId,
-            recordId: record.id,
-            status: record.status,
-          }
-        );
-
-        await audit.log({
-          source: 'cli',
-          actor: { username: user.username, role: user.role },
-          action: 'record_publish',
-          target: { type: 'record', id: record.id, name: record.title },
-          outcome: 'success',
-          metadata: { draftId, status: record.status },
-        });
-
-        process.exit(0);
-      } catch (error) {
-        await audit.log({
-          source: 'cli',
-          actor: { username: user.username, role: user.role },
-          action: 'record_publish',
-          target: { type: 'draft', id: draftId },
-          outcome: 'failure',
-          message: error instanceof Error ? error.message : String(error),
-        });
-        cliError(
-          'Failed to publish draft',
-          'PUBLISH_FAILED',
-          {
+    .action(
+      withCli<[string, any]>(
+        {
+          operation: 'publish',
+          errorMessage: 'Failed to publish draft',
+          errorCode: 'PUBLISH_FAILED',
+          details: (error, draftId) => ({
             error: error instanceof Error ? error.message : String(error),
             draftId,
-          },
-          'publish'
-        );
-        process.exit(1);
-      } finally {
-        endOperation();
-      }
-    });
+          }),
+        },
+        async ({ globalOptions }, draftId: string, options: any) => {
+          // Validate authentication and get civic instance
+          const { civic, user } = await AuthUtils.requireAuthWithCivic(
+            options.token,
+            globalOptions.json
+          );
+
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const coreMod: any = await import('@civicpress/core');
+          const audit = new coreMod.AuditLogger();
+
+          try {
+            const recordManager = civic.getRecordManager();
+            const indexingService = civic.getIndexingService();
+
+            // Run saga via RecordManager.publishDraft. The saga handles:
+            //   1. Move draft → records table (ACID)
+            //   2. Create/update file on disk
+            //   3. Commit to git (authoritative)
+            //   4. Delete from record_drafts (ACID)
+            //   5. Queue indexing (derived, fire-and-forget)
+            //   6. Emit record:published hook (derived, fire-and-forget)
+            const record = await recordManager.publishDraft(
+              draftId,
+              user,
+              options.targetStatus,
+              undefined, // sagaExecutor — let RecordManager construct one
+              indexingService
+            );
+
+            cliSuccess(
+              {
+                draftId,
+                recordId: record.id,
+                recordTitle: record.title,
+                recordType: record.type,
+                status: record.status,
+                path: record.path,
+              },
+              `Published draft ${draftId} as record "${record.title}" (status: ${record.status})`,
+              {
+                operation: 'publish',
+                draftId,
+                recordId: record.id,
+                status: record.status,
+              }
+            );
+
+            await audit.log({
+              source: 'cli',
+              actor: { username: user.username, role: user.role },
+              action: 'record_publish',
+              target: { type: 'record', id: record.id, name: record.title },
+              outcome: 'success',
+              metadata: { draftId, status: record.status },
+            });
+
+            process.exit(0);
+          } catch (error) {
+            // Failure audit needs `user` and `draftId`; re-thrown so withCli emits
+            // PUBLISH_FAILED and exits.
+            await audit.log({
+              source: 'cli',
+              actor: { username: user.username, role: user.role },
+              action: 'record_publish',
+              target: { type: 'draft', id: draftId },
+              outcome: 'failure',
+              message: error instanceof Error ? error.message : String(error),
+            });
+            throw error;
+          }
+        }
+      )
+    );
 };
