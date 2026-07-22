@@ -1,9 +1,6 @@
 import { CAC } from 'cac';
 import { AuthUtils } from '../utils/auth-utils.js';
-import {
-  getGlobalOptionsFromArgs,
-  initializeCliOutput,
-} from '../utils/global-options.js';
+import { withCli } from '../utils/with-cli.js';
 import { userCan } from '@civicpress/core';
 import {
   getAvailableRecords,
@@ -13,7 +10,6 @@ import {
   cliSuccess,
   cliError,
   cliWarn,
-  cliStartOperation,
 } from '../utils/cli-output.js';
 
 export const commitCommand = (cli: CAC) => {
@@ -24,13 +20,18 @@ export const commitCommand = (cli: CAC) => {
     .option('-r, --role <role>', 'Role for commit (clerk, council, etc.)')
     .option('-a, --all', 'Commit all changes (not just specific files)')
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .action(async (recordName: string, options: any) => {
-      // Initialize CLI output with global options
-      const globalOptions = getGlobalOptionsFromArgs();
-      initializeCliOutput(globalOptions);
-
-      const endOperation = cliStartOperation('commit');
-
+    .action(
+      withCli<[string, any]>(
+        {
+          operation: 'commit',
+          errorMessage: 'Failed to commit records',
+          errorCode: 'COMMIT_FAILED',
+          details: (error, recordName) => ({
+            error: error instanceof Error ? error.message : String(error),
+            recordName,
+          }),
+        },
+        async ({ globalOptions }, recordName: string, options: any) => {
       // Validate authentication and get civic instance
       const { civic, user } = await AuthUtils.requireAuthWithCivic(
         options.token,
@@ -155,6 +156,8 @@ export const commitCommand = (cli: CAC) => {
           metadata: { files: filesToCommit },
         });
       } catch (error) {
+        // Failure audit stays in the handler — it needs `user` and
+        // `recordName`. Re-thrown so withCli reports (COMMIT_FAILED) and exits.
         await audit.log({
           source: 'cli',
           actor: { username: user.username, role: user.role },
@@ -163,18 +166,9 @@ export const commitCommand = (cli: CAC) => {
           outcome: 'failure',
           message: error instanceof Error ? error.message : String(error),
         });
-        cliError(
-          'Failed to commit records',
-          'COMMIT_FAILED',
-          {
-            error: error instanceof Error ? error.message : String(error),
-            recordName,
-          },
-          'commit'
-        );
-        process.exit(1);
-      } finally {
-        endOperation();
+        throw error;
       }
-    });
+        }
+      )
+    );
 };
