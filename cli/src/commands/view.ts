@@ -4,22 +4,13 @@ import * as fs from 'fs';
 import * as path from 'path';
 import matter = require('gray-matter');
 import { userCan } from '@civicpress/core';
-import {
-  initializeLogger,
-  getGlobalOptionsFromArgs,
-  initializeCliOutput,
-} from '../utils/global-options.js';
+import { withCli } from '../utils/with-cli.js';
 import { AuthUtils } from '../utils/auth-utils.js';
 import {
   getAvailableRecords,
   resolveRecordReference,
 } from '../utils/record-locator.js';
-import {
-  cliSuccess,
-  cliError,
-  cliWarn,
-  cliStartOperation,
-} from '../utils/cli-output.js';
+import { cliSuccess, cliError, cliWarn } from '../utils/cli-output.js';
 
 export const viewCommand = (cli: CAC) => {
   cli
@@ -27,190 +18,185 @@ export const viewCommand = (cli: CAC) => {
     .option('--token <token>', 'Session token for authentication')
     .option('-r, --raw', 'Show raw markdown content')
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .action(async (recordName: string, options: any) => {
-      // Initialize CLI output with global options
-      const globalOptions = getGlobalOptionsFromArgs();
-      initializeCliOutput(globalOptions);
-
-      const logger = initializeLogger();
-      const endOperation = cliStartOperation('view');
-
-      // Validate authentication and get civic instance
-      const { civic, user } = await AuthUtils.requireAuthWithCivic(
-        options.token,
-        globalOptions.json
-      );
-      const dataDir = civic.getDataDir();
-
-      // Check view permissions
-      const canView = await userCan(user, 'records:view');
-      if (!canView) {
-        cliError(
-          'Insufficient permissions to view records',
-          'PERMISSION_DENIED',
-          {
-            requiredPermission: 'records:view',
-            userRole: user.role,
-          },
-          'view'
-        );
-        process.exit(1);
-      }
-
-      try {
-        logger.info(`📖 Viewing record: ${recordName}`);
-
-        if (!dataDir) {
-          throw new Error('Data directory not found. Run "civic init" first.');
-        }
-
-        const recordsDir = path.join(dataDir, 'records');
-        if (!fs.existsSync(recordsDir)) {
-          cliWarn('No records directory found', 'view');
-          return;
-        }
-
-        const resolvedRecord = resolveRecordReference(dataDir, recordName);
-
-        if (!resolvedRecord) {
-          const availableRecords = getAvailableRecords(dataDir);
-
-          cliError(
-            `Record "${recordName}" not found`,
-            'RECORD_NOT_FOUND',
-            {
-              recordName,
-              availableRecords,
-            },
-            'view'
-          );
-          return;
-        }
-
-        const recordPath = resolvedRecord.absolutePath;
-        const parsedRecord = resolvedRecord.parsed;
-        const recordType = parsedRecord.type;
-
-        // Read and parse the record
-        const content = fs.readFileSync(recordPath, 'utf8');
-        const { data: frontmatter, content: markdownContent } = matter(content);
-
-        // Create record object for JSON output
-        const pathFromDataRoot = path
-          .relative(dataDir, recordPath)
-          .replace(/\\/g, '/');
-        const pathFromRecordsDir = path
-          .relative(path.join(dataDir, 'records'), recordPath)
-          .replace(/\\/g, '/');
-
-        const record = {
-          title: frontmatter.title || path.basename(recordPath, '.md'),
-          type: recordType,
-          status: frontmatter.status || 'draft',
-          author: frontmatter.author || 'unknown',
-          version: frontmatter.version || '1.0.0',
-          path: pathFromDataRoot,
-          relativePath: pathFromRecordsDir,
-          createdAt: frontmatter.created
-            ? new Date(frontmatter.created).toISOString()
-            : null,
-          updatedAt: frontmatter.updated
-            ? new Date(frontmatter.updated).toISOString()
-            : null,
-          created: frontmatter.created
-            ? new Date(frontmatter.created).toLocaleString()
-            : 'unknown',
-          updated: frontmatter.updated
-            ? new Date(frontmatter.updated).toLocaleString()
-            : 'unknown',
-          metadata: frontmatter,
-          content: markdownContent,
-          rawContent: content,
-        };
-
-        cliSuccess({ record }, `Record: ${record.title}`, {
+    .action(
+      withCli<[string, any]>(
+        {
           operation: 'view',
-          recordType: record.type,
-          recordTitle: record.title,
-        });
+          errorMessage: 'Failed to view record',
+          errorCode: 'VIEW_FAILED',
+        },
+        // auth + permission checks used to sit before the try; they now run
+        // inside withCli's try. Both exit directly (AuthUtils.requireAuthWithCivic
+        // and the permission cliError call each process.exit), so nothing about
+        // their success path changes — and a throw from userCan, previously an
+        // uncaught crash, now becomes the same VIEW_FAILED envelope as any other.
+        async ({ globalOptions, logger }, recordName: string, options: any) => {
+          // Validate authentication and get civic instance
+          const { civic, user } = await AuthUtils.requireAuthWithCivic(
+            options.token,
+            globalOptions.json
+          );
+          const dataDir = civic.getDataDir();
 
-        // Display record information
-        logger.info('\n' + '='.repeat(60));
-        logger.info(
-          `📄 ${frontmatter.title || path.basename(recordPath, '.md')}`
-        );
-        logger.info('='.repeat(60));
+          // Check view permissions
+          const canView = await userCan(user, 'records:view');
+          if (!canView) {
+            cliError(
+              'Insufficient permissions to view records',
+              'PERMISSION_DENIED',
+              {
+                requiredPermission: 'records:view',
+                userRole: user.role,
+              },
+              'view'
+            );
+            process.exit(1);
+          }
 
-        // Metadata section
-        logger.info('\n📋 Metadata:');
-        logger.debug('─'.repeat(40));
+          logger.info(`📖 Viewing record: ${recordName}`);
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const statusColors: Record<string, any> = {
-          draft: chalk.yellow,
-          proposed: chalk.blue,
-          approved: chalk.green,
-          active: chalk.green,
-          archived: chalk.gray,
-        };
-        const statusColor = statusColors[frontmatter.status] || chalk.white;
+          if (!dataDir) {
+            throw new Error(
+              'Data directory not found. Run "civic init" first.'
+            );
+          }
 
-        logger.info(`  Type: ${recordType}`);
-        logger.info(`  Status: ${statusColor(frontmatter.status || 'draft')}`);
-        logger.info(
-          `  Created: ${frontmatter.created ? new Date(frontmatter.created).toLocaleString() : 'unknown'}`
-        );
-        logger.info(
-          `  Updated: ${frontmatter.updated ? new Date(frontmatter.updated).toLocaleString() : 'unknown'}`
-        );
-        logger.info(`  Author: ${frontmatter.author || 'unknown'}`);
-        logger.info(`  Version: ${frontmatter.version || '1.0.0'}`);
-        logger.info(`  File: ${path.relative(dataDir, recordPath)}`);
+          const recordsDir = path.join(dataDir, 'records');
+          if (!fs.existsSync(recordsDir)) {
+            cliWarn('No records directory found', 'view');
+            return;
+          }
 
-        // Content section
-        logger.info('\n📝 Content:');
-        logger.debug('─'.repeat(40));
+          const resolvedRecord = resolveRecordReference(dataDir, recordName);
 
-        if (options.raw) {
-          // Show raw markdown
-          logger.output(markdownContent);
-        } else {
-          // Show formatted content (basic markdown rendering)
-          const lines = markdownContent.split('\n');
-          for (const line of lines) {
-            if (line.startsWith('# ')) {
-              logger.output(line.substring(2));
-            } else if (line.startsWith('## ')) {
-              logger.output(line.substring(3));
-            } else if (line.startsWith('### ')) {
-              logger.output(line.substring(4));
-            } else if (line.startsWith('- ') || line.startsWith('* ')) {
-              logger.output(`  ${line}`);
-            } else if (line.trim() === '') {
-              logger.output('');
-            } else {
-              logger.output(line);
+          if (!resolvedRecord) {
+            const availableRecords = getAvailableRecords(dataDir);
+
+            cliError(
+              `Record "${recordName}" not found`,
+              'RECORD_NOT_FOUND',
+              {
+                recordName,
+                availableRecords,
+              },
+              'view'
+            );
+            return;
+          }
+
+          const recordPath = resolvedRecord.absolutePath;
+          const parsedRecord = resolvedRecord.parsed;
+          const recordType = parsedRecord.type;
+
+          // Read and parse the record
+          const content = fs.readFileSync(recordPath, 'utf8');
+          const { data: frontmatter, content: markdownContent } =
+            matter(content);
+
+          // Create record object for JSON output
+          const pathFromDataRoot = path
+            .relative(dataDir, recordPath)
+            .replace(/\\/g, '/');
+          const pathFromRecordsDir = path
+            .relative(path.join(dataDir, 'records'), recordPath)
+            .replace(/\\/g, '/');
+
+          const record = {
+            title: frontmatter.title || path.basename(recordPath, '.md'),
+            type: recordType,
+            status: frontmatter.status || 'draft',
+            author: frontmatter.author || 'unknown',
+            version: frontmatter.version || '1.0.0',
+            path: pathFromDataRoot,
+            relativePath: pathFromRecordsDir,
+            createdAt: frontmatter.created
+              ? new Date(frontmatter.created).toISOString()
+              : null,
+            updatedAt: frontmatter.updated
+              ? new Date(frontmatter.updated).toISOString()
+              : null,
+            created: frontmatter.created
+              ? new Date(frontmatter.created).toLocaleString()
+              : 'unknown',
+            updated: frontmatter.updated
+              ? new Date(frontmatter.updated).toLocaleString()
+              : 'unknown',
+            metadata: frontmatter,
+            content: markdownContent,
+            rawContent: content,
+          };
+
+          cliSuccess({ record }, `Record: ${record.title}`, {
+            operation: 'view',
+            recordType: record.type,
+            recordTitle: record.title,
+          });
+
+          // Display record information
+          logger.info('\n' + '='.repeat(60));
+          logger.info(
+            `📄 ${frontmatter.title || path.basename(recordPath, '.md')}`
+          );
+          logger.info('='.repeat(60));
+
+          // Metadata section
+          logger.info('\n📋 Metadata:');
+          logger.debug('─'.repeat(40));
+
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const statusColors: Record<string, any> = {
+            draft: chalk.yellow,
+            proposed: chalk.blue,
+            approved: chalk.green,
+            active: chalk.green,
+            archived: chalk.gray,
+          };
+          const statusColor = statusColors[frontmatter.status] || chalk.white;
+
+          logger.info(`  Type: ${recordType}`);
+          logger.info(
+            `  Status: ${statusColor(frontmatter.status || 'draft')}`
+          );
+          logger.info(
+            `  Created: ${frontmatter.created ? new Date(frontmatter.created).toLocaleString() : 'unknown'}`
+          );
+          logger.info(
+            `  Updated: ${frontmatter.updated ? new Date(frontmatter.updated).toLocaleString() : 'unknown'}`
+          );
+          logger.info(`  Author: ${frontmatter.author || 'unknown'}`);
+          logger.info(`  Version: ${frontmatter.version || '1.0.0'}`);
+          logger.info(`  File: ${path.relative(dataDir, recordPath)}`);
+
+          // Content section
+          logger.info('\n📝 Content:');
+          logger.debug('─'.repeat(40));
+
+          if (options.raw) {
+            // Show raw markdown
+            logger.output(markdownContent);
+          } else {
+            // Show formatted content (basic markdown rendering)
+            const lines = markdownContent.split('\n');
+            for (const line of lines) {
+              if (line.startsWith('# ')) {
+                logger.output(line.substring(2));
+              } else if (line.startsWith('## ')) {
+                logger.output(line.substring(3));
+              } else if (line.startsWith('### ')) {
+                logger.output(line.substring(4));
+              } else if (line.startsWith('- ') || line.startsWith('* ')) {
+                logger.output(`  ${line}`);
+              } else if (line.trim() === '') {
+                logger.output('');
+              } else {
+                logger.output(line);
+              }
             }
           }
-        }
 
-        logger.info('\n' + '='.repeat(60));
-        logger.success('✅ Record displayed successfully!');
-      } catch (error) {
-        // Report through cliError, not logger.error: Logger suppresses itself
-        // entirely in JSON mode, so routing failures through it made
-        // `view --json` exit 1 with NO output at all. cliError emits the
-        // structured error envelope on stderr under --json and the human
-        // message otherwise.
-        cliError(
-          'Failed to view record',
-          'VIEW_FAILED',
-          { error: error instanceof Error ? error.message : String(error) },
-          'view'
-        );
-        process.exit(1);
-      } finally {
-        endOperation();
-      }
-    });
+          logger.info('\n' + '='.repeat(60));
+          logger.success('✅ Record displayed successfully!');
+        }
+      )
+    );
 };
