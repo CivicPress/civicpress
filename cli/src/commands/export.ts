@@ -8,22 +8,13 @@ import {
   RecordParser,
   parseRecordRelativePath,
 } from '@civicpress/core';
-import {
-  getGlobalOptionsFromArgs,
-  initializeCliOutput,
-} from '../utils/global-options.js';
 import { AuthUtils } from '../utils/auth-utils.js';
 import {
   getAvailableRecords,
   resolveRecordReference,
 } from '../utils/record-locator.js';
-import {
-  cliSuccess,
-  cliError,
-  cliInfo,
-  cliWarn,
-  cliStartOperation,
-} from '../utils/cli-output.js';
+import { cliSuccess, cliError, cliInfo, cliWarn } from '../utils/cli-output.js';
+import { withCli } from '../utils/with-cli.js';
 
 interface ExportOptions {
   token?: string;
@@ -69,65 +60,54 @@ export function registerExportCommand(cli: CAC) {
     .option('--include-metadata', 'Include full metadata in export')
     .option('--pretty', 'Pretty-print JSON output')
     .option('--template <template>', 'Custom HTML template file')
-    .action(async (record: string, options: ExportOptions) => {
-      // Initialize CLI output with global options
-      const globalOptions = getGlobalOptionsFromArgs();
-      initializeCliOutput(globalOptions);
+    .action(
+      withCli<[any, any]>(
+        {
+          operation: 'export',
+          errorMessage: 'Export failed',
+          errorCode: 'EXPORT_FAILED',
+        },
+        async ({ globalOptions }, record: any, options: any) => {
+          // Validate authentication and get civic instance
+          const { civic, user } = await AuthUtils.requireAuthWithCivic(
+            options.token,
+            globalOptions.json
+          );
+          const dataDir = civic.getDataDir();
 
-      const endOperation = cliStartOperation('export');
+          // Check export permissions
+          const canExport = await userCan(user, 'records:export');
+          if (!canExport) {
+            cliError(
+              'Insufficient permissions to export records',
+              'PERMISSION_DENIED',
+              {
+                requiredPermission: 'records:export',
+                userRole: user.role,
+              },
+              'export'
+            );
+            process.exit(1);
+          }
 
-      // Validate authentication and get civic instance
-      const { civic, user } = await AuthUtils.requireAuthWithCivic(
-        options.token,
-        globalOptions.json
-      );
-      const dataDir = civic.getDataDir();
+          const exportOptions: ExportOptions = {
+            ...options,
+            format: options.format || 'json',
+            includeContent: options.includeContent || false,
+            includeMetadata: options.includeMetadata || false,
+            pretty: options.pretty || false,
+          };
 
-      // Check export permissions
-      const canExport = await userCan(user, 'records:export');
-      if (!canExport) {
-        cliError(
-          'Insufficient permissions to export records',
-          'PERMISSION_DENIED',
-          {
-            requiredPermission: 'records:export',
-            userRole: user.role,
-          },
-          'export'
-        );
-        process.exit(1);
-      }
-
-      try {
-        const exportOptions: ExportOptions = {
-          ...options,
-          format: options.format || 'json',
-          includeContent: options.includeContent || false,
-          includeMetadata: options.includeMetadata || false,
-          pretty: options.pretty || false,
-        };
-
-        // If specific record is provided, export just that record
-        if (record) {
-          await exportSingleRecord(dataDir, record, exportOptions);
-        } else {
-          // Export filtered records
-          await exportRecords(dataDir, exportOptions);
+          // If specific record is provided, export just that record
+          if (record) {
+            await exportSingleRecord(dataDir, record, exportOptions);
+          } else {
+            // Export filtered records
+            await exportRecords(dataDir, exportOptions);
+          }
         }
-      } catch (error) {
-        cliError(
-          'Export failed',
-          'EXPORT_FAILED',
-          {
-            error: error instanceof Error ? error.message : String(error),
-          },
-          'export'
-        );
-        process.exit(1);
-      } finally {
-        endOperation();
-      }
-    });
+      )
+    );
 }
 
 async function exportSingleRecord(
