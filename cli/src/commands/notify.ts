@@ -1,3 +1,4 @@
+import { withCli } from '../utils/with-cli.js';
 import { CAC } from 'cac';
 import {
   NotificationService,
@@ -6,16 +7,7 @@ import {
   EmailChannel,
   type EmailChannelOptions,
 } from '@civicpress/core';
-import {
-  getGlobalOptionsFromArgs,
-  initializeCliOutput,
-} from '../utils/global-options.js';
-import {
-  cliSuccess,
-  cliError,
-  cliWarn,
-  cliStartOperation,
-} from '../utils/cli-output.js';
+import { cliSuccess, cliError, cliWarn } from '../utils/cli-output.js';
 
 // Deep-normalize metadata-shaped values { value, type, ... } -> value
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -146,95 +138,148 @@ export default function notifyCommand(cli: CAC) {
     .option('--json', 'Output in JSON format')
     .option('--silent', 'Suppress output')
     .option('--verbose', 'Enable verbose debugging output')
-    .action(async (options) => {
-      // Initialize CLI output with global options
-      const globalOptions = getGlobalOptionsFromArgs();
-      initializeCliOutput(globalOptions);
+    .action(
+      withCli<[any]>(
+        {
+          operation: 'notify:test',
+          errorMessage: 'Notification test failed',
+          errorCode: 'NOTIFY_TEST_FAILED',
+          // Faithful to the old `errorMessage` local: a non-Error throw
+          // read 'Unknown error' here, not String(error).
+          details: (error) => ({
+            error: error instanceof Error ? error.message : 'Unknown error',
+          }),
+        },
+        async ({ globalOptions }, options: any) => {
+          const { to, subject, message, provider, template, variables } =
+            options;
 
-      const endOperation = cliStartOperation('notify:test');
+          // Initialize configuration
+          const config = new NotificationConfig();
 
-      try {
-        const {
-          to,
-          subject,
-          message,
-          provider,
-          template,
-          variables,
-        } = options;
+          // Create notification service
+          const notificationService = new NotificationService(config);
 
-        // Initialize configuration
-        const config = new NotificationConfig();
-
-        // Create notification service
-        const notificationService = new NotificationService(config);
-
-        // Get email configuration
-        const emailConfig = config.getChannelConfig('email');
-        if (!emailConfig || !emailConfig.enabled) {
-          throw new Error('Email channel not enabled in configuration');
-        }
-
-        // Create and register email channel (adapter around canonical
-        // EmailChannel from @civicpress/core).
-        const rawCreds =
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (emailConfig as any)[provider as any] ||
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (emailConfig as any).sendgrid;
-        const emailChannel = buildEmailChannelAdapter({
-          enabled: emailConfig.enabled,
-          provider: provider as 'sendgrid' | 'smtp' | 'nodemailer',
-          credentials: rawCreds,
-          settings: {},
-        });
-
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        notificationService.registerChannel('email', emailChannel as any);
-
-        // Handle template-based sending
-        if (template) {
-          // Register template
-          let templateContent = '';
-          let templateName = template;
-
-          switch (template) {
-            case 'email_verification':
-              templateContent =
-                'Please click the following link to verify your account: {{verification_url}}';
-              break;
-            case 'password_reset':
-              templateContent =
-                'Click here to reset your password: {{reset_url}}';
-              break;
-            case 'two_factor_auth':
-              templateContent = 'Your verification code is: {{code}}';
-              break;
-            case 'security_alert':
-              templateContent = 'Suspicious activity detected: {{details}}';
-              break;
-            default:
-              throw new Error(`Unknown template: ${template}`);
+          // Get email configuration
+          const emailConfig = config.getChannelConfig('email');
+          if (!emailConfig || !emailConfig.enabled) {
+            throw new Error('Email channel not enabled in configuration');
           }
 
-          const authTemplate = new AuthTemplate(templateName, templateContent);
-          notificationService.registerTemplate(templateName, authTemplate);
+          // Create and register email channel (adapter around canonical
+          // EmailChannel from @civicpress/core).
+          const rawCreds =
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (emailConfig as any)[provider as any] ||
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (emailConfig as any).sendgrid;
+          const emailChannel = buildEmailChannelAdapter({
+            enabled: emailConfig.enabled,
+            provider: provider as 'sendgrid' | 'smtp' | 'nodemailer',
+            credentials: rawCreds,
+            settings: {},
+          });
 
-          // Parse variables
-          let templateData = {};
-          if (variables) {
-            try {
-              templateData = JSON.parse(variables);
-            } catch {
-              throw new Error(`Invalid JSON in --variables: ${variables}`);
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          notificationService.registerChannel('email', emailChannel as any);
+
+          // Handle template-based sending
+          if (template) {
+            // Register template
+            let templateContent = '';
+            let templateName = template;
+
+            switch (template) {
+              case 'email_verification':
+                templateContent =
+                  'Please click the following link to verify your account: {{verification_url}}';
+                break;
+              case 'password_reset':
+                templateContent =
+                  'Click here to reset your password: {{reset_url}}';
+                break;
+              case 'two_factor_auth':
+                templateContent = 'Your verification code is: {{code}}';
+                break;
+              case 'security_alert':
+                templateContent = 'Suspicious activity detected: {{details}}';
+                break;
+              default:
+                throw new Error(`Unknown template: ${template}`);
             }
+
+            const authTemplate = new AuthTemplate(
+              templateName,
+              templateContent
+            );
+            notificationService.registerTemplate(templateName, authTemplate);
+
+            // Parse variables
+            let templateData = {};
+            if (variables) {
+              try {
+                templateData = JSON.parse(variables);
+              } catch {
+                throw new Error(`Invalid JSON in --variables: ${variables}`);
+              }
+            }
+
+            // Send template-based notification
+            const result = await notificationService.sendNotification({
+              channels: ['email'],
+              template: templateName,
+              data: templateData,
+            });
+
+            if (result.success) {
+              cliSuccess(
+                {
+                  notificationId: result.notificationId,
+                  sentChannels: result.sentChannels,
+                },
+                `Email sent successfully using template ${templateName}`,
+                {
+                  operation: 'notify:test',
+                  template: templateName,
+                  notificationId: result.notificationId,
+                }
+              );
+            } else {
+              cliError(
+                `Email failed to send: ${result.errors?.join(', ')}`,
+                'SEND_FAILED',
+                {
+                  errors: result.errors,
+                  template: templateName,
+                },
+                'notify:test'
+              );
+              process.exit(1);
+            }
+
+            return;
           }
 
-          // Send template-based notification
+          // Handle direct message sending
+          if (!to) {
+            throw new Error('Recipient email address required (use --to)');
+          }
+
+          if (!subject || !message) {
+            throw new Error(
+              'Subject and message required for direct sending (use --subject and --message)'
+            );
+          }
+
+          // For direct sending, we'll use a simple template
+          const directTemplate = new AuthTemplate('direct', message);
+          notificationService.registerTemplate('direct', directTemplate);
+
           const result = await notificationService.sendNotification({
+            email: to,
             channels: ['email'],
-            template: templateName,
-            data: templateData,
+            template: 'direct',
+            data: {},
           });
 
           if (result.success) {
@@ -242,11 +287,13 @@ export default function notifyCommand(cli: CAC) {
               {
                 notificationId: result.notificationId,
                 sentChannels: result.sentChannels,
+                to,
+                subject,
               },
-              `Email sent successfully using template ${templateName}`,
+              `Email sent successfully to ${to}`,
               {
                 operation: 'notify:test',
-                template: templateName,
+                to,
                 notificationId: result.notificationId,
               }
             );
@@ -256,133 +303,61 @@ export default function notifyCommand(cli: CAC) {
               'SEND_FAILED',
               {
                 errors: result.errors,
-                template: templateName,
+                to,
               },
               'notify:test'
             );
             process.exit(1);
           }
 
-          return result;
+          return;
         }
-
-        // Handle direct message sending
-        if (!to) {
-          throw new Error('Recipient email address required (use --to)');
-        }
-
-        if (!subject || !message) {
-          throw new Error(
-            'Subject and message required for direct sending (use --subject and --message)'
-          );
-        }
-
-        // For direct sending, we'll use a simple template
-        const directTemplate = new AuthTemplate('direct', message);
-        notificationService.registerTemplate('direct', directTemplate);
-
-        const result = await notificationService.sendNotification({
-          email: to,
-          channels: ['email'],
-          template: 'direct',
-          data: {},
-        });
-
-        if (result.success) {
-          cliSuccess(
-            {
-              notificationId: result.notificationId,
-              sentChannels: result.sentChannels,
-              to,
-              subject,
-            },
-            `Email sent successfully to ${to}`,
-            {
-              operation: 'notify:test',
-              to,
-              notificationId: result.notificationId,
-            }
-          );
-        } else {
-          cliError(
-            `Email failed to send: ${result.errors?.join(', ')}`,
-            'SEND_FAILED',
-            {
-              errors: result.errors,
-              to,
-            },
-            'notify:test'
-          );
-          process.exit(1);
-        }
-
-        return result;
-      } catch (error) {
-        const errorMessage =
-          error instanceof Error ? error.message : 'Unknown error';
-
-        cliError(
-          'Notification test failed',
-          'NOTIFY_TEST_FAILED',
-          { error: errorMessage },
-          'notify:test'
-        );
-        process.exit(1);
-      } finally {
-        endOperation();
-      }
-    });
+      )
+    );
 
   cli
     .command('notify:config', 'Show notification configuration')
     .option('--json', 'Output in JSON format')
     .option('--silent', 'Suppress output')
-    .action(async (_options) => {
-      // Initialize CLI output with global options
-      const globalOptions = getGlobalOptionsFromArgs();
-      initializeCliOutput(globalOptions);
-
-      const endOperation = cliStartOperation('notify:config');
-
-      try {
-        const config = new NotificationConfig();
-        const emailConfig = config.getChannelConfig('email');
-
-        const emailData = {
-          enabled: emailConfig?.enabled,
-          provider: emailConfig?.provider,
-          sendgrid: emailConfig?.sendgrid
-            ? {
-                apiKey: emailConfig.sendgrid.apiKey ? '***' : undefined,
-                from: emailConfig.sendgrid.from,
-              }
-            : undefined,
-        };
-
-        const message = emailConfig?.enabled
-          ? `Email notifications enabled (${emailConfig?.provider || 'default'} provider)`
-          : 'Email notifications disabled';
-
-        cliSuccess({ email: emailData }, message, {
+    .action(
+      withCli<[any]>(
+        {
           operation: 'notify:config',
-          emailEnabled: emailConfig?.enabled,
-          provider: emailConfig?.provider,
-        });
-      } catch (error) {
-        const errorMessage =
-          error instanceof Error ? error.message : 'Unknown error';
+          errorMessage: 'Failed to get notification configuration',
+          errorCode: 'GET_CONFIG_FAILED',
+          // Faithful to the old `errorMessage` local: a non-Error throw
+          // read 'Unknown error' here, not String(error).
+          details: (error) => ({
+            error: error instanceof Error ? error.message : 'Unknown error',
+          }),
+        },
+        async ({ globalOptions }, _options: any) => {
+          const config = new NotificationConfig();
+          const emailConfig = config.getChannelConfig('email');
 
-        cliError(
-          'Failed to get notification configuration',
-          'GET_CONFIG_FAILED',
-          { error: errorMessage },
-          'notify:config'
-        );
-        process.exit(1);
-      } finally {
-        endOperation();
-      }
-    });
+          const emailData = {
+            enabled: emailConfig?.enabled,
+            provider: emailConfig?.provider,
+            sendgrid: emailConfig?.sendgrid
+              ? {
+                  apiKey: emailConfig.sendgrid.apiKey ? '***' : undefined,
+                  from: emailConfig.sendgrid.from,
+                }
+              : undefined,
+          };
+
+          const message = emailConfig?.enabled
+            ? `Email notifications enabled (${emailConfig?.provider || 'default'} provider)`
+            : 'Email notifications disabled';
+
+          cliSuccess({ email: emailData }, message, {
+            operation: 'notify:config',
+            emailEnabled: emailConfig?.enabled,
+            provider: emailConfig?.provider,
+          });
+        }
+      )
+    );
 
   cli
     .command('notify:queue', 'List notification queue status')
@@ -398,87 +373,81 @@ export default function notifyCommand(cli: CAC) {
     })
     .option('--json', 'Output in JSON format')
     .option('--silent', 'Suppress output')
-    .action(async (options) => {
-      // Initialize CLI output with global options
-      const globalOptions = getGlobalOptionsFromArgs();
-      initializeCliOutput(globalOptions);
+    .action(
+      withCli<[any]>(
+        {
+          operation: 'notify:queue',
+          errorMessage: 'Failed to get notification queue',
+          errorCode: 'GET_QUEUE_FAILED',
+          // Faithful to the old `errorMessage` local: a non-Error throw
+          // read 'Unknown error' here, not String(error).
+          details: (error) => ({
+            error: error instanceof Error ? error.message : 'Unknown error',
+          }),
+        },
+        async ({ globalOptions }, options: any) => {
+          const { status, limit } = options;
 
-      const endOperation = cliStartOperation('notify:queue');
+          // Initialize configuration
+          const config = new NotificationConfig();
 
-      try {
-        const { status, limit } = options;
+          // Create notification service
+          const notificationService = new NotificationService(config);
 
-        // Initialize configuration
-        const config = new NotificationConfig();
+          // Get queue statistics
+          const stats = await notificationService.getStatistics();
 
-        // Create notification service
-        const notificationService = new NotificationService(config);
+          // Get recent history
+          const history = await notificationService.getHistory(parseInt(limit));
 
-        // Get queue statistics
-        const stats = await notificationService.getStatistics();
-
-        // Get recent history
-        const history = await notificationService.getHistory(parseInt(limit));
-
-        // Filter by status if specified
-        let filteredHistory = history;
-        if (status !== 'all') {
-          filteredHistory = history.filter((entry) => {
-            if (status === 'completed') return entry.details?.success === true;
-            if (status === 'failed') return entry.details?.success === false;
-            if (status === 'pending')
-              return entry.details?.status === 'pending';
-            if (status === 'processing')
-              return entry.details?.status === 'processing';
-            return true;
-          });
-        }
-
-        const successRate =
-          stats.totalSent > 0
-            ? (
-                (stats.totalSent / (stats.totalSent + stats.totalFailed)) *
-                100
-              ).toFixed(1)
-            : '0';
-
-        const message =
-          filteredHistory.length === 0
-            ? `No notifications found (status: ${status})`
-            : `Found ${filteredHistory.length} notification${filteredHistory.length === 1 ? '' : 's'} (${stats.totalSent} sent, ${stats.totalFailed} failed, ${successRate}% success rate)`;
-
-        cliSuccess(
-          {
-            statistics: stats,
-            queue: filteredHistory,
-            filters: {
-              status,
-              limit: parseInt(limit),
-            },
-          },
-          message,
-          {
-            operation: 'notify:queue',
-            totalSent: stats.totalSent,
-            totalFailed: stats.totalFailed,
-            queueLength: filteredHistory.length,
+          // Filter by status if specified
+          let filteredHistory = history;
+          if (status !== 'all') {
+            filteredHistory = history.filter((entry) => {
+              if (status === 'completed')
+                return entry.details?.success === true;
+              if (status === 'failed') return entry.details?.success === false;
+              if (status === 'pending')
+                return entry.details?.status === 'pending';
+              if (status === 'processing')
+                return entry.details?.status === 'processing';
+              return true;
+            });
           }
-        );
-      } catch (error) {
-        const errorMessage =
-          error instanceof Error ? error.message : 'Unknown error';
 
-        cliError(
-          'Failed to get notification queue',
-          'GET_QUEUE_FAILED',
-          { error: errorMessage },
-          'notify:queue'
-        );
-        process.exit(1);
-      } finally {
-        endOperation();
-      }
-    });
+          const successRate =
+            stats.totalSent > 0
+              ? (
+                  (stats.totalSent / (stats.totalSent + stats.totalFailed)) *
+                  100
+                ).toFixed(1)
+              : '0';
+
+          const message =
+            filteredHistory.length === 0
+              ? `No notifications found (status: ${status})`
+              : `Found ${filteredHistory.length} notification${filteredHistory.length === 1 ? '' : 's'} (${stats.totalSent} sent, ${stats.totalFailed} failed, ${successRate}% success rate)`;
+
+          cliSuccess(
+            {
+              statistics: stats,
+              queue: filteredHistory,
+              filters: {
+                status,
+                limit: parseInt(limit),
+              },
+            },
+            message,
+            {
+              operation: 'notify:queue',
+              totalSent: stats.totalSent,
+              totalFailed: stats.totalFailed,
+              queueLength: filteredHistory.length,
+            }
+          );
+        }
+      )
+    );
 
   cli
     .command('notify:retry', 'Retry failed notifications')
@@ -493,58 +462,53 @@ export default function notifyCommand(cli: CAC) {
     )
     .option('--json', 'Output in JSON format')
     .option('--silent', 'Suppress output')
-    .action(async (options) => {
-      // Initialize CLI output with global options
-      const globalOptions = getGlobalOptionsFromArgs();
-      initializeCliOutput(globalOptions);
+    .action(
+      withCli<[any]>(
+        {
+          operation: 'notify:retry',
+          errorMessage: 'Failed to retry notifications',
+          errorCode: 'RETRY_FAILED',
+          // Faithful to the old `errorMessage` local: a non-Error throw
+          // read 'Unknown error' here, not String(error).
+          details: (error) => ({
+            error: error instanceof Error ? error.message : 'Unknown error',
+          }),
+        },
+        async ({ globalOptions }, options: any) => {
+          const { id, all, limit } = options;
 
-      const endOperation = cliStartOperation('notify:retry');
+          // Initialize configuration
+          const config = new NotificationConfig();
 
-      try {
-        const { id, all, limit } = options;
+          // Create notification service
+          const notificationService = new NotificationService(config);
 
-        // Initialize configuration
-        const config = new NotificationConfig();
+          if (id) {
+            // Retry specific notification
+            cliWarn('Retry functionality not yet implemented', 'notify:retry');
+          } else if (all) {
+            // Retry all failed notifications
+            const history = await notificationService.getHistory(
+              parseInt(limit)
+            );
+            const failedNotifications = history.filter(
+              (entry) => !entry.details?.success
+            );
 
-        // Create notification service
-        const notificationService = new NotificationService(config);
-
-        if (id) {
-          // Retry specific notification
-          cliWarn('Retry functionality not yet implemented', 'notify:retry');
-        } else if (all) {
-          // Retry all failed notifications
-          const history = await notificationService.getHistory(parseInt(limit));
-          const failedNotifications = history.filter(
-            (entry) => !entry.details?.success
-          );
-
-          cliWarn(
-            `Found ${failedNotifications.length} failed notification${failedNotifications.length === 1 ? '' : 's'} to retry, but retry functionality is not yet implemented`,
-            'notify:retry'
-          );
-        } else {
-          cliError(
-            'Please specify --id or --all',
-            'VALIDATION_ERROR',
-            undefined,
-            'notify:retry'
-          );
-          process.exit(1);
+            cliWarn(
+              `Found ${failedNotifications.length} failed notification${failedNotifications.length === 1 ? '' : 's'} to retry, but retry functionality is not yet implemented`,
+              'notify:retry'
+            );
+          } else {
+            cliError(
+              'Please specify --id or --all',
+              'VALIDATION_ERROR',
+              undefined,
+              'notify:retry'
+            );
+            process.exit(1);
+          }
         }
-      } catch (error) {
-        const errorMessage =
-          error instanceof Error ? error.message : 'Unknown error';
-
-        cliError(
-          'Failed to retry notifications',
-          'RETRY_FAILED',
-          { error: errorMessage },
-          'notify:retry'
-        );
-        process.exit(1);
-      } finally {
-        endOperation();
-      }
-    });
+      )
+    );
 }
