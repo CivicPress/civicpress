@@ -281,7 +281,11 @@ export async function loadConfig() {
 }
 
 // Export central configuration
-export { CentralConfigManager } from './config/central-config.js';
+export {
+  CentralConfigManager,
+  resolveSystemDataDir,
+  resolveProjectRoot,
+} from './config/central-config.js';
 export type { CentralConfig } from './config/central-config.js';
 
 // Export record types configuration

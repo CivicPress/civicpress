@@ -1,3 +1,4 @@
+import { CentralConfigManager } from './config/central-config.js';
 import { WorkflowEngine } from './workflows/workflow-engine.js';
 import { GitEngine } from './git/git-engine.js';
 import { HookSystem } from './hooks/hook-system.js';
@@ -19,6 +20,13 @@ import { SecretsManager } from './security/secrets.js';
 
 export interface CivicPressConfig {
   dataDir: string;
+  /**
+   * Absolute path to `.system-data/`, anchored to the project root. Populated
+   * from CentralConfigManager when this config came from there; read via
+   * `resolveSystemDataDir()`, which falls back to a `dataDir`-derived path only
+   * for directly-constructed configs that never carried the anchor.
+   */
+  systemDataDir?: string;
   database?: {
     type: 'sqlite' | 'postgres';
     sqlite?: {
@@ -174,11 +182,28 @@ export class CivicPress {
   constructor(config: CivicPressConfig) {
     this.config = config;
 
+    // Anchor `.system-data` from the config authority, but ONLY when this
+    // config demonstrably came from it — i.e. its dataDir matches the one
+    // CentralConfigManager resolved. That guard is deliberate: a raw config
+    // built directly in a test has no `.civicrc` anchor, and blindly stamping
+    // the static systemDataDir onto it would point its data somewhere the test
+    // never set up. Those configs fall through to resolveSystemDataDir's
+    // dataDir-derived fallback instead, preserving prior behavior.
+    if (!this.config.systemDataDir) {
+      try {
+        if (CentralConfigManager.getDataDir() === this.config.dataDir) {
+          this.config.systemDataDir = CentralConfigManager.getSystemDataDir();
+        }
+      } catch {
+        // CentralConfigManager not initialized / no dataDir — leave unset.
+      }
+    }
+
     // Create dependency injection container
     this.container = new ServiceContainer();
 
     // Register all services
-    registerCivicPressServices(this.container, config);
+    registerCivicPressServices(this.container, this.config);
 
     // Get logger from container
     this.logger = this.container.resolve<Logger>('logger');
