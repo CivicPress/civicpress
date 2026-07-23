@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- CLI command handlers pass CAC's untyped options through withCli. */
 import { CAC } from 'cac';
 import {
   WorkflowConfigManager,
@@ -30,7 +31,6 @@ export const createCommand = (cli: CAC) => {
     .option('-r, --role <role>', 'Role for the action (clerk, council, etc.)')
     .option('--json', 'Output as JSON')
     .option('--silent', 'Suppress output')
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .action(
       withCli<[string, string, any]>(
         {
@@ -54,7 +54,6 @@ export const createCommand = (cli: CAC) => {
             options.token,
             globalOptions.json
           );
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const coreMod: any = await import('@civicpress/core');
           const audit = new coreMod.AuditLogger();
           // Get data directory from civic instance

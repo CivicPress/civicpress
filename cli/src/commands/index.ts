@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- CLI command handlers pass CAC's untyped options through withCli. */
 import { CAC } from 'cac';
 import { CivicPress } from '@civicpress/core';
 import { withCli } from '../utils/with-cli.js';
@@ -22,18 +23,17 @@ export const indexCommand = (cli: CAC) => {
     )
     .option('--json', 'Output in JSON format')
     .option('--silent', 'Suppress output')
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .action(
       withCli<[any]>(
         {
           operation: 'index',
           errorMessage: 'Index command failed',
           errorCode: 'INDEX_COMMAND_FAILED',
-          details: (error, options) => ({
+          details: (error, _options) => ({
             error: error instanceof Error ? error.message : String(error),
           }),
         },
-        async ({ globalOptions }, options: any) => {
+        async (_ctx, options: any) => {
           // Initialize CivicPress
           const civicPress = new CivicPress({
             dataDir: 'data',
@@ -63,7 +63,6 @@ export const indexCommand = (cli: CAC) => {
     );
 };
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function handleGenerate(indexingService: any, options: any) {
   const indexingOptions = {
     rebuild: options.rebuild,
@@ -126,7 +125,6 @@ async function handleGenerate(indexingService: any, options: any) {
   }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function handleSearch(indexingService: any, query: string, options: any) {
   const recordsDir = 'data/records';
   const indexPath = `${recordsDir}/index.yml`;
@@ -167,7 +165,6 @@ async function handleSearch(indexingService: any, query: string, options: any) {
   }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function handleList(indexingService: any, _options: any) {
   const recordsDir = 'data/records';
   const indexPath = `${recordsDir}/index.yml`;
@@ -184,7 +181,6 @@ async function handleList(indexingService: any, _options: any) {
     process.exit(1);
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const moduleIndexes: any[] = [];
   for (const module of index.metadata.modules) {
     const moduleIndexPath = `${recordsDir}/${module}/index.yml`;
@@ -215,7 +211,6 @@ async function handleList(indexingService: any, _options: any) {
   );
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function handleValidate(indexingService: any, _options: any) {
   const recordsDir = 'data/records';
   const indexPath = `${recordsDir}/index.yml`;

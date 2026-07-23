@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- CLI command handlers pass CAC's untyped options through withCli. */
 import { withCli } from '../utils/with-cli.js';
 import { CAC } from 'cac';
 import { CivicPress, isSimulatedAuthEnabled } from '@civicpress/core';
@@ -253,7 +254,6 @@ export default function setupAuthCommand(cli: CAC) {
           }
 
           // Get OAuth provider manager to validate token
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const oauthManager = (authService as any).oauthManager;
           const user = await oauthManager.validateToken(
             options.provider,

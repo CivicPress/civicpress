@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- CLI command handlers pass CAC's untyped options through withCli. */
 import { CAC } from 'cac';
 import {
   validateGeography,
@@ -28,9 +29,7 @@ interface GeographyValidationOptions {
 
 interface GeographyFile {
   path: string;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   geography: any;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   validation: any;
 }
 
@@ -50,12 +49,12 @@ export function registerGeographyCommand(cli: CAC) {
           operation: 'geography:validate',
           errorMessage: 'Failed to validate geography data',
           errorCode: 'VALIDATE_GEOGRAPHY_FAILED',
-          details: (error, filePath, options) => ({
+          details: (error, filePath, _options) => ({
             error: (error as Error).message,
             filePath,
           }),
         },
-        async ({ globalOptions }, filePath: any, options: any) => {
+        async (_ctx, filePath: any, options: any) => {
           const result = await validateGeographyFile(filePath, options);
 
           cliSuccess(
@@ -90,12 +89,12 @@ export function registerGeographyCommand(cli: CAC) {
           operation: 'geography:scan',
           errorMessage: 'Failed to scan directory for geography data',
           errorCode: 'SCAN_GEOGRAPHY_FAILED',
-          details: (error, dirPath, options) => ({
+          details: (error, dirPath, _options) => ({
             error: (error as Error).message,
             directory: dirPath,
           }),
         },
-        async ({ globalOptions }, dirPath: any, options: any) => {
+        async (_ctx, dirPath: any, options: any) => {
           const results = await scanDirectoryForGeography(dirPath, options);
 
           const message =
@@ -285,7 +284,6 @@ async function normalizeGeographyFile(
   };
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function extractGeographyFromContent(content: string): any {
   // Look for YAML frontmatter
   const frontmatterMatch = content.match(/^---\s*\n([\s\S]*?)\n---\s*\n/);
@@ -294,7 +292,6 @@ function extractGeographyFromContent(content: string): any {
   }
 
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const frontmatter = parseYaml(frontmatterMatch[1]) as any;
     return frontmatter.geography || null;
   } catch {
@@ -302,7 +299,6 @@ function extractGeographyFromContent(content: string): any {
   }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function updateGeographyInContent(content: string, geography: any): string {
   const frontmatterMatch = content.match(/^---\s*\n([\s\S]*?)\n---\s*\n/);
   if (!frontmatterMatch) {
@@ -312,7 +308,6 @@ function updateGeographyInContent(content: string, geography: any): string {
   }
 
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const frontmatter = parseYaml(frontmatterMatch[1]) as any;
     frontmatter.geography = geography;
     const newFrontmatter = stringifyYaml(frontmatter);

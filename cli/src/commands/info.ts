@@ -1,5 +1,6 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- CLI command handlers pass CAC's untyped options through withCli. */
 import { CAC } from 'cac';
-import { cliSuccess, cliError } from '../utils/cli-output.js';
+import { cliSuccess } from '../utils/cli-output.js';
 import { withCli } from '../utils/with-cli.js';
 
 export const infoCommand = (cli: CAC) => {
@@ -20,12 +21,9 @@ export const infoCommand = (cli: CAC) => {
         async ({ globalOptions }, options: any) => {
           const token = options.token;
           let isAdmin = false;
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           let userInfo: any = null;
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           let systemConfig: any = null;
           let dataDir: string | undefined = undefined;
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           let dbConfig: any = undefined;
           const { CentralConfigManager } = await import('@civicpress/core');
           const orgConfig = CentralConfigManager.getOrgConfig();
@@ -70,7 +68,6 @@ export const infoCommand = (cli: CAC) => {
             dbConfig = CentralConfigManager.getDatabaseConfig();
           }
 
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const output: any = {
             organization: orgConfig,
           };

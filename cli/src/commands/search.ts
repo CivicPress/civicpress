@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- CLI command handlers pass CAC's untyped options through withCli. */
 import { CAC } from 'cac';
 import { readFile } from 'fs/promises';
 import { join } from 'path';
@@ -34,7 +35,6 @@ interface SearchResult {
     value: string;
     context?: string;
   }[];
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   metadata: Record<string, any>;
 }
 
@@ -68,11 +68,11 @@ export function registerSearchCommand(cli: CAC) {
           operation: 'search',
           errorMessage: 'Search failed',
           errorCode: 'SEARCH_FAILED',
-          details: (error, query, options) => ({
+          details: (error, _query, _options) => ({
             error: error instanceof Error ? error.message : String(error),
           }),
         },
-        async ({ globalOptions }, query: any, options: any) => {
+        async (_ctx, query: any, options: any) => {
           const config = await loadConfig();
           if (!config) {
             cliError(
@@ -317,9 +317,7 @@ async function searchRecords(
   }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function parseRecordMetadata(content: string): Record<string, any> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const metadata: Record<string, any> = {};
 
   // Extract frontmatter

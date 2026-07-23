@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- CLI command handlers pass CAC's untyped options through withCli. */
 import { CAC } from 'cac';
 import chalk from 'chalk';
 import * as fs from 'fs';
@@ -17,7 +18,6 @@ export const viewCommand = (cli: CAC) => {
     .command('view <record>', 'View a specific civic record')
     .option('--token <token>', 'Session token for authentication')
     .option('-r, --raw', 'Show raw markdown content')
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .action(
       withCli<[string, any]>(
         {
@@ -143,7 +143,6 @@ export const viewCommand = (cli: CAC) => {
           logger.info('\n📋 Metadata:');
           logger.debug('─'.repeat(40));
 
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const statusColors: Record<string, any> = {
             draft: chalk.yellow,
             proposed: chalk.blue,

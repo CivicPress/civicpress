@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- CLI command handlers pass CAC's untyped options through withCli. */
 import { CAC } from 'cac';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -30,7 +31,6 @@ export const listCommand = (cli: CAC) => {
     .option('-a, --all', 'Show all details')
     .option('--json', 'Output as JSON')
     .option('--silent', 'Suppress output')
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .action(
       withCli<[string, any]>(
         {
@@ -90,7 +90,6 @@ export const listCommand = (cli: CAC) => {
           let totalRecords = 0;
           const statusCounts: Record<string, number> = {};
           const typeCounts: Record<string, number> = {};
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const records: any[] = [];
 
           for (const relativePath of recordPaths) {

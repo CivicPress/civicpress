@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- CLI command handlers pass CAC's untyped options through withCli. */
 import { CAC } from 'cac';
 import { simpleGit, SimpleGit } from 'simple-git';
 import { loadConfig, parseRecordRelativePath } from '@civicpress/core';
@@ -93,11 +94,11 @@ export function registerDiffCommand(cli: CAC) {
           operation: 'diff',
           errorMessage: 'Diff failed',
           errorCode: 'DIFF_FAILED',
-          details: (error, record, options) => ({
+          details: (error, _record, _options) => ({
             error: error instanceof Error ? error.message : String(error),
           }),
         },
-        async ({ globalOptions }, record: any, options: any) => {
+        async (_ctx, record: any, options: any) => {
           const config = await loadConfig();
           if (!config) {
             cliError(
@@ -525,9 +526,7 @@ async function getChangedFiles(
   }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function parseRecordMetadata(content: string): Record<string, any> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const metadata: Record<string, any> = {};
 
   // Extract frontmatter

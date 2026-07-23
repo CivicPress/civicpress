@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- CLI command handlers pass CAC's untyped options through withCli. */
 import { CAC } from 'cac';
 import { CivicPress } from '@civicpress/core';
 import * as fs from 'fs';
@@ -7,7 +8,6 @@ import { cliSuccess, cliError, cliWarn } from '../utils/cli-output.js';
 import { withCli } from '../utils/with-cli.js';
 
 // Node.js globals
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 declare const process: any;
 
 export const loginCommand = (cli: CAC) => {
@@ -21,7 +21,6 @@ export const loginCommand = (cli: CAC) => {
     })
     .option('--logout', 'Log out and clear current session')
     .option('--status', 'Show current authentication status')
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .action(
       withCli<[any]>(
         {
@@ -80,10 +79,8 @@ export const loginCommand = (cli: CAC) => {
     );
 };
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function handleLogin(civic: CivicPress, options: any): Promise<void> {
   const authService = civic.getAuthService();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let session: any;
 
   try {

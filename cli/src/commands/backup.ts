@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- CLI command handlers pass CAC's untyped options through withCli. */
 import { CAC } from 'cac';
 import path from 'path';
 import { createRequire } from 'module';
@@ -7,7 +8,7 @@ import {
   type BackupCreateResult,
   type BackupRestoreResult,
 } from '@civicpress/core';
-import { cliSuccess, cliError, cliInfo, cliWarn } from '../utils/cli-output.js';
+import { cliSuccess, cliInfo, cliWarn } from '../utils/cli-output.js';
 import { withCli } from '../utils/with-cli.js';
 import { initializeLogger } from '../utils/global-options.js';
 
@@ -53,7 +54,6 @@ export function registerBackupCommand(cli: CAC): void {
     .option('--overwrite', 'Overwrite existing data when restoring')
     .option('--json', 'Output in JSON format')
     .option('--silent', 'Suppress output')
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .action(
       withCli<[string, string | undefined, any]>(
         {

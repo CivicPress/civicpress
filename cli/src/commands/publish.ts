@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- CLI command handlers pass CAC's untyped options through withCli. */
 /**
  * `civic publish <draftId>` — wraps `publish-draft-saga`.
  *
@@ -30,7 +31,6 @@ export const publishCommand = (cli: CAC) => {
       '--target-status <status>',
       'Override target status (default: draft status, typically "published")'
     )
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .action(
       withCli<[string, any]>(
         {
@@ -49,7 +49,6 @@ export const publishCommand = (cli: CAC) => {
             globalOptions.json
           );
 
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const coreMod: any = await import('@civicpress/core');
           const audit = new coreMod.AuditLogger();
 

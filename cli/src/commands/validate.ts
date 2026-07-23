@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- CLI command handlers pass CAC's untyped options through withCli. */
 import { CAC } from 'cac';
 import { readFile } from 'fs/promises';
 import { join, extname, dirname, resolve } from 'path';
@@ -52,18 +53,17 @@ export function registerValidateCommand(cli: CAC) {
     .option('-f, --fix', 'Attempt to auto-fix validation issues')
     .option('-s, --strict', 'Treat warnings as errors')
     .option('--format <format>', 'Output format', { default: 'human' })
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .action(
       withCli<[any, any]>(
         {
           operation: 'validate',
           errorMessage: 'Validation failed',
           errorCode: 'VALIDATION_FAILED',
-          details: (error, record, options) => ({
+          details: (error, _record, _options) => ({
             error: error instanceof Error ? error.message : String(error),
           }),
         },
-        async ({ globalOptions }, record: any, options: any) => {
+        async (_ctx, record: any, options: any) => {
           const config = await loadConfig();
           if (!config) {
             cliError(
@@ -117,7 +117,6 @@ export function registerValidateCommand(cli: CAC) {
     );
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function validateAllRecords(dataDir: string, options: any) {
   const recordsDir = join(dataDir, 'records');
 
@@ -158,7 +157,6 @@ async function validateAllRecords(dataDir: string, options: any) {
 async function validateSingleRecord(
   dataDir: string,
   recordPath: string,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   options: any
 ) {
   const resolvedRecord = resolveRecordReference(dataDir, recordPath);
@@ -213,7 +211,6 @@ async function validateSingleRecord(
 async function validateRecord(
   dataDir: string,
   recordPath: string,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   options: any,
   absoluteOverride?: string
 ): Promise<ValidationResult> {
@@ -272,7 +269,6 @@ async function validateRecord(
   const recordType = record.type || parsedPathInfo.type;
 
   // Try to load the template using the template engine
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let template: any | null = null;
   try {
     // First try to load the specific template if specified in metadata
@@ -417,7 +413,6 @@ async function validateRecord(
 
 function validateCommonIssues(
   title: string,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   metadata: Record<string, any>,
   content: string,
   errors: ValidationError[],
@@ -534,7 +529,6 @@ function validateMarkdownLinks(
   }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function displayValidationResults(results: ValidationResult[], _options: any) {
   const totalRecords = results.length;
   const validRecords = results.filter((r) => r.isValid).length;

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- CLI command handlers pass CAC's untyped options through withCli. */
 import { CAC } from 'cac';
 import { CivicPress } from '@civicpress/core';
 import { AuthUtils } from '../utils/auth-utils.js';
@@ -49,7 +50,6 @@ async function initializeStorageServices(
   const config = await configManager.loadConfig();
 
   // Get cache manager from CivicPress instance if available
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const cacheManager = (civic as any).getCacheManager?.();
   const storageService = new CloudUuidStorageService(
     config,
@@ -58,7 +58,6 @@ async function initializeStorageServices(
   );
 
   // Get database service from CivicPress instance
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const databaseService = (civic as any).getDatabaseService();
   if (!databaseService) {
     throw new Error('Database service not available');
@@ -130,7 +129,6 @@ export default function setupStorageCommand(cli: CAC) {
             if (options.update) {
               // Update configuration
               const currentConfig = await configManager.loadConfig();
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               const updateData: any = { ...currentConfig };
 
               if (options.backend) {

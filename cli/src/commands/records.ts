@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- CLI command handlers pass CAC's untyped options through withCli. */
 import { CAC } from 'cac';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -12,7 +13,7 @@ import {
   parseRecordRelativePath,
 } from '@civicpress/core';
 import { withCli } from '../utils/with-cli.js';
-import { cliSuccess, cliError, cliInfo } from '../utils/cli-output.js';
+import { cliSuccess, cliInfo } from '../utils/cli-output.js';
 
 interface MigrationResult {
   id: string;
@@ -37,18 +38,17 @@ export function registerRecordsCommand(cli: CAC) {
     .option('--data-dir <path>', 'Override data directory (defaults to config)')
     .option('--json', 'Output results as JSON')
     .option('--silent', 'Suppress non-error output')
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .action(
       withCli<[any]>(
         {
           operation: 'records:migrate-folders',
           errorMessage: 'Failed to migrate record folders',
           errorCode: 'MIGRATION_FAILED',
-          details: (error, options) => ({
+          details: (error, _options) => ({
             error: error instanceof Error ? error.message : String(error),
           }),
         },
-        async ({ globalOptions }, options: any) => {
+        async (_ctx, options: any) => {
           const dataDir =
             options.dataDir ||
             CentralConfigManager.getDataDir() ||

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- CLI command handlers pass CAC's untyped options through withCli. */
 import { CAC } from 'cac';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -17,7 +18,6 @@ export const editCommand = (cli: CAC) => {
     .option('--token <token>', 'Session token for authentication')
     .option('-e, --editor <editor>', 'Specify editor (code, vim, nano, etc.)')
     .option('--dry-run', 'Show what would be done without opening the editor')
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .action(
       withCli<[string, any]>(
         {

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- CLI command handlers pass CAC's untyped options through withCli. */
 import { withCli } from '../utils/with-cli.js';
 import { CAC } from 'cac';
 import { promises as fsp } from 'fs';
@@ -5,16 +6,9 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { ConfigurationService, CentralConfigManager } from '@civicpress/core';
 import { createRequire } from 'module';
-import {
-  getGlobalOptionsFromArgs,
-  initializeCliOutput,
-} from '../utils/global-options.js';
+import {} from '../utils/global-options.js';
 import { AuthUtils } from '../utils/auth-utils.js';
-import {
-  cliSuccess,
-  cliError,
-  cliStartOperation,
-} from '../utils/cli-output.js';
+import { cliSuccess, cliError } from '../utils/cli-output.js';
 
 function createConfigService(): ConfigurationService {
   const central = CentralConfigManager.getConfig();
@@ -48,7 +42,6 @@ function createConfigService(): ConfigurationService {
  * toString, then the first stack line, and — when all of those are empty —
  * the structured fields (name/code/path/syscall/errno) as a last resort.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function describeInitError(err: any): string {
   let errorMessage = 'Unknown error';
   if (err?.message && err.message.trim()) {
@@ -103,7 +96,7 @@ export function registerConfigCommands(cli: CAC) {
             error: error instanceof Error ? error.message : String(error),
           }),
         },
-        async ({ globalOptions }) => {
+        async (_ctx) => {
           const service = createConfigService();
           const status = await service.getConfigurationStatus();
 
@@ -111,7 +104,6 @@ export function registerConfigCommands(cli: CAC) {
             operation: 'config:status',
             configCount: Object.keys(status).length,
           });
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
         }
       )
     );
@@ -127,7 +119,7 @@ export function registerConfigCommands(cli: CAC) {
           error: error instanceof Error ? error.message : String(error),
         }),
       },
-      async ({ globalOptions }) => {
+      async (_ctx) => {
         const service = createConfigService();
         const list = await service.getConfigurationList();
 
@@ -139,7 +131,6 @@ export function registerConfigCommands(cli: CAC) {
             configCount: list.length,
           }
         );
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
       }
     )
   );
@@ -148,22 +139,20 @@ export function registerConfigCommands(cli: CAC) {
   cli
     .command('config:get <type>', 'Get a configuration file')
     .option('--raw', 'Output raw YAML (no transforms)')
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .action(
       withCli<[any, any]>(
         {
           operation: 'config:get',
           errorMessage: (type: any) => `Failed to get configuration '${type}'`,
           errorCode: 'GET_CONFIG_FAILED',
-          details: (error, type, options) => ({
+          details: (error, type, _options) => ({
             error: error instanceof Error ? error.message : String(error),
             configType: type,
           }),
         },
-        async ({ globalOptions }, type: any, options: any) => {
+        async (_ctx, type: any, options: any) => {
           const service = createConfigService();
           if (options.raw) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const yamlTxt = await (service as any).loadRawConfigurationYAML(
               type
             );
@@ -184,7 +173,6 @@ export function registerConfigCommands(cli: CAC) {
               format: 'normalized',
             });
           }
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
         }
       )
     );
@@ -195,23 +183,20 @@ export function registerConfigCommands(cli: CAC) {
     .option('--raw', 'Save raw YAML (no transforms)', { default: true })
     .option('--file <path>', 'Path to YAML file to save')
     .option('--token <token>', 'Session token for authentication (for audit)')
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .action(
       withCli<[any, any]>(
         {
           operation: 'config:put',
           errorMessage: (type: any) => `Failed to save configuration '${type}'`,
           errorCode: 'SAVE_CONFIG_FAILED',
-          details: (error, type, options) => ({
+          details: (error, type, _options) => ({
             error: error instanceof Error ? error.message : String(error),
             configType: type,
           }),
         },
         async ({ globalOptions }, type: any, options: any) => {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const coreMod: any = await import('@civicpress/core');
           const audit = new coreMod.AuditLogger();
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           let actor: any | undefined;
           if (options?.token) {
             try {
@@ -246,7 +231,6 @@ export function registerConfigCommands(cli: CAC) {
               process.exit(1);
             }
             const yamlTxt = await fsp.readFile(filePath, 'utf8');
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             await (service as any).saveRawConfigurationYAML(type, yamlTxt);
 
             cliSuccess({ type }, `Saved configuration '${type}'`, {
@@ -263,7 +247,6 @@ export function registerConfigCommands(cli: CAC) {
               target: { type: 'config', name: type },
               outcome: 'success',
             });
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
           } catch (error) {
             // The failure audit record is written HERE rather than in the
             // wrapper: it needs the handler's own context (actor, target,
@@ -291,23 +274,20 @@ export function registerConfigCommands(cli: CAC) {
     .command('config:validate [type]', 'Validate configuration (one or all)')
     .option('--all', 'Validate all configurations')
     .option('--token <token>', 'Session token for authentication (for audit)')
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .action(
       withCli<[any, any]>(
         {
           operation: 'config:validate',
           errorMessage: 'Configuration validation failed',
           errorCode: 'VALIDATION_ERROR',
-          details: (error, type, options) => ({
+          details: (error, type, _options) => ({
             error: error instanceof Error ? error.message : String(error),
             configType: type || 'all',
           }),
         },
         async ({ globalOptions }, type: any, options: any) => {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const coreMod: any = await import('@civicpress/core');
           const audit = new coreMod.AuditLogger();
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           let actor: any | undefined;
           if (options?.token) {
             try {
@@ -329,9 +309,7 @@ export function registerConfigCommands(cli: CAC) {
 
             if (options.all) {
               const list = await service.getConfigurationList();
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               const types = list.map((i: any) => i.file);
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               const results = [] as any[];
               for (const t of types) {
                 results.push(await validateOne(t));
@@ -403,7 +381,6 @@ export function registerConfigCommands(cli: CAC) {
               );
               process.exit(1);
             }
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
           } catch (error) {
             // The failure audit record is written HERE rather than in the
             // wrapper: it needs the handler's own context (actor, target,
@@ -430,23 +407,20 @@ export function registerConfigCommands(cli: CAC) {
   cli
     .command('config:reset <type>', 'Reset a configuration to defaults')
     .option('--token <token>', 'Session token for authentication (for audit)')
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .action(
       withCli<[any, any]>(
         {
           operation: 'config:reset',
           errorMessage: (type: any) => `Failed to reset '${type}'`,
           errorCode: 'RESET_CONFIG_FAILED',
-          details: (error, type, options) => ({
+          details: (error, type, _options) => ({
             error: error instanceof Error ? error.message : String(error),
             configType: type,
           }),
         },
         async ({ globalOptions }, type: any, options: any) => {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const coreMod: any = await import('@civicpress/core');
           const audit = new coreMod.AuditLogger();
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           let actor: any | undefined;
           if (options?.token) {
             try {
@@ -476,7 +450,6 @@ export function registerConfigCommands(cli: CAC) {
               target: { type: 'config', name: type },
               outcome: 'success',
             });
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
           } catch (error) {
             // The failure audit record is written HERE rather than in the
             // wrapper: it needs the handler's own context (actor, target,
@@ -506,22 +479,19 @@ export function registerConfigCommands(cli: CAC) {
       default: 'civic-config-export',
     })
     .option('--token <token>', 'Session token for authentication (for audit)')
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .action(
       withCli<[any]>(
         {
           operation: 'config:export',
           errorMessage: 'Configuration export failed',
           errorCode: 'EXPORT_CONFIG_FAILED',
-          details: (error, options) => ({
+          details: (error, _options) => ({
             error: error instanceof Error ? error.message : String(error),
           }),
         },
         async ({ globalOptions }, options: any) => {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const coreMod: any = await import('@civicpress/core');
           const audit = new coreMod.AuditLogger();
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           let actor: any | undefined;
           if (options?.token) {
             try {
@@ -545,7 +515,6 @@ export function registerConfigCommands(cli: CAC) {
             const list = await service.getConfigurationList();
             for (const item of list) {
               const type = item.file;
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               const yamlTxt = await (service as any).loadRawConfigurationYAML(
                 type
               );
@@ -567,7 +536,6 @@ export function registerConfigCommands(cli: CAC) {
             cliSuccess(
               {
                 dir: destRoot,
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 files: list.map((i: any) => i.file),
               },
               `Exported ${list.length} configuration${list.length === 1 ? '' : 's'} to ${destRoot}`,
@@ -588,7 +556,6 @@ export function registerConfigCommands(cli: CAC) {
               outcome: 'success',
               metadata: { dir: destRoot },
             });
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
           } catch (error) {
             // The failure audit record is written HERE rather than in the
             // wrapper: it needs the handler's own context (actor, target,
@@ -618,22 +585,19 @@ export function registerConfigCommands(cli: CAC) {
       default: 'civic-config-export',
     })
     .option('--token <token>', 'Session token for authentication (for audit)')
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .action(
       withCli<[any]>(
         {
           operation: 'config:import',
           errorMessage: 'Configuration import failed',
           errorCode: 'IMPORT_CONFIG_FAILED',
-          details: (error, options) => ({
+          details: (error, _options) => ({
             error: error instanceof Error ? error.message : String(error),
           }),
         },
         async ({ globalOptions }, options: any) => {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const coreMod: any = await import('@civicpress/core');
           const audit = new coreMod.AuditLogger();
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           let actor: any | undefined;
           if (options?.token) {
             try {
@@ -669,7 +633,6 @@ export function registerConfigCommands(cli: CAC) {
             for (const item of toImport) {
               if (fs.existsSync(item.file)) {
                 const yamlTxt = await fsp.readFile(item.file, 'utf8');
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 await (service as any).saveRawConfigurationYAML(
                   item.type,
                   yamlTxt
@@ -697,7 +660,6 @@ export function registerConfigCommands(cli: CAC) {
               outcome: 'success',
               metadata: { imported },
             });
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
           } catch (error) {
             // The failure audit record is written HERE rather than in the
             // wrapper: it needs the handler's own context (actor, target,
@@ -735,15 +697,13 @@ export function registerConfigCommands(cli: CAC) {
           errorCode: 'INIT_CONFIG_FAILED',
           details: (error) => ({
             error: describeInitError(error),
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             stack: (error as any)?.stack,
           }),
         },
-        async ({ globalOptions }, type: string | undefined, options: any) => {
+        async (_ctx, type: string | undefined, options: any) => {
           let service;
           try {
             service = createConfigService();
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
           } catch (serviceError: any) {
             const serviceErrMsg =
               serviceError?.message ||
@@ -758,7 +718,6 @@ export function registerConfigCommands(cli: CAC) {
           let status;
           try {
             status = await service.getConfigurationStatus();
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
           } catch (statusError: any) {
             const statusErrMsg =
               statusError?.message ||
@@ -772,12 +731,10 @@ export function registerConfigCommands(cli: CAC) {
 
           const initOne = async (t: string) => {
             try {
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               const state = (status as any)[t];
               if (state === 'user') return { type: t, created: false };
               await service.resetToDefaults(t);
               return { type: t, created: true };
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
             } catch (innerError: any) {
               const innerMsg =
                 innerError?.message ||
@@ -805,7 +762,6 @@ export function registerConfigCommands(cli: CAC) {
           for (const t of types) {
             try {
               results.push(await initOne(t));
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
             } catch (initError: any) {
               let initErrMsg = 'Unknown error';
               if (initError?.message && initError.message.trim()) {

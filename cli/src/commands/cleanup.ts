@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- CLI command handlers pass CAC's untyped options through withCli. */
 import { CAC } from 'cac';
 import { cliSuccess, cliError, cliInfo, cliWarn } from '../utils/cli-output.js';
 import { withCli } from '../utils/with-cli.js';
@@ -67,7 +68,6 @@ export const cleanupCommand = (cli: CAC) => {
     )
     .option('--json', 'Output in JSON format')
     .option('--silent', 'Suppress output')
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .action(
       withCli<[any]>(
         {

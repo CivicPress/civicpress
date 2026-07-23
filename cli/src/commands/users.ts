@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- CLI command handlers pass CAC's untyped options through withCli. */
 import { CAC } from 'cac';
 import * as readline from 'readline';
 import { CivicPress } from '@civicpress/core';
@@ -59,7 +60,7 @@ export default function setupUsersCommand(cli: CAC) {
             error: error instanceof Error ? error.message : 'Unknown error',
           }),
         },
-        async ({ globalOptions }, options) => {
+        async (_ctx, options) => {
           let username = options.username;
           let email = options.email;
           let name = options.name;
@@ -371,7 +372,6 @@ export default function setupUsersCommand(cli: CAC) {
           }
           const authService = civic.getAuthService();
 
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const updates: any = {};
           if (email) updates.email = email;
           if (name) updates.name = name;
@@ -814,7 +814,6 @@ export default function setupUsersCommand(cli: CAC) {
             process.exit(1);
           }
           await civic.shutdown();
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
         }
       )
     );
@@ -968,7 +967,6 @@ export default function setupUsersCommand(cli: CAC) {
             process.exit(1);
           }
           await civic.shutdown();
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
         }
       )
     );
@@ -1114,7 +1112,6 @@ export default function setupUsersCommand(cli: CAC) {
             process.exit(1);
           }
           await civic.shutdown();
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
         }
       )
     );
@@ -1169,7 +1166,6 @@ export default function setupUsersCommand(cli: CAC) {
             process.exit(1);
           }
           await civic.shutdown();
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
         }
       )
     );
@@ -1291,7 +1287,6 @@ export default function setupUsersCommand(cli: CAC) {
             process.exit(1);
           }
           await civic.shutdown();
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
         }
       )
     );
@@ -1407,7 +1402,6 @@ export default function setupUsersCommand(cli: CAC) {
           });
 
           await civic.shutdown();
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
         }
       )
     );

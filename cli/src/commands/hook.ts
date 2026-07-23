@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- CLI command handlers pass CAC's untyped options through withCli. */
 import { CAC } from 'cac';
 import { readFile } from 'fs/promises';
 import { existsSync } from 'fs';
@@ -20,7 +21,6 @@ export function registerHookCommand(cli: CAC) {
     .option('-w, --workflows', 'List available workflows')
     .option('--logs', 'Show hook execution logs')
     .option('--format <format>', 'Output format', { default: 'human' })
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .action(
       withCli<[any, any]>(
         {
@@ -296,7 +296,6 @@ async function listWorkflows(hookSystem: HookSystem) {
   );
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function showLogs(dataDir: string, _options: any) {
   const logPath = join(dataDir, '.civic', 'hooks.log.jsonl');
 

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- CLI command handlers pass CAC's untyped options through withCli. */
 import { CAC } from 'cac';
 import { readFile, writeFile, mkdir } from 'fs/promises';
 import { join } from 'path';
@@ -13,7 +14,6 @@ interface LegacyTemplate {
   name: string;
   type: string;
   description: string;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   metadata: Record<string, any>;
   content: string;
   validation: ValidationRules;
@@ -44,7 +44,6 @@ export function registerTemplateCommand(cli: CAC) {
     .option('--partials', 'List available partials')
     .option('--partial <name>', 'Show partial details')
     .option('--create-partial <name>', 'Create a new partial')
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .action(
       withCli<[any]>(
         {
@@ -424,7 +423,6 @@ async function listTemplates(dataDir: string, shouldOutputJson?: boolean) {
 
   try {
     const recordTypes = ['bylaw', 'policy', 'proposal', 'resolution'];
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const allTemplates: any[] = [];
 
     for (const type of recordTypes) {
@@ -440,9 +438,7 @@ async function listTemplates(dataDir: string, shouldOutputJson?: boolean) {
             allTemplates.push({
               name: templateName,
               type: type,
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               extends: (template as any).extends,
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               hasParent: !!(template as any).parentTemplate,
               sections: template.sections?.length || 0,
               requiredFields: template.validation?.required_fields?.length || 0,
@@ -526,9 +522,7 @@ async function showTemplate(dataDir: string, templateName: string) {
         template: {
           name: template.name,
           type: template.type,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           extends: (template as any).extends,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           hasParent: !!(template as any).parentTemplate,
           sections: template.sections,
           validation: template.validation,
@@ -777,7 +771,6 @@ async function previewTemplate(dataDir: string, templateName: string) {
       return;
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sampleVariables: Record<string, any> = {
       title: 'My Record Title',
       description: 'This is a description for a sample record.',

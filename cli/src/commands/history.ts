@@ -1,12 +1,7 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- CLI command handlers pass CAC's untyped options through withCli. */
 import { CAC } from 'cac';
 import { withCli } from '../utils/with-cli.js';
-import {
-  cliSuccess,
-  cliError,
-  cliInfo,
-  cliWarn,
-  cliDebug,
-} from '../utils/cli-output.js';
+import { cliSuccess, cliInfo, cliWarn, cliDebug } from '../utils/cli-output.js';
 
 export const historyCommand = (cli: CAC) => {
   cli
@@ -15,7 +10,6 @@ export const historyCommand = (cli: CAC) => {
       default: '10',
     })
     .option('--format <format>', 'Output format', { default: 'human' })
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .action(
       withCli<[any, any]>(
         {
@@ -27,7 +21,7 @@ export const historyCommand = (cli: CAC) => {
             stack: error instanceof Error ? error.stack : undefined,
           }),
         },
-        async ({ globalOptions, logger }, record: any, options: any) => {
+        async ({ logger }, record: any, options: any) => {
           // Initialize CivicPress (will auto-discover config)
           // Get data directory from config discovery
           const { loadConfig } = await import('@civicpress/core');
@@ -51,7 +45,6 @@ export const historyCommand = (cli: CAC) => {
           // Initialize GitEngine
           try {
             await git.initialize();
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
           } catch (error: any) {
             logger.error(
               '❌ Failed to initialize Git repository:',
@@ -88,12 +81,10 @@ export const historyCommand = (cli: CAC) => {
 
           // Get commit history
           const limit = parseInt(options.limit) || 10;
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           let history: any[] = [];
 
           try {
             history = await git.getHistory(limit, pathspec);
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
           } catch (error: any) {
             // Handle case where there are no commits yet
             if (
@@ -149,7 +140,6 @@ export const historyCommand = (cli: CAC) => {
           }
 
           cliInfo('✅ History displayed successfully!', 'history');
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
         }
       )
     );

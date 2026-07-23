@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- CLI command handlers pass CAC's untyped options through withCli. */
 import { CAC } from 'cac';
 import { CivicPress, WorkflowConfigManager } from '@civicpress/core';
 import * as fs from 'fs';
@@ -44,7 +45,6 @@ export function statusCommand(cli: CAC) {
       '--dry-run-hooks <hooks>',
       'Dry-run specific hooks (comma-separated)'
     )
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .action(
       withCli<[string, string, any]>(
         {
@@ -56,13 +56,7 @@ export function statusCommand(cli: CAC) {
             recordName,
           }),
         },
-        async (
-          { globalOptions },
-          recordName: string,
-          newStatus: string,
-          options: any
-        ) => {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        async (_ctx, recordName: string, newStatus: string, options: any) => {
           const coreMod: any = await import('@civicpress/core');
           const audit = new coreMod.AuditLogger();
           try {
@@ -186,7 +180,6 @@ export function statusCommand(cli: CAC) {
             }
 
             // Update frontmatter
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const updatedFrontmatter: any = {
               ...frontmatter,
               status: newStatus,
