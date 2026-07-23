@@ -48,13 +48,38 @@ tracker has the detailed per-item notes.
   ways that only agreed when `dataDir == <root>/data`. Settled with the
   maintainer: anchor to `.civicrc`. See `docs/configuration-architecture.md`.
 
-## Release state
+## Release state (updated 2026-07-23)
 
-- `develop` is ~85 commits ahead of `main`, **no PR yet** (maintainer opens it).
-- The earlier audit/hardening work already merged to `main` via PR #19.
-- **Branch protection on `main` is still unset** (the automation token is
-  `admin:false`). The `gh api` command to require the `build-test` + `truth-check`
-  status checks is ready for the maintainer to run.
+- The earlier audit/hardening work merged to `main` via **PR #19**.
+- This tech-debt work is **PR #20** (`develop → main`, the ~29 commits after
+  #19): **CI green, `merge_state: clean`, awaiting the maintainer's merge**
+  (the automation token can't merge a protected branch). Merge as a **merge
+  commit, not squash** — the commit messages carry the per-decision reasoning.
+- **Branch protection on `main` is now LIVE** — required status checks
+  `build-test` + `truth-check`, no required PR reviews (so Renovate automerge
+  still works). Confirmed gating: PR #20 went behind → blocked → clean as the
+  checks ran.
+
+### Two fixes that landed AFTER the initial docs commit
+
+- **CI lint failure (mine).** The withCli migration tripped the CLI package's
+  error-level `no-explicit-any` / `no-unused-vars` (211 errors) — my local gate
+  was `tsc` + `prettier`, which don't run eslint. Fixed: file-level
+  `no-explicit-any` disable per command file (CAC options are genuinely
+  untyped) + removed the genuine unused imports/params. **Lesson: run `eslint`
+  locally too — CI does.**
+- **Test-mock `any` warning noise.** Flipped the TEST-file `no-explicit-any`
+  from `warn` → `off` in every module's eslint config (source stays `error`).
+  Chosen over typing ~380 sites because several source types are
+  `Record<string, any>` themselves, so typing test mocks can't reach an
+  any-free type.
+
+### Follow-ups (not blockers)
+
+- **`actions/checkout` Node-20 deprecation.** CI annotates that
+  `actions/checkout@v4` is forced onto Node 24 (GitHub is sunsetting Node 20 on
+  runners). Bump the pinned action across `.github/workflows` — its own tiny PR
+  AFTER #20 merges, to avoid re-triggering a green PR's CI.
 
 ## Known deliberate non-changes (not regressions)
 

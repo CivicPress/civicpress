@@ -628,6 +628,22 @@ follow-up. (Storage, config+CLI, API-routes clusters + saga/BB/notifications.)
 
 ## Test & CI health
 
+- [ ] **`actions/checkout` Node-20 deprecation (CI maintenance, low priority).**
+  CI annotates every run: `actions/checkout@v4` is being forced onto Node 24
+  because GitHub is sunsetting Node 20 on its runners. Jobs still pass, so it is
+  cosmetic for now — bump the pinned action across `.github/workflows` (find the
+  new SHA; actions are SHA-pinned). Do it as its own tiny PR, NOT bundled with a
+  feature branch, so it never re-triggers an otherwise-green PR's CI.
+
+- [x] **CLI eslint gate (2026-07-23).** The withCli migration (see the
+  `withCli()` item above) tripped the CLI package's error-level
+  `no-explicit-any` / `no-unused-vars` — caught by CI's lint step, missed
+  locally because the pre-commit gate was `tsc` + `prettier`, not `eslint`.
+  Fixed (file-level any-disable for CAC-option handlers + genuine unused
+  removals), and the test-mock `any` warning noise was retired by flipping the
+  TEST-file `no-explicit-any` `warn`→`off` per module (source stays `error`).
+  **Process note: run `eslint` locally before pushing — CI does.**
+
 - [x] **Tier-C skeptic coverage-gap follow-up — DONE 2026-07-20.** Covered by
   `tests/api/pagination-sql-side.test.ts` ("geography linked-records" block, 4
   tests): rows linking the geography across multiple pages, exact `total` and a
