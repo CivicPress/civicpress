@@ -65,7 +65,7 @@ describe('Config API — error responses are redacted', () => {
 
     expect(response.status).toBe(404);
     expect(response.body.success).toBe(false);
-    expect(response.body.error).toBe('Configuration not found');
+    expect(response.body.error.message).toBe('Configuration not found');
     expectNoLeak(response.body);
   });
 
@@ -76,7 +76,7 @@ describe('Config API — error responses are redacted', () => {
 
     expect(response.status).toBe(404);
     expect(response.body.success).toBe(false);
-    expect(response.body.error).toBe('Raw configuration not found');
+    expect(response.body.error.message).toBe('Raw configuration not found');
     expectNoLeak(response.body);
   });
 
@@ -95,7 +95,7 @@ describe('Config API — error responses are redacted', () => {
     // a disclosure. What must never appear is where the server would have
     // looked — the resolved data dir / .civic path — which expectNoLeak pins.
     if (response.status === 400) {
-      expect(response.body.error).toMatch(/^Invalid config type:/);
+      expect(response.body.error.message).toMatch(/^Invalid config type:/);
     }
     expectNoLeak(response.body);
   });

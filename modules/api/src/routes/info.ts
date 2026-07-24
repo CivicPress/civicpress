@@ -8,8 +8,7 @@ const router = Router();
 type CentralConfig = ReturnType<typeof CentralConfigManager.getConfig>;
 type DbConfig = ReturnType<typeof CentralConfigManager.getDatabaseConfig>;
 
-interface InfoResponse {
-  success: boolean;
+interface InfoData {
   organization: ReturnType<typeof CentralConfigManager.getOrgConfig>;
   analytics: {
     inject_head: string;
@@ -69,9 +68,10 @@ router.get('/', async (req, res) => {
       dbConfig = CentralConfigManager.getDatabaseConfig();
     }
 
-    // Build response
-    const response: InfoResponse = {
-      success: true,
+    // Build the payload. Canonical envelope: the fields live under `data`,
+    // not at the top level. (UI consumers — index.vue, app.vue, Logo.vue —
+    // were updated to read `.data.organization` / `.data.analytics`.)
+    const data: InfoData = {
       organization: orgConfig,
       analytics: analyticsConfig.enabled
         ? {
@@ -83,25 +83,28 @@ router.get('/', async (req, res) => {
     };
 
     if (isAdmin && systemConfig) {
-      response.system = {
+      data.system = {
         ...systemConfig,
         dataDir,
         database: dbConfig,
       };
-      if (userInfo) response.user = userInfo;
+      if (userInfo) data.user = userInfo;
     } else if (token) {
-      response.note = 'System config is only visible to admin users.';
-      if (userInfo) response.user = userInfo;
+      data.note = 'System config is only visible to admin users.';
+      if (userInfo) data.user = userInfo;
     }
 
-    res.json(response);
+    res.json({ success: true, data });
   } catch (error) {
     // Unauthenticated endpoint — never surface the raw message (this route
     // reads YAML config, so errors can carry filesystem paths).
     logApiError('info', error, req);
     res.status(500).json({
       success: false,
-      error: 'Failed to load system info',
+      error: {
+        message: 'Failed to load system info',
+        code: 'LOAD_SYSTEM_INFO_FAILED',
+      },
     });
   }
 });

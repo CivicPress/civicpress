@@ -71,10 +71,11 @@ onMounted(() => {
     api('/api/v1/info')
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .then((res: any) => {
-        if (!res?.success || !res?.analytics) return;
+        // /info now returns the canonical envelope: fields under `data`.
+        if (!res?.success || !res?.data?.analytics) return;
 
         const { inject_head, inject_body_start, inject_body_end } =
-          res.analytics;
+          res.data.analytics;
 
         injectAnalyticsFragment(inject_head, (node) =>
           document.head.appendChild(node)

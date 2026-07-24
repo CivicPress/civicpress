@@ -1,21 +1,13 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- CLI command handlers pass CAC's untyped options through withCli. */
 import { CAC } from 'cac';
 import { simpleGit, SimpleGit } from 'simple-git';
 import { loadConfig, parseRecordRelativePath } from '@civicpress/core';
 import chalk from 'chalk';
 import * as diff from 'diff';
 import * as readline from 'readline';
-import {
-  initializeLogger,
-  getGlobalOptionsFromArgs,
-  initializeCliOutput,
-} from '../utils/global-options.js';
-import {
-  cliSuccess,
-  cliError,
-  cliInfo,
-  cliWarn,
-  cliStartOperation,
-} from '../utils/cli-output.js';
+import { withCli } from '../utils/with-cli.js';
+import { initializeLogger } from '../utils/global-options.js';
+import { cliSuccess, cliError, cliInfo, cliWarn } from '../utils/cli-output.js';
 import {
   getAvailableRecords,
   resolveRecordReference,
@@ -96,77 +88,69 @@ export function registerDiffCommand(cli: CAC) {
       '-i, --interactive',
       'Interactive mode - show commit history and select version'
     )
-    .action(async (record: string, options: DiffOptions) => {
-      // Initialize CLI output with global options
-      const globalOptions = getGlobalOptionsFromArgs();
-      initializeCliOutput(globalOptions);
-
-      const endOperation = cliStartOperation('diff');
-
-      try {
-        const config = await loadConfig();
-        if (!config) {
-          cliError(
-            'No CivicPress configuration found. Run "civic init" first.',
-            'NOT_INITIALIZED',
-            undefined,
-            'diff'
-          );
-          process.exit(1);
-        }
-
-        const diffOptions: DiffOptions = {
-          ...options,
-          format: options.format || 'unified',
-          context: parseInt(options.context?.toString() || '3'),
-          showMetadata: options.showMetadata !== false,
-          showContent: options.showContent !== false,
-          color: options.color !== false,
-          content: options.content || false,
-          metadata: options.metadata || false,
-          interactive: options.interactive || false,
-        };
-
-        // Handle content-only and metadata-only flags
-        if (options.content) {
-          diffOptions.showMetadata = false;
-        }
-        if (options.metadata) {
-          diffOptions.showContent = false;
-        }
-
-        // If record is provided as first argument, use it
-        if (record && !options.record) {
-          diffOptions.record = record;
-        }
-
-        // Handle interactive mode
-        if (diffOptions.interactive && diffOptions.record) {
-          if (!config.dataDir) {
-            throw new Error('dataDir is not configured');
-          }
-          await handleInteractiveDiff(config.dataDir, diffOptions);
-        } else {
-          if (!config.dataDir) {
-            throw new Error('dataDir is not configured');
-          }
-          const results = await compareRecords(config.dataDir, diffOptions);
-          displayDiffResults(results, diffOptions);
-        }
-      } catch (error) {
-        cliError(
-          'Diff failed',
-          'DIFF_FAILED',
-          {
+    .action(
+      withCli<[any, any]>(
+        {
+          operation: 'diff',
+          errorMessage: 'Diff failed',
+          errorCode: 'DIFF_FAILED',
+          details: (error, _record, _options) => ({
             error: error instanceof Error ? error.message : String(error),
-          },
-          'diff'
-        );
-        process.exit(1);
-      } finally {
-        endOperation();
-      }
-    });
+          }),
+        },
+        async (_ctx, record: any, options: any) => {
+          const config = await loadConfig();
+          if (!config) {
+            cliError(
+              'No CivicPress configuration found. Run "civic init" first.',
+              'NOT_INITIALIZED',
+              undefined,
+              'diff'
+            );
+            process.exit(1);
+          }
+
+          const diffOptions: DiffOptions = {
+            ...options,
+            format: options.format || 'unified',
+            context: parseInt(options.context?.toString() || '3'),
+            showMetadata: options.showMetadata !== false,
+            showContent: options.showContent !== false,
+            color: options.color !== false,
+            content: options.content || false,
+            metadata: options.metadata || false,
+            interactive: options.interactive || false,
+          };
+
+          // Handle content-only and metadata-only flags
+          if (options.content) {
+            diffOptions.showMetadata = false;
+          }
+          if (options.metadata) {
+            diffOptions.showContent = false;
+          }
+
+          // If record is provided as first argument, use it
+          if (record && !options.record) {
+            diffOptions.record = record;
+          }
+
+          // Handle interactive mode
+          if (diffOptions.interactive && diffOptions.record) {
+            if (!config.dataDir) {
+              throw new Error('dataDir is not configured');
+            }
+            await handleInteractiveDiff(config.dataDir, diffOptions);
+          } else {
+            if (!config.dataDir) {
+              throw new Error('dataDir is not configured');
+            }
+            const results = await compareRecords(config.dataDir, diffOptions);
+            displayDiffResults(results, diffOptions);
+          }
+        }
+      )
+    );
 }
 
 async function handleInteractiveDiff(dataDir: string, options: DiffOptions) {
@@ -542,9 +526,7 @@ async function getChangedFiles(
   }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function parseRecordMetadata(content: string): Record<string, any> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const metadata: Record<string, any> = {};
 
   // Extract frontmatter

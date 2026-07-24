@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- CLI command handlers pass CAC's untyped options through withCli. */
 /**
  * Diagnostic Command
  *
@@ -6,17 +7,13 @@
 
 import { CAC } from 'cac';
 import {
-  getGlobalOptionsFromArgs,
-  initializeCliOutput,
-} from '../utils/global-options.js';
-import {
   cliSuccess,
   cliError,
   cliInfo,
   cliWarn,
-  cliStartOperation,
   cliRaw,
 } from '../utils/cli-output.js';
+import { withCli } from '../utils/with-cli.js';
 import {
   CivicPress,
   DiagnosticService,
@@ -46,183 +43,180 @@ export function registerDiagnoseCommand(cli: CAC) {
     .option('--no-cache', 'Disable result caching')
     .option('--force', 'Force fixes in production (use with caution)')
     .option('--dry-run', 'Simulate fixes without applying')
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .action(async (component: string, options: any) => {
-      const globalOptions = getGlobalOptionsFromArgs();
-      initializeCliOutput(globalOptions);
-
-      const endOperation = cliStartOperation('diagnose');
-
-      try {
-        const config = await import('@civicpress/core').then((m) =>
-          m.loadConfig()
-        );
-        if (!config) {
-          cliError(
-            'No CivicPress configuration found. Run "civic init" first.',
-            'NOT_INITIALIZED',
-            undefined,
-            'diagnose'
-          );
-          process.exit(1);
-        }
-
-        const dataDir = config.dataDir;
-        if (!dataDir) {
-          throw new Error('dataDir is not configured');
-        }
-
-        // Initialize CivicPress
-        const { CentralConfigManager } = await import('@civicpress/core');
-        const dbConfig = CentralConfigManager.getDatabaseConfig();
-
-        const civic = new CivicPress({
-          dataDir,
-          database: dbConfig,
-          logger: {
-            json: globalOptions.json,
-            silent: globalOptions.silent,
-            verbose: globalOptions.verbose,
-          },
-        });
-        await civic.initialize();
-
-        // Initialize diagnostic service
-        const diagnosticService = new DiagnosticService({
-          databaseService: civic.getDatabaseService(),
-          searchService: civic.getDatabaseService().getSearchService(),
-          configManager: CentralConfigManager,
-          logger: civic['logger'] as Logger,
-          auditLogger: new AuditLogger({ dataDir }),
-          dataDir,
-          cacheManager: civic.getCacheManager(),
-        });
-
-        // Register checkers
-        const databaseChecker = new DatabaseDiagnosticChecker(
-          civic.getDatabaseService(),
-          dataDir,
-          civic['logger'] as Logger
-        );
-        diagnosticService.registerChecker(databaseChecker);
-
-        const searchChecker = new SearchDiagnosticChecker(
-          civic.getDatabaseService(),
-          civic.getDatabaseService().getSearchService(),
-          dataDir,
-          civic['logger'] as Logger
-        );
-        diagnosticService.registerChecker(searchChecker);
-
-        const configChecker = new ConfigurationDiagnosticChecker(
-          CentralConfigManager,
-          dataDir,
-          civic['logger'] as Logger
-        );
-        diagnosticService.registerChecker(configChecker);
-
-        const filesystemChecker = new FilesystemDiagnosticChecker(
-          dataDir,
-          civic['logger'] as Logger,
-          process.cwd() // Project root for .system-data
-        );
-        diagnosticService.registerChecker(filesystemChecker);
-
-        const systemChecker = new SystemDiagnosticChecker(
-          civic['logger'] as Logger
-        );
-        diagnosticService.registerChecker(systemChecker);
-
-        // Determine component to check
-        const componentToCheck =
-          component || options.component
-            ? [component || options.component]
-            : undefined;
-
-        // Prepare diagnostic options
-        const diagnosticOptions = {
-          components: componentToCheck,
-          timeout: parseInt(options.timeout, 10),
-          maxConcurrency: parseInt(options.maxConcurrency, 10),
-          enableAutoFix: options.fix || false,
-          dryRun: options.dryRun || false,
-        };
-
-        // Run diagnostics
-        if (componentToCheck && componentToCheck.length === 1) {
-          // Single component
-          cliInfo(
-            `🔍 Running diagnostics for component: ${componentToCheck[0]}`,
-            'diagnose'
-          );
-          const result = await diagnosticService.runComponent(
-            componentToCheck[0],
-            diagnosticOptions
-          );
-          await outputDiagnosticResult(result, options.format, globalOptions, {
-            verbose: globalOptions.verbose,
-            dryRun: options.dryRun || false,
-          });
-
-          // Show what would be fixed in dry-run mode
-          if (options.dryRun && result.issues.length > 0) {
-            const fixableIssues = result.issues.filter((i) => i.autoFixable);
-            if (fixableIssues.length > 0) {
-              cliInfo(
-                `\n🔍 DRY-RUN: Would attempt to fix ${fixableIssues.length} issue(s):`,
-                'diagnose'
-              );
-              for (const issue of fixableIssues) {
-                cliRaw(`   • ${issue.message}`);
-                if (issue.fix) {
-                  cliRaw(`     Fix: ${issue.fix.description}`);
-                  if (issue.fix.command) {
-                    cliRaw(`     Command: ${issue.fix.command}`);
-                  }
-                }
-              }
-              cliRaw('');
-            }
-          }
-        } else {
-          // All components
-          cliInfo('🔍 Running full system diagnostics...', 'diagnose');
-          const report = await diagnosticService.runAll(diagnosticOptions);
-          await outputDiagnosticReport(report, options.format, globalOptions);
-
-          // Handle auto-fix if requested
-          if (options.fix && report.issues.length > 0) {
-            const fixableIssues = report.issues.filter((i) => i.autoFixable);
-            if (fixableIssues.length > 0) {
-              await handleAutoFix(
-                diagnosticService,
-                fixableIssues,
-                options,
-                globalOptions
-              );
-            }
-          }
-        }
-
-        await civic.shutdown();
-
-        // Explicitly exit to ensure process terminates
-        process.exit(0);
-      } catch (error) {
-        cliError(
-          'Diagnostic run failed',
-          'DIAGNOSTIC_FAILED',
-          {
+    .action(
+      withCli<[string, any]>(
+        {
+          operation: 'diagnose',
+          errorMessage: 'Diagnostic run failed',
+          errorCode: 'DIAGNOSTIC_FAILED',
+          details: (error) => ({
             error: error instanceof Error ? error.message : String(error),
             stack: error instanceof Error ? error.stack : undefined,
-          },
-          'diagnose'
-        );
-        process.exit(1);
-      } finally {
-        endOperation();
-      }
-    });
+          }),
+        },
+        async ({ globalOptions }, component: string, options: any) => {
+          const config = await import('@civicpress/core').then((m) =>
+            m.loadConfig()
+          );
+          if (!config) {
+            cliError(
+              'No CivicPress configuration found. Run "civic init" first.',
+              'NOT_INITIALIZED',
+              undefined,
+              'diagnose'
+            );
+            process.exit(1);
+          }
+
+          const dataDir = config.dataDir;
+          if (!dataDir) {
+            throw new Error('dataDir is not configured');
+          }
+
+          // Initialize CivicPress
+          const { CentralConfigManager } = await import('@civicpress/core');
+          const dbConfig = CentralConfigManager.getDatabaseConfig();
+
+          const civic = new CivicPress({
+            dataDir,
+            database: dbConfig,
+            logger: {
+              json: globalOptions.json,
+              silent: globalOptions.silent,
+              verbose: globalOptions.verbose,
+            },
+          });
+          await civic.initialize();
+
+          // Initialize diagnostic service
+          const diagnosticService = new DiagnosticService({
+            databaseService: civic.getDatabaseService(),
+            searchService: civic.getDatabaseService().getSearchService(),
+            configManager: CentralConfigManager,
+            logger: civic['logger'] as Logger,
+            auditLogger: new AuditLogger({ dataDir }),
+            dataDir,
+            cacheManager: civic.getCacheManager(),
+          });
+
+          // Register checkers
+          const databaseChecker = new DatabaseDiagnosticChecker(
+            civic.getDatabaseService(),
+            dataDir,
+            civic['logger'] as Logger
+          );
+          diagnosticService.registerChecker(databaseChecker);
+
+          const searchChecker = new SearchDiagnosticChecker(
+            civic.getDatabaseService(),
+            civic.getDatabaseService().getSearchService(),
+            dataDir,
+            civic['logger'] as Logger
+          );
+          diagnosticService.registerChecker(searchChecker);
+
+          const configChecker = new ConfigurationDiagnosticChecker(
+            CentralConfigManager,
+            dataDir,
+            civic['logger'] as Logger
+          );
+          diagnosticService.registerChecker(configChecker);
+
+          const filesystemChecker = new FilesystemDiagnosticChecker(
+            dataDir,
+            civic['logger'] as Logger,
+            process.cwd() // Project root for .system-data
+          );
+          diagnosticService.registerChecker(filesystemChecker);
+
+          const systemChecker = new SystemDiagnosticChecker(
+            civic['logger'] as Logger
+          );
+          diagnosticService.registerChecker(systemChecker);
+
+          // Determine component to check
+          const componentToCheck =
+            component || options.component
+              ? [component || options.component]
+              : undefined;
+
+          // Prepare diagnostic options
+          const diagnosticOptions = {
+            components: componentToCheck,
+            timeout: parseInt(options.timeout, 10),
+            maxConcurrency: parseInt(options.maxConcurrency, 10),
+            enableAutoFix: options.fix || false,
+            dryRun: options.dryRun || false,
+          };
+
+          // Run diagnostics
+          if (componentToCheck && componentToCheck.length === 1) {
+            // Single component
+            cliInfo(
+              `🔍 Running diagnostics for component: ${componentToCheck[0]}`,
+              'diagnose'
+            );
+            const result = await diagnosticService.runComponent(
+              componentToCheck[0],
+              diagnosticOptions
+            );
+            await outputDiagnosticResult(
+              result,
+              options.format,
+              globalOptions,
+              {
+                verbose: globalOptions.verbose,
+                dryRun: options.dryRun || false,
+              }
+            );
+
+            // Show what would be fixed in dry-run mode
+            if (options.dryRun && result.issues.length > 0) {
+              const fixableIssues = result.issues.filter((i) => i.autoFixable);
+              if (fixableIssues.length > 0) {
+                cliInfo(
+                  `\n🔍 DRY-RUN: Would attempt to fix ${fixableIssues.length} issue(s):`,
+                  'diagnose'
+                );
+                for (const issue of fixableIssues) {
+                  cliRaw(`   • ${issue.message}`);
+                  if (issue.fix) {
+                    cliRaw(`     Fix: ${issue.fix.description}`);
+                    if (issue.fix.command) {
+                      cliRaw(`     Command: ${issue.fix.command}`);
+                    }
+                  }
+                }
+                cliRaw('');
+              }
+            }
+          } else {
+            // All components
+            cliInfo('🔍 Running full system diagnostics...', 'diagnose');
+            const report = await diagnosticService.runAll(diagnosticOptions);
+            await outputDiagnosticReport(report, options.format, globalOptions);
+
+            // Handle auto-fix if requested
+            if (options.fix && report.issues.length > 0) {
+              const fixableIssues = report.issues.filter((i) => i.autoFixable);
+              if (fixableIssues.length > 0) {
+                await handleAutoFix(
+                  diagnosticService,
+                  fixableIssues,
+                  options,
+                  globalOptions
+                );
+              }
+            }
+          }
+
+          await civic.shutdown();
+
+          // Explicitly exit to ensure process terminates
+          process.exit(0);
+        }
+      )
+    );
 
   // Component-specific commands
   registerComponentCommands(cli);
@@ -244,123 +238,113 @@ function registerComponentCommands(cli: CAC) {
       .option('--format <format>', 'Output format', { default: 'human' })
       .option('--force', 'Force fixes in production')
       .option('--dry-run', 'Simulate fixes without applying')
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .action(async (options: any) => {
-        const globalOptions = getGlobalOptionsFromArgs();
-        initializeCliOutput(globalOptions);
-
-        const endOperation = cliStartOperation(`diagnose:${component}`);
-
-        try {
-          const config = await import('@civicpress/core').then((m) =>
-            m.loadConfig()
-          );
-          if (!config?.dataDir) {
-            cliError(
-              'No CivicPress configuration found.',
-              'NOT_INITIALIZED',
-              undefined,
-              `diagnose:${component}`
+      .action(
+        withCli<[any]>(
+          {
+            // `component` is the loop variable, captured at registration time.
+            operation: `diagnose:${component}`,
+            errorMessage: `Diagnostic failed for ${component}`,
+            errorCode: 'DIAGNOSTIC_FAILED',
+          },
+          async ({ globalOptions }, options: any) => {
+            const config = await import('@civicpress/core').then((m) =>
+              m.loadConfig()
             );
-            process.exit(1);
-          }
-
-          const { CentralConfigManager } = await import('@civicpress/core');
-          const dbConfig = CentralConfigManager.getDatabaseConfig();
-
-          const civic = new CivicPress({
-            dataDir: config.dataDir,
-            database: dbConfig,
-            logger: {
-              json: globalOptions.json,
-              silent: globalOptions.silent,
-            },
-          });
-          await civic.initialize();
-
-          const diagnosticService = new DiagnosticService({
-            databaseService: civic.getDatabaseService(),
-            searchService: civic.getDatabaseService().getSearchService(),
-            configManager: CentralConfigManager,
-            logger: civic['logger'] as Logger,
-            auditLogger: new AuditLogger({ dataDir: config.dataDir }),
-            dataDir: config.dataDir,
-          });
-
-          // Register checkers for the specific component
-          if (component === 'database') {
-            const databaseChecker = new DatabaseDiagnosticChecker(
-              civic.getDatabaseService(),
-              config.dataDir,
-              civic['logger'] as Logger
-            );
-            diagnosticService.registerChecker(databaseChecker);
-          } else if (component === 'search') {
-            const searchChecker = new SearchDiagnosticChecker(
-              civic.getDatabaseService(),
-              civic.getDatabaseService().getSearchService(),
-              config.dataDir,
-              civic['logger'] as Logger
-            );
-            diagnosticService.registerChecker(searchChecker);
-          } else if (component === 'config') {
-            const configChecker = new ConfigurationDiagnosticChecker(
-              CentralConfigManager,
-              config.dataDir,
-              civic['logger'] as Logger
-            );
-            diagnosticService.registerChecker(configChecker);
-          } else if (component === 'filesystem') {
-            const filesystemChecker = new FilesystemDiagnosticChecker(
-              config.dataDir,
-              civic['logger'] as Logger,
-              process.cwd() // Project root for .system-data
-            );
-            diagnosticService.registerChecker(filesystemChecker);
-          } else if (component === 'system') {
-            const systemChecker = new SystemDiagnosticChecker(
-              civic['logger'] as Logger
-            );
-            diagnosticService.registerChecker(systemChecker);
-          }
-
-          const result = await diagnosticService.runComponent(component, {
-            enableAutoFix: options.fix || false,
-            dryRun: options.dryRun || false,
-          });
-
-          await outputDiagnosticResult(result, options.format, globalOptions);
-
-          if (options.fix && result.issues.length > 0) {
-            const fixableIssues = result.issues.filter((i) => i.autoFixable);
-            if (fixableIssues.length > 0) {
-              await handleAutoFix(
-                diagnosticService,
-                fixableIssues,
-                options,
-                globalOptions
+            if (!config?.dataDir) {
+              cliError(
+                'No CivicPress configuration found.',
+                'NOT_INITIALIZED',
+                undefined,
+                `diagnose:${component}`
               );
+              process.exit(1);
             }
+
+            const { CentralConfigManager } = await import('@civicpress/core');
+            const dbConfig = CentralConfigManager.getDatabaseConfig();
+
+            const civic = new CivicPress({
+              dataDir: config.dataDir,
+              database: dbConfig,
+              logger: {
+                json: globalOptions.json,
+                silent: globalOptions.silent,
+              },
+            });
+            await civic.initialize();
+
+            const diagnosticService = new DiagnosticService({
+              databaseService: civic.getDatabaseService(),
+              searchService: civic.getDatabaseService().getSearchService(),
+              configManager: CentralConfigManager,
+              logger: civic['logger'] as Logger,
+              auditLogger: new AuditLogger({ dataDir: config.dataDir }),
+              dataDir: config.dataDir,
+            });
+
+            // Register checkers for the specific component
+            if (component === 'database') {
+              const databaseChecker = new DatabaseDiagnosticChecker(
+                civic.getDatabaseService(),
+                config.dataDir,
+                civic['logger'] as Logger
+              );
+              diagnosticService.registerChecker(databaseChecker);
+            } else if (component === 'search') {
+              const searchChecker = new SearchDiagnosticChecker(
+                civic.getDatabaseService(),
+                civic.getDatabaseService().getSearchService(),
+                config.dataDir,
+                civic['logger'] as Logger
+              );
+              diagnosticService.registerChecker(searchChecker);
+            } else if (component === 'config') {
+              const configChecker = new ConfigurationDiagnosticChecker(
+                CentralConfigManager,
+                config.dataDir,
+                civic['logger'] as Logger
+              );
+              diagnosticService.registerChecker(configChecker);
+            } else if (component === 'filesystem') {
+              const filesystemChecker = new FilesystemDiagnosticChecker(
+                config.dataDir,
+                civic['logger'] as Logger,
+                process.cwd() // Project root for .system-data
+              );
+              diagnosticService.registerChecker(filesystemChecker);
+            } else if (component === 'system') {
+              const systemChecker = new SystemDiagnosticChecker(
+                civic['logger'] as Logger
+              );
+              diagnosticService.registerChecker(systemChecker);
+            }
+
+            const result = await diagnosticService.runComponent(component, {
+              enableAutoFix: options.fix || false,
+              dryRun: options.dryRun || false,
+            });
+
+            await outputDiagnosticResult(result, options.format, globalOptions);
+
+            if (options.fix && result.issues.length > 0) {
+              const fixableIssues = result.issues.filter((i) => i.autoFixable);
+              if (fixableIssues.length > 0) {
+                await handleAutoFix(
+                  diagnosticService,
+                  fixableIssues,
+                  options,
+                  globalOptions
+                );
+              }
+            }
+
+            await civic.shutdown();
+
+            // Explicitly exit to ensure process terminates
+            process.exit(0);
           }
-
-          await civic.shutdown();
-
-          // Explicitly exit to ensure process terminates
-          process.exit(0);
-        } catch (error) {
-          cliError(
-            `Diagnostic failed for ${component}`,
-            'DIAGNOSTIC_FAILED',
-            {
-              error: error instanceof Error ? error.message : String(error),
-            },
-            `diagnose:${component}`
-          );
-          process.exit(1);
-        } finally {
-          endOperation();
-        }
-      });
+        )
+      );
   }
 }
 
@@ -368,10 +352,8 @@ function registerComponentCommands(cli: CAC) {
  * Output diagnostic result in specified format
  */
 async function outputDiagnosticResult(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   result: any,
   format: string,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   globalOptions: any,
   options?: { verbose?: boolean; dryRun?: boolean }
 ): Promise<void> {
@@ -394,10 +376,8 @@ async function outputDiagnosticResult(
  * Output diagnostic report in specified format
  */
 async function outputDiagnosticReport(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   report: any,
   format: string,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   globalOptions: any,
   options?: { verbose?: boolean; dryRun?: boolean }
 ): Promise<void> {
@@ -420,7 +400,6 @@ async function outputDiagnosticReport(
  * Output human-readable diagnostic result
  */
 function outputHumanReadable(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   result: any,
   options?: { verbose?: boolean; dryRun?: boolean }
 ): void {
@@ -513,14 +492,12 @@ function outputHumanReadable(
         }
         // Show memory details
         if (issue.details.systemMemory) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const mem = issue.details.systemMemory as any;
           cliRaw(
             `     System Memory: ${mem.usedGB}GB / ${mem.totalGB}GB used (${mem.usagePercent}), ${mem.freeGB}GB free`
           );
         }
         if (issue.details.processMemory) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const proc = issue.details.processMemory as any;
           if (proc.heapUsedMB && proc.heapTotalMB) {
             cliRaw(
@@ -533,7 +510,6 @@ function outputHumanReadable(
         }
         // Show CPU load details
         if (issue.details.loadAverage) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const load = issue.details.loadAverage as any;
           cliRaw(
             `     Load Average: ${load['1min']} (1min), ${load['5min']} (5min), ${load['15min']} (15min)`
@@ -583,7 +559,6 @@ function outputHumanReadable(
         cliRaw(`     ${check.message}`);
       }
       if (check.details && typeof check.details === 'object') {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const details = check.details as any;
         if (details.missing && Array.isArray(details.missing)) {
           cliRaw(`     Missing: ${details.missing.join(', ')}`);
@@ -659,7 +634,6 @@ function outputHumanReadable(
  * Output human-readable diagnostic report
  */
 function outputHumanReadableReport(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   report: any,
   options?: { verbose?: boolean; dryRun?: boolean }
 ): void {
@@ -700,11 +674,8 @@ function outputHumanReadableReport(
  */
 async function handleAutoFix(
   diagnosticService: DiagnosticService,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   issues: any[],
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   options: any,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   globalOptions: any
 ): Promise<void> {
   if (globalOptions.json || globalOptions.silent) {
@@ -765,7 +736,6 @@ async function handleAutoFix(
         }
         // Check for recommendation property (may be in error.details or as a direct property)
         const recommendation =
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           (result as any).recommendation ||
           result.error?.details?.recommendation;
         if (recommendation) {
@@ -788,7 +758,6 @@ async function handleAutoFix(
 /**
  * Prompt user for auto-fix confirmation
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function confirmAutoFix(issues: any[]): Promise<boolean> {
   return new Promise((resolve) => {
     const rl = readline.createInterface({

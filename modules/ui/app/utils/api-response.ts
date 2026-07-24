@@ -10,30 +10,24 @@ export interface ApiResponse<T = any> {
   success: boolean;
   data: T;
   /**
-   * Server-side errors use the structured object form; a small number
-   * of UI-side helpers historically expected a bare string (the `as any`
-   * casts hid the mismatch). Accept both for backward compat.
+   * The canonical error shape — ONE object everywhere (the envelope
+   * standardization). `requestId`, when present, comes from the uncaught-error
+   * fallback for support-ticket correlation. The bare-`string` arm and the
+   * top-level index signature that used to sit here are gone: the server emits
+   * neither a string error nor a top-level payload (every response wraps its
+   * body in `.data`), and a full `nuxt typecheck` confirms no consumer relies
+   * on them.
    */
-  error?:
-    | string
-    | {
-        message: string;
-        code?: string;
-        details?: unknown[];
-        correlationId?: string;
-      };
-  timestamp?: string;
-  path?: string;
-  method?: string;
-  requestId?: string;
-  /**
-   * A handful of legacy endpoints return data at the top level instead
-   * of wrapping it in `.data`. The index signature preserves that
-   * access pattern (`response.organization`, `response.message`, etc.)
-   * without re-introducing `as any`. Field types are `unknown`, so
-   * call sites must narrow before use.
-   */
-  [key: string]: unknown;
+  error?: {
+    message: string;
+    code?: string;
+    details?: unknown[];
+    correlationId?: string;
+    requestId?: string;
+  };
+  // Canonical success envelope also carries these at the top level.
+  message?: string;
+  meta?: Record<string, unknown>;
 }
 
 /**

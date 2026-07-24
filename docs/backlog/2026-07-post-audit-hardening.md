@@ -584,12 +584,65 @@ follow-up. (Storage, config+CLI, API-routes clusters + saga/BB/notifications.)
   rather than continuing without the guarantee the auth code assumes.
   8 regression tests; the no-swallow ones were confirmed to fail against the
   old behaviour (`promise resolved "undefined" instead of rejecting`).
-- [ ] `withCli()` wrapper for ~30 commands
-- [ ] Standardize API response/error envelopes
+- [x] **`withCli()` wrapper — DONE 2026-07-22.** All 69 command registrations
+  across 31 files now run through `cli/src/utils/with-cli.ts`, which states once
+  the two rules each handler used to restate (or miss): `initializeCliOutput`
+  before any emit, and failures via `cliError` (not `logger.error`, which is
+  silent under `--json`). The wrapper deliberately does NOT own the CivicPress
+  lifecycle (that's a per-command behaviour change for another pass). Migration
+  surfaced two real bugs — storage's `finally` shutdown never ran because
+  `process.exit(1)` preceded it, and `cache:*` reported errors code-less with an
+  Error serialized to `{}` (normalized). Interactive trio (init/login/cleanup)
+  migrated by hand with a manual-test runbook at
+  `docs/handoff/2026-07-22-withcli-interactive-manual-test.md`. `WithCliSpec`
+  details/errorMessage take the command args so envelopes keep their subject.
+- [x] **Standardize API response/error envelopes — DONE 2026-07-22.** One shape
+  everywhere: success `{ success, data, message?, meta? }`, error
+  `{ success:false, error:{ message, code, details? } }`. Stage 0 fixed the
+  shared helpers (dropped redundant top-level `statusCode`, always-set `code`,
+  unified the error-handler middleware's third shape). Stage 1 converted the
+  deviants (geography validation, config ×15 + notifications ×3 bare-string
+  errors → objects, audit/info, `/info` top-level → `data` + its 3 UI readers,
+  the 501 stubs, storage-handlers' `timestamp`). Stage 2 tightened the UI
+  `ApiResponse` type (dropped the `string`-error arm + index signature; a full
+  `nuxt typecheck` proved nothing relied on them). Coordinated test updates —
+  the ~7 assertions that deliberately pinned old shapes now read `error.message`.
 - [ ] HW `ffmpeg_capture.py` decomposition; `command_handler.py` dispatch table; storage provider Strategy
-- [ ] Config discovery unification; DDL vs column-migration drift
+- [x] **Config discovery — DONE 2026-07-21/22.** (a) Deleted dead
+  `ConfigDiscovery` (`CIVIC_DIR='.system-data'` while config lives in `.civic/`,
+  so it never found anything; zero callers/tests). (b) Fixed two `/config`
+  endpoints that resolved the SAME file differently — one via
+  CentralConfigManager, one via an import-time singleton with cwd-relative
+  defaults — so they served different files under `CIVIC_DATA_DIR`. (c) The
+  `dataDir` split-brain: `.system-data` (DB, secret, storage creds, realtime/BB
+  data) was located two contradictory ways (`dirname(.civicrc)` vs seven copies
+  of `dirname(dataDir)`) that only agreed when `dataDir == <root>/data`. Settled
+  with maintainer: anchor to `.civicrc`. `CentralConfigManager` resolves
+  `systemDataDir` once + exposes `getSystemDataDir()`; `resolveSystemDataDir()` /
+  `resolveProjectRoot()` are the single readers; `CIVIC_DATA_DIR` now sets only
+  the data dir. Happy path byte-identical. **DDL vs column-migration drift —
+  DONE 2026-07-21** (separate commit): the migration ledger's applied/adopted
+  split exposed `records.linked_geography_files` declared only via ALTER, never
+  in CREATE TABLE; added to the DDL + a behavioural guard (a fresh DB must run
+  NO column migration).
 
 ## Test & CI health
+
+- [ ] **`actions/checkout` Node-20 deprecation (CI maintenance, low priority).**
+  CI annotates every run: `actions/checkout@v4` is being forced onto Node 24
+  because GitHub is sunsetting Node 20 on its runners. Jobs still pass, so it is
+  cosmetic for now — bump the pinned action across `.github/workflows` (find the
+  new SHA; actions are SHA-pinned). Do it as its own tiny PR, NOT bundled with a
+  feature branch, so it never re-triggers an otherwise-green PR's CI.
+
+- [x] **CLI eslint gate (2026-07-23).** The withCli migration (see the
+  `withCli()` item above) tripped the CLI package's error-level
+  `no-explicit-any` / `no-unused-vars` — caught by CI's lint step, missed
+  locally because the pre-commit gate was `tsc` + `prettier`, not `eslint`.
+  Fixed (file-level any-disable for CAC-option handlers + genuine unused
+  removals), and the test-mock `any` warning noise was retired by flipping the
+  TEST-file `no-explicit-any` `warn`→`off` per module (source stays `error`).
+  **Process note: run `eslint` locally before pushing — CI does.**
 
 - [x] **Tier-C skeptic coverage-gap follow-up — DONE 2026-07-20.** Covered by
   `tests/api/pagination-sql-side.test.ts` ("geography linked-records" block, 4

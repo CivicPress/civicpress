@@ -5,6 +5,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Request, Response } from 'express';
 import { ApiLogger } from '../api-logger.js';
+import { HttpError } from '../http-error.js';
 import {
   ValidationError,
   NotFoundError,
@@ -171,6 +172,72 @@ describe('ApiLogger - Error Handling', () => {
           }),
         })
       );
+    });
+  });
+
+  /**
+   * An HttpError's message is assumed to have been WRITTEN BY A DEVELOPER, so
+   * it is returned verbatim at any status. That assumption is load-bearing and
+   * sharp-edged: wrap an arbitrary caught error as `new HttpError(500,
+   * err.message)` and its raw text — filesystem paths, YAML parser detail —
+   * goes straight to the client, skipping the redaction below.
+   *
+   * `routes/geography.ts` did exactly that for all 11 of its endpoints. These
+   * pin both halves of the rule so the next caller can see where the line is.
+   */
+  describe('5xx redaction depends on who authored the message', () => {
+    const bodyOf = () => (mockResponse.json as any).mock.calls[0][0];
+
+    it('redacts an arbitrary error — the raw message never reaches the client', () => {
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      apiLogger.handleError(
+        'list_geography',
+        new Error(
+          'ENOENT: no such file or directory, open /home/civic/data/.civic/x.yml'
+        ),
+        mockRequest as Request,
+        mockResponse as Response,
+        'list_geography failed'
+      );
+
+      expect(mockResponse.status).toHaveBeenCalledWith(500);
+      const serialized = JSON.stringify(bodyOf());
+      expect(serialized).not.toContain('/home/');
+      expect(serialized).not.toContain('ENOENT');
+      expect(bodyOf().error.message).toBe('list_geography failed');
+    });
+
+    it('keeps an author-written 4xx message, which routes rely on', () => {
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      apiLogger.handleError(
+        'get_preset',
+        new HttpError(404, 'Preset not found', 'NOT_FOUND'),
+        mockRequest as Request,
+        mockResponse as Response,
+        'get_preset failed'
+      );
+
+      expect(mockResponse.status).toHaveBeenCalledWith(404);
+      expect(bodyOf().error.message).toBe('Preset not found');
+    });
+
+    it('returns an HttpError 5xx message verbatim — why arbitrary errors must not be wrapped as one', () => {
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      apiLogger.handleError(
+        'anything',
+        new HttpError(500, 'raw detail from a caught error'),
+        mockRequest as Request,
+        mockResponse as Response,
+        'anything failed'
+      );
+
+      // NOT a bug in itself — a deliberate 503 like status.ts's "Git engine not
+      // available" is a useful, safe message. It is the reason callers must
+      // hand raw errors to handleError unwrapped.
+      expect(bodyOf().error.message).toBe('raw detail from a caught error');
     });
   });
 });

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- CLI command handlers pass CAC's untyped options through withCli. */
 import { CAC } from 'cac';
 import { readFile, writeFile, mkdir } from 'fs/promises';
 import { join, dirname } from 'path';
@@ -5,18 +6,10 @@ import * as fs from 'fs';
 import matter from 'gray-matter';
 import { glob } from 'glob';
 import { userCan } from '@civicpress/core';
-import {
-  initializeLogger,
-  getGlobalOptionsFromArgs,
-  initializeCliOutput,
-} from '../utils/global-options.js';
+import { withCli } from '../utils/with-cli.js';
+import { initializeLogger } from '../utils/global-options.js';
 import { AuthUtils } from '../utils/auth-utils.js';
-import {
-  cliSuccess,
-  cliError,
-  cliWarn,
-  cliStartOperation,
-} from '../utils/cli-output.js';
+import { cliSuccess, cliError, cliWarn } from '../utils/cli-output.js';
 
 interface ImportOptions {
   token?: string;
@@ -40,7 +33,6 @@ interface ImportRecord {
   updated?: string;
   author: string;
   content?: string;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   metadata?: Record<string, any>;
 }
 
@@ -57,65 +49,54 @@ export function registerImportCommand(cli: CAC) {
     .option('--dry-run', 'Show what would be imported without importing')
     .option('--validate', 'Validate imported records')
     .option('--template <template>', 'Default template for imported records')
-    .action(async (file: string, options: ImportOptions) => {
-      // Initialize CLI output with global options
-      const globalOptions = getGlobalOptionsFromArgs();
-      initializeCliOutput(globalOptions);
+    .action(
+      withCli<[any, any]>(
+        {
+          operation: 'import',
+          errorMessage: 'Import failed',
+          errorCode: 'IMPORT_FAILED',
+        },
+        async ({ globalOptions }, file: any, options: any) => {
+          // Validate authentication and get civic instance
+          const { civic, user } = await AuthUtils.requireAuthWithCivic(
+            options.token,
+            globalOptions.json
+          );
+          const dataDir = civic.getDataDir();
 
-      const endOperation = cliStartOperation('import');
+          // Check import permissions
+          const canImport = await userCan(user, 'records:import');
+          if (!canImport) {
+            cliError(
+              'Insufficient permissions to import records',
+              'PERMISSION_DENIED',
+              {
+                requiredPermission: 'records:import',
+                userRole: user.role,
+              },
+              'import'
+            );
+            process.exit(1);
+          }
 
-      // Validate authentication and get civic instance
-      const { civic, user } = await AuthUtils.requireAuthWithCivic(
-        options.token,
-        globalOptions.json
-      );
-      const dataDir = civic.getDataDir();
+          const importOptions: ImportOptions = {
+            ...options,
+            format: options.format || 'json',
+            overwrite: options.overwrite || false,
+            dryRun: options.dryRun || false,
+            validate: options.validate || false,
+          };
 
-      // Check import permissions
-      const canImport = await userCan(user, 'records:import');
-      if (!canImport) {
-        cliError(
-          'Insufficient permissions to import records',
-          'PERMISSION_DENIED',
-          {
-            requiredPermission: 'records:import',
-            userRole: user.role,
-          },
-          'import'
-        );
-        process.exit(1);
-      }
-
-      try {
-        const importOptions: ImportOptions = {
-          ...options,
-          format: options.format || 'json',
-          overwrite: options.overwrite || false,
-          dryRun: options.dryRun || false,
-          validate: options.validate || false,
-        };
-
-        // If specific file is provided, import just that file
-        if (file) {
-          await importSingleFile(dataDir, file, importOptions);
-        } else {
-          // Import from input directory or file
-          await importRecords(dataDir, importOptions);
+          // If specific file is provided, import just that file
+          if (file) {
+            await importSingleFile(dataDir, file, importOptions);
+          } else {
+            // Import from input directory or file
+            await importRecords(dataDir, importOptions);
+          }
         }
-      } catch (error) {
-        cliError(
-          'Import failed',
-          'IMPORT_FAILED',
-          {
-            error: error instanceof Error ? error.message : String(error),
-          },
-          'import'
-        );
-        process.exit(1);
-      } finally {
-        endOperation();
-      }
-    });
+      )
+    );
 }
 
 async function importSingleFile(
@@ -276,12 +257,10 @@ function parseJSONImport(
 
     // Handle different JSON structures
     if (Array.isArray(data)) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return data.map((record: Record<string, any>) =>
         normalizeImportRecord(record, options)
       );
     } else if (data.records && Array.isArray(data.records)) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return data.records.map((record: Record<string, any>) =>
         normalizeImportRecord(record, options)
       );
@@ -311,7 +290,6 @@ function parseCSVImport(
 
   for (let i = 1; i < lines.length; i++) {
     const values = parseCSVLine(lines[i]);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const record: Record<string, any> = {};
 
     headers.forEach((header, index) => {
@@ -368,7 +346,6 @@ function parseMarkdownImport(
 }
 
 function normalizeImportRecord(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   record: Record<string, any>,
   options: ImportOptions
 ): ImportRecord {

@@ -1,20 +1,13 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- CLI command handlers pass CAC's untyped options through withCli. */
 import { CAC } from 'cac';
 import { readFile } from 'fs/promises';
 import { join } from 'path';
 import { glob } from 'glob';
 import { simpleGit } from 'simple-git';
 import { loadConfig } from '@civicpress/core';
-import {
-  initializeLogger,
-  getGlobalOptionsFromArgs,
-  initializeCliOutput,
-} from '../utils/global-options.js';
-import {
-  cliSuccess,
-  cliError,
-  cliWarn,
-  cliStartOperation,
-} from '../utils/cli-output.js';
+import { withCli } from '../utils/with-cli.js';
+import { initializeLogger } from '../utils/global-options.js';
+import { cliSuccess, cliError, cliWarn } from '../utils/cli-output.js';
 
 interface SearchOptions {
   content?: string;
@@ -42,7 +35,6 @@ interface SearchResult {
     value: string;
     context?: string;
   }[];
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   metadata: Record<string, any>;
 }
 
@@ -70,77 +62,69 @@ export function registerSearchCommand(cli: CAC) {
     .option('-f, --format <format>', 'Output format', { default: 'table' })
     .option('--json', 'Output as JSON')
     .option('--silent', 'Suppress output')
-    .action(async (query: string, options: SearchOptions) => {
-      // Initialize CLI output with global options
-      const globalOptions = getGlobalOptionsFromArgs();
-      initializeCliOutput(globalOptions);
-
-      const endOperation = cliStartOperation('search');
-
-      try {
-        const config = await loadConfig();
-        if (!config) {
-          cliError(
-            'No CivicPress configuration found. Run "civic init" first.',
-            'NOT_INITIALIZED',
-            undefined,
-            'search'
-          );
-          process.exit(1);
-        }
-
-        const searchOptions: SearchOptions = {
-          ...options,
-          caseSensitive: options.caseSensitive || false,
-          regex: options.regex || false,
-          limit: parseInt(options.limit?.toString() || '50'),
-          format: options.format || 'table',
-        };
-
-        // If query is provided as first argument, use it as content search
-        if (query && !options.content) {
-          searchOptions.content = query;
-        }
-
-        if (!config.dataDir) {
-          throw new Error('dataDir is not configured');
-        }
-        const results = await searchRecords(config.dataDir, searchOptions);
-
-        const summary = {
-          results,
-          summary: {
-            totalResults: results.length,
-            searchOptions: {
-              content: searchOptions.content,
-              title: searchOptions.title,
-              status: searchOptions.status,
-              type: searchOptions.type,
-              author: searchOptions.author,
-              limit: searchOptions.limit,
-            },
-          },
-        };
-
-        cliSuccess(summary, 'Search completed', {
+    .action(
+      withCli<[any, any]>(
+        {
           operation: 'search',
-        });
-
-        displayResults(results, searchOptions);
-      } catch (error) {
-        cliError(
-          'Search failed',
-          'SEARCH_FAILED',
-          {
+          errorMessage: 'Search failed',
+          errorCode: 'SEARCH_FAILED',
+          details: (error, _query, _options) => ({
             error: error instanceof Error ? error.message : String(error),
-          },
-          'search'
-        );
-        process.exit(1);
-      } finally {
-        endOperation();
-      }
-    });
+          }),
+        },
+        async (_ctx, query: any, options: any) => {
+          const config = await loadConfig();
+          if (!config) {
+            cliError(
+              'No CivicPress configuration found. Run "civic init" first.',
+              'NOT_INITIALIZED',
+              undefined,
+              'search'
+            );
+            process.exit(1);
+          }
+
+          const searchOptions: SearchOptions = {
+            ...options,
+            caseSensitive: options.caseSensitive || false,
+            regex: options.regex || false,
+            limit: parseInt(options.limit?.toString() || '50'),
+            format: options.format || 'table',
+          };
+
+          // If query is provided as first argument, use it as content search
+          if (query && !options.content) {
+            searchOptions.content = query;
+          }
+
+          if (!config.dataDir) {
+            throw new Error('dataDir is not configured');
+          }
+          const results = await searchRecords(config.dataDir, searchOptions);
+
+          const summary = {
+            results,
+            summary: {
+              totalResults: results.length,
+              searchOptions: {
+                content: searchOptions.content,
+                title: searchOptions.title,
+                status: searchOptions.status,
+                type: searchOptions.type,
+                author: searchOptions.author,
+                limit: searchOptions.limit,
+              },
+            },
+          };
+
+          cliSuccess(summary, 'Search completed', {
+            operation: 'search',
+          });
+
+          displayResults(results, searchOptions);
+        }
+      )
+    );
 }
 
 async function searchRecords(
@@ -333,9 +317,7 @@ async function searchRecords(
   }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function parseRecordMetadata(content: string): Record<string, any> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const metadata: Record<string, any> = {};
 
   // Extract frontmatter

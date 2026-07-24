@@ -2,6 +2,7 @@ import * as crypto from 'crypto';
 import { promises as fs } from 'fs';
 import * as path from 'path';
 import { Logger } from '../utils/logger.js';
+import { resolveSystemDataDir } from '../config/central-config.js';
 
 const logger = new Logger();
 
@@ -34,23 +35,19 @@ export class SecretsManager {
   private derivedKeys: Map<string, Buffer> = new Map();
   private secretsFilePath: string;
 
-  private constructor(dataDir: string) {
-    // .system-data is at project root, not inside dataDir
-    // If dataDir is absolute like '/path/to/project/data', project root is its parent
-    // If dataDir is relative like 'data', resolve from process.cwd()
-    const projectRoot = path.isAbsolute(dataDir)
-      ? path.dirname(dataDir)
-      : path.resolve(process.cwd(), path.dirname(dataDir));
+  private constructor(dataDir: string, systemDataDir?: string) {
+    // secrets.yml lives in `.system-data`, anchored to the project root by
+    // resolveSystemDataDir — the same place the DB and storage credentials
+    // resolve to, rather than each stripping a segment off dataDir.
     this.secretsFilePath = path.join(
-      projectRoot,
-      '.system-data',
+      resolveSystemDataDir({ dataDir, systemDataDir }),
       'secrets.yml'
     );
   }
 
-  static getInstance(dataDir: string): SecretsManager {
+  static getInstance(dataDir: string, systemDataDir?: string): SecretsManager {
     if (!SecretsManager.instance) {
-      SecretsManager.instance = new SecretsManager(dataDir);
+      SecretsManager.instance = new SecretsManager(dataDir, systemDataDir);
     }
     return SecretsManager.instance;
   }

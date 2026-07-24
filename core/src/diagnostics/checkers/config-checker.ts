@@ -41,7 +41,13 @@ export class ConfigurationDiagnosticChecker extends BaseDiagnosticChecker {
     if (dataDir) {
       try {
         this.configurationService = new ConfigurationService({
-          dataPath: dataDir,
+          // `.civic` is part of the path, not an implementation detail of the
+          // caller: ConfigurationService's own default is `data/.civic`, and
+          // the CLI passes `join(dataDir, '.civic')`. Passing bare `dataDir`
+          // pointed the checker at `<dataDir>/notifications.yml` — a path
+          // nothing writes — so `civic diagnose` was validating files that do
+          // not exist and reporting on config the deployment does not use.
+          dataPath: path.join(dataDir, '.civic'),
         });
       } catch (error: unknown) {
         this.logger.warn('Failed to initialize ConfigurationService', {
@@ -312,7 +318,10 @@ export class ConfigurationDiagnosticChecker extends BaseDiagnosticChecker {
       });
     } catch (error: unknown) {
       // Check if it's a YAML parsing error
-      if (errorMessage(error)?.includes('YAML') || errorMessage(error)?.includes('parse')) {
+      if (
+        errorMessage(error)?.includes('YAML') ||
+        errorMessage(error)?.includes('parse')
+      ) {
         return this.createErrorResult(
           'YAML parsing error in configuration',
           error,

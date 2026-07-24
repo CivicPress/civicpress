@@ -1,16 +1,9 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- CLI command handlers pass CAC's untyped options through withCli. */
 import { CAC } from 'cac';
 import { CivicPress } from '@civicpress/core';
-import {
-  getGlobalOptionsFromArgs,
-  initializeCliOutput,
-} from '../utils/global-options.js';
-import {
-  cliSuccess,
-  cliError,
-  cliInfo,
-  cliWarn,
-  cliStartOperation,
-} from '../utils/cli-output.js';
+import { withCli } from '../utils/with-cli.js';
+import { getGlobalOptionsFromArgs } from '../utils/global-options.js';
+import { cliSuccess, cliError, cliInfo, cliWarn } from '../utils/cli-output.js';
 
 export const indexCommand = (cli: CAC) => {
   cli
@@ -30,55 +23,46 @@ export const indexCommand = (cli: CAC) => {
     )
     .option('--json', 'Output in JSON format')
     .option('--silent', 'Suppress output')
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .action(async (options: any) => {
-      const globalOptions = getGlobalOptionsFromArgs();
-      initializeCliOutput(globalOptions);
-
-      const endOperation = cliStartOperation('index');
-
-      try {
-        // Initialize CivicPress
-        const civicPress = new CivicPress({
-          dataDir: 'data',
-        });
-
-        await civicPress.initialize();
-
-        const indexingService = civicPress.getIndexingService();
-
-        // Handle different sub-commands based on options
-        if (options.search) {
-          await handleSearch(indexingService, options.search, options);
-        } else if (options.list) {
-          await handleList(indexingService, options);
-        } else if (options.validate) {
-          await handleValidate(indexingService, options);
-        } else {
-          await handleGenerate(indexingService, options);
-        }
-
-        await civicPress.shutdown();
-
-        // Explicitly exit to ensure process terminates
-        process.exit(0);
-      } catch (error) {
-        cliError(
-          'Index command failed',
-          'INDEX_COMMAND_FAILED',
-          {
+    .action(
+      withCli<[any]>(
+        {
+          operation: 'index',
+          errorMessage: 'Index command failed',
+          errorCode: 'INDEX_COMMAND_FAILED',
+          details: (error, _options) => ({
             error: error instanceof Error ? error.message : String(error),
-          },
-          'index'
-        );
-        process.exit(1);
-      } finally {
-        endOperation();
-      }
-    });
+          }),
+        },
+        async (_ctx, options: any) => {
+          // Initialize CivicPress
+          const civicPress = new CivicPress({
+            dataDir: 'data',
+          });
+
+          await civicPress.initialize();
+
+          const indexingService = civicPress.getIndexingService();
+
+          // Handle different sub-commands based on options
+          if (options.search) {
+            await handleSearch(indexingService, options.search, options);
+          } else if (options.list) {
+            await handleList(indexingService, options);
+          } else if (options.validate) {
+            await handleValidate(indexingService, options);
+          } else {
+            await handleGenerate(indexingService, options);
+          }
+
+          await civicPress.shutdown();
+
+          // Explicitly exit to ensure process terminates
+          process.exit(0);
+        }
+      )
+    );
 };
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function handleGenerate(indexingService: any, options: any) {
   const indexingOptions = {
     rebuild: options.rebuild,
@@ -141,7 +125,6 @@ async function handleGenerate(indexingService: any, options: any) {
   }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function handleSearch(indexingService: any, query: string, options: any) {
   const recordsDir = 'data/records';
   const indexPath = `${recordsDir}/index.yml`;
@@ -182,7 +165,6 @@ async function handleSearch(indexingService: any, query: string, options: any) {
   }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function handleList(indexingService: any, _options: any) {
   const recordsDir = 'data/records';
   const indexPath = `${recordsDir}/index.yml`;
@@ -199,7 +181,6 @@ async function handleList(indexingService: any, _options: any) {
     process.exit(1);
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const moduleIndexes: any[] = [];
   for (const module of index.metadata.modules) {
     const moduleIndexPath = `${recordsDir}/${module}/index.yml`;
@@ -230,7 +211,6 @@ async function handleList(indexingService: any, _options: any) {
   );
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function handleValidate(indexingService: any, _options: any) {
   const recordsDir = 'data/records';
   const indexPath = `${recordsDir}/index.yml`;

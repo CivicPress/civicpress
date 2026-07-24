@@ -198,6 +198,12 @@ export function errorHandler(
 
   // Don't leak error details in production
   const isDevelopment = process.env.NODE_ENV === 'development';
+  // Canonical envelope — { success:false, error:{...} } — matching
+  // handleApiError / handleValidationError, so the uncaught-error fallback is
+  // the same shape as every other error. `requestId` stays (it lets a user
+  // quote a failing call in a support ticket) but INSIDE error, not as a
+  // sibling; the pure-debug path/method/timestamp live in the server log, not
+  // the wire.
   const errorResponse = {
     success: false,
     error: {
@@ -208,11 +214,8 @@ export function errorHandler(
         details: errorContext,
       }),
       ...(correlationId && { correlationId }),
+      ...(context.requestId && { requestId: context.requestId }),
     },
-    requestId: context.requestId,
-    timestamp: new Date().toISOString(),
-    path: req.path,
-    method: req.method,
   };
 
   res.status(statusCode).json(errorResponse);

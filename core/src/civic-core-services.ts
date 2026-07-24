@@ -6,13 +6,16 @@
  */
 
 import * as path from 'path';
+import {
+  resolveSystemDataDir,
+  resolveProjectRoot,
+} from './config/central-config.js';
 import { errorMessage, errorStack, errorCode } from './utils/error-narrow.js';
 import { ServiceContainer } from './di/container.js';
 import { CivicPressConfig } from './civic-core.js';
 import { Logger } from './utils/logger.js';
 import { DatabaseService } from './database/database-service.js';
 import { AuthService } from './auth/auth-service.js';
-import { ConfigDiscovery } from './config/config-discovery.js';
 import { WorkflowEngine } from './workflows/workflow-engine.js';
 import { GitEngine } from './git/git-engine.js';
 import { HookSystem } from './hooks/hook-system.js';
@@ -60,7 +63,10 @@ export function registerCivicPressServices(
   // Step 1.5: Register secrets manager (must be early, before auth services)
   container.singleton('secretsManager', (c) => {
     const config = c.resolve<CivicPressConfig>('config');
-    const secretsManager = SecretsManager.getInstance(config.dataDir);
+    const secretsManager = SecretsManager.getInstance(
+      config.dataDir,
+      config.systemDataDir
+    );
     // Note: initialize() will be called in completeServiceInitialization
     return secretsManager;
   });
@@ -68,27 +74,22 @@ export function registerCivicPressServices(
   // Step 2: Prepare database configuration
   let dbConfig = config.database;
   if (!dbConfig) {
-    // Resolve project root: if dataDir is 'data', project root is parent
-    // If dataDir is absolute like '/path/to/project/data', project root is its parent
-    const projectRoot = path.isAbsolute(config.dataDir)
-      ? path.dirname(config.dataDir)
-      : path.resolve(process.cwd(), path.dirname(config.dataDir));
+    // Default DB lives in `.system-data`, anchored to the project root by
+    // resolveSystemDataDir (NOT dirname(dataDir), which split it from the rest
+    // of the system data on non-default layouts).
     dbConfig = {
       type: 'sqlite' as const,
       sqlite: {
-        file: path.join(projectRoot, '.system-data', 'civic.db'),
+        file: path.join(resolveSystemDataDir(config), 'civic.db'),
       },
     };
   } else if (dbConfig.sqlite?.file && !path.isAbsolute(dbConfig.sqlite.file)) {
-    // Resolve relative database paths to absolute using project root
-    const projectRoot = path.isAbsolute(config.dataDir)
-      ? path.dirname(config.dataDir)
-      : path.resolve(process.cwd(), path.dirname(config.dataDir));
+    // A relative db path in config resolves against the project root.
     dbConfig = {
       ...dbConfig,
       sqlite: {
         ...dbConfig.sqlite,
-        file: path.resolve(projectRoot, dbConfig.sqlite.file),
+        file: path.resolve(resolveProjectRoot(config), dbConfig.sqlite.file),
       },
     };
   }
@@ -102,10 +103,9 @@ export function registerCivicPressServices(
   // both find the modules/ directory deterministically.
   container.singleton('moduleResolver', (c) => {
     const config = c.resolve<CivicPressConfig>('config');
-    const projectRoot = path.isAbsolute(config.dataDir)
-      ? path.dirname(config.dataDir)
-      : path.resolve(process.cwd(), path.dirname(config.dataDir));
-    const resolver = new ModuleResolver(path.join(projectRoot, 'modules'));
+    const resolver = new ModuleResolver(
+      path.join(resolveProjectRoot(config), 'modules')
+    );
     // Wire into RecordSchemaBuilder so schema-extension lookup uses the
     // same resolver instance (singleton across the request lifecycle).
     setRecordSchemaModuleResolver(resolver);
@@ -136,7 +136,6 @@ export function registerCivicPressServices(
   initializeRoleManager(config.dataDir);
 
   // Step 6: Register services with no dependencies
-  container.singleton('configDiscovery', () => new ConfigDiscovery());
   container.singleton('workflow', () => {
     return new WorkflowEngine();
   });

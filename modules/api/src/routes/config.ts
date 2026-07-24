@@ -1,5 +1,5 @@
 import express, { Router } from 'express';
-import { configurationService, CentralConfigManager } from '@civicpress/core';
+import { ConfigurationService, CentralConfigManager } from '@civicpress/core';
 import { readFile, writeFile, mkdir } from 'fs/promises';
 import { join, dirname } from 'path';
 import { authMiddleware, requirePermission } from '../middleware/auth.js';
@@ -9,6 +9,30 @@ import { AuditLogger } from '@civicpress/core';
 const router = Router();
 const audit = new AuditLogger();
 
+/**
+ * Build a ConfigurationService against the RESOLVED data directory.
+ *
+ * This route used to import the `configurationService` singleton, which is
+ * constructed at module-import time (`configuration-service.ts`) and therefore
+ * takes the constructor defaults — `dataPath: 'data/.civic'`, relative to
+ * whatever the process cwd happened to be. `resolveRawPaths()` below, in this
+ * same file, instead asks CentralConfigManager. The two disagreed the moment
+ * the data directory was not `./data`: with `CIVIC_DATA_DIR=/var/civic/data`
+ * (the documented Docker path), `GET /config/attachment-types` and
+ * `GET /config/raw/attachment-types` read DIFFERENT FILES — one the deployment's
+ * real config, the other whatever happened to sit under the cwd.
+ *
+ * Built per call rather than memoized: the constructor only stores three
+ * strings, so it costs nothing, and nothing can then go stale when the
+ * underlying config is re-resolved (which tests do via
+ * CentralConfigManager.reset()).
+ */
+function getConfigurationService(): ConfigurationService {
+  return new ConfigurationService({
+    dataPath: join(CentralConfigManager.getDataDir(), '.civic'),
+  });
+}
+
 // Public configuration endpoints (no auth required)
 /**
  * GET /api/v1/config/attachment-types
@@ -17,7 +41,7 @@ const audit = new AuditLogger();
 router.get('/attachment-types', async (req, res) => {
   try {
     const config =
-      await configurationService.loadConfiguration('attachment-types');
+      await getConfigurationService().loadConfiguration('attachment-types');
     res.json({
       success: true,
       data: config,
@@ -26,7 +50,7 @@ router.get('/attachment-types', async (req, res) => {
     logApiError('config', error, req);
     res.status(500).json({
       success: false,
-      error: 'Failed to get attachment types',
+      error: { message: 'Failed to get attachment types', code: 'FAILED_TO_GET_ATTACHMENT_TYPES' },
     });
   }
 });
@@ -38,7 +62,7 @@ router.get('/attachment-types', async (req, res) => {
 router.get('/link-categories', async (req, res) => {
   try {
     const config =
-      await configurationService.loadConfiguration('link-categories');
+      await getConfigurationService().loadConfiguration('link-categories');
     res.json({
       success: true,
       data: config,
@@ -47,7 +71,7 @@ router.get('/link-categories', async (req, res) => {
     logApiError('config', error, req);
     res.status(500).json({
       success: false,
-      error: 'Failed to get link categories',
+      error: { message: 'Failed to get link categories', code: 'FAILED_TO_GET_LINK_CATEGORIES' },
     });
   }
 });
@@ -82,7 +106,7 @@ router.post(
       }
       // If content is undefined, validateConfiguration will load from disk
 
-      const validation = await configurationService.validateConfiguration(
+      const validation = await getConfigurationService().validateConfiguration(
         type,
         content
       );
@@ -97,7 +121,11 @@ router.post(
       if (actor?.id) {
         await audit.log({
           source: 'api',
-          actor: { id: actor?.id, username: actor?.username, role: actor?.role },
+          actor: {
+            id: actor?.id,
+            username: actor?.username,
+            role: actor?.role,
+          },
           action: 'config:validate',
           target: { type: 'config', id: type },
           outcome: validation?.valid ? 'success' : 'failure',
@@ -113,7 +141,11 @@ router.post(
       if (actor?.id) {
         await audit.log({
           source: 'api',
-          actor: { id: actor?.id, username: actor?.username, role: actor?.role },
+          actor: {
+            id: actor?.id,
+            username: actor?.username,
+            role: actor?.role,
+          },
           action: 'config:validate',
           target: { type: 'config', id: type },
           outcome: 'failure',
@@ -123,7 +155,7 @@ router.post(
       logApiError('config', error, req);
       res.status(500).json({
         success: false,
-        error: 'Failed to validate configuration',
+        error: { message: 'Failed to validate configuration', code: 'FAILED_TO_VALIDATE_CONFIGURATION' },
       });
     }
   }
@@ -143,7 +175,7 @@ router.use(requirePermission('config:manage'));
  */
 router.get('/list', async (req, res) => {
   try {
-    const configs = await configurationService.getConfigurationList();
+    const configs = await getConfigurationService().getConfigurationList();
     res.json({
       success: true,
       data: configs,
@@ -152,7 +184,7 @@ router.get('/list', async (req, res) => {
     logApiError('config', error, req);
     res.status(500).json({
       success: false,
-      error: 'Failed to get configuration list',
+      error: { message: 'Failed to get configuration list', code: 'FAILED_TO_GET_CONFIGURATION_LIST' },
     });
   }
 });
@@ -164,7 +196,8 @@ router.get('/list', async (req, res) => {
 router.get('/metadata/:type', async (req, res) => {
   try {
     const { type } = req.params;
-    const metadata = await configurationService.getConfigurationMetadata(type);
+    const metadata =
+      await getConfigurationService().getConfigurationMetadata(type);
 
     res.json({
       success: true,
@@ -174,7 +207,7 @@ router.get('/metadata/:type', async (req, res) => {
     logApiError('config', error, req);
     res.status(404).json({
       success: false,
-      error: 'Configuration metadata not found',
+      error: { message: 'Configuration metadata not found', code: 'CONFIGURATION_METADATA_NOT_FOUND' },
     });
   }
 });
@@ -224,12 +257,12 @@ router.get('/raw/:type', async (req, res) => {
     res.status(200).send(yaml);
   } catch (error) {
     if (error instanceof InvalidConfigTypeError) {
-      return res.status(400).json({ success: false, error: error.message });
+      return res.status(400).json({ success: false, error: { message: error.message, code: 'INVALID_CONFIG_TYPE' } });
     }
     logApiError('config', error, req);
     res.status(404).json({
       success: false,
-      error: 'Raw configuration not found',
+      error: { message: 'Raw configuration not found', code: 'RAW_CONFIGURATION_NOT_FOUND' },
     });
   }
 });
@@ -248,7 +281,7 @@ router.put(
       if (!yamlContent) {
         return res
           .status(400)
-          .json({ success: false, error: 'YAML content is required' });
+          .json({ success: false, error: { message: 'YAML content is required', code: 'YAML_CONTENT_IS_REQUIRED' } });
       }
 
       const { userPath } = resolveRawPaths(type);
@@ -281,12 +314,12 @@ router.put(
         message: String(error),
       });
       if (error instanceof InvalidConfigTypeError) {
-        return res.status(400).json({ success: false, error: error.message });
+        return res.status(400).json({ success: false, error: { message: error.message, code: 'INVALID_CONFIG_TYPE' } });
       }
       logApiError('config', error, req);
       res.status(500).json({
         success: false,
-        error: 'Failed to save raw configuration',
+        error: { message: 'Failed to save raw configuration', code: 'FAILED_TO_SAVE_RAW_CONFIGURATION' },
       });
     }
   }
@@ -298,7 +331,7 @@ router.put(
  */
 router.get('/status', async (req, res) => {
   try {
-    const status = await configurationService.getConfigurationStatus();
+    const status = await getConfigurationService().getConfigurationStatus();
     res.json({
       success: true,
       data: status,
@@ -307,7 +340,7 @@ router.get('/status', async (req, res) => {
     logApiError('config', error, req);
     res.status(500).json({
       success: false,
-      error: 'Failed to get configuration status',
+      error: { message: 'Failed to get configuration status', code: 'FAILED_TO_GET_CONFIGURATION_STATUS' },
     });
   }
 });
@@ -319,7 +352,7 @@ router.get('/status', async (req, res) => {
 router.get('/:type', async (req, res) => {
   try {
     const { type } = req.params;
-    const config = await configurationService.loadConfiguration(type);
+    const config = await getConfigurationService().loadConfiguration(type);
 
     res.json({
       success: true,
@@ -329,7 +362,7 @@ router.get('/:type', async (req, res) => {
     logApiError('config', error, req);
     res.status(404).json({
       success: false,
-      error: 'Configuration not found',
+      error: { message: 'Configuration not found', code: 'CONFIGURATION_NOT_FOUND' },
     });
   }
 });
@@ -343,7 +376,7 @@ router.put('/:type', async (req, res) => {
     const { type } = req.params;
     const content = req.body;
 
-    await configurationService.saveConfiguration(type, content);
+    await getConfigurationService().saveConfiguration(type, content);
 
     res.json({
       success: true,
@@ -372,7 +405,7 @@ router.put('/:type', async (req, res) => {
     logApiError('config', error, req);
     res.status(500).json({
       success: false,
-      error: 'Failed to save configuration',
+      error: { message: 'Failed to save configuration', code: 'FAILED_TO_SAVE_CONFIGURATION' },
     });
   }
 });
@@ -385,7 +418,7 @@ router.post('/:type/reset', async (req, res) => {
   try {
     const { type } = req.params;
 
-    await configurationService.resetToDefaults(type);
+    await getConfigurationService().resetToDefaults(type);
 
     res.json({
       success: true,
@@ -414,7 +447,7 @@ router.post('/:type/reset', async (req, res) => {
     logApiError('config', error, req);
     res.status(500).json({
       success: false,
-      error: 'Failed to reset configuration',
+      error: { message: 'Failed to reset configuration', code: 'FAILED_TO_RESET_CONFIGURATION' },
     });
   }
 });
@@ -437,7 +470,8 @@ router.get('/validate/all', async (req, res) => {
 
     for (const type of configTypes) {
       try {
-        results[type] = await configurationService.validateConfiguration(type);
+        results[type] =
+          await getConfigurationService().validateConfiguration(type);
       } catch (error) {
         logApiError('config', error, req);
         results[type] = {
@@ -455,7 +489,7 @@ router.get('/validate/all', async (req, res) => {
     logApiError('config', error, req);
     res.status(500).json({
       success: false,
-      error: 'Failed to validate configurations',
+      error: { message: 'Failed to validate configurations', code: 'FAILED_TO_VALIDATE_CONFIGURATIONS' },
     });
   }
 });

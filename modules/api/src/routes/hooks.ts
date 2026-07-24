@@ -9,11 +9,15 @@ export const hooksRouter = Router();
 // callers. Now returns 501 Not Implemented with a clear message and
 // planned milestone. Auth gates retained so the surface stays bounded.
 const NOT_IMPLEMENTED = {
-  error: 'not_implemented',
-  code: 'NOT_IMPLEMENTED',
-  message:
-    'Hook management is planned for v0.4.x. See docs/audits/2026-05-16-manifesto-fit-findings.md (api-004).',
-  retry_after_milestone: 'v0.4.x',
+  success: false,
+  error: {
+    message:
+      'Hook management is planned for v0.4.x. See docs/audits/2026-05-16-manifesto-fit-findings.md (api-004).',
+    code: 'NOT_IMPLEMENTED',
+    details: {
+      retry_after_milestone: 'v0.4.x',
+    },
+  },
 };
 
 // GET /api/v1/hooks - List all hooks

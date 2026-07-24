@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- CLI command handlers pass CAC's untyped options through withCli. */
 import { CAC } from 'cac';
 import path from 'path';
 import { createRequire } from 'module';
@@ -7,18 +8,9 @@ import {
   type BackupCreateResult,
   type BackupRestoreResult,
 } from '@civicpress/core';
-import {
-  initializeLogger,
-  getGlobalOptionsFromArgs,
-  initializeCliOutput,
-} from '../utils/global-options.js';
-import {
-  cliSuccess,
-  cliError,
-  cliInfo,
-  cliWarn,
-  cliStartOperation,
-} from '../utils/cli-output.js';
+import { cliSuccess, cliInfo, cliWarn } from '../utils/cli-output.js';
+import { withCli } from '../utils/with-cli.js';
+import { initializeLogger } from '../utils/global-options.js';
 
 const require = createRequire(import.meta.url);
 const { version: civicpressVersion } = require('../../../package.json');
@@ -62,47 +54,41 @@ export function registerBackupCommand(cli: CAC): void {
     .option('--overwrite', 'Overwrite existing data when restoring')
     .option('--json', 'Output in JSON format')
     .option('--silent', 'Suppress output')
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .action(async (action: string, source: string | undefined, opts: any) => {
-      const options = opts as BackupCommandOptions;
-      const globalOpts = getGlobalOptionsFromArgs();
-      initializeCliOutput(globalOpts);
-
-      const logger = initializeLogger();
-      const endOperation = cliStartOperation('backup');
-
-      try {
-        switch (action) {
-          case 'create':
-            await handleCreate(options, globalOpts.json, logger);
-            break;
-          case 'restore':
-            if (!source) {
+    .action(
+      withCli<[string, string | undefined, any]>(
+        {
+          operation: 'backup',
+          errorMessage: 'Backup command failed',
+          errorCode: 'BACKUP_FAILED',
+        },
+        async (
+          { globalOptions, logger },
+          action: string,
+          source: string | undefined,
+          opts: any
+        ) => {
+          const globalOpts = globalOptions;
+          const options = opts as BackupCommandOptions;
+          switch (action) {
+            case 'create':
+              await handleCreate(options, globalOpts.json, logger);
+              break;
+            case 'restore':
+              if (!source) {
+                throw new Error(
+                  'Backup source is required for restore (directory or archive).'
+                );
+              }
+              await handleRestore(source, options, globalOpts.json, logger);
+              break;
+            default:
               throw new Error(
-                'Backup source is required for restore (directory or archive).'
+                `Unknown backup action '${action}'. Use 'create' or 'restore'.`
               );
-            }
-            await handleRestore(source, options, globalOpts.json, logger);
-            break;
-          default:
-            throw new Error(
-              `Unknown backup action '${action}'. Use 'create' or 'restore'.`
-            );
+          }
         }
-      } catch (error) {
-        cliError(
-          'Backup command failed',
-          'BACKUP_FAILED',
-          {
-            error: error instanceof Error ? error.message : String(error),
-          },
-          'backup'
-        );
-        process.exit(1);
-      } finally {
-        endOperation();
-      }
-    });
+      )
+    );
 }
 
 async function handleCreate(

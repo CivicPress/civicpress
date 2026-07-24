@@ -2,6 +2,26 @@
  * Core SQLite table DDL — extracted from database-adapter.ts in Phase 2d
  * W2-T4. Exported as an ordered array of CREATE TABLE statements applied
  * by the adapter's initialize() flow.
+ *
+ * These statements and `schema/migrations.ts` are two descriptions of the same
+ * schema, reaching it by different routes: a NEW database gets its shape from
+ * the CREATE TABLE below, an EXISTING one from the migrations. Let them
+ * disagree and the two kinds of database end up with different schemas.
+ *
+ * So both directions have to hold when a column is added to a table that has
+ * already shipped:
+ *
+ *  - declare it here, so new databases get it in one statement, AND
+ *  - add a migration for it, so existing databases get it too.
+ *
+ * `records.linked_geography_files` had only the second half for ten months —
+ * the geography feature added the ALTER and never updated this DDL — so every
+ * new database created the table without the column and immediately altered it
+ * back in. Harmless in effect, but it meant this file had stopped describing
+ * the real schema. The first half of that invariant is enforced by a test:
+ * a fresh database must not have to RUN any column migration, so anything the
+ * ledger records as `applied` rather than `adopted` on a new database means
+ * these two files have drifted apart again.
  */
 
 export const CORE_TABLE_STATEMENTS: string[] = [
@@ -88,6 +108,7 @@ export const CORE_TABLE_STATEMENTS: string[] = [
     geography TEXT,
     attached_files TEXT,
     linked_records TEXT,
+    linked_geography_files TEXT,
     path TEXT,
     author TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,

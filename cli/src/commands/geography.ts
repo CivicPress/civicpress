@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- CLI command handlers pass CAC's untyped options through withCli. */
 import { CAC } from 'cac';
 import {
   validateGeography,
@@ -8,6 +9,7 @@ import {
 import fs from 'fs-extra';
 import path from 'path';
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
+import { withCli } from '../utils/with-cli.js';
 import {
   getGlobalOptionsFromArgs,
   initializeCliOutput,
@@ -27,9 +29,7 @@ interface GeographyValidationOptions {
 
 interface GeographyFile {
   path: string;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   geography: any;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   validation: any;
 }
 
@@ -43,45 +43,37 @@ export function registerGeographyCommand(cli: CAC) {
     .option('--silent', 'Suppress output')
     .option('--normalize', 'Show normalized geography data')
     .option('--summary', 'Show geography summary')
-    .action(async (filePath: string, options: GeographyValidationOptions) => {
-      // Initialize CLI output with global options
-      const globalOptions = getGlobalOptionsFromArgs();
-      initializeCliOutput(globalOptions);
-
-      const endOperation = cliStartOperation('geography:validate');
-
-      try {
-        const result = await validateGeographyFile(filePath, options);
-
-        cliSuccess(
-          result,
-          result.hasGeography
-            ? result.validation?.valid
-              ? `Geography data is valid in ${filePath}`
-              : `Geography data has validation errors in ${filePath}`
-            : `No geography data found in ${filePath}`,
-          {
-            operation: 'geography:validate',
-            filePath,
-            hasGeography: result.hasGeography,
-            isValid: result.validation?.valid,
-          }
-        );
-      } catch (error) {
-        cliError(
-          'Failed to validate geography data',
-          'VALIDATE_GEOGRAPHY_FAILED',
-          {
+    .action(
+      withCli<[any, any]>(
+        {
+          operation: 'geography:validate',
+          errorMessage: 'Failed to validate geography data',
+          errorCode: 'VALIDATE_GEOGRAPHY_FAILED',
+          details: (error, filePath, _options) => ({
             error: (error as Error).message,
             filePath,
-          },
-          'geography:validate'
-        );
-        process.exit(1);
-      } finally {
-        endOperation();
-      }
-    });
+          }),
+        },
+        async (_ctx, filePath: any, options: any) => {
+          const result = await validateGeographyFile(filePath, options);
+
+          cliSuccess(
+            result,
+            result.hasGeography
+              ? result.validation?.valid
+                ? `Geography data is valid in ${filePath}`
+                : `Geography data has validation errors in ${filePath}`
+              : `No geography data found in ${filePath}`,
+            {
+              operation: 'geography:validate',
+              filePath,
+              hasGeography: result.hasGeography,
+              isValid: result.validation?.valid,
+            }
+          );
+        }
+      )
+    );
 
   cli
     .command(
@@ -91,42 +83,34 @@ export function registerGeographyCommand(cli: CAC) {
     .option('--json', 'Output as JSON')
     .option('--silent', 'Suppress output')
     .option('--summary', 'Show geography summaries')
-    .action(async (dirPath: string, options: GeographyValidationOptions) => {
-      // Initialize CLI output with global options
-      const globalOptions = getGlobalOptionsFromArgs();
-      initializeCliOutput(globalOptions);
-
-      const endOperation = cliStartOperation('geography:scan');
-
-      try {
-        const results = await scanDirectoryForGeography(dirPath, options);
-
-        const message =
-          results.filesWithGeography === 0
-            ? `No files with geography data found in ${dirPath}`
-            : `Found ${results.filesWithGeography} file${results.filesWithGeography === 1 ? '' : 's'} with geography data out of ${results.totalFiles} total files`;
-
-        cliSuccess(results, message, {
+    .action(
+      withCli<[any, any]>(
+        {
           operation: 'geography:scan',
-          directory: dirPath,
-          totalFiles: results.totalFiles,
-          filesWithGeography: results.filesWithGeography,
-        });
-      } catch (error) {
-        cliError(
-          'Failed to scan directory for geography data',
-          'SCAN_GEOGRAPHY_FAILED',
-          {
+          errorMessage: 'Failed to scan directory for geography data',
+          errorCode: 'SCAN_GEOGRAPHY_FAILED',
+          details: (error, dirPath, _options) => ({
             error: (error as Error).message,
             directory: dirPath,
-          },
-          'geography:scan'
-        );
-        process.exit(1);
-      } finally {
-        endOperation();
-      }
-    });
+          }),
+        },
+        async (_ctx, dirPath: any, options: any) => {
+          const results = await scanDirectoryForGeography(dirPath, options);
+
+          const message =
+            results.filesWithGeography === 0
+              ? `No files with geography data found in ${dirPath}`
+              : `Found ${results.filesWithGeography} file${results.filesWithGeography === 1 ? '' : 's'} with geography data out of ${results.totalFiles} total files`;
+
+          cliSuccess(results, message, {
+            operation: 'geography:scan',
+            directory: dirPath,
+            totalFiles: results.totalFiles,
+            filesWithGeography: results.filesWithGeography,
+          });
+        }
+      )
+    );
 
   cli
     .command(
@@ -300,7 +284,6 @@ async function normalizeGeographyFile(
   };
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function extractGeographyFromContent(content: string): any {
   // Look for YAML frontmatter
   const frontmatterMatch = content.match(/^---\s*\n([\s\S]*?)\n---\s*\n/);
@@ -309,7 +292,6 @@ function extractGeographyFromContent(content: string): any {
   }
 
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const frontmatter = parseYaml(frontmatterMatch[1]) as any;
     return frontmatter.geography || null;
   } catch {
@@ -317,7 +299,6 @@ function extractGeographyFromContent(content: string): any {
   }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function updateGeographyInContent(content: string, geography: any): string {
   const frontmatterMatch = content.match(/^---\s*\n([\s\S]*?)\n---\s*\n/);
   if (!frontmatterMatch) {
@@ -327,7 +308,6 @@ function updateGeographyInContent(content: string, geography: any): string {
   }
 
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const frontmatter = parseYaml(frontmatterMatch[1]) as any;
     frontmatter.geography = geography;
     const newFrontmatter = stringifyYaml(frontmatter);
@@ -360,4 +340,3 @@ async function findMarkdownFiles(dirPath: string): Promise<string[]> {
   await scanDirectory(dirPath);
   return files;
 }
-

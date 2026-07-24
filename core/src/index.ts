@@ -168,7 +168,6 @@ export type { GitCommit } from './git/git-engine.js';
 export { HookSystem } from './hooks/hook-system.js';
 export { WorkflowEngine } from './workflows/workflow-engine.js';
 export { WorkflowConfigManager } from './config/workflow-config.js';
-export { ConfigDiscovery } from './config/config-discovery.js';
 export { Logger } from './utils/logger.js';
 export { TemplateEngine } from './utils/template-engine.js';
 // Export unified cache system
@@ -282,7 +281,11 @@ export async function loadConfig() {
 }
 
 // Export central configuration
-export { CentralConfigManager } from './config/central-config.js';
+export {
+  CentralConfigManager,
+  resolveSystemDataDir,
+  resolveProjectRoot,
+} from './config/central-config.js';
 export type { CentralConfig } from './config/central-config.js';
 
 // Export record types configuration

@@ -1,28 +1,19 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- CLI command handlers pass CAC's untyped options through withCli. */
 import { CAC } from 'cac';
 import { readFile, writeFile, mkdir } from 'fs/promises';
 import { join } from 'path';
 import { TemplateEngine, userCan } from '@civicpress/core';
 import * as yaml from 'yaml';
 import * as fs from 'fs';
-import {
-  initializeLogger,
-  getGlobalOptionsFromArgs,
-  initializeCliOutput,
-} from '../utils/global-options.js';
 import { AuthUtils } from '../utils/auth-utils.js';
-import {
-  cliSuccess,
-  cliError,
-  cliInfo,
-  cliWarn,
-  cliStartOperation,
-} from '../utils/cli-output.js';
+import { cliSuccess, cliError, cliInfo, cliWarn } from '../utils/cli-output.js';
+import { withCli } from '../utils/with-cli.js';
+import { initializeLogger } from '../utils/global-options.js';
 
 interface LegacyTemplate {
   name: string;
   type: string;
   description: string;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   metadata: Record<string, any>;
   content: string;
   validation: ValidationRules;
@@ -53,86 +44,74 @@ export function registerTemplateCommand(cli: CAC) {
     .option('--partials', 'List available partials')
     .option('--partial <name>', 'Show partial details')
     .option('--create-partial <name>', 'Create a new partial')
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .action(async (options: any) => {
-      // Initialize CLI output with global options
-      const globalOptions = getGlobalOptionsFromArgs();
-      initializeCliOutput(globalOptions);
-
-      const endOperation = cliStartOperation('template');
-
-      // Validate authentication and get civic instance
-      const { civic, user } = await AuthUtils.requireAuthWithCivic(
-        options.token,
-        globalOptions.json
-      );
-      const dataDir = civic.getDataDir();
-
-      // Check template management permissions
-      const canManageTemplates = await userCan(user, 'templates:manage');
-      if (!canManageTemplates) {
-        cliError(
-          'Insufficient permissions to manage templates',
-          'PERMISSION_DENIED',
-          {
-            requiredPermission: 'templates:manage',
-            userRole: user.role,
-          },
-          'template'
-        );
-        process.exit(1);
-      }
-
-      try {
-        if (options.init) {
-          await initializeDefaultTemplates(dataDir);
-        } else if (options.list) {
-          await listTemplates(dataDir, globalOptions.json);
-        } else if (options.show) {
-          await showTemplate(dataDir, options.show);
-        } else if (options.create) {
-          await createTemplate(dataDir, options.create, options.type);
-        } else if (options.validate) {
-          await validateTemplate(dataDir, options.validate);
-        } else if (options.preview) {
-          await previewTemplate(dataDir, options.preview);
-        } else if (options.partials) {
-          await listPartials(dataDir);
-        } else if (options.partial) {
-          await showPartial(dataDir, options.partial);
-        } else if (options.createPartial) {
-          await createPartial(dataDir, options.createPartial);
-        } else {
-          cliInfo(
-            'Template Management Commands:\n' +
-              '  civic template --list                    # List all templates\n' +
-              '  civic template --show <template>         # Show template details\n' +
-              '  civic template --create <name> --type <type>  # Create new template\n' +
-              '  civic template --validate <template>     # Validate template\n' +
-              '  civic template --preview <template>      # Preview template with sample data\n' +
-              '  civic template --init                    # Initialize default templates\n' +
-              '\n' +
-              'Partial Management Commands:\n' +
-              '  civic template --partials               # List available partials\n' +
-              '  civic template --partial <name>         # Show partial details\n' +
-              '  civic template --create-partial <name>  # Create new partial',
-            'template'
+    .action(
+      withCli<[any]>(
+        {
+          operation: 'template',
+          errorMessage: 'Template command failed',
+          errorCode: 'TEMPLATE_COMMAND_FAILED',
+        },
+        async ({ globalOptions }, options: any) => {
+          // Validate authentication and get civic instance
+          const { civic, user } = await AuthUtils.requireAuthWithCivic(
+            options.token,
+            globalOptions.json
           );
+          const dataDir = civic.getDataDir();
+
+          // Check template management permissions
+          const canManageTemplates = await userCan(user, 'templates:manage');
+          if (!canManageTemplates) {
+            cliError(
+              'Insufficient permissions to manage templates',
+              'PERMISSION_DENIED',
+              {
+                requiredPermission: 'templates:manage',
+                userRole: user.role,
+              },
+              'template'
+            );
+            process.exit(1);
+          }
+
+          if (options.init) {
+            await initializeDefaultTemplates(dataDir);
+          } else if (options.list) {
+            await listTemplates(dataDir, globalOptions.json);
+          } else if (options.show) {
+            await showTemplate(dataDir, options.show);
+          } else if (options.create) {
+            await createTemplate(dataDir, options.create, options.type);
+          } else if (options.validate) {
+            await validateTemplate(dataDir, options.validate);
+          } else if (options.preview) {
+            await previewTemplate(dataDir, options.preview);
+          } else if (options.partials) {
+            await listPartials(dataDir);
+          } else if (options.partial) {
+            await showPartial(dataDir, options.partial);
+          } else if (options.createPartial) {
+            await createPartial(dataDir, options.createPartial);
+          } else {
+            cliInfo(
+              'Template Management Commands:\n' +
+                '  civic template --list                    # List all templates\n' +
+                '  civic template --show <template>         # Show template details\n' +
+                '  civic template --create <name> --type <type>  # Create new template\n' +
+                '  civic template --validate <template>     # Validate template\n' +
+                '  civic template --preview <template>      # Preview template with sample data\n' +
+                '  civic template --init                    # Initialize default templates\n' +
+                '\n' +
+                'Partial Management Commands:\n' +
+                '  civic template --partials               # List available partials\n' +
+                '  civic template --partial <name>         # Show partial details\n' +
+                '  civic template --create-partial <name>  # Create new partial',
+              'template'
+            );
+          }
         }
-      } catch (error) {
-        cliError(
-          'Template command failed',
-          'TEMPLATE_COMMAND_FAILED',
-          {
-            error: error instanceof Error ? error.message : String(error),
-          },
-          'template'
-        );
-        process.exit(1);
-      } finally {
-        endOperation();
-      }
-    });
+      )
+    );
 }
 
 async function initializeDefaultTemplates(dataDir: string) {
@@ -444,7 +423,6 @@ async function listTemplates(dataDir: string, shouldOutputJson?: boolean) {
 
   try {
     const recordTypes = ['bylaw', 'policy', 'proposal', 'resolution'];
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const allTemplates: any[] = [];
 
     for (const type of recordTypes) {
@@ -460,9 +438,7 @@ async function listTemplates(dataDir: string, shouldOutputJson?: boolean) {
             allTemplates.push({
               name: templateName,
               type: type,
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               extends: (template as any).extends,
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               hasParent: !!(template as any).parentTemplate,
               sections: template.sections?.length || 0,
               requiredFields: template.validation?.required_fields?.length || 0,
@@ -546,9 +522,7 @@ async function showTemplate(dataDir: string, templateName: string) {
         template: {
           name: template.name,
           type: template.type,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           extends: (template as any).extends,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           hasParent: !!(template as any).parentTemplate,
           sections: template.sections,
           validation: template.validation,
@@ -797,7 +771,6 @@ async function previewTemplate(dataDir: string, templateName: string) {
       return;
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sampleVariables: Record<string, any> = {
       title: 'My Record Title',
       description: 'This is a description for a sample record.',

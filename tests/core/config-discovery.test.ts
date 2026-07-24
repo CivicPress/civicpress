@@ -3,7 +3,10 @@ import { createTestContext, cleanupTestContext } from '../utils/cli-test-utils';
 import { existsSync, writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import yaml from 'js-yaml';
-import { CentralConfigManager } from '@civicpress/core';
+import {
+  CentralConfigManager,
+  resolveSystemDataDir,
+} from '@civicpress/core';
 
 describe('Config Discovery with Database Configuration', () => {
   let context: ReturnType<typeof createTestContext>;
@@ -330,6 +333,91 @@ describe('Config Discovery with Database Configuration', () => {
         expect(dataDir).toContain('custom_data');
       } finally {
         process.chdir(originalCwd);
+      }
+    });
+  });
+
+  /**
+   * `.system-data/` (DB, secret, storage creds, realtime/BB data) is anchored
+   * to the PROJECT ROOT — the directory holding `.civicrc` — not derived by
+   * stripping a segment off `dataDir`. Those two rules only agreed when
+   * `dataDir` was exactly `<root>/data`; on any other layout the DB and the
+   * secrets/storage landed in different directories. These pin the one rule.
+   */
+  describe('.system-data anchoring (dataDir issue)', () => {
+    it('anchors systemDataDir to .civicrc even when dataDir is nested elsewhere', async () => {
+      const civicrcPath = join(context.testDir, '.civicrc');
+      writeFileSync(
+        civicrcPath,
+        yaml.dump({
+          // dataDir points TWO levels down — the old dirname(dataDir) rule
+          // would have put .system-data at <root>/var, splitting it from the DB.
+          dataDir: 'var/records',
+        })
+      );
+      CentralConfigManager.reset();
+      const originalCwd = process.cwd();
+      process.chdir(context.testDir);
+
+      try {
+        const systemDataDir = CentralConfigManager.getSystemDataDir();
+        // Anchored to the .civicrc dir, NOT to dirname(dataDir) (= <root>/var).
+        expect(systemDataDir).toBe(join(context.testDir, '.system-data'));
+        expect(systemDataDir).not.toContain(join('var', '.system-data'));
+
+        // And the defaulted DB lands in that same .system-data, not inside the
+        // (relocated) data dir.
+        const dbFile = CentralConfigManager.getConfig().database?.sqlite?.file;
+        expect(dbFile).toBe(
+          join(context.testDir, '.system-data', 'civic.db')
+        );
+      } finally {
+        process.chdir(originalCwd);
+        CentralConfigManager.reset();
+      }
+    });
+
+    it('resolveSystemDataDir prefers the anchored value; falls back to dirname(dataDir) only without one', () => {
+      // Anchored config (came through CentralConfigManager): use it verbatim.
+      expect(
+        resolveSystemDataDir({
+          dataDir: '/srv/civic/var/records',
+          systemDataDir: '/srv/civic/.system-data',
+        })
+      ).toBe('/srv/civic/.system-data');
+
+      // Raw config with no anchor (e.g. a directly-built test config): the
+      // documented dirname(dataDir) fallback, preserving prior behavior.
+      expect(resolveSystemDataDir({ dataDir: '/srv/civic/data' })).toBe(
+        join('/srv/civic', '.system-data')
+      );
+    });
+
+    it('CIVIC_DATA_DIR sets only the data dir — the DB resolves canonically, not inside it', async () => {
+      // .civicrc with NO database block (so the default path is taken).
+      writeFileSync(
+        join(context.testDir, '.civicrc'),
+        yaml.dump({ dataDir: 'data' })
+      );
+      CentralConfigManager.reset();
+      const originalEnv = process.env.CIVIC_DATA_DIR;
+      const originalCwd = process.cwd();
+      process.env.CIVIC_DATA_DIR = '/external/civic-data';
+      process.chdir(context.testDir);
+
+      try {
+        const config = CentralConfigManager.getConfig();
+        expect(config.dataDir).toBe('/external/civic-data');
+        // The DB is NOT `/external/civic-data/civic.db` (the old third
+        // behavior) — it resolves to the canonical project-root .system-data.
+        expect(config.database?.sqlite?.file).toBe(
+          join(context.testDir, '.system-data', 'civic.db')
+        );
+      } finally {
+        process.chdir(originalCwd);
+        if (originalEnv) process.env.CIVIC_DATA_DIR = originalEnv;
+        else delete process.env.CIVIC_DATA_DIR;
+        CentralConfigManager.reset();
       }
     });
   });

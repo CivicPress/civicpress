@@ -64,7 +64,10 @@ export function createAuditRouter() {
     } catch {
       res.status(500).json({
         success: false,
-        error: 'Failed to load activity log',
+        error: {
+          message: 'Failed to load activity log',
+          code: 'LOAD_ACTIVITY_LOG_FAILED',
+        },
       });
     }
   });

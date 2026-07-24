@@ -1,16 +1,8 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- CLI command handlers pass CAC's untyped options through withCli. */
 import { CAC } from 'cac';
 import { CivicPress } from '@civicpress/core';
-import {
-  initializeLogger,
-  getGlobalOptionsFromArgs,
-  initializeCliOutput,
-} from '../utils/global-options.js';
-import {
-  cliSuccess,
-  cliError,
-  cliInfo,
-  cliStartOperation,
-} from '../utils/cli-output.js';
+import { cliSuccess, cliInfo } from '../utils/cli-output.js';
+import { withCli } from '../utils/with-cli.js';
 import { AuthUtils } from '../utils/auth-utils.js';
 
 export const autoIndexCommand = (cli: CAC) => {
@@ -23,80 +15,69 @@ export const autoIndexCommand = (cli: CAC) => {
     .option('--demo', 'Run a complete auto-indexing demo')
     .option('--json', 'Output in JSON format')
     .option('--silent', 'Suppress output')
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .action(async (options: any) => {
-      // Initialize CLI output with global options
-      const globalOpts = getGlobalOptionsFromArgs();
-      initializeCliOutput(globalOpts);
+    .action(
+      withCli<[any]>(
+        {
+          operation: 'auto-index',
+          errorMessage: 'Auto-index command failed',
+          errorCode: 'AUTO_INDEX_FAILED',
+        },
+        async ({ globalOptions, logger }, options: any) => {
+          const globalOpts = globalOptions;
 
-      const logger = initializeLogger();
-      const endOperation = cliStartOperation('auto-index');
+          // Check if we should output JSON
+          const shouldOutputJson = globalOpts.json;
 
-      // Check if we should output JSON
-      const shouldOutputJson = globalOpts.json;
-
-      try {
-        // Validate authentication and get civic instance
-        const { civic } = await AuthUtils.requireAuthWithCivic(
-          options.token,
-          shouldOutputJson
-        );
-
-        // Use the authenticated civic instance
-        const civicPress = civic;
-
-        if (options.demo) {
-          await runAutoIndexingDemo(civicPress, options, globalOpts, logger);
-        } else if (options.create) {
-          await createTestRecord(
-            civicPress,
-            options.create,
-            options,
-            globalOpts,
-            logger
+          // Validate authentication and get civic instance
+          const { civic } = await AuthUtils.requireAuthWithCivic(
+            options.token,
+            shouldOutputJson
           );
-        } else if (options.update) {
-          await updateTestRecord(
-            civicPress,
-            options.update,
-            options,
-            globalOpts,
-            logger
-          );
-        } else if (options.list) {
-          await listRecords(civicPress, options, globalOpts, logger);
-        } else {
-          cliInfo('Auto-indexing workflow test command', 'auto-index');
-          cliInfo('Use --demo to run a complete demonstration', 'auto-index');
-          cliInfo('Use --create <title> to create a test record', 'auto-index');
-          cliInfo('Use --update <id> to update a record', 'auto-index');
-          cliInfo('Use --list to list all records', 'auto-index');
+
+          // Use the authenticated civic instance
+          const civicPress = civic;
+
+          if (options.demo) {
+            await runAutoIndexingDemo(civicPress, options, globalOpts, logger);
+          } else if (options.create) {
+            await createTestRecord(
+              civicPress,
+              options.create,
+              options,
+              globalOpts,
+              logger
+            );
+          } else if (options.update) {
+            await updateTestRecord(
+              civicPress,
+              options.update,
+              options,
+              globalOpts,
+              logger
+            );
+          } else if (options.list) {
+            await listRecords(civicPress, options, globalOpts, logger);
+          } else {
+            cliInfo('Auto-indexing workflow test command', 'auto-index');
+            cliInfo('Use --demo to run a complete demonstration', 'auto-index');
+            cliInfo(
+              'Use --create <title> to create a test record',
+              'auto-index'
+            );
+            cliInfo('Use --update <id> to update a record', 'auto-index');
+            cliInfo('Use --list to list all records', 'auto-index');
+          }
+
+          await civicPress.shutdown();
         }
-
-        await civicPress.shutdown();
-      } catch (error) {
-        cliError(
-          'Auto-index command failed',
-          'AUTO_INDEX_FAILED',
-          {
-            error: error instanceof Error ? error.message : String(error),
-          },
-          'auto-index'
-        );
-        process.exit(1);
-      } finally {
-        endOperation();
-      }
-    });
+      )
+    );
 };
 
 async function runAutoIndexingDemo(
   civicPress: CivicPress,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   options: any,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   globalOpts: any,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   logger: any
 ) {
   if (!globalOpts.silent) {
@@ -163,7 +144,6 @@ async function runAutoIndexingDemo(
 
     // Check if our updated record is in the index
     const demoRecordInIndex = index.entries.find(
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (entry: any) => entry.title === 'Updated Demo Bylaw for Auto-Indexing'
     );
 
@@ -196,11 +176,8 @@ async function runAutoIndexingDemo(
 async function createTestRecord(
   civicPress: CivicPress,
   title: string,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   options: any,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   globalOpts: any,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   logger: any
 ) {
   // TODO: Fix AuthUser type compatibility
@@ -215,11 +192,8 @@ async function createTestRecord(
 async function updateTestRecord(
   civicPress: CivicPress,
   recordId: string,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   options: any,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   globalOpts: any,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   logger: any
 ) {
   // TODO: Fix AuthUser type compatibility
@@ -233,11 +207,8 @@ async function updateTestRecord(
 
 async function listRecords(
   civicPress: CivicPress,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   options: any,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   globalOpts: any,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   logger: any
 ) {
   // Explicitly the complete set: this prints one line per record and reports

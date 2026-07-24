@@ -30,8 +30,9 @@ const fetchOrgInfo = async () => {
   if (!organizationInfo.value) {
     try {
       const response = (await $civicApi('/api/v1/info')) as ApiResponse;
-      if (response?.success && response.organization) {
-        organizationInfo.value = response.organization;
+      // /info now returns the canonical envelope: fields under `data`.
+      if (response?.success && response.data?.organization) {
+        organizationInfo.value = response.data.organization;
       }
     } catch (err) {
       console.error('Error fetching organization info for logo:', err);

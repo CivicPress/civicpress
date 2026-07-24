@@ -1,3 +1,4 @@
+import { resolveSystemDataDir } from '@civicpress/core';
 /**
  * Storage Module Service Registration
  *
@@ -7,7 +8,6 @@
  * @module storage-services
  */
 
-import path from 'path';
 import type { ServiceContainer, CivicPressConfig } from '@civicpress/core';
 import type { UnifiedCacheManager } from '@civicpress/core';
 import type { DatabaseService } from '@civicpress/core';
@@ -44,10 +44,7 @@ export function registerStorageServices(
   config: CivicPressConfig
 ): void {
   // Determine system data directory
-  const projectRoot = path.isAbsolute(config.dataDir)
-    ? path.dirname(config.dataDir)
-    : path.resolve(process.cwd(), path.dirname(config.dataDir));
-  const systemDataDir = path.join(projectRoot, '.system-data');
+  const systemDataDir = resolveSystemDataDir(config);
 
   // Register StorageConfigManager as singleton (stateless, no initialization needed)
   container.singleton('storageConfigManager', () => {

@@ -42,9 +42,13 @@ router.post('/test', async (req, res) => {
     const { to, subject, message, provider } = req.body || {};
 
     if (!to) {
-      return res
-        .status(400)
-        .json({ success: false, error: 'Recipient email (to) is required' });
+      return res.status(400).json({
+        success: false,
+        error: {
+          message: 'Recipient email (to) is required',
+          code: 'VALIDATION_ERROR',
+        },
+      });
     }
 
     // Load notifications config
@@ -53,7 +57,10 @@ router.post('/test', async (req, res) => {
     if (!emailConfig || !emailConfig.enabled) {
       return res.status(400).json({
         success: false,
-        error: 'Email channel is not enabled in configuration',
+        error: {
+          message: 'Email channel is not enabled in configuration',
+          code: 'EMAIL_CHANNEL_DISABLED',
+        },
       });
     }
 
@@ -168,7 +175,10 @@ router.post('/test', async (req, res) => {
     // (SMTP errors carry hosts, credential hints, and config paths).
     return res.status(500).json({
       success: false,
-      error: 'Failed to send test email',
+      error: {
+        message: 'Failed to send test email',
+        code: 'NOTIFICATION_SEND_FAILED',
+      },
     });
   }
 });

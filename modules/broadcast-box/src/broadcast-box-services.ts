@@ -1,3 +1,4 @@
+import { resolveSystemDataDir } from '@civicpress/core';
 /**
  * Broadcast Box Module Service Registration
  *
@@ -418,10 +419,7 @@ export async function registerBroadcastBoxServices(
     const storageService = c.resolve<CloudUuidStorageService>('storage');
 
     // Determine system data directory
-    const projectRoot = path.isAbsolute(config.dataDir)
-      ? path.dirname(config.dataDir)
-      : path.resolve(process.cwd(), path.dirname(config.dataDir));
-    const systemDataDir = path.join(projectRoot, '.system-data');
+    const systemDataDir = resolveSystemDataDir(config);
 
     // Hooks drive upload→record linking; may not be registered yet — optional.
     let hookSystem: HookSystem | undefined;
@@ -476,7 +474,10 @@ export async function registerBroadcastBoxServices(
         });
       });
       // Expose the running instance so the host can stop it on shutdown.
-      container.registerInstance('broadcastBoxRedactionWorker', redactionWorker);
+      container.registerInstance(
+        'broadcastBoxRedactionWorker',
+        redactionWorker
+      );
       logger.info('Redaction worker registered and started', {
         operation: 'broadcast-box:redaction:registered',
         pollIntervalMs,

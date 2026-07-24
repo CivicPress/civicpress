@@ -5,6 +5,7 @@ import {
   runSimpleColumnMigrations,
   ensureWorkflowStateColumn,
   listAppliedMigrations,
+  COLUMN_MIGRATION_IDS,
   type DDLExecutor,
 } from '../../core/src/database/schema/migrations';
 import * as fs from 'fs';
@@ -66,19 +67,29 @@ describe('Schema migration ledger', () => {
     }
   });
 
-  it('distinguishes a migration it EXECUTED from one whose shape it inherited', async () => {
+  // The drift guard. schema/tables.ts and schema/migrations.ts describe the
+  // same schema by different routes — a new database gets its shape from the
+  // CREATE TABLE, an existing one from the migrations — so if they disagree the
+  // two kinds of database end up with different schemas.
+  //
+  // A brand-new database should therefore never have to RUN a column
+  // migration: everything is already declared, so every one of them reports
+  // 'adopted'. An 'applied' here means a column was added to the migration list
+  // without being added to the DDL, which is exactly how
+  // `records.linked_geography_files` sat mismatched for ten months.
+  it('runs NO column migration on a fresh database — DDL and migrations agree', async () => {
     const ledger = await listAppliedMigrations(exec);
-    const outcome = (id: string) => ledger.find((r) => r.id === id)?.outcome;
 
-    // The records DDL already declares geography/attached_files/linked_records,
-    // so a fresh database inherits those...
-    expect(outcome('records.geography')).toBe('adopted');
-    expect(outcome('records.attached_files')).toBe('adopted');
+    const executed = COLUMN_MIGRATION_IDS.filter(
+      (id) => ledger.find((row) => row.id === id)?.outcome === 'applied'
+    );
 
-    // ...but NOT linked_geography_files, which is genuinely added by ALTER.
-    // The split is what stops a pre-existing deployment from looking, on its
-    // first run after the ledger landed, exactly like a fresh one.
-    expect(outcome('records.linked_geography_files')).toBe('applied');
+    expect(executed).toEqual([]);
+    // And every one of them is actually accounted for, so the check above
+    // cannot pass by silently matching nothing.
+    for (const id of COLUMN_MIGRATION_IDS) {
+      expect(ledger.find((row) => row.id === id)?.outcome).toBe('adopted');
+    }
   });
 
   it('is idempotent: re-initializing adds no duplicate rows', async () => {

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- CLI command handlers pass CAC's untyped options through withCli. */
 import { CAC } from 'cac';
 import chalk from 'chalk';
 import {
@@ -9,16 +10,8 @@ import * as fs from 'fs';
 import * as path from 'path';
 import inquirer from 'inquirer';
 import * as yaml from 'yaml';
-import {
-  initializeLogger,
-  getGlobalOptionsFromArgs,
-  initializeCliOutput,
-} from '../utils/global-options.js';
-import {
-  cliSuccess,
-  cliError,
-  cliStartOperation,
-} from '../utils/cli-output.js';
+import { cliSuccess } from '../utils/cli-output.js';
+import { withCli } from '../utils/with-cli.js';
 import { fileURLToPath } from 'url';
 
 // FA-CLI-005: the default record-type / status config blocks were inlined
@@ -125,570 +118,592 @@ export const initCommand = (cli: CAC) => {
       '--demo-data [city]',
       'Load demo data (optional: specify city name)'
     )
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .action(async (options: any) => {
-      const skipPrompts = options.yes || options.noPrompt;
-      // Initialize CLI output with global options
-      const globalOptions = getGlobalOptionsFromArgs();
-      initializeCliOutput(globalOptions);
+    .action(
+      withCli<[any]>(
+        {
+          operation: 'init',
+          errorMessage: 'Failed to initialize repository',
+          errorCode: 'INIT_FAILED',
+          details: (error) => ({
+            error: (error as any)?.message || error,
+            stack: (error as any)?.stack || undefined,
+          }),
+        },
+        async ({ globalOptions, logger }, options: any) => {
+          const skipPrompts = options.yes || options.noPrompt;
 
-      const logger = initializeLogger();
-      const endOperation = cliStartOperation('init');
+          // Check if we should output JSON
+          const shouldOutputJson = globalOptions.json;
 
-      // Check if we should output JSON
-      const shouldOutputJson = globalOptions.json;
-
-      try {
-        // If --help is present, let CAC handle it and exit 0
-        if (options.help) {
-          process.stdout.write('', () => process.exit(0));
-        }
-
-        if (!shouldOutputJson) {
-          logger.info('🚀 Initializing CivicPress repository...');
-        }
-
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        let config: any;
-        let dataDir = 'data';
-
-        if (skipPrompts) {
-          // Use all defaults for prompts
-          config = {
-            version: '1.0.0',
-            name: 'Civic Records',
-            city: 'Richmond',
-            state: 'Quebec',
-            country: 'Canada',
-            timezone: 'America/Montreal',
-            repo_url: null,
-            modules: ['legal-register'],
-            record_types: ['bylaw', 'policy'],
-            record_types_config: INIT_RECORD_TYPES_CONFIG,
-            record_statuses_config: INIT_RECORD_STATUSES_CONFIG,
-            default_role: 'clerk',
-            hooks: { enabled: true },
-            workflows: { enabled: true },
-            audit: { enabled: true },
-            created: new Date().toISOString(),
-          };
-          // Write config to .civicrc
-          const fs = await import('fs/promises');
-          await fs.writeFile('.civicrc', JSON.stringify(config, null, 2));
-          // Create data directory if it doesn't exist
-          const { existsSync, mkdirSync } = await import('fs');
-          if (!existsSync(dataDir)) {
-            mkdirSync(dataDir, { recursive: true });
-          }
-
-          // Handle demo data loading for skipPrompts mode
-          if (options.demoData) {
-            const demoCity =
-              typeof options.demoData === 'string'
-                ? options.demoData
-                : 'richmond-quebec';
-            await loadDemoData(dataDir, demoCity, logger);
-          }
-
-          cliSuccess(
-            {
-              initialized: true,
-              message: 'CivicPress project initialized with defaults.',
-            },
-            'CivicPress project initialized with defaults.',
-            { operation: 'init' }
-          );
-          return;
-        }
-
-        if (options.dataDir) {
-          dataDir = options.dataDir;
-          // Skip interactive prompts when --data-dir is provided
-          // Use default config similar to skipPrompts
-          config = {
-            version: '1.0.0',
-            name: 'Civic Records',
-            city: 'Richmond',
-            state: 'Quebec',
-            country: 'Canada',
-            timezone: 'America/Montreal',
-            repo_url: null,
-            modules: ['legal-register'],
-            record_types: ['bylaw', 'policy'],
-            record_types_config: INIT_RECORD_TYPES_CONFIG,
-            record_statuses_config: INIT_RECORD_STATUSES_CONFIG,
-            default_role: 'clerk',
-            hooks: {
-              enabled: true,
-            },
-            workflows: {
-              enabled: true,
-            },
-            audit: {
-              enabled: true,
-            },
-            database: {
-              type: 'sqlite',
-              sqlite: {
-                file: path.join(process.cwd(), '.system-data/civic.db'),
-              },
-            },
-            storage_path: path.join(process.cwd(), 'storage'),
-          };
-        } else if (options.config) {
-          // Load config from file
-          const configPath = path.resolve(options.config);
-          if (!fs.existsSync(configPath)) {
-            process.stderr.write(
-              chalk.red(`❌ Config file not found: ${configPath}\n`),
-              () => process.exit(1)
-            );
-            return;
-          }
-
-          const configContent = fs.readFileSync(configPath, 'utf8');
-          config = yaml.parse(configContent);
-          logger.info(`📁 Using config from: ${configPath}`);
-
-          // Use data directory from config if specified, otherwise default
-          dataDir = config.dataDir || 'data';
-        } else {
-          // Interactive prompts for data directory
-          const { dataDirPrompt } = await inquirer.prompt([
-            {
-              type: 'input',
-              name: 'dataDirPrompt',
-              message: 'Where should your civic data directory be?',
-              default: 'data',
-              validate: (input: string) => {
-                const trimmed = input.trim();
-                if (trimmed.length === 0) return 'Data directory is required';
-                if (trimmed.includes('..'))
-                  return 'Data directory cannot contain ".."';
-                return true;
-              },
-            },
-          ]);
-          dataDir = dataDirPrompt;
-        }
-
-        // Check if .civicrc already exists (will be handled later)
-        const civicrcPath = path.join(process.cwd(), '.civicrc');
-        const civicrcExists = fs.existsSync(civicrcPath);
-
-        const fullDataDir = path.resolve(dataDir);
-        if (!shouldOutputJson) {
-          logger.info(`📁 Using data directory: ${fullDataDir}`);
-        }
-
-        // Create data directory if it doesn't exist
-        if (!fs.existsSync(fullDataDir)) {
-          fs.mkdirSync(fullDataDir, { recursive: true });
-          if (!shouldOutputJson) {
-            logger.success('📁 Created data directory');
-          }
-        }
-
-        // Ensure .civic directory exists inside data directory
-        const civicDir = path.join(fullDataDir, '.civic');
-        if (!fs.existsSync(civicDir)) {
-          fs.mkdirSync(civicDir, { recursive: true });
-        }
-
-        // Copy default configuration files if they don't exist
-        const __filename = fileURLToPath(import.meta.url);
-        const projectRoot = path.resolve(path.dirname(__filename), '../../../');
-        const defaultsDir = path.join(projectRoot, 'core', 'src', 'defaults');
-
-        // Copy roles.yml
-        const rolesSrc = path.join(defaultsDir, 'roles.yml');
-        const rolesDest = path.join(civicDir, 'roles.yml');
-        if (!fs.existsSync(rolesDest) && fs.existsSync(rolesSrc)) {
-          fs.copyFileSync(rolesSrc, rolesDest);
-          if (!shouldOutputJson) {
-            logger.success('👥 Default roles.yml created');
-          }
-        }
-
-        // Copy workflows.yml
-        const workflowsSrc = path.join(defaultsDir, 'workflows.yml');
-        const workflowsDest = path.join(civicDir, 'workflows.yml');
-        if (!fs.existsSync(workflowsDest) && fs.existsSync(workflowsSrc)) {
-          fs.copyFileSync(workflowsSrc, workflowsDest);
-          if (!shouldOutputJson) {
-            logger.success('⚙️  Default workflows.yml created');
-          }
-        }
-
-        // Copy hooks.yml
-        const hooksSrc = path.join(defaultsDir, 'hooks.yml');
-        const hooksDest = path.join(civicDir, 'hooks.yml');
-        if (!fs.existsSync(hooksDest) && fs.existsSync(hooksSrc)) {
-          fs.copyFileSync(hooksSrc, hooksDest);
-          if (!shouldOutputJson) {
-            logger.success('🔗 Default hooks.yml created');
-          }
-        }
-
-        // Copy org-config.yml
-        const orgConfigSrc = path.join(defaultsDir, 'org-config.yml');
-        const orgConfigDest = path.join(civicDir, 'org-config.yml');
-        if (!fs.existsSync(orgConfigDest) && fs.existsSync(orgConfigSrc)) {
-          fs.copyFileSync(orgConfigSrc, orgConfigDest);
-          if (!shouldOutputJson) {
-            logger.success('🏢 Default org-config.yml created');
-          }
-        }
-
-        // Copy config.yml (contains record_types_config and record_statuses_config)
-        const configSrc = path.join(defaultsDir, 'config.yml');
-        const configDest = path.join(civicDir, 'config.yml');
-        if (!fs.existsSync(configDest) && fs.existsSync(configSrc)) {
-          fs.copyFileSync(configSrc, configDest);
-          if (!shouldOutputJson) {
-            logger.success('📋 Default config.yml created');
-          }
-        }
-
-        // Copy analytics.yml
-        const analyticsSrc = path.join(defaultsDir, 'analytics.yml');
-        const analyticsDest = path.join(civicDir, 'analytics.yml');
-        if (!fs.existsSync(analyticsDest) && fs.existsSync(analyticsSrc)) {
-          fs.copyFileSync(analyticsSrc, analyticsDest);
-          if (!shouldOutputJson) {
-            logger.success('📊 Default analytics.yml created');
-          }
-        }
-
-        // Copy geography-presets.yml
-        const geographyPresetsSrc = path.join(
-          defaultsDir,
-          'geography-presets.yml'
-        );
-        const geographyPresetsDest = path.join(
-          civicDir,
-          'geography-presets.yml'
-        );
-        if (
-          !fs.existsSync(geographyPresetsDest) &&
-          fs.existsSync(geographyPresetsSrc)
-        ) {
-          fs.copyFileSync(geographyPresetsSrc, geographyPresetsDest);
-          if (!shouldOutputJson) {
-            logger.success('🗺️  Default geography-presets.yml created');
-          }
-        }
-
-        // Copy default templates
-        const templatesSrc = path.join(defaultsDir, 'templates');
-        const templatesDest = path.join(civicDir, 'templates');
-        if (!fs.existsSync(templatesDest) && fs.existsSync(templatesSrc)) {
-          // Copy templates directory recursively
-          const copyRecursive = (src: string, dest: string) => {
-            if (fs.statSync(src).isDirectory()) {
-              if (!fs.existsSync(dest)) {
-                fs.mkdirSync(dest, { recursive: true });
-              }
-              const files = fs.readdirSync(src);
-              files.forEach((file) => {
-                const srcPath = path.join(src, file);
-                const destPath = path.join(dest, file);
-                copyRecursive(srcPath, destPath);
-              });
-            } else {
-              fs.copyFileSync(src, dest);
-            }
-          };
-
-          copyRecursive(templatesSrc, templatesDest);
-          if (!shouldOutputJson) {
-            logger.success('📄 Default templates created');
-          }
-        }
-
-        // Check if Git repo exists in data directory
-        const gitExists = fs.existsSync(path.join(fullDataDir, '.git'));
-        let initGit = false;
-
-        if (!gitExists) {
-          initGit = true;
-
-          if (!options.config && !options.dataDir) {
-            // Interactive prompt for git initialization
-            const { initGitPrompt } = await inquirer.prompt([
-              {
-                type: 'confirm',
-                name: 'initGitPrompt',
-                message: `No Git repository found in ${dataDir}. Initialize a new Git repo here?`,
-                default: true,
-              },
-            ]);
-            initGit = initGitPrompt;
-          }
-
-          if (initGit) {
-            // Initialize Git repository in data directory
-            const { GitEngine } = await import('@civicpress/core');
-            const git = new GitEngine(fullDataDir);
-            await git.init();
-            if (!shouldOutputJson) {
-              logger.success('📦 Initialized Git repository');
-            }
-          }
-        }
-
-        // Create .system-data directory in project root (for system data)
-        const systemDataDir = path.join(process.cwd(), '.system-data');
-        if (!fs.existsSync(systemDataDir)) {
-          fs.mkdirSync(systemDataDir, { recursive: true });
-          if (!shouldOutputJson) {
-            logger.success('📁 Created .system-data directory');
-          }
-        }
-
-        if (civicrcExists && !options.config && !options.dataDir) {
-          const { overwrite } = await inquirer.prompt([
-            {
-              type: 'confirm',
-              name: 'overwrite',
-              message: '.civicrc file already exists. Overwrite it?',
-              default: false,
-            },
-          ]);
-
-          if (!overwrite) {
-            logger.warn('⏭️  Skipping .civicrc setup');
-          } else {
-            const storagePath = await setupCivicrc(
-              civicrcPath,
-              dataDir,
-              logger
-            );
-            // Update config with storage path for setupStorage
-            if (storagePath) {
-              config = { ...config, storage_path: storagePath };
-            }
-          }
-        } else if (!civicrcExists || options.config || options.dataDir) {
-          if (options.config) {
-            // Use the provided config file
-            await setupCivicrcFromFile(civicrcPath, config, dataDir, logger);
-          } else if (options.dataDir) {
-            // Use non-interactive setup when --data-dir is provided
-            await setupCivicrcNonInteractive(civicrcPath, dataDir, logger);
-          } else {
-            const storagePath = await setupCivicrc(
-              civicrcPath,
-              dataDir,
-              logger
-            );
-            // Update config with storage path for setupStorage
-            if (storagePath) {
-              config = { ...config, storage_path: storagePath };
-            }
-          }
-        }
-
-        // Initialize CivicPress core with data directory
-        const civic = new CivicPress({ dataDir: fullDataDir });
-        await civic.initialize();
-        if (!shouldOutputJson) {
-          logger.success('🔧 Initialized CivicPress core');
-        }
-
-        // Setup notifications configuration
-        await setupNotifications(
-          systemDataDir,
-          logger,
-          shouldOutputJson || false
-        );
-
-        // Setup storage configuration
-        await setupStorage(
-          systemDataDir,
-          logger,
-          shouldOutputJson || false,
-          config?.storage_path
-        );
-
-        // Create admin user if not already specified
-        if (!skipPrompts && !options.config && !options.dataDir) {
-          const { createAdmin } = await inquirer.prompt([
-            {
-              type: 'confirm',
-              name: 'createAdmin',
-              message: 'Would you like to create an admin user now?',
-              default: true,
-            },
-          ]);
-
-          if (createAdmin) {
-            const adminDetails = await inquirer.prompt([
-              {
-                type: 'input',
-                name: 'username',
-                message: 'Admin username:',
-                default: 'admin',
-                validate: (input: string) => {
-                  if (!input.trim()) return 'Username is required';
-                  if (input.length < 3)
-                    return 'Username must be at least 3 characters';
-                  return true;
-                },
-              },
-              {
-                type: 'input',
-                name: 'email',
-                message: 'Admin email:',
-                validate: (input: string) => {
-                  if (!input.trim()) return 'Email is required';
-                  if (!input.includes('@')) return 'Please enter a valid email';
-                  return true;
-                },
-              },
-              {
-                type: 'password',
-                name: 'password',
-                message: 'Admin password:',
-                validate: (input: string) => {
-                  if (input.length < 6)
-                    return 'Password must be at least 6 characters';
-                  return true;
-                },
-              },
-              {
-                type: 'input',
-                name: 'name',
-                message: 'Admin full name:',
-                default: 'System Administrator',
-              },
-            ]);
-
-            try {
-              const authService = civic.getAuthService();
-
-              // Enforce the password policy on the bootstrap admin — the
-              // inline min-6 prompt check above is weaker than the policy
-              // (default: 8 + upper/lower/number/special).
-              const policy = authService.validatePasswordPolicy(
-                adminDetails.password
-              );
-              if (!policy.valid) {
-                logger.error(
-                  `Admin password does not meet requirements: ${policy.errors.join('; ')}`
-                );
-                process.exit(1);
-              }
-
-              // Hash the password
-              const bcrypt = await import('bcrypt');
-              const passwordHash = await bcrypt.hash(adminDetails.password, 12);
-
-              await authService.createUserWithPassword({
-                username: adminDetails.username,
-                email: adminDetails.email,
-                passwordHash: passwordHash,
-                name: adminDetails.name,
-                role: 'admin',
-              });
-
-              if (!shouldOutputJson) {
-                logger.success(
-                  `👤 Created admin user: ${adminDetails.username}`
-                );
-                logger.info(`📧 Email: ${adminDetails.email}`);
-                logger.info(`🔑 Role: admin`);
-              }
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            } catch (error: any) {
-              logger.warn(`⚠️  Failed to create admin user: ${error.message}`);
-              logger.info(
-                '💡 You can create an admin user later with: civic users create'
-              );
-            }
-          }
-        }
-
-        // Ask about demo data if not already specified (now at the end)
-        let loadDemoDataFlag = options.demoData;
-        if (
-          !loadDemoDataFlag &&
-          !skipPrompts &&
-          !options.config &&
-          !options.dataDir
-        ) {
-          const { loadDemo } = await inquirer.prompt([
-            {
-              type: 'confirm',
-              name: 'loadDemo',
-              message: 'Would you like to load demo data to get started?',
-              default: true,
-            },
-          ]);
-
-          if (loadDemo) {
-            const { demoCity } = await inquirer.prompt([
-              {
-                type: 'list',
-                name: 'demoCity',
-                message: 'Which demo city would you like to load?',
-                choices: [
-                  {
-                    name: 'Richmond, QC, Canada - Francais',
-                    value: 'richmond-quebec',
-                  },
-                  {
-                    name: 'Springfield, VA, USA - English',
-                    value: 'springfield-usa',
-                  },
-                  // Future: Add more cities here
-                ],
-                default: 'richmond-quebec',
-              },
-            ]);
-            loadDemoDataFlag = demoCity;
-          }
-        }
-
-        // Load demo data if requested
-        if (loadDemoDataFlag) {
-          const demoCity =
-            typeof loadDemoDataFlag === 'string'
-              ? loadDemoDataFlag
-              : 'richmond-quebec';
-          await loadDemoData(fullDataDir, demoCity, logger);
-        }
-
-        // Always run indexing and db sync after init (whether or not demo data was loaded)
-        try {
-          if (!shouldOutputJson) logger.info('🔄 Indexing records...');
-          const civic = new CivicPress({ dataDir: fullDataDir });
-          await civic.initialize();
-          const indexingService = civic.getIndexingService();
-          await indexingService.generateIndexes();
-          if (!shouldOutputJson) logger.success('📊 Indexing complete');
-
-          if (!shouldOutputJson)
-            logger.info('🔄 Syncing indexed records to database...');
-          await indexingService.generateIndexes({ syncDatabase: true });
-          if (!shouldOutputJson) logger.success('🗄️  Database sync complete');
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        } catch (err: any) {
-          logger.warn(
-            '⚠️  Indexing or DB sync failed: ' +
-              (err && err.message ? err.message : err)
-          );
-        }
-
-        // Commit all files to Git if repository was initialized
-        if (initGit || gitExists) {
           try {
-            const { GitEngine } = await import('@civicpress/core');
-            const git = new GitEngine(fullDataDir);
-            await git.initialize();
+            // If --help is present, let CAC handle it and exit 0
+            if (options.help) {
+              process.stdout.write('', () => process.exit(0));
+            }
 
-            // Create initial commit with all files
-            const commitMessage = `Initial CivicPress setup
+            if (!shouldOutputJson) {
+              logger.info('🚀 Initializing CivicPress repository...');
+            }
+
+            let config: any;
+            let dataDir = 'data';
+
+            if (skipPrompts) {
+              // Use all defaults for prompts
+              config = {
+                version: '1.0.0',
+                name: 'Civic Records',
+                city: 'Richmond',
+                state: 'Quebec',
+                country: 'Canada',
+                timezone: 'America/Montreal',
+                repo_url: null,
+                modules: ['legal-register'],
+                record_types: ['bylaw', 'policy'],
+                record_types_config: INIT_RECORD_TYPES_CONFIG,
+                record_statuses_config: INIT_RECORD_STATUSES_CONFIG,
+                default_role: 'clerk',
+                hooks: { enabled: true },
+                workflows: { enabled: true },
+                audit: { enabled: true },
+                created: new Date().toISOString(),
+              };
+              // Write config to .civicrc
+              const fs = await import('fs/promises');
+              await fs.writeFile('.civicrc', JSON.stringify(config, null, 2));
+              // Create data directory if it doesn't exist
+              const { existsSync, mkdirSync } = await import('fs');
+              if (!existsSync(dataDir)) {
+                mkdirSync(dataDir, { recursive: true });
+              }
+
+              // Handle demo data loading for skipPrompts mode
+              if (options.demoData) {
+                const demoCity =
+                  typeof options.demoData === 'string'
+                    ? options.demoData
+                    : 'richmond-quebec';
+                await loadDemoData(dataDir, demoCity, logger);
+              }
+
+              cliSuccess(
+                {
+                  initialized: true,
+                  message: 'CivicPress project initialized with defaults.',
+                },
+                'CivicPress project initialized with defaults.',
+                { operation: 'init' }
+              );
+              return;
+            }
+
+            if (options.dataDir) {
+              dataDir = options.dataDir;
+              // Skip interactive prompts when --data-dir is provided
+              // Use default config similar to skipPrompts
+              config = {
+                version: '1.0.0',
+                name: 'Civic Records',
+                city: 'Richmond',
+                state: 'Quebec',
+                country: 'Canada',
+                timezone: 'America/Montreal',
+                repo_url: null,
+                modules: ['legal-register'],
+                record_types: ['bylaw', 'policy'],
+                record_types_config: INIT_RECORD_TYPES_CONFIG,
+                record_statuses_config: INIT_RECORD_STATUSES_CONFIG,
+                default_role: 'clerk',
+                hooks: {
+                  enabled: true,
+                },
+                workflows: {
+                  enabled: true,
+                },
+                audit: {
+                  enabled: true,
+                },
+                database: {
+                  type: 'sqlite',
+                  sqlite: {
+                    file: path.join(process.cwd(), '.system-data/civic.db'),
+                  },
+                },
+                storage_path: path.join(process.cwd(), 'storage'),
+              };
+            } else if (options.config) {
+              // Load config from file
+              const configPath = path.resolve(options.config);
+              if (!fs.existsSync(configPath)) {
+                process.stderr.write(
+                  chalk.red(`❌ Config file not found: ${configPath}\n`),
+                  () => process.exit(1)
+                );
+                return;
+              }
+
+              const configContent = fs.readFileSync(configPath, 'utf8');
+              config = yaml.parse(configContent);
+              logger.info(`📁 Using config from: ${configPath}`);
+
+              // Use data directory from config if specified, otherwise default
+              dataDir = config.dataDir || 'data';
+            } else {
+              // Interactive prompts for data directory
+              const { dataDirPrompt } = await inquirer.prompt([
+                {
+                  type: 'input',
+                  name: 'dataDirPrompt',
+                  message: 'Where should your civic data directory be?',
+                  default: 'data',
+                  validate: (input: string) => {
+                    const trimmed = input.trim();
+                    if (trimmed.length === 0)
+                      return 'Data directory is required';
+                    if (trimmed.includes('..'))
+                      return 'Data directory cannot contain ".."';
+                    return true;
+                  },
+                },
+              ]);
+              dataDir = dataDirPrompt;
+            }
+
+            // Check if .civicrc already exists (will be handled later)
+            const civicrcPath = path.join(process.cwd(), '.civicrc');
+            const civicrcExists = fs.existsSync(civicrcPath);
+
+            const fullDataDir = path.resolve(dataDir);
+            if (!shouldOutputJson) {
+              logger.info(`📁 Using data directory: ${fullDataDir}`);
+            }
+
+            // Create data directory if it doesn't exist
+            if (!fs.existsSync(fullDataDir)) {
+              fs.mkdirSync(fullDataDir, { recursive: true });
+              if (!shouldOutputJson) {
+                logger.success('📁 Created data directory');
+              }
+            }
+
+            // Ensure .civic directory exists inside data directory
+            const civicDir = path.join(fullDataDir, '.civic');
+            if (!fs.existsSync(civicDir)) {
+              fs.mkdirSync(civicDir, { recursive: true });
+            }
+
+            // Copy default configuration files if they don't exist
+            const __filename = fileURLToPath(import.meta.url);
+            const projectRoot = path.resolve(
+              path.dirname(__filename),
+              '../../../'
+            );
+            const defaultsDir = path.join(
+              projectRoot,
+              'core',
+              'src',
+              'defaults'
+            );
+
+            // Copy roles.yml
+            const rolesSrc = path.join(defaultsDir, 'roles.yml');
+            const rolesDest = path.join(civicDir, 'roles.yml');
+            if (!fs.existsSync(rolesDest) && fs.existsSync(rolesSrc)) {
+              fs.copyFileSync(rolesSrc, rolesDest);
+              if (!shouldOutputJson) {
+                logger.success('👥 Default roles.yml created');
+              }
+            }
+
+            // Copy workflows.yml
+            const workflowsSrc = path.join(defaultsDir, 'workflows.yml');
+            const workflowsDest = path.join(civicDir, 'workflows.yml');
+            if (!fs.existsSync(workflowsDest) && fs.existsSync(workflowsSrc)) {
+              fs.copyFileSync(workflowsSrc, workflowsDest);
+              if (!shouldOutputJson) {
+                logger.success('⚙️  Default workflows.yml created');
+              }
+            }
+
+            // Copy hooks.yml
+            const hooksSrc = path.join(defaultsDir, 'hooks.yml');
+            const hooksDest = path.join(civicDir, 'hooks.yml');
+            if (!fs.existsSync(hooksDest) && fs.existsSync(hooksSrc)) {
+              fs.copyFileSync(hooksSrc, hooksDest);
+              if (!shouldOutputJson) {
+                logger.success('🔗 Default hooks.yml created');
+              }
+            }
+
+            // Copy org-config.yml
+            const orgConfigSrc = path.join(defaultsDir, 'org-config.yml');
+            const orgConfigDest = path.join(civicDir, 'org-config.yml');
+            if (!fs.existsSync(orgConfigDest) && fs.existsSync(orgConfigSrc)) {
+              fs.copyFileSync(orgConfigSrc, orgConfigDest);
+              if (!shouldOutputJson) {
+                logger.success('🏢 Default org-config.yml created');
+              }
+            }
+
+            // Copy config.yml (contains record_types_config and record_statuses_config)
+            const configSrc = path.join(defaultsDir, 'config.yml');
+            const configDest = path.join(civicDir, 'config.yml');
+            if (!fs.existsSync(configDest) && fs.existsSync(configSrc)) {
+              fs.copyFileSync(configSrc, configDest);
+              if (!shouldOutputJson) {
+                logger.success('📋 Default config.yml created');
+              }
+            }
+
+            // Copy analytics.yml
+            const analyticsSrc = path.join(defaultsDir, 'analytics.yml');
+            const analyticsDest = path.join(civicDir, 'analytics.yml');
+            if (!fs.existsSync(analyticsDest) && fs.existsSync(analyticsSrc)) {
+              fs.copyFileSync(analyticsSrc, analyticsDest);
+              if (!shouldOutputJson) {
+                logger.success('📊 Default analytics.yml created');
+              }
+            }
+
+            // Copy geography-presets.yml
+            const geographyPresetsSrc = path.join(
+              defaultsDir,
+              'geography-presets.yml'
+            );
+            const geographyPresetsDest = path.join(
+              civicDir,
+              'geography-presets.yml'
+            );
+            if (
+              !fs.existsSync(geographyPresetsDest) &&
+              fs.existsSync(geographyPresetsSrc)
+            ) {
+              fs.copyFileSync(geographyPresetsSrc, geographyPresetsDest);
+              if (!shouldOutputJson) {
+                logger.success('🗺️  Default geography-presets.yml created');
+              }
+            }
+
+            // Copy default templates
+            const templatesSrc = path.join(defaultsDir, 'templates');
+            const templatesDest = path.join(civicDir, 'templates');
+            if (!fs.existsSync(templatesDest) && fs.existsSync(templatesSrc)) {
+              // Copy templates directory recursively
+              const copyRecursive = (src: string, dest: string) => {
+                if (fs.statSync(src).isDirectory()) {
+                  if (!fs.existsSync(dest)) {
+                    fs.mkdirSync(dest, { recursive: true });
+                  }
+                  const files = fs.readdirSync(src);
+                  files.forEach((file) => {
+                    const srcPath = path.join(src, file);
+                    const destPath = path.join(dest, file);
+                    copyRecursive(srcPath, destPath);
+                  });
+                } else {
+                  fs.copyFileSync(src, dest);
+                }
+              };
+
+              copyRecursive(templatesSrc, templatesDest);
+              if (!shouldOutputJson) {
+                logger.success('📄 Default templates created');
+              }
+            }
+
+            // Check if Git repo exists in data directory
+            const gitExists = fs.existsSync(path.join(fullDataDir, '.git'));
+            let initGit = false;
+
+            if (!gitExists) {
+              initGit = true;
+
+              if (!options.config && !options.dataDir) {
+                // Interactive prompt for git initialization
+                const { initGitPrompt } = await inquirer.prompt([
+                  {
+                    type: 'confirm',
+                    name: 'initGitPrompt',
+                    message: `No Git repository found in ${dataDir}. Initialize a new Git repo here?`,
+                    default: true,
+                  },
+                ]);
+                initGit = initGitPrompt;
+              }
+
+              if (initGit) {
+                // Initialize Git repository in data directory
+                const { GitEngine } = await import('@civicpress/core');
+                const git = new GitEngine(fullDataDir);
+                await git.init();
+                if (!shouldOutputJson) {
+                  logger.success('📦 Initialized Git repository');
+                }
+              }
+            }
+
+            // Create .system-data directory in project root (for system data)
+            const systemDataDir = path.join(process.cwd(), '.system-data');
+            if (!fs.existsSync(systemDataDir)) {
+              fs.mkdirSync(systemDataDir, { recursive: true });
+              if (!shouldOutputJson) {
+                logger.success('📁 Created .system-data directory');
+              }
+            }
+
+            if (civicrcExists && !options.config && !options.dataDir) {
+              const { overwrite } = await inquirer.prompt([
+                {
+                  type: 'confirm',
+                  name: 'overwrite',
+                  message: '.civicrc file already exists. Overwrite it?',
+                  default: false,
+                },
+              ]);
+
+              if (!overwrite) {
+                logger.warn('⏭️  Skipping .civicrc setup');
+              } else {
+                const storagePath = await setupCivicrc(
+                  civicrcPath,
+                  dataDir,
+                  logger
+                );
+                // Update config with storage path for setupStorage
+                if (storagePath) {
+                  config = { ...config, storage_path: storagePath };
+                }
+              }
+            } else if (!civicrcExists || options.config || options.dataDir) {
+              if (options.config) {
+                // Use the provided config file
+                await setupCivicrcFromFile(
+                  civicrcPath,
+                  config,
+                  dataDir,
+                  logger
+                );
+              } else if (options.dataDir) {
+                // Use non-interactive setup when --data-dir is provided
+                await setupCivicrcNonInteractive(civicrcPath, dataDir, logger);
+              } else {
+                const storagePath = await setupCivicrc(
+                  civicrcPath,
+                  dataDir,
+                  logger
+                );
+                // Update config with storage path for setupStorage
+                if (storagePath) {
+                  config = { ...config, storage_path: storagePath };
+                }
+              }
+            }
+
+            // Initialize CivicPress core with data directory
+            const civic = new CivicPress({ dataDir: fullDataDir });
+            await civic.initialize();
+            if (!shouldOutputJson) {
+              logger.success('🔧 Initialized CivicPress core');
+            }
+
+            // Setup notifications configuration
+            await setupNotifications(
+              systemDataDir,
+              logger,
+              shouldOutputJson || false
+            );
+
+            // Setup storage configuration
+            await setupStorage(
+              systemDataDir,
+              logger,
+              shouldOutputJson || false,
+              config?.storage_path
+            );
+
+            // Create admin user if not already specified
+            if (!skipPrompts && !options.config && !options.dataDir) {
+              const { createAdmin } = await inquirer.prompt([
+                {
+                  type: 'confirm',
+                  name: 'createAdmin',
+                  message: 'Would you like to create an admin user now?',
+                  default: true,
+                },
+              ]);
+
+              if (createAdmin) {
+                const adminDetails = await inquirer.prompt([
+                  {
+                    type: 'input',
+                    name: 'username',
+                    message: 'Admin username:',
+                    default: 'admin',
+                    validate: (input: string) => {
+                      if (!input.trim()) return 'Username is required';
+                      if (input.length < 3)
+                        return 'Username must be at least 3 characters';
+                      return true;
+                    },
+                  },
+                  {
+                    type: 'input',
+                    name: 'email',
+                    message: 'Admin email:',
+                    validate: (input: string) => {
+                      if (!input.trim()) return 'Email is required';
+                      if (!input.includes('@'))
+                        return 'Please enter a valid email';
+                      return true;
+                    },
+                  },
+                  {
+                    type: 'password',
+                    name: 'password',
+                    message: 'Admin password:',
+                    validate: (input: string) => {
+                      if (input.length < 6)
+                        return 'Password must be at least 6 characters';
+                      return true;
+                    },
+                  },
+                  {
+                    type: 'input',
+                    name: 'name',
+                    message: 'Admin full name:',
+                    default: 'System Administrator',
+                  },
+                ]);
+
+                try {
+                  const authService = civic.getAuthService();
+
+                  // Enforce the password policy on the bootstrap admin — the
+                  // inline min-6 prompt check above is weaker than the policy
+                  // (default: 8 + upper/lower/number/special).
+                  const policy = authService.validatePasswordPolicy(
+                    adminDetails.password
+                  );
+                  if (!policy.valid) {
+                    logger.error(
+                      `Admin password does not meet requirements: ${policy.errors.join('; ')}`
+                    );
+                    process.exit(1);
+                  }
+
+                  // Hash the password
+                  const bcrypt = await import('bcrypt');
+                  const passwordHash = await bcrypt.hash(
+                    adminDetails.password,
+                    12
+                  );
+
+                  await authService.createUserWithPassword({
+                    username: adminDetails.username,
+                    email: adminDetails.email,
+                    passwordHash: passwordHash,
+                    name: adminDetails.name,
+                    role: 'admin',
+                  });
+
+                  if (!shouldOutputJson) {
+                    logger.success(
+                      `👤 Created admin user: ${adminDetails.username}`
+                    );
+                    logger.info(`📧 Email: ${adminDetails.email}`);
+                    logger.info(`🔑 Role: admin`);
+                  }
+                } catch (error: any) {
+                  logger.warn(
+                    `⚠️  Failed to create admin user: ${error.message}`
+                  );
+                  logger.info(
+                    '💡 You can create an admin user later with: civic users create'
+                  );
+                }
+              }
+            }
+
+            // Ask about demo data if not already specified (now at the end)
+            let loadDemoDataFlag = options.demoData;
+            if (
+              !loadDemoDataFlag &&
+              !skipPrompts &&
+              !options.config &&
+              !options.dataDir
+            ) {
+              const { loadDemo } = await inquirer.prompt([
+                {
+                  type: 'confirm',
+                  name: 'loadDemo',
+                  message: 'Would you like to load demo data to get started?',
+                  default: true,
+                },
+              ]);
+
+              if (loadDemo) {
+                const { demoCity } = await inquirer.prompt([
+                  {
+                    type: 'list',
+                    name: 'demoCity',
+                    message: 'Which demo city would you like to load?',
+                    choices: [
+                      {
+                        name: 'Richmond, QC, Canada - Francais',
+                        value: 'richmond-quebec',
+                      },
+                      {
+                        name: 'Springfield, VA, USA - English',
+                        value: 'springfield-usa',
+                      },
+                      // Future: Add more cities here
+                    ],
+                    default: 'richmond-quebec',
+                  },
+                ]);
+                loadDemoDataFlag = demoCity;
+              }
+            }
+
+            // Load demo data if requested
+            if (loadDemoDataFlag) {
+              const demoCity =
+                typeof loadDemoDataFlag === 'string'
+                  ? loadDemoDataFlag
+                  : 'richmond-quebec';
+              await loadDemoData(fullDataDir, demoCity, logger);
+            }
+
+            // Always run indexing and db sync after init (whether or not demo data was loaded)
+            try {
+              if (!shouldOutputJson) logger.info('🔄 Indexing records...');
+              const civic = new CivicPress({ dataDir: fullDataDir });
+              await civic.initialize();
+              const indexingService = civic.getIndexingService();
+              await indexingService.generateIndexes();
+              if (!shouldOutputJson) logger.success('📊 Indexing complete');
+
+              if (!shouldOutputJson)
+                logger.info('🔄 Syncing indexed records to database...');
+              await indexingService.generateIndexes({ syncDatabase: true });
+              if (!shouldOutputJson)
+                logger.success('🗄️  Database sync complete');
+            } catch (err: any) {
+              logger.warn(
+                '⚠️  Indexing or DB sync failed: ' +
+                  (err && err.message ? err.message : err)
+              );
+            }
+
+            // Commit all files to Git if repository was initialized
+            if (initGit || gitExists) {
+              try {
+                const { GitEngine } = await import('@civicpress/core');
+                const git = new GitEngine(fullDataDir);
+                await git.initialize();
+
+                // Create initial commit with all files
+                const commitMessage = `Initial CivicPress setup
 
 - Created configuration files (.civicrc, org-config.yml)
 - Added default templates and workflows
@@ -698,99 +713,91 @@ export const initCommand = (cli: CAC) => {
 Generated by: civic init
 Date: ${new Date().toISOString()}`;
 
-            await git.commit(commitMessage);
+                await git.commit(commitMessage);
+
+                if (!shouldOutputJson) {
+                  logger.success('📝 Initial commit created');
+                }
+              } catch (commitError: any) {
+                if (!shouldOutputJson) {
+                  logger.warn(
+                    `⚠️  Failed to create initial commit: ${commitError.message}`
+                  );
+                  logger.info(
+                    '💡 You can manually commit files with: git add . && git commit -m "Initial setup"'
+                  );
+                }
+              }
+            }
+
+            const successData = {
+              success: true,
+              message: 'CivicPress repository initialized successfully',
+              data: {
+                dataDir: fullDataDir,
+                systemDataDir: systemDataDir,
+                gitInitialized: initGit || gitExists,
+                configPath: path.join(systemDataDir, 'config.yml'),
+              },
+              nextSteps: [
+                `cd ${dataDir}`,
+                'civic create <type> <title> - Create a new civic record',
+                'civic commit -m "message" -r <role> - Commit changes',
+                'civic history - View record history',
+              ],
+            };
+
+            cliSuccess(
+              successData,
+              'CivicPress repository initialized successfully!',
+              {
+                operation: 'init',
+              }
+            );
 
             if (!shouldOutputJson) {
-              logger.success('📝 Initial commit created');
-            }
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          } catch (commitError: any) {
-            if (!shouldOutputJson) {
-              logger.warn(
-                `⚠️  Failed to create initial commit: ${commitError.message}`
+              logger.success(
+                '✅ CivicPress repository initialized successfully!'
+              );
+              logger.info('📖 Next steps:');
+              logger.info(`   cd ${dataDir}`);
+              logger.info(
+                '   civic create <type> <title> - Create a new civic record'
               );
               logger.info(
-                '💡 You can manually commit files with: git add . && git commit -m "Initial setup"'
+                '   civic commit -m "message" -r <role> - Commit changes'
+              );
+              logger.info('   civic history - View record history');
+              logger.info('');
+              logger.warn(
+                "💡 Don't forget to commit your config and records to version control!"
               );
             }
+            // Explicitly flush stdout before exit (for test environments)
+            process.stdout.write('', () => process.exit(0));
+          } catch (err: any) {
+            // The human-mode detail print stays in the handler (it needs
+            // shouldOutputJson + logger); re-thrown so withCli emits the
+            // INIT_FAILED envelope and exits. cliError's own call moved into the
+            // wrapper via the spec above.
+            if (!shouldOutputJson) {
+              logger.error('❌ Failed to initialize repository:');
+              logger.error(err?.message || err);
+              if (err?.stack) {
+                logger.error(err.stack);
+              }
+            }
+            throw err;
           }
         }
-
-        const successData = {
-          success: true,
-          message: 'CivicPress repository initialized successfully',
-          data: {
-            dataDir: fullDataDir,
-            systemDataDir: systemDataDir,
-            gitInitialized: initGit || gitExists,
-            configPath: path.join(systemDataDir, 'config.yml'),
-          },
-          nextSteps: [
-            `cd ${dataDir}`,
-            'civic create <type> <title> - Create a new civic record',
-            'civic commit -m "message" -r <role> - Commit changes',
-            'civic history - View record history',
-          ],
-        };
-
-        cliSuccess(
-          successData,
-          'CivicPress repository initialized successfully!',
-          {
-            operation: 'init',
-          }
-        );
-
-        if (!shouldOutputJson) {
-          logger.success('✅ CivicPress repository initialized successfully!');
-          logger.info('📖 Next steps:');
-          logger.info(`   cd ${dataDir}`);
-          logger.info(
-            '   civic create <type> <title> - Create a new civic record'
-          );
-          logger.info(
-            '   civic commit -m "message" -r <role> - Commit changes'
-          );
-          logger.info('   civic history - View record history');
-          logger.info('');
-          logger.warn(
-            "💡 Don't forget to commit your config and records to version control!"
-          );
-        }
-        // Explicitly flush stdout before exit (for test environments)
-        process.stdout.write('', () => process.exit(0));
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      } catch (err: any) {
-        cliError(
-          'Failed to initialize repository',
-          'INIT_FAILED',
-          {
-            error: err?.message || err,
-            stack: err?.stack || undefined,
-          },
-          'init'
-        );
-
-        if (!shouldOutputJson) {
-          logger.error('❌ Failed to initialize repository:');
-          logger.error(err?.message || err);
-          if (err?.stack) {
-            logger.error(err.stack);
-          }
-        }
-        process.exit(1);
-      } finally {
-        endOperation();
-      }
-    });
+      )
+    );
 };
 
 async function setupCivicrcFromFile(
   civicrcPath: string,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   config: any,
   dataDir: string,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   logger: any
 ): Promise<void> {
   logger.info('⚙️  Setting up configuration from file...');
@@ -918,7 +925,6 @@ async function setupCivicrcFromFile(
 async function setupCivicrcNonInteractive(
   civicrcPath: string,
   dataDir: string,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   logger: any
 ): Promise<void> {
   logger.info('⚙️  Setting up configuration (non-interactive)...');
@@ -1009,7 +1015,6 @@ async function setupCivicrcNonInteractive(
 async function loadDemoData(
   dataDir: string,
   demoCity: string = 'richmond-quebec',
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   logger: any
 ): Promise<void> {
   try {
@@ -1111,12 +1116,10 @@ async function loadDemoData(
       );
 
       logger.info(`🎯 Triggered hooks for demo data loading`);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (hookError: any) {
       logger.warn(`⚠️  Hook triggering failed: ${hookError.message}`);
       // Don't fail the entire demo data loading if hooks fail
     }
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } catch (error: any) {
     logger.error(`❌ Failed to load demo data: ${error.message}`);
     throw error;
@@ -1126,7 +1129,6 @@ async function loadDemoData(
 async function setupCivicrc(
   civicrcPath: string,
   dataDir: string,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   logger: any
 ): Promise<string | undefined> {
   logger.info('⚙️  Setting up configuration...');
@@ -1200,7 +1202,6 @@ async function setupCivicrc(
       name: 'database_path',
       message: 'SQLite database file path:',
       default: path.join(process.cwd(), '.system-data/civic.db'),
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       when: (answers: any) => answers.database_type === 'sqlite',
     },
     {
@@ -1208,7 +1209,6 @@ async function setupCivicrc(
       name: 'database_url',
       message: 'PostgreSQL connection URL:',
       default: 'postgres://user:password@localhost:5432/civicpress',
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       when: (answers: any) => answers.database_type === 'postgres',
     },
     {
@@ -1346,7 +1346,6 @@ async function setupCivicrc(
 
 async function setupNotifications(
   systemDataDir: string,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   logger: any,
   shouldOutputJson: boolean
 ): Promise<void> {
@@ -1461,7 +1460,6 @@ async function setupNotifications(
         );
       }
     }
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } catch (error: any) {
     if (!shouldOutputJson) {
       logger.warn(`⚠️  Failed to setup notifications: ${error.message}`);
@@ -1474,7 +1472,6 @@ async function setupNotifications(
 
 async function setupStorage(
   systemDataDir: string,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   logger: any,
   shouldOutputJson: boolean,
   storagePath?: string
@@ -1641,7 +1638,6 @@ async function setupStorage(
         logger.info('💡 Test with: civic storage:list');
       }
     }
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } catch (error: any) {
     if (!shouldOutputJson) {
       logger.warn(`⚠️  Failed to setup storage: ${error.message}`);

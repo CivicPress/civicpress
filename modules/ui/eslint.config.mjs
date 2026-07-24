@@ -95,7 +95,9 @@ export default withNuxt(
       ...STYLE_RULES_TIER_A,
       ...STYLE_RULES_TIER_B,
       ...STYLE_RULES_TIER_D_OFF,
-      '@typescript-eslint/no-explicit-any': 'warn',
+      // Test files use `any` freely for mocks/fixtures, and several source types are
+      // `Record<string, any>` themselves, so flagging it in tests is pure noise.
+      '@typescript-eslint/no-explicit-any': 'off',
     },
   },
 );

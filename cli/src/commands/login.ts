@@ -1,21 +1,13 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- CLI command handlers pass CAC's untyped options through withCli. */
 import { CAC } from 'cac';
 import { CivicPress } from '@civicpress/core';
 import * as fs from 'fs';
 import inquirer from 'inquirer';
 import { AuthUtils } from '../utils/auth-utils.js';
-import {
-  getGlobalOptionsFromArgs,
-  initializeCliOutput,
-} from '../utils/global-options.js';
-import {
-  cliSuccess,
-  cliError,
-  cliWarn,
-  cliStartOperation,
-} from '../utils/cli-output.js';
+import { cliSuccess, cliError, cliWarn } from '../utils/cli-output.js';
+import { withCli } from '../utils/with-cli.js';
 
 // Node.js globals
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 declare const process: any;
 
 export const loginCommand = (cli: CAC) => {
@@ -29,75 +21,66 @@ export const loginCommand = (cli: CAC) => {
     })
     .option('--logout', 'Log out and clear current session')
     .option('--status', 'Show current authentication status')
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .action(async (options: any) => {
-      // Initialize CLI output with global options
-      const globalOptions = getGlobalOptionsFromArgs();
-      initializeCliOutput(globalOptions);
-
-      const endOperation = cliStartOperation('login');
-
-      try {
-        // If --help is present, let CAC handle it and exit 0
-        if (options.help) {
-          process.stdout.write('', () => process.exit(0));
-        }
-
-        // Get configuration from central config
-        const { CentralConfigManager } = await import('@civicpress/core');
-        const dataDir = CentralConfigManager.getDataDir();
-        const dbConfig = CentralConfigManager.getDatabaseConfig();
-
-        // Check if CivicPress is initialized
-        if (!fs.existsSync(dataDir)) {
-          cliError(
-            'CivicPress not initialized. Run "civic init" first.',
-            'NOT_INITIALIZED',
-            undefined,
-            'login'
-          );
-          process.exit(1);
-        }
-
-        // Initialize CivicPress with database configuration
-        const civic = new CivicPress({
-          dataDir,
-          database: dbConfig,
-        });
-        await civic.initialize();
-
-        if (options.logout) {
-          // Handle logout
-          await handleLogout(civic, options.token);
-        } else if (options.status) {
-          // Handle status check
-          await handleStatus(civic);
-        } else {
-          // Handle login
-          await handleLogin(civic, options);
-        }
-
-        await civic.shutdown();
-      } catch (error) {
-        cliError(
-          error instanceof Error ? error.message : 'Unknown error occurred',
-          'LOGIN_FAILED',
-          {
+    .action(
+      withCli<[any]>(
+        {
+          operation: 'login',
+          errorMessage: 'Login failed',
+          errorCode: 'LOGIN_FAILED',
+          details: (error) => ({
             error: error instanceof Error ? error.message : String(error),
-          },
-          'login'
-        );
-        process.exit(1);
-      } finally {
-        endOperation();
-      }
-    });
+          }),
+        },
+        async (_ctx, options: any) => {
+          // If --help is present, let CAC handle it and exit 0. Kept inside the
+          // handler (the explicit stdout flush before exit matters for the
+          // subprocess tests); withCli's operation span is harmless here.
+          if (options.help) {
+            process.stdout.write('', () => process.exit(0));
+          }
+
+          // Get configuration from central config
+          const { CentralConfigManager } = await import('@civicpress/core');
+          const dataDir = CentralConfigManager.getDataDir();
+          const dbConfig = CentralConfigManager.getDatabaseConfig();
+
+          // Check if CivicPress is initialized
+          if (!fs.existsSync(dataDir)) {
+            cliError(
+              'CivicPress not initialized. Run "civic init" first.',
+              'NOT_INITIALIZED',
+              undefined,
+              'login'
+            );
+            process.exit(1);
+          }
+
+          // Initialize CivicPress with database configuration
+          const civic = new CivicPress({
+            dataDir,
+            database: dbConfig,
+          });
+          await civic.initialize();
+
+          if (options.logout) {
+            // Handle logout
+            await handleLogout(civic, options.token);
+          } else if (options.status) {
+            // Handle status check
+            await handleStatus(civic);
+          } else {
+            // Handle login
+            await handleLogin(civic, options);
+          }
+
+          await civic.shutdown();
+        }
+      )
+    );
 };
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function handleLogin(civic: CivicPress, options: any): Promise<void> {
   const authService = civic.getAuthService();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let session: any;
 
   try {

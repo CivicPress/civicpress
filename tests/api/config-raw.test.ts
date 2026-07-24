@@ -83,7 +83,7 @@ describe('Config RAW endpoints', () => {
       .get('/api/v1/config/raw/..%2f..%2f..%2fpackage')
       .set('Authorization', `Bearer ${token}`);
     expect(res.status).toBe(400);
-    expect(res.body?.error).toMatch(/invalid config type/i);
+    expect(res.body?.error?.message).toMatch(/invalid config type/i);
   });
 
   it('rejects a path-traversal config type on PUT (FA-API-012)', async () => {
@@ -98,6 +98,6 @@ describe('Config RAW endpoints', () => {
       .set('Content-Type', 'text/yaml')
       .send('pwned: true\n');
     expect(res.status).toBe(400);
-    expect(res.body?.error).toMatch(/invalid config type/i);
+    expect(res.body?.error?.message).toMatch(/invalid config type/i);
   });
 });

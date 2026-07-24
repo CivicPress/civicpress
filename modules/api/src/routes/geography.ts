@@ -16,10 +16,7 @@ import {
 } from '@civicpress/core';
 import type { GeographyCategory, GeographyFileType } from '@civicpress/core';
 import { AuthenticatedRequest, requirePermission } from '../middleware/auth.js';
-import {
-  handleApiError,
-  logApiSuccess,
-} from '../utils/api-logger.js';
+import { handleApiError, logApiSuccess } from '../utils/api-logger.js';
 import type { RecordsService } from '../services/records-service.js';
 
 // (FA-API-014's `LINKED_RECORDS_SCAN_CAP` is gone: it bounded the in-JS scan of
@@ -47,30 +44,56 @@ export function createGeographyRouter(
     });
   };
 
+  /**
+   * `statusCode` is only ever passed for a DELIBERATE client-facing failure —
+   * every call site that supplies one pairs it with an author-written message
+   * (`new Error('Preset not found')`, 404). Those keep their message.
+   *
+   * Everything else is an arbitrary error caught by a route's catch block, and
+   * it must NOT be relabelled as an author-written HttpError. Doing so used to
+   * route it down `createErrorResponse`'s HttpError branch, which returns
+   * `error.message` verbatim because an HttpError message is assumed to have
+   * been chosen by a developer — so all 11 geography endpoints answered a 500
+   * with the raw text of whatever threw: filesystem paths, YAML parse detail.
+   * The redaction that the Tier-B sweep added for `config.ts` /
+   * `notifications.ts` lives one branch further down and was never reached
+   * from here. Hand the original error over untouched and let it apply.
+   */
   const handleError = (
     operation: string,
     error: unknown,
     req: Request,
     res: Response,
-    statusCode: number = 500
+    statusCode?: number
   ) => {
-    const message = error instanceof Error ? error.message : String(error);
-    const errorObj = new HttpError(statusCode, message, undefined, {
-      cause: error,
-    });
-    handleApiError(operation, errorObj, req, res, `${operation} failed`);
+    if (statusCode !== undefined && statusCode < 500) {
+      const message = error instanceof Error ? error.message : String(error);
+      const errorObj = new HttpError(statusCode, message, undefined, {
+        cause: error,
+      });
+      handleApiError(operation, errorObj, req, res, `${operation} failed`);
+      return;
+    }
+    handleApiError(operation, error, req, res, `${operation} failed`);
   };
 
   const handleValidationError = (
-    operation: string,
+    // `_operation` is unused (the canonical validation message is fixed) but
+    // kept positional so the call sites read the same as the other helpers.
+    _operation: string,
     errors: unknown[],
     res: Response
   ) => {
+    // Canonical envelope — matches the shared handleValidationError. Was the
+    // outlier `{ error: 'Validation failed', message, details }` (error as a
+    // STRING); now `error` is the standard object with a code.
     res.status(400).json({
       success: false,
-      error: 'Validation failed',
-      message: `${operation} validation failed`,
-      details: errors,
+      error: {
+        message: 'Invalid request data',
+        code: 'VALIDATION_ERROR',
+        details: errors,
+      },
     });
   };
 

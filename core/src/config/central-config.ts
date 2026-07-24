@@ -87,6 +87,15 @@ export interface DocumentNumberFormats {
 
 export interface CentralConfig {
   dataDir?: string;
+  /**
+   * Absolute path to `.system-data/` — the SQLite DB, the CIVICPRESS_SECRET,
+   * storage credentials, realtime snapshots, and BroadcastBox data all live
+   * here. Anchored to the PROJECT ROOT (the directory containing `.civicrc`),
+   * NOT derived from `dataDir`, so it stays put wherever `dataDir` points.
+   * Resolved once by CentralConfigManager; read everywhere via
+   * `resolveSystemDataDir()`.
+   */
+  systemDataDir?: string;
   // System configuration (from .civicrc)
   modules?: string[];
   record_types?: string[];
@@ -117,6 +126,45 @@ export interface CentralConfig {
   auth?: Record<string, unknown>;
   version?: string;
   created?: string;
+}
+
+/**
+ * Where `.system-data/` lives for a given config.
+ *
+ * The one rule, applied everywhere: `.system-data` is anchored to the PROJECT
+ * ROOT (the directory holding `.civicrc`), which CentralConfigManager resolves
+ * into `config.systemDataDir`. This replaced seven copies of
+ * `dirname(config.dataDir)` scattered across core/storage/realtime/broadcast-box
+ * — a rule that only agreed with the config authority when `dataDir` happened
+ * to be `<projectRoot>/data`, and split the DB from the secrets/storage on any
+ * other layout.
+ *
+ * The fallback is reached ONLY by a config built directly (never through
+ * CentralConfigManager, so it carries no `.civicrc` anchor) — chiefly some
+ * unit tests. It reproduces the old `dirname(dataDir)` behavior so those
+ * callers don't move.
+ */
+export function resolveSystemDataDir(config: {
+  dataDir: string;
+  systemDataDir?: string;
+}): string {
+  if (config.systemDataDir) return config.systemDataDir;
+  const root = path.isAbsolute(config.dataDir)
+    ? path.dirname(config.dataDir)
+    : path.resolve(process.cwd(), path.dirname(config.dataDir));
+  return path.join(root, '.system-data');
+}
+
+/**
+ * The project root for a config: the parent of its `.system-data/`. Used where
+ * a service needs the root itself (e.g. locating `modules/`), so it derives
+ * from the same single rule rather than re-stripping `dataDir`.
+ */
+export function resolveProjectRoot(config: {
+  dataDir: string;
+  systemDataDir?: string;
+}): string {
+  return path.dirname(resolveSystemDataDir(config));
 }
 
 /**
@@ -215,13 +263,13 @@ export class CentralConfigManager {
     // back to a sqlite file under the env data dir (the old behavior) — but a
     // database block from .civicrc (postgres, custom sqlite path) is honored.
     if (envDataDir) {
+      // CIVIC_DATA_DIR sets ONLY the data directory. It used to also default
+      // the DB to `<env>/civic.db` (inside the data dir) when .civicrc named no
+      // database — a third, inconsistent location. Removed: the DB now falls
+      // through to the canonical `<projectRoot>/.system-data/civic.db` default
+      // below, the same as a file-configured deployment. A database block from
+      // .civicrc is still honored.
       mergedConfig.dataDir = path.resolve(envDataDir);
-      if (!mergedConfig.database) {
-        mergedConfig.database = {
-          type: 'sqlite',
-          sqlite: { file: path.join(path.resolve(envDataDir), 'civic.db') },
-        };
-      }
     }
 
     // Check for missing required fields and warn if fallback was used
@@ -274,6 +322,17 @@ export class CentralConfigManager {
       );
     }
 
+    // Resolve `.system-data/` ONCE, anchored to the project root (the directory
+    // holding `.civicrc`, or cwd when none was found) — never derived by
+    // stripping a segment off `dataDir`. This is the single source of truth the
+    // storage/secrets/realtime/broadcast-box services read via
+    // resolveSystemDataDir(); it keeps the DB and every other piece of system
+    // data in ONE place regardless of where `dataDir` points.
+    {
+      const projectRoot = configPath ? path.dirname(configPath) : process.cwd();
+      mergedConfig.systemDataDir = path.join(projectRoot, '.system-data');
+    }
+
     // Deprecation notices for legacy fields
     const deprecated: Array<keyof CentralConfig> = [
       'modules',
@@ -307,6 +366,18 @@ export class CentralConfigManager {
       throw new Error('dataDir is not configured');
     }
     return config.dataDir;
+  }
+
+  /**
+   * Absolute path to `.system-data/`, anchored to the project root (the
+   * directory containing `.civicrc`). This is the ONE authority for where the
+   * DB / secret / storage credentials live; the services read it via
+   * resolveSystemDataDir() rather than each stripping a segment off dataDir.
+   */
+  static getSystemDataDir(): string {
+    return (
+      this.getConfig().systemDataDir ?? path.join(process.cwd(), '.system-data')
+    );
   }
 
   /**

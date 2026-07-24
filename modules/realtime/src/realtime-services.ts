@@ -1,3 +1,4 @@
+import { resolveSystemDataDir } from '@civicpress/core';
 /**
  * Realtime Module Service Registration
  *
@@ -7,7 +8,6 @@
  * @module realtime-services
  */
 
-import path from 'path';
 import type {
   ServiceContainer,
   CivicPressConfig,
@@ -21,14 +21,6 @@ import { RealtimeConfigManager } from './realtime-config-manager.js';
 import { RealtimeServer } from './realtime-server.js';
 import { RoomManager } from './rooms/room-manager.js';
 import { RecordRoomHandler } from './rooms/record-room-handler.js';
-
-/** Compute the `.system-data` directory that holds `realtime.yml`. */
-function resolveSystemDataDir(config: CivicPressConfig): string {
-  const projectRoot = path.isAbsolute(config.dataDir)
-    ? path.dirname(config.dataDir)
-    : path.resolve(process.cwd(), path.dirname(config.dataDir));
-  return path.join(projectRoot, '.system-data');
-}
 
 /**
  * Explicit collaborators a fully-wired {@link RealtimeServer} needs. This is the
@@ -65,9 +57,7 @@ export function createRealtimeServer(
   const { logger, hookSystem, authService, recordManager, databaseService } =
     deps;
 
-  const configManager = new RealtimeConfigManager(
-    resolveSystemDataDir(config)
-  );
+  const configManager = new RealtimeConfigManager(resolveSystemDataDir(config));
 
   const server = new RealtimeServer(
     logger,

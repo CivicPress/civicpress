@@ -68,7 +68,6 @@ describe('CivicPress DI Integration', () => {
       expect(civic.getService('config')).toBeDefined();
       expect(civic.getService('database')).toBeDefined();
       expect(civic.getService('auth')).toBeDefined();
-      expect(civic.getService('configDiscovery')).toBeDefined();
       expect(civic.getService('workflow')).toBeDefined();
       expect(civic.getService('git')).toBeDefined();
       expect(civic.getService('hooks')).toBeDefined();

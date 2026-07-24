@@ -1,21 +1,13 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- CLI command handlers pass CAC's untyped options through withCli. */
 import { CAC } from 'cac';
 import { readFile } from 'fs/promises';
 import { existsSync } from 'fs';
 import { join } from 'path';
 import { HookSystem } from '@civicpress/core';
-import {
-  getGlobalOptionsFromArgs,
-  initializeCliOutput,
-} from '../utils/global-options.js';
 import { AuthUtils } from '../utils/auth-utils.js';
 import { userCan } from '@civicpress/core';
-import {
-  cliSuccess,
-  cliError,
-  cliInfo,
-  cliWarn,
-  cliStartOperation,
-} from '../utils/cli-output.js';
+import { cliSuccess, cliError, cliInfo, cliWarn } from '../utils/cli-output.js';
+import { withCli } from '../utils/with-cli.js';
 
 export function registerHookCommand(cli: CAC) {
   cli
@@ -29,71 +21,59 @@ export function registerHookCommand(cli: CAC) {
     .option('-w, --workflows', 'List available workflows')
     .option('--logs', 'Show hook execution logs')
     .option('--format <format>', 'Output format', { default: 'human' })
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .action(async (action: string, options: any) => {
-      // Initialize CLI output with global options
-      const globalOptions = getGlobalOptionsFromArgs();
-      initializeCliOutput(globalOptions);
+    .action(
+      withCli<[any, any]>(
+        {
+          operation: 'hook',
+          errorMessage: 'Hook management failed',
+          errorCode: 'HOOK_MANAGEMENT_FAILED',
+        },
+        async ({ globalOptions }, action: any, options: any) => {
+          // Validate authentication and get civic instance
+          const { civic, user } = await AuthUtils.requireAuthWithCivic(
+            options.token,
+            globalOptions.json
+          );
+          const dataDir = civic.getDataDir();
 
-      const endOperation = cliStartOperation('hook');
+          // Check hook management permissions
+          const canManageHooks = await userCan(user, 'hooks:manage');
+          if (!canManageHooks) {
+            cliError(
+              'Insufficient permissions to manage hooks',
+              'PERMISSION_DENIED',
+              {
+                requiredPermission: 'hooks:manage',
+                userRole: user.role,
+              },
+              'hook'
+            );
+            process.exit(1);
+          }
 
-      // Validate authentication and get civic instance
-      const { civic, user } = await AuthUtils.requireAuthWithCivic(
-        options.token,
-        globalOptions.json
-      );
-      const dataDir = civic.getDataDir();
+          const hookSystem = new HookSystem(dataDir);
+          await hookSystem.initialize();
 
-      // Check hook management permissions
-      const canManageHooks = await userCan(user, 'hooks:manage');
-      if (!canManageHooks) {
-        cliError(
-          'Insufficient permissions to manage hooks',
-          'PERMISSION_DENIED',
-          {
-            requiredPermission: 'hooks:manage',
-            userRole: user.role,
-          },
-          'hook'
-        );
-        process.exit(1);
-      }
-
-      try {
-        const hookSystem = new HookSystem(dataDir);
-        await hookSystem.initialize();
-
-        if (options.list || action === 'list') {
-          await listHooks(hookSystem);
-        } else if (options.config || action === 'config') {
-          await showConfig(hookSystem);
-        } else if (options.test || action === 'test') {
-          await testHook(hookSystem, options.test || action);
-        } else if (options.enable || action === 'enable') {
-          await enableHook(hookSystem, options.enable || action);
-        } else if (options.disable || action === 'disable') {
-          await disableHook(hookSystem, options.disable || action);
-        } else if (options.workflows || action === 'workflows') {
-          await listWorkflows(hookSystem);
-        } else if (options.logs || action === 'logs') {
-          await showLogs(dataDir, options);
-        } else {
-          showHelp();
+          if (options.list || action === 'list') {
+            await listHooks(hookSystem);
+          } else if (options.config || action === 'config') {
+            await showConfig(hookSystem);
+          } else if (options.test || action === 'test') {
+            await testHook(hookSystem, options.test || action);
+          } else if (options.enable || action === 'enable') {
+            await enableHook(hookSystem, options.enable || action);
+          } else if (options.disable || action === 'disable') {
+            await disableHook(hookSystem, options.disable || action);
+          } else if (options.workflows || action === 'workflows') {
+            await listWorkflows(hookSystem);
+          } else if (options.logs || action === 'logs') {
+            await showLogs(dataDir, options);
+          } else {
+            showHelp();
+          }
         }
-      } catch (error) {
-        cliError(
-          'Hook management failed',
-          'HOOK_MANAGEMENT_FAILED',
-          {
-            error: error instanceof Error ? error.message : String(error),
-          },
-          'hook'
-        );
-        process.exit(1);
-      } finally {
-        endOperation();
-      }
-    });
+      )
+    );
 }
 
 async function listHooks(hookSystem: HookSystem) {
@@ -316,7 +296,6 @@ async function listWorkflows(hookSystem: HookSystem) {
   );
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function showLogs(dataDir: string, _options: any) {
   const logPath = join(dataDir, '.civic', 'hooks.log.jsonl');
 
