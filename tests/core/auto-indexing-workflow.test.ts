@@ -137,15 +137,13 @@ describe('Auto-Indexing Workflow', () => {
     expect(recordInModuleIndex?.module).toBe('legal-register');
   });
 
-  // SKIPPED — asserts unimplemented behavior, NOT a regression. This checks that
-  // the record:updated hook drives the WorkflowEngine (an entry shows up in
-  // getActiveWorkflows()). That hook→engine wiring does not exist yet:
-  // HookSystem.executeWorkflow (core/src/hooks/hook-system.ts) is a stub that
-  // only logs ("TODO: Implement workflow engine integration"), so no workflow is
-  // ever registered as active and this asserts `0 > 0`. Un-skip when that
-  // integration lands. (generateIndexes() itself is exercised by the two tests
-  // above and by tests/core/indexing-service.test.ts.)
-  it.skip('registers an active workflow when a record is updated (needs hook→WorkflowEngine wiring)', async () => {
+  // core-002: the record:updated hook now drives the WorkflowEngine — it runs
+  // the `update-index` workflow, which registers an entry in
+  // getActiveWorkflows(). HookSystem.executeWorkflow fires startWorkflow
+  // fire-and-forget, but startWorkflow records the active entry synchronously
+  // before its first await, so the entry is present as soon as updateRecord
+  // returns. (generateIndexes() itself is also exercised by the two tests above.)
+  it('registers an active workflow when a record is updated (record:updated → update-index)', async () => {
     // Create a record that will trigger indexing
     const record = await civicPress.getRecordManager().createRecord(
       {

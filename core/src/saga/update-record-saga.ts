@@ -423,59 +423,15 @@ class CommitToGitStep extends BaseSagaStep<UpdateRecordContext, string> {
   }
 }
 
-/**
- * Step 4: Queue re-indexing (Derived - fire and forget)
- */
-class QueueReIndexingStep extends BaseSagaStep<UpdateRecordContext, void> {
-  name = 'QueueReIndexing';
-  isCompensatable = false; // Derived state
-  timeout = 5000; // 5 seconds
-
-  constructor(private indexingService: IndexingService | null) {
-    super(5000);
-  }
-
-  async execute(context: UpdateRecordContext): Promise<void> {
-    this.logStep('start', context);
-
-    if (!context.updatedRecord) {
-      return;
-    }
-
-    // Indexing is fire-and-forget derived state; skip cleanly when no
-    // indexing service is wired (callers may legitimately run without one).
-    if (!this.indexingService) {
-      this.logStep('complete', context);
-      return;
-    }
-
-    try {
-      // Queue re-indexing (fire and forget)
-      this.indexingService
-        .generateIndexes({
-          types: [context.updatedRecord.type],
-          rebuild: false,
-        })
-        .catch((error) => {
-          coreDebug(
-            `Re-indexing queued but failed (will retry): ${context.updatedRecord?.id}`,
-            {
-              recordId: context.updatedRecord?.id,
-              error: error instanceof Error ? error.message : String(error),
-            }
-          );
-        });
-
-      this.logStep('complete', context);
-    } catch (error) {
-      this.logStep('fail', context, undefined, error as Error);
-      // Swallow error - indexing is derived state
-    }
-  }
-}
+// Re-indexing on update is no longer a dedicated saga step. The EmitHooksStep
+// below emits `record:updated`, which is configured to run the `update-index`
+// workflow (core-002 hook→WorkflowEngine wiring) — that workflow performs the
+// same fire-and-forget `generateIndexes`. Keeping a QueueReIndexingStep here too
+// would index the record twice per update. (Create/publish still index via their
+// own saga steps — their hooks are not mapped to `update-index`.)
 
 /**
- * Step 5: Emit hooks (Derived - fire and forget)
+ * Step 4: Emit hooks (Derived - fire and forget)
  */
 class EmitHooksStep extends BaseSagaStep<UpdateRecordContext, RecordData> {
   name = 'EmitHooks';
@@ -530,14 +486,16 @@ export class UpdateRecordSaga implements Saga<UpdateRecordContext, RecordData> {
     recordManager: RecordManager,
     git: GitEngine,
     hooks: HookSystem,
-    indexingService: IndexingService | null,
+    // Retained for constructor-signature parity with the create/publish sagas
+    // (and their callers); re-indexing now runs via the record:updated →
+    // update-index hook, so this saga no longer indexes directly.
+    _indexingService: IndexingService | null,
     dataDir: string
   ) {
     this.steps = [
       new UpdateInRecordsStep(db, recordManager),
       new UpdateFileStep(recordManager, dataDir),
       new CommitToGitStep(git),
-      new QueueReIndexingStep(indexingService),
       new EmitHooksStep(hooks),
     ];
   }

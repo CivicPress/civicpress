@@ -46,14 +46,24 @@ export class WorkflowEngine {
     this.activeWorkflows = new Map();
   }
 
+  /** Cap on retained active-workflow entries (see pruneActiveWorkflows). */
+  private static readonly MAX_ACTIVE_WORKFLOWS = 100;
+
   /**
    * Initialize the workflow engine
    */
   initialize(): void {
-    // Register default workflows
-    this.registerWorkflow('approval', this.approvalWorkflow.bind(this));
-    this.registerWorkflow('publication', this.publicationWorkflow.bind(this));
-    this.registerWorkflow('archival', this.archivalWorkflow.bind(this));
+    // Register default workflows. `update-index` is the only real built-in — it
+    // re-runs indexing when a record changes (driven by the record:updated hook).
+    //
+    // core-002: the former `approval` / `publication` / `archival` entries were
+    // TODO log-only stubs registered as if functional. They were removed rather
+    // than left advertised — nothing triggered them (no hook config references
+    // them), and the engine has no auth/notification/record services to
+    // implement them against. Programmable civic workflows are specified as
+    // sandboxed user `.js` files in `data/.civic/workflows/` (see
+    // docs/specs/workflows.md), not hardcoded engine methods, so these stubs
+    // were not the real implementation path.
     this.registerWorkflow('update-index', this.updateIndexWorkflow.bind(this));
   }
 
@@ -72,6 +82,15 @@ export class WorkflowEngine {
   }
 
   /**
+   * Whether a workflow name is registered. Callers (e.g. HookSystem) use this to
+   * skip config-referenced-but-unregistered names quietly instead of letting
+   * startWorkflow throw "not found" on every hook.
+   */
+  hasWorkflow(name: string): boolean {
+    return this.workflows.has(name);
+  }
+
+  /**
    * Start a workflow
    */
   async startWorkflow(name: string, data: WorkflowData): Promise<string> {
@@ -79,6 +98,11 @@ export class WorkflowEngine {
     if (!workflow) {
       throw new Error(`Workflow '${name}' not found`);
     }
+
+    // Now that hooks drive workflows at record-op volume, bound the retained
+    // history so completed/failed entries can't accumulate for the process
+    // lifetime. Running entries are always kept.
+    this.pruneActiveWorkflows();
 
     const workflowId = this.generateWorkflowId();
     this.activeWorkflows.set(workflowId, {
@@ -120,47 +144,23 @@ export class WorkflowEngine {
     return `wf_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   }
 
-  // Default workflows
-  private async approvalWorkflow(
-    _data: WorkflowData,
-    workflowId: string
-  ): Promise<void> {
-    // TODO: Implement approval workflow
-    // - Check permissions
-    // - Send notifications
-    // - Update record status
-    coreInfo('Approval workflow started', {
-      operation: 'workflow:approval',
-      workflowId,
-    });
-  }
-
-  private async publicationWorkflow(
-    data: WorkflowData,
-    workflowId: string
-  ): Promise<void> {
-    // TODO: Implement publication workflow
-    // - Validate record
-    // - Update status to published
-    // - Notify stakeholders
-    coreInfo('Publication workflow started', {
-      operation: 'workflow:publication',
-      workflowId,
-    });
-  }
-
-  private async archivalWorkflow(
-    _data: WorkflowData,
-    workflowId: string
-  ): Promise<void> {
-    // TODO: Implement archival workflow
-    // - Archive record
-    // - Update metadata
-    // - Notify stakeholders
-    coreInfo('Archival workflow started', {
-      operation: 'workflow:archival',
-      workflowId,
-    });
+  /**
+   * Evict oldest terminal (completed/failed) entries once the retained history
+   * exceeds MAX_ACTIVE_WORKFLOWS. Map preserves insertion order, so iterating
+   * removes oldest-first; still-running entries are never evicted.
+   */
+  private pruneActiveWorkflows(): void {
+    if (this.activeWorkflows.size <= WorkflowEngine.MAX_ACTIVE_WORKFLOWS) {
+      return;
+    }
+    for (const [id, wf] of this.activeWorkflows) {
+      if (this.activeWorkflows.size <= WorkflowEngine.MAX_ACTIVE_WORKFLOWS) {
+        break;
+      }
+      if (wf.status !== 'running') {
+        this.activeWorkflows.delete(id);
+      }
+    }
   }
 
   /**

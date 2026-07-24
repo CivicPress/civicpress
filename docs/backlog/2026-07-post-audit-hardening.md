@@ -759,10 +759,10 @@ follow-up. (Storage, config+CLI, API-routes clusters + saga/BB/notifications.)
   acquire endpoint → every renewal 409'd → holder's own lock silently expired mid-edit).
   10/12 un-skipped + passing; stale tests fixed (draft-GET needed `?edit=true`; me.test.ts
   `--silent` asserted a non-existent string → real banner-suppression differential).
-  **Remaining real skips = 2 justified, feature-gated deferrals:** auto-indexing test 3
-  needs the hook→WorkflowEngine wiring (`hook-system.ts` `executeWorkflow` is a log-only
-  stub — the `core-002` WorkflowEngine-stubs item under Roadmap-tier), and
-  `realtime-server.test.ts:390` needs `RecordRoomHandler.onConnect` (W5). Every other skip
+  **Remaining real skip = 1 justified deferral:** `realtime-server.test.ts:390` needs
+  `RecordRoomHandler.onConnect` (W5). (Auto-indexing test 3 was the other deferral; it was
+  **un-skipped once core-002 wired the hook→WorkflowEngine path** — see the core-002 entry
+  below.) Every other skip
   is an env-gated `skipIf` (ffmpeg/whisper). Test-isolation landmine also fixed: the
   auto-indexing test's dataDir sat inside the repo, so the record saga git-committed test
   records into THIS repo → moved to `os.tmpdir()` via `createTestDirectory` + a `.gitignore`
@@ -779,10 +779,30 @@ follow-up. (Storage, config+CLI, API-routes clusters + saga/BB/notifications.)
   concurrency/periodicity via wall-time — concurrency-limiter, check-executor's
   max-concurrency, health-checker's periodic-checks — and the integration/e2e suites
   (realtime/device-ws/saga/upload), which wait on real async I/O, not fakeable clocks.
+- [x] **core-002 — WorkflowEngine wired + made honest — DONE 2026-07-24.** The 2026-05-16
+  manifesto-fit audit flagged `WorkflowEngine.approval/publication/archivalWorkflow` as
+  "log-only stubs registered as if functional" and `HookSystem`'s workflow integration as a
+  stub. Resolution did BOTH halves of the audit's "retire OR wire":
+  - **Wired** the hook→engine path: `HookSystem.setWorkflowEngine` (setter injection in
+    `civic-core-services.ts`, no cycle), and `executeWorkflow` now calls
+    `WorkflowEngine.startWorkflow` — **fire-and-forget** (keeps the record op non-blocking) and
+    **guarded by `hasWorkflow(name)`** so config-only names (`validate-record`, `notify-*`) skip
+    quietly instead of throwing per op. `record:updated → update-index` now really re-indexes;
+    the skipped auto-indexing test 3 is un-skipped and green.
+  - **Retired** the three fake stubs (removed their `registerWorkflow` + methods) — nothing
+    triggered them, and the spec's real design is sandboxed user `.js` (docs/specs/workflows.md),
+    not hardcoded engine methods.
+  - **Dedupe:** dropped `update-record-saga`'s `QueueReIndexingStep` (the hook now re-indexes
+    published-record updates) so an update indexes once, not twice. Create/publish keep their
+    saga indexing (their hooks aren't mapped to `update-index`).
+  - **Capped** `activeWorkflows` (previously never pruned) now that it's driven at record-op
+    volume.
+  Verified: auto-indexing 3/3, hooks+workflows+saga+di+indexing 148 green, record/publish
+  regression 104 green, core builds + lints clean.
 
 ## Roadmap-tier (scope with user before starting)
 
-- [ ] `ui-003` SSR; `core-002` WorkflowEngine stubs; signed appliance image;
+- [ ] `ui-003` SSR; signed appliance image;
   HW config-apply/reboot/button; equity/i18n; uncleared-surface follow-up
   (quick-start/by-meeting authz, FTS injection, config reflection);
   supply-chain (dependency-review/CodeQL/osv-scanner, SECURITY.md, Node-pin

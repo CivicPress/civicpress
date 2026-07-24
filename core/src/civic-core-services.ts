@@ -287,6 +287,14 @@ export async function completeServiceInitialization(
   const workflow = container.resolve<WorkflowEngine>('workflow');
   workflow.setIndexingService(indexingService);
 
+  // Wire the workflow engine into the hook system so hook-configured workflows
+  // actually run (e.g. record:updated → update-index). Setter injection, done
+  // after the engine has its IndexingService. No cycle: HookSystem →
+  // WorkflowEngine → IndexingService, and IndexingService does not depend on
+  // HookSystem.
+  const hooks = container.resolve<HookSystem>('hooks');
+  hooks.setWorkflowEngine(workflow);
+
   // Register storage module services (optional, depends on: logger, cacheManager, database)
   // Note: Storage module is optional - registration will be skipped if module is not available
   // We use dynamic import here since this function is async and can handle ES modules properly
