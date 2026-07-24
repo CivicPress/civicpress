@@ -12,7 +12,7 @@ name: audit-truth-check
 # the structural-dishonesty patterns the 2026-05 audit named.
 #
 # The job runs on PRs touching docs/ or the gate scripts (where
-# overclaim language tends to enter), and on every push to main/dev
+# overclaim language tends to enter), and on every push to main/develop
 # (the integration branches the refactor merges through).
 
 on:
@@ -26,7 +26,7 @@ on:
   push:
     branches:
       - main
-      - dev
+      - develop
 
 jobs:
   truth-check:
