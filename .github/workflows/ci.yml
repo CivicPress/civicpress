@@ -97,6 +97,11 @@ jobs:
         run: npx vitest run
         env:
           CIVIC_TEST_QUARANTINE: '1'
+          # ffmpeg is installed above; require it so the FA-BB-002 redaction e2e
+          # (tests/broadcast-box/redaction-e2e.test.ts) FAILS rather than silently
+          # skips if that install ever breaks — it is the only proof published A/V
+          # is actually blanked/silenced.
+          CIVIC_REQUIRE_FFMPEG: '1'
 
       - name: UI test suite
         run: npx vitest run --config vitest.config.ui.mjs

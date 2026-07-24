@@ -736,7 +736,15 @@ follow-up. (Storage, config+CLI, API-routes clusters + saga/BB/notifications.)
   table/civic-ref/lists/code/blockquote/empty/literal-`<`), non-round-trippable fallback (raw
   HTML block, inline `<span>`/`<br>`, non-civic-ref comment, footnotes), and malformed input
   (never throws → false). No gap.
-- [ ] FA-BB-002 redaction e2e mandatory in CI (`CIVIC_REQUIRE_FFMPEG=1`)
+- [x] **FA-BB-002 redaction e2e mandatory in CI — DONE 2026-07-24.** The redaction
+  e2e (`tests/broadcast-box/redaction-e2e.test.ts`) is the only proof that published
+  A/V bytes are actually blanked/silenced, but it was `describe.skipIf(!HAVE_FFMPEG)`
+  — a broken ffmpeg install in CI would drop it out of coverage with a green build.
+  Added a `CIVIC_REQUIRE_FFMPEG` gate: when set (CI sets `=1` on the Root-test-suite
+  step, right where ffmpeg is already apt-installed), a missing ffmpeg now FAILS a
+  guard test loudly instead of skipping; unset (local dev) keeps the clean self-skip.
+  Verified all three modes: required+present → real suite runs+passes (guard skips);
+  required+missing → hard fail; unset+missing → clean skip.
 - [ ] HW capture-builder tests; frontend tests
 - [x] **Skip triage — DONE (skip portion; 2026-07-24, commit `7502987` on `origin/develop`).**
   The "36 skips" (2026-07-14/15 count) is burned down: phases 7e–7j cleared the quarantine
