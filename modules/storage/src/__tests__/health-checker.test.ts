@@ -58,6 +58,20 @@ describe('StorageHealthChecker', () => {
   });
 
   describe('checkProviderHealth', () => {
+    // Fake timers for this block: the timeout and latency tests hinge on a
+    // check operation's delay racing health_check_timeout, so we advance the
+    // clock instead of really sleeping 100–500ms. The immediate success/failure
+    // tests don't use timers and are unaffected. (The main healthChecker is
+    // constructed in the outer beforeEach under real timers, so its periodic
+    // interval — if any — stays real and dormant; only the per-call timeout
+    // created inside each checkProviderHealth() below is faked.)
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
     it('should return healthy status for successful check', async () => {
       const result = await healthChecker.checkProviderHealth('local');
 
@@ -105,7 +119,11 @@ describe('StorageHealthChecker', () => {
           )
       );
 
-      const result = await shortTimeoutChecker.checkProviderHealth('local');
+      const p = shortTimeoutChecker.checkProviderHealth('local');
+      // Advance past both the 100ms health_check_timeout (which wins) and the
+      // op's 500ms sleep, leaving no fake timer pending.
+      await vi.advanceTimersByTimeAsync(500);
+      const result = await p;
 
       expect(result.healthy).toBe(false);
       expect(result.error).toBeDefined();
@@ -132,7 +150,9 @@ describe('StorageHealthChecker', () => {
           )
       );
 
-      const result = await healthChecker.checkProviderHealth('local');
+      const p = healthChecker.checkProviderHealth('local');
+      await vi.advanceTimersByTimeAsync(100); // op sleeps 100ms → latency is exactly 100
+      const result = await p;
 
       expect(result.latency).toBeDefined();
       expect(result.latency).toBeGreaterThanOrEqual(90);

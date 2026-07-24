@@ -2,7 +2,7 @@
  * Unit Tests for Timeout Utilities
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   withTimeout,
   getTimeoutForOperation,
@@ -11,15 +11,28 @@ import {
 import { StorageTimeoutError } from '../errors/storage-errors.js';
 
 describe('withTimeout', () => {
+  // Fake timers: withTimeout races the operation against a setTimeout, so the
+  // outcome is decided by advancing the clock rather than by real 50–200ms
+  // sleeps out-racing each other. Each test starts the call, attaches its
+  // handler, THEN advances — so the pending rejection is always handled (no
+  // unhandled-rejection window) and the winner is deterministic.
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('should return result when operation completes before timeout', async () => {
     const operation = async () => {
       await new Promise((resolve) => setTimeout(resolve, 50));
       return 'success';
     };
 
-    const result = await withTimeout(operation, 1000, 'test-operation');
+    const p = withTimeout(operation, 1000, 'test-operation');
+    await vi.advanceTimersByTimeAsync(50); // operation (50ms) beats the 1000ms timeout
 
-    expect(result).toBe('success');
+    expect(await p).toBe('success');
   });
 
   it('should throw StorageTimeoutError when operation exceeds timeout', async () => {
@@ -28,9 +41,11 @@ describe('withTimeout', () => {
       return 'success';
     };
 
-    await expect(withTimeout(operation, 100, 'test-operation')).rejects.toThrow(
-      StorageTimeoutError
-    );
+    const assertion = expect(
+      withTimeout(operation, 100, 'test-operation')
+    ).rejects.toThrow(StorageTimeoutError);
+    await vi.advanceTimersByTimeAsync(100); // the 100ms timeout beats the 200ms operation
+    await assertion;
   });
 
   it('should throw StorageTimeoutError with correct timeout value', async () => {
@@ -44,15 +59,17 @@ describe('withTimeout', () => {
       return 'success';
     };
 
-    try {
-      await withTimeout(operation, 100, 'upload');
-      expect.fail('Should have thrown StorageTimeoutError');
-    } catch (error) {
-      expect(error).toBeInstanceOf(StorageTimeoutError);
-      if (error instanceof StorageTimeoutError) {
-        expect(error.context?.timeout).toBe(100);
-        expect(error.context?.operation).toBe('upload');
-      }
+    // `.catch((e) => e)` attaches the handler up front (turning the rejection
+    // into a resolved value), so advancing the clock cannot surface an
+    // unhandled rejection before we inspect the error.
+    const settled = withTimeout(operation, 100, 'upload').catch((e) => e);
+    await vi.advanceTimersByTimeAsync(100);
+    const error = await settled;
+
+    expect(error).toBeInstanceOf(StorageTimeoutError);
+    if (error instanceof StorageTimeoutError) {
+      expect(error.context?.timeout).toBe(100);
+      expect(error.context?.operation).toBe('upload');
     }
   });
 
@@ -61,6 +78,8 @@ describe('withTimeout', () => {
       throw new Error('Custom error');
     };
 
+    // The operation rejects on the microtask queue before the timeout timer,
+    // so no clock advance is needed.
     await expect(
       withTimeout(operation, 1000, 'test-operation')
     ).rejects.toThrow('Custom error');
@@ -72,14 +91,13 @@ describe('withTimeout', () => {
       return 'success';
     };
 
-    try {
-      await withTimeout(operation, 100);
-      expect.fail('Should have thrown StorageTimeoutError');
-    } catch (error) {
-      expect(error).toBeInstanceOf(StorageTimeoutError);
-      if (error instanceof StorageTimeoutError) {
-        expect(error.context?.operation).toBe('operation');
-      }
+    const settled = withTimeout(operation, 100).catch((e) => e);
+    await vi.advanceTimersByTimeAsync(100);
+    const error = await settled;
+
+    expect(error).toBeInstanceOf(StorageTimeoutError);
+    if (error instanceof StorageTimeoutError) {
+      expect(error.context?.operation).toBe('operation');
     }
   });
 });

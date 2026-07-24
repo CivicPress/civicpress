@@ -2,7 +2,7 @@
  * Unit Tests for Circuit Breaker
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   CircuitBreaker,
   CircuitBreakerManager,
@@ -14,6 +14,12 @@ describe('CircuitBreaker', () => {
   let mockLogger: Logger;
 
   beforeEach(() => {
+    // Fake timers: the open→half-open transition is purely time-based
+    // (Date.now() - lastFailureTime >= timeout, circuit-breaker.ts), so the
+    // "wait for timeout" sleeps below become instant clock advances. No real
+    // 150ms waits, and no dependence on the sleep out-running a 100ms timeout.
+    vi.useFakeTimers();
+
     mockLogger = {
       debug: vi.fn(),
       info: vi.fn(),
@@ -22,6 +28,10 @@ describe('CircuitBreaker', () => {
     } as any;
 
     circuitBreaker = new CircuitBreaker('test-provider', {}, mockLogger);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   describe('State Transitions', () => {
@@ -103,7 +113,7 @@ describe('CircuitBreaker', () => {
       expect(breaker.getState()).toBe('open');
 
       // Wait past the timeout window
-      await new Promise((resolve) => setTimeout(resolve, 150));
+      await vi.advanceTimersByTimeAsync(150);
 
       // One successful call triggers the lazy open→half-open transition
       // (and stays in half-open since successCount 1 < successThreshold 2)
@@ -134,7 +144,7 @@ describe('CircuitBreaker', () => {
       }
 
       // Wait for timeout
-      await new Promise((resolve) => setTimeout(resolve, 150));
+      await vi.advanceTimersByTimeAsync(150);
 
       // Success in half-open should close circuit
       const successOp = vi.fn().mockResolvedValue('success');
@@ -164,7 +174,7 @@ describe('CircuitBreaker', () => {
       }
 
       // Wait for timeout
-      await new Promise((resolve) => setTimeout(resolve, 150));
+      await vi.advanceTimersByTimeAsync(150);
 
       // Failure in half-open should reopen
       await expect(breaker.execute(failingOp)).rejects.toThrow();
@@ -230,7 +240,7 @@ describe('CircuitBreaker', () => {
       }
 
       // Wait for timeout
-      await new Promise((resolve) => setTimeout(resolve, 150));
+      await vi.advanceTimersByTimeAsync(150);
 
       // Two half-open calls (within limit; circuit stays half-open
       // because successThreshold=99 is unreachable in 2 calls)

@@ -2,7 +2,7 @@
  * Unit Tests for Check Executor
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { CheckExecutor } from '../check-executor.js';
 import { DiagnosticCircuitBreaker } from '../circuit-breaker.js';
 import { ResourceMonitor } from '../resource-monitor.js';
@@ -62,6 +62,18 @@ describe('CheckExecutor', () => {
   });
 
   describe('executeCheck', () => {
+    // Fake timers for the single-check path: the timeout test below relies on
+    // the executor's 100ms defaultTimeout firing before a 200ms checker. The
+    // sibling success/failure/duration tests don't use timers and are
+    // unaffected. (The executeAll concurrency test keeps real timers — it
+    // measures actual batch wall-time, which fake time would make meaningless.)
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
     it('should execute a single check successfully', async () => {
       const checker = new TestChecker('test1');
 
@@ -83,7 +95,11 @@ describe('CheckExecutor', () => {
     it('should handle timeouts', async () => {
       const checker = new TestChecker('test1', false, true);
 
-      const result = await executor.executeCheck(checker);
+      const p = executor.executeCheck(checker);
+      // Advance past both the 100ms defaultTimeout (which wins the race) and the
+      // checker's 200ms sleep, so no fake timer is left pending afterwards.
+      await vi.advanceTimersByTimeAsync(200);
+      const result = await p;
 
       expect(result.status).toBe('timeout');
     });

@@ -765,9 +765,18 @@ follow-up. (Storage, config+CLI, API-routes clusters + saga/BB/notifications.)
   auto-indexing test's dataDir sat inside the repo, so the record saga git-committed test
   records into THIS repo → moved to `os.tmpdir()` via `createTestDirectory` + a `.gitignore`
   guard for repo-root scratch dirs.
-- [ ] **fake-timer adoption** (the other half of the old "Triage 36 skips" line, still open).
-  Tests using real `setTimeout`/`setInterval`/sleeps → `vi.useFakeTimers()` for determinism
-  + speed. Not started.
+- [x] **fake-timer adoption — DONE 2026-07-24** (the other half of the old "Triage 36 skips"
+  line). Converted the 7 unit-test files whose sleeps were *incidental waits* on a timeout /
+  TTL / duration to `vi.useFakeTimers()` + `advanceTimersByTimeAsync`: both circuit-breakers
+  (core diagnostics + storage), diagnostics cache (TTL), resource-monitor (duration),
+  storage timeout-utils (`withTimeout` race), diagnostics check-executor (single-check
+  timeout), storage health-checker (check timeout + latency). Each went from real 50–600ms
+  sleeps to a few ms and is now deterministic (no more "sleep must out-race the timeout"
+  flakiness). Verified per-file + full suites green (core diagnostics 94, storage 234).
+  **Deliberately left on REAL timers** (documented inline): tests that assert genuine
+  concurrency/periodicity via wall-time — concurrency-limiter, check-executor's
+  max-concurrency, health-checker's periodic-checks — and the integration/e2e suites
+  (realtime/device-ws/saga/upload), which wait on real async I/O, not fakeable clocks.
 
 ## Roadmap-tier (scope with user before starting)
 
