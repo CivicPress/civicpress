@@ -33,6 +33,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        # SHA-pinned to the same actions/checkout v6 (Node 24) as ci.yml — the
+        # bare v4 tag here ran on the sunset Node 20 and annotated every run.
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
       - name: Run audit-truth-check
         run: make audit-truth-check

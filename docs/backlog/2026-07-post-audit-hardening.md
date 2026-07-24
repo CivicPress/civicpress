@@ -628,12 +628,14 @@ follow-up. (Storage, config+CLI, API-routes clusters + saga/BB/notifications.)
 
 ## Test & CI health
 
-- [ ] **`actions/checkout` Node-20 deprecation (CI maintenance, low priority).**
-  CI annotates every run: `actions/checkout@v4` is being forced onto Node 24
-  because GitHub is sunsetting Node 20 on its runners. Jobs still pass, so it is
-  cosmetic for now — bump the pinned action across `.github/workflows` (find the
-  new SHA; actions are SHA-pinned). Do it as its own tiny PR, NOT bundled with a
-  feature branch, so it never re-triggers an otherwise-green PR's CI.
+- [x] **`actions/checkout` Node-20 deprecation — DONE 2026-07-24.** `ci.yml` was already
+  SHA-pinned to checkout v6 (Node 24) in the CI batch; the straggler was `truth-check.yml`,
+  still on the bare `actions/checkout@v4` tag (Node 20). Pinned it to the SAME proven v6.0.3
+  SHA `ci.yml` uses (`df4cb1c…`, verified via the actions/checkout tags API) so both workflows
+  match. Committed straight to `develop` rather than a standalone PR — the "its own tiny PR"
+  caveat was to protect PR #20's green CI, and #20 is now MERGED with no open PR on develop, so
+  the concern is moot. (The `v6` tag has since moved to v6.1/`d23441a…`; left ci.yml on its
+  proven pin — routine SHA freshening is Renovate's job.)
 
 - [x] **CLI eslint gate (2026-07-23).** The withCli migration (see the
   `withCli()` item above) tripped the CLI package's error-level
