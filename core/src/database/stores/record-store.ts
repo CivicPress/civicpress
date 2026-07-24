@@ -298,7 +298,7 @@ export class RecordStore {
     title: string;
     type: string;
     status?: string;
-    workflow_state?: string;
+    workflow_state?: string | null;
     content?: string;
     metadata?: string;
     geography?: string;

@@ -66,7 +66,10 @@ export interface CreateRecordRequest {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   metadata?: Record<string, any>;
   status?: string; // Legal status (stored in YAML + DB)
-  workflowState?: string; // Internal editorial status (DB-only, never in YAML)
+  // Internal editorial status (DB-only, never in YAML). Pass `null` to create a
+  // record with no editorial state (e.g. publishing a draft straight to a
+  // published record); omit/`undefined` defaults it to 'draft'.
+  workflowState?: string | null;
   createdAt?: string;
   updatedAt?: string;
   relativePath?: string;

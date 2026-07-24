@@ -59,21 +59,27 @@ describe('civic me command', () => {
     );
   });
 
-  it.skip('should suppress output when --silent flag is used', () => {
-    let result = '';
-    try {
-      result = execSync(`node "${cliPath}" auth:me --silent`, {
-        encoding: 'utf8',
-        cwd: testDataDir,
-        stdio: 'pipe',
-      });
-    } catch (e: any) {
-      result = e.stdout || e.message || '';
-    }
-    expect(result).not.toContain('💡 Use --token to provide a session token');
+  it('should suppress the progress banner when --silent flag is used', () => {
+    // auth:me with no token exits 1, so execSync throws and stdout is on e.stdout.
+    const run = (args: string): string => {
+      try {
+        return execSync(`node "${cliPath}" auth:me ${args}`, {
+          encoding: 'utf8',
+          cwd: testDataDir,
+          stdio: 'pipe',
+        });
+      } catch (e: any) {
+        return e.stdout || e.message || '';
+      }
+    };
+    // Baseline: the non-silent run emits the "🔄 Starting: auth:me" progress banner.
+    expect(run('')).toContain('Starting: auth:me');
+    // --silent suppresses that banner. (The auth error + hints still print so the
+    // user still learns why it failed; --silent only quiets progress output.)
+    expect(run('--silent')).not.toContain('Starting: auth:me');
   });
 
-  it.skip('should validate session token when --token is provided (invalid token)', () => {
+  it('should validate session token when --token is provided (invalid token)', () => {
     let result = '';
     try {
       result = execSync(`node "${cliPath}" auth:me --token invalid-token`, {
@@ -89,7 +95,7 @@ describe('civic me command', () => {
     );
   });
 
-  it.skip('should output JSON format when --json flag is used (invalid token)', () => {
+  it('should output JSON format when --json flag is used (invalid token)', () => {
     let result = '';
     try {
       result = execSync(

@@ -58,6 +58,15 @@ exports/backups/
 # tracked as a W2-T18 storage-decomposition follow-up.
 **/.test-storage/
 
+# Repo-root CLI/core test scratch dirs. Some tests point a CivicPress dataDir
+# (or `civic init --data-dir`) at a dir under the repo root and clean it up in
+# afterEach. Ignored as a safety net so a crashed/interrupted run can never
+# leave (or commit) these — the record saga's git step would otherwise commit
+# them straight into THIS repo. Prefer os.tmpdir()-based dirs for new tests.
+/test-auto-indexing/
+/test-auth-cli/
+/test-auth/
+
 # Agent / IDE local state (per-machine; not for the repo).
 .claude/
 

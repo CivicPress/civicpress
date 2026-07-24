@@ -1,25 +1,37 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { CivicPress } from '../../core/src/civic-core.js';
-import { mkdirSync, writeFileSync, rmSync } from 'fs';
 import { join } from 'path';
+import {
+  createTestDirectory,
+  cleanupTestDirectory,
+} from '../fixtures/test-setup';
 
-// TODO: Fix auto-indexing workflow tests after CivicPress integration is complete
-describe.skip('Auto-Indexing Workflow', () => {
+// createRecord/updateRecord take an AuthUser object (id/username/role) — the
+// old string-role second argument left author/authors empty and tripped schema
+// validation.
+const TEST_USER = { id: 1, username: 'clerk', role: 'admin' } as any;
+
+describe('Auto-Indexing Workflow', () => {
   let civicPress: CivicPress;
-  let testDataDir: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let testConfig: any;
 
   beforeEach(async () => {
-    // Create test data directory
-    testDataDir = join(process.cwd(), 'test-auto-indexing');
-    mkdirSync(testDataDir, { recursive: true });
+    // Use an ISOLATED data dir under the OS temp dir with its OWN git repo
+    // (createTestDirectory runs `git init` in dataDir). Publishing/updating a
+    // record runs the saga's git-commit step against dataDir's repo; if dataDir
+    // sat inside THIS repo (the old `join(process.cwd(), 'test-auto-indexing')`),
+    // those commits leaked straight into the CivicPress repo. tmpdir isolation
+    // keeps them contained.
+    testConfig = createTestDirectory('auto-indexing');
 
     // Initialize CivicPress with test database
     civicPress = new CivicPress({
-      dataDir: testDataDir,
+      dataDir: testConfig.dataDir,
       database: {
         type: 'sqlite' as const,
         sqlite: {
-          file: join(testDataDir, 'test.db'),
+          file: join(testConfig.testDir, 'test.db'),
         },
       },
     });
@@ -28,10 +40,10 @@ describe.skip('Auto-Indexing Workflow', () => {
 
   afterEach(async () => {
     await civicPress.shutdown();
-    rmSync(testDataDir, { recursive: true, force: true });
+    cleanupTestDirectory(testConfig);
   });
 
-  it('should automatically trigger indexing when a record is updated', async () => {
+  it('reflects a created-then-updated record (title + status) in generated indexes', async () => {
     // Create a test record
     const record = await civicPress.getRecordManager().createRecord(
       {
@@ -43,7 +55,7 @@ describe.skip('Auto-Indexing Workflow', () => {
           tags: ['test', 'auto-indexing'],
         },
       },
-      'clerk'
+      TEST_USER
     );
 
     expect(record).toBeDefined();
@@ -56,9 +68,9 @@ describe.skip('Auto-Indexing Workflow', () => {
         title: 'Updated Test Bylaw for Auto-Indexing',
         content:
           '# Updated Test Bylaw\n\nThis is an updated test bylaw for auto-indexing.',
-        status: 'proposed',
+        status: 'approved',
       },
-      'clerk'
+      TEST_USER
     );
 
     expect(updatedRecord).toBeDefined();
@@ -66,8 +78,6 @@ describe.skip('Auto-Indexing Workflow', () => {
 
     // Check that the indexing service has been triggered
     const indexingService = civicPress.getIndexingService();
-    const recordsDir = join(testDataDir, 'records');
-    const indexPath = join(recordsDir, 'index.yml');
 
     // Generate indexes to verify they were updated
     const index = await indexingService.generateIndexes();
@@ -81,10 +91,10 @@ describe.skip('Auto-Indexing Workflow', () => {
     );
 
     expect(updatedRecordInIndex).toBeDefined();
-    expect(updatedRecordInIndex?.status).toBe('proposed');
+    expect(updatedRecordInIndex?.status).toBe('approved');
   });
 
-  it('should trigger module-specific indexing when a record with module is updated', async () => {
+  it('includes a module-tagged record in module-filtered indexes', async () => {
     // Create a record with a specific module
     const record = await civicPress.getRecordManager().createRecord(
       {
@@ -96,7 +106,7 @@ describe.skip('Auto-Indexing Workflow', () => {
           tags: ['legal', 'policy'],
         },
       },
-      'clerk'
+      TEST_USER
     );
 
     // Update the record
@@ -104,9 +114,9 @@ describe.skip('Auto-Indexing Workflow', () => {
       record.id,
       {
         title: 'Updated Legal Register Test Record',
-        status: 'adopted',
+        status: 'published',
       },
-      'clerk'
+      TEST_USER
     );
 
     // Check that module-specific indexing was triggered
@@ -127,7 +137,15 @@ describe.skip('Auto-Indexing Workflow', () => {
     expect(recordInModuleIndex?.module).toBe('legal-register');
   });
 
-  it('should handle workflow execution errors gracefully', async () => {
+  // SKIPPED — asserts unimplemented behavior, NOT a regression. This checks that
+  // the record:updated hook drives the WorkflowEngine (an entry shows up in
+  // getActiveWorkflows()). That hook→engine wiring does not exist yet:
+  // HookSystem.executeWorkflow (core/src/hooks/hook-system.ts) is a stub that
+  // only logs ("TODO: Implement workflow engine integration"), so no workflow is
+  // ever registered as active and this asserts `0 > 0`. Un-skip when that
+  // integration lands. (generateIndexes() itself is exercised by the two tests
+  // above and by tests/core/indexing-service.test.ts.)
+  it.skip('registers an active workflow when a record is updated (needs hook→WorkflowEngine wiring)', async () => {
     // Create a record that will trigger indexing
     const record = await civicPress.getRecordManager().createRecord(
       {
@@ -138,7 +156,7 @@ describe.skip('Auto-Indexing Workflow', () => {
           module: 'test-module',
         },
       },
-      'clerk'
+      TEST_USER
     );
 
     // Update the record - this should trigger the workflow
@@ -149,7 +167,7 @@ describe.skip('Auto-Indexing Workflow', () => {
         title: 'Updated Error Test Record',
         status: 'draft',
       },
-      'clerk'
+      TEST_USER
     );
 
     expect(updatedRecord).toBeDefined();

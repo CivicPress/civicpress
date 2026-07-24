@@ -30,7 +30,7 @@ describe('Draft → Publish Workflow Integration', () => {
     await cleanupAPITestContext(context);
   });
 
-  it.skip('should create draft, update workflowState, then publish', async () => {
+  it('should create draft, update workflowState, then publish', async () => {
     const recordId = 'integration-workflow-1';
 
     // Step 1: Create draft

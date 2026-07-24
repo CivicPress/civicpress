@@ -33,7 +33,10 @@ export interface RecordData {
   title: string;
   type: string;
   status: string; // Legal status (stored in YAML + DB)
-  workflowState?: string; // Internal editorial status (DB-only, never in YAML)
+  // Internal editorial status (DB-only, never in YAML). `null` means the record
+  // has no editorial state — the state published records land in (it is cleared
+  // on publish). Distinct from an unset/`undefined` field.
+  workflowState?: string | null;
   content?: string;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   metadata?: Record<string, any>;
@@ -527,7 +530,7 @@ export class RecordManager {
           // Keep database fields for internal tracking
           path: dbRecord.path,
           // workflowState is DB-only (never in YAML), so always get it from database
-          workflowState: dbRecord.workflow_state || 'draft', // Internal editorial status (DB-only, never in YAML)
+          workflowState: dbRecord.workflow_state ?? null, // Internal editorial status (DB-only, never in YAML). null = cleared (published)
           // Ensure timestamps are set (use parsed if available, otherwise database)
           created_at:
             parsedRecord.created_at ||
@@ -555,7 +558,7 @@ export class RecordManager {
       title: dbRecord.title,
       type: dbRecord.type,
       status: dbRecord.status || 'draft', // Legal status (stored in YAML + DB)
-      workflowState: dbRecord.workflow_state || 'draft', // Internal editorial status (DB-only, never in YAML)
+      workflowState: dbRecord.workflow_state ?? null, // Internal editorial status (DB-only, never in YAML). null = cleared (published)
       content: dbRecord.content || '',
       path: dbRecord.path,
       author: dbRecord.author || 'unknown',

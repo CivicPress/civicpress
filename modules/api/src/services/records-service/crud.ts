@@ -24,7 +24,8 @@ interface ApiRecord {
   title: string;
   type: string;
   status?: string;
-  workflowState?: string;
+  // null = cleared editorial state (published records); see RecordData.workflowState.
+  workflowState?: string | null;
   content?: string;
   metadata: Record<string, unknown>;
   authors?: Array<{
