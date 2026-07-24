@@ -730,10 +730,36 @@ follow-up. (Storage, config+CLI, API-routes clusters + saga/BB/notifications.)
   tests** (`password`→`newPassword` field, `body.data.message`/`body.error.message`
   paths, verify-email token read via raw DB query NOT `getUserById` — that column
   is a live verification secret).
-- [ ] `isLosslesslyRoundTrippable` tests
+- [x] **`isLosslesslyRoundTrippable` tests — already DONE (stale entry, verified 2026-07-24).**
+  `tests/ui/editor/content-loss-guard.test.ts` (16 cases, green under `vitest.config.ui.mjs`)
+  landed with the feature in `0fbb660` (W5-T9): round-trippable path (paragraph/headings/GFM
+  table/civic-ref/lists/code/blockquote/empty/literal-`<`), non-round-trippable fallback (raw
+  HTML block, inline `<span>`/`<br>`, non-civic-ref comment, footnotes), and malformed input
+  (never throws → false). No gap.
 - [ ] FA-BB-002 redaction e2e mandatory in CI (`CIVIC_REQUIRE_FFMPEG=1`)
 - [ ] HW capture-builder tests; frontend tests
-- [ ] Triage 36 skips incl. draft→publish flow; fake-timer adoption
+- [x] **Skip triage — DONE (skip portion; 2026-07-24, commit `7502987` on `origin/develop`).**
+  The "36 skips" (2026-07-14/15 count) is burned down: phases 7e–7j cleared the quarantine
+  cluster, and a 2026-07-24 sweep took the draft→publish/workflowState cluster + the
+  fully-disabled Auto-Indexing suite. Un-skipping AGAIN surfaced **2 real prod bugs** —
+  (a) workflowState never cleared on publish (first-publish stored `workflow_state='draft'`
+  via `undefined→'draft'` defaults + a `null||'draft'` read coercion → published records
+  leaked into `listUnpublishedRecords`); (b) record locks never renewed (`acquireLock`'s
+  atomic ON CONFLICT rejected the SAME holder, and the UI's `refreshLock()` re-POSTs the
+  acquire endpoint → every renewal 409'd → holder's own lock silently expired mid-edit).
+  10/12 un-skipped + passing; stale tests fixed (draft-GET needed `?edit=true`; me.test.ts
+  `--silent` asserted a non-existent string → real banner-suppression differential).
+  **Remaining real skips = 2 justified, feature-gated deferrals:** auto-indexing test 3
+  needs the hook→WorkflowEngine wiring (`hook-system.ts` `executeWorkflow` is a log-only
+  stub — the `core-002` WorkflowEngine-stubs item under Roadmap-tier), and
+  `realtime-server.test.ts:390` needs `RecordRoomHandler.onConnect` (W5). Every other skip
+  is an env-gated `skipIf` (ffmpeg/whisper). Test-isolation landmine also fixed: the
+  auto-indexing test's dataDir sat inside the repo, so the record saga git-committed test
+  records into THIS repo → moved to `os.tmpdir()` via `createTestDirectory` + a `.gitignore`
+  guard for repo-root scratch dirs.
+- [ ] **fake-timer adoption** (the other half of the old "Triage 36 skips" line, still open).
+  Tests using real `setTimeout`/`setInterval`/sleeps → `vi.useFakeTimers()` for determinism
+  + speed. Not started.
 
 ## Roadmap-tier (scope with user before starting)
 
