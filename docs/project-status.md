@@ -1,6 +1,23 @@
 # CivicPress Project Status
 
-> **Current status (2026-07-15) — supersedes the 2026-06-03 snapshot below.**
+> **Current status (2026-07-25) — supersedes the 2026-07-15 snapshot below.**
+> Remediation from the 2026-07-02 `FA-*` audit is complete and merged to `main`
+> (PR #19), as is the follow-on tech-debt/refactor batch (PR #20). `main` is no
+> longer frozen and now carries **branch protection** (required `build-test` +
+> `audit-truth-check`). Ongoing hardening lives on `develop` and is tracked in
+> **`docs/backlog/2026-07-post-audit-hardening.md`** — the live tracker, which
+> supersedes the branch/PR details in the older banners below. Its Tiers A–D,
+> Improvements, Refactors/tech-debt, and Test & CI health sections are closed.
+> Recent work: phase-7e→7j test-health (per-test DB isolation, CI parallelism,
+> quarantine burn-down — which surfaced several real product bugs); a skipped-test
+> triage (two more real bugs fixed — published records leaking into the drafts
+> list, and record locks expiring mid-edit); and the core-002 hook→WorkflowEngine
+> wiring. Remaining open: HW/frontend test coverage and the roadmap-tier features
+> (SSR, signed appliance image, equity/i18n, supply-chain, doc-drift). The honest
+> v0.2.x answer below still holds — functional for early pilots, expect breaking
+> changes through v0.3.x.
+>
+> **Prior snapshot (2026-07-15) — supersedes the 2026-06-03 snapshot below.**
 > A second, full two-repo audit landed 2026-07-02 (`docs/audits/2026-07-02-full-audit.md`,
 > `FA-*` registry — the authoritative tracker). Its remediation is essentially
 > complete: **all 4 Criticals, all 22 Highs, and the entire actionable
