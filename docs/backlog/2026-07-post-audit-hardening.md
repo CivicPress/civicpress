@@ -814,6 +814,17 @@ follow-up. (Storage, config+CLI, API-routes clusters + saga/BB/notifications.)
   **Remaining supply-chain sub-items** (folded into the roadmap line below): CodeQL SAST (a
   code-security axis, distinct from these dependency-focused tools) and the Node-pin reconcile
   (actions are SHA-pinned; a `.nvmrc`/`engines` audit is still outstanding).
+  **First-scan finding (osv-scanner v2.4.0 on `pnpm-lock.yaml`, 2026-07-25):** the current tree
+  has **94 known vulnerabilities across 36 packages (3 Critical, 45 High, 33 Medium, 13 Low) —
+  all with fixes available.** These pre-date the tooling and are why the full scan runs
+  report-only. Remediation is tracked as its own item ↓.
+- [ ] **Dependency vulnerability remediation.** osv-scanner surfaced 94 fixable advisories
+  (3 Critical, 45 High) — mostly transitive (`tar`, `undici`, `axios`, `body-parser`, `esbuild`,
+  `postcss`, `brace-expansion`, `form-data`, …) plus some direct-ish (`vitest` 3.2.4 → CVSS 9.8,
+  `nuxt` 4.4.6 → 8.8, `multer`, `nodemailer`, `dompurify`, `happy-dom`, `js-yaml`, `markdown-it`).
+  Drive via Renovate's automerge for the transitive/patch bumps + targeted major bumps with a
+  test run each (vitest/nuxt/multer can break). Re-scan to confirm the count drops. Not bundled
+  with the tooling PR — bumping 36 packages needs per-bump verification.
 - [ ] `ui-003` SSR; signed appliance image;
   HW config-apply/reboot/button; equity/i18n; uncleared-surface follow-up
   (quick-start/by-meeting authz, FTS injection, config reflection);
