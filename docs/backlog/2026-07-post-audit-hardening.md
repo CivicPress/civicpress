@@ -818,13 +818,25 @@ follow-up. (Storage, config+CLI, API-routes clusters + saga/BB/notifications.)
   has **94 known vulnerabilities across 36 packages (3 Critical, 45 High, 33 Medium, 13 Low) —
   all with fixes available.** These pre-date the tooling and are why the full scan runs
   report-only. Remediation is tracked as its own item ↓.
-- [ ] **Dependency vulnerability remediation.** osv-scanner surfaced 94 fixable advisories
-  (3 Critical, 45 High) — mostly transitive (`tar`, `undici`, `axios`, `body-parser`, `esbuild`,
-  `postcss`, `brace-expansion`, `form-data`, …) plus some direct-ish (`vitest` 3.2.4 → CVSS 9.8,
-  `nuxt` 4.4.6 → 8.8, `multer`, `nodemailer`, `dompurify`, `happy-dom`, `js-yaml`, `markdown-it`).
-  Drive via Renovate's automerge for the transitive/patch bumps + targeted major bumps with a
-  test run each (vitest/nuxt/multer can break). Re-scan to confirm the count drops. Not bundled
-  with the tooling PR — bumping 36 packages needs per-bump verification.
+- [x] **Dependency vulnerability remediation — DONE 2026-07-25 (94 → 2).** Remediated via a
+  centralized `pnpm.overrides` block (forces non-vulnerable versions tree-wide; Renovate can
+  retire entries as real ranges advance), each batch build+test verified:
+  - **Same-major (semver-safe):** ajv, axios, body-parser, brace-expansion(1/2/5), diff,
+    dompurify, esbuild, fast-uri, form-data(2/4), glob, happy-dom, js-yaml, morgan, nuxt (4.4.7,
+    minimal), postcss, shell-quote, svgo, undici, valibot, vitest+@vitest/ui, yaml.
+  - **Compatible-API majors (tested):** nodemailer 7→9, @tootallnate/once 1→2, uuid 8/9→11,
+    markdown-it 13→14 + linkify-it 4→5, **multer 1→2** (upload paths retested), **tar 6→7**
+    (needed a one-line `import * as tar` fix in `backup-service.ts` — tar 7 dropped its default
+    export; backup create/restore retested).
+  - Verified: all workspaces build; ~350 tests across core/api/integration/storage/bb-upload/
+    backup/editor-schema — all green.
+  - **Residual (2, accepted):** `brace-expansion` GHSA-mh99-v99m-4gvg (CVSS 7.5 DoS) is modelled
+    as a flat range (fixed only in 5.0.8), and 5.x is ESM-only — forcing it under old CJS
+    `minimatch@3`/glob would break foundational pattern-matching. brace-expansion is reached only
+    via INTERNAL glob patterns (test/config/gitignore matching), never user request input, so the
+    DoS is not exploitable in the request surface. Left at the highest safe same-major versions
+    (1.1.16 / 2.1.2 / 5.0.8); revisit when the old CJS minimatch consumers age out. The scheduled
+    osv-scanner (report-only) will keep it visible.
 - [ ] `ui-003` SSR; signed appliance image;
   HW config-apply/reboot/button; equity/i18n; uncleared-surface follow-up
   (quick-start/by-meeting authz, FTS injection, config reflection);
