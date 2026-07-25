@@ -802,8 +802,19 @@ follow-up. (Storage, config+CLI, API-routes clusters + saga/BB/notifications.)
 
 ## Roadmap-tier (scope with user before starting)
 
+- [x] **Supply-chain CI hardening (dependency scanning + disclosure policy) — DONE 2026-07-25.**
+  Added `.github/SECURITY.md` (private-disclosure policy, supported versions, coordinated-
+  disclosure targets) and two SHA-pinned GitHub Actions:
+  - **dependency-review** (`actions/dependency-review-action` v5.0.0) — PR gate,
+    `fail-on-severity: high`; vets the dep bumps Renovate opens.
+  - **osv-scanner** (`google/osv-scanner-action` v2.3.8 reusable workflows) — PR diff-scan
+    FAILS on a newly-introduced vuln; weekly `schedule` + `workflow_dispatch` full scan REPORTS
+    to Security > Code scanning (`fail-on-vuln: false`, so a pre-existing advisory surfaces
+    without breaking a build). No `push` trigger, so it can't red-CI `develop` on introduction.
+  **Remaining supply-chain sub-items** (folded into the roadmap line below): CodeQL SAST (a
+  code-security axis, distinct from these dependency-focused tools) and the Node-pin reconcile
+  (actions are SHA-pinned; a `.nvmrc`/`engines` audit is still outstanding).
 - [ ] `ui-003` SSR; signed appliance image;
   HW config-apply/reboot/button; equity/i18n; uncleared-surface follow-up
   (quick-start/by-meeting authz, FTS injection, config reflection);
-  supply-chain (dependency-review/CodeQL/osv-scanner, SECURITY.md, Node-pin
-  reconcile — actions SHA-pinning landed with CI batch); doc-drift sweep
+  CodeQL SAST + Node-pin reconcile (remainder of supply-chain); doc-drift sweep
