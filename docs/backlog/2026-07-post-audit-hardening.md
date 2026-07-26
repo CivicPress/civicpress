@@ -804,13 +804,17 @@ follow-up. (Storage, config+CLI, API-routes clusters + saga/BB/notifications.)
 
 - [x] **Supply-chain CI hardening (dependency scanning + disclosure policy) — DONE 2026-07-25.**
   Added `.github/SECURITY.md` (private-disclosure policy, supported versions, coordinated-
-  disclosure targets) and two SHA-pinned GitHub Actions:
-  - **dependency-review** (`actions/dependency-review-action` v5.0.0) — PR gate,
-    `fail-on-severity: high`; vets the dep bumps Renovate opens.
+  disclosure targets) and a SHA-pinned GitHub Action:
   - **osv-scanner** (`google/osv-scanner-action` v2.3.8 reusable workflows) — PR diff-scan
     FAILS on a newly-introduced vuln; weekly `schedule` + `workflow_dispatch` full scan REPORTS
     to Security > Code scanning (`fail-on-vuln: false`, so a pre-existing advisory surfaces
     without breaking a build). No `push` trigger, so it can't red-CI `develop` on introduction.
+  - ~~dependency-review~~ **removed** (`404a82c`-era): `actions/dependency-review-action`
+    requires the repo's **Dependency Graph**, which is disabled here (org/repo setting we can't
+    toggle) — it errored "Dependency review is not supported on this repository" on every PR.
+    osv-scanner's PR diff-scan already provides the dependency-vuln gate, so this was dropped
+    rather than left permanently red. Re-add `dependency-review.yml` if Dependency Graph gets
+    enabled (it also brings license checks + an inline PR comment osv-scanner lacks).
   **Remaining supply-chain sub-items** (folded into the roadmap line below): CodeQL SAST (a
   code-security axis, distinct from these dependency-focused tools) and the Node-pin reconcile
   (actions are SHA-pinned; a `.nvmrc`/`engines` audit is still outstanding).
