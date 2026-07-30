@@ -31,6 +31,17 @@ and this project adheres to
   log-only `approval` / `publication` / `archival` workflow stubs — registered as
   if functional — were removed.
 
+### Security
+
+- **Remediated known dependency vulnerabilities.** A centralized `pnpm.overrides`
+  block takes the dependency tree from 94 osv-scanner advisories (3 Critical, 45
+  High) down to 2 (a brace-expansion DoS not reachable from the request surface).
+  Includes major bumps verified against their consumers (nodemailer, multer, tar,
+  markdown-it, uuid).
+- **Added supply-chain scanning to CI.** osv-scanner (PR diff-gate + weekly
+  lockfile scan) and CodeQL SAST (report-only), plus a `SECURITY.md`
+  vulnerability-disclosure policy.
+
 ## [0.2.0] - 2025-01-30
 
 ### Added

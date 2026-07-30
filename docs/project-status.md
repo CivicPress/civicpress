@@ -1,19 +1,19 @@
 # CivicPress Project Status
 
-> **Current status (2026-07-25) — supersedes the 2026-07-15 snapshot below.**
-> Remediation from the 2026-07-02 `FA-*` audit is complete and merged to `main`
-> (PR #19), as is the follow-on tech-debt/refactor batch (PR #20). `main` is no
-> longer frozen and now carries **branch protection** (required `build-test` +
-> `audit-truth-check`). Ongoing hardening lives on `develop` and is tracked in
-> **`docs/backlog/2026-07-post-audit-hardening.md`** — the live tracker, which
-> supersedes the branch/PR details in the older banners below. Its Tiers A–D,
-> Improvements, Refactors/tech-debt, and Test & CI health sections are closed.
-> Recent work: phase-7e→7j test-health (per-test DB isolation, CI parallelism,
-> quarantine burn-down — which surfaced several real product bugs); a skipped-test
-> triage (two more real bugs fixed — published records leaking into the drafts
-> list, and record locks expiring mid-edit); and the core-002 hook→WorkflowEngine
-> wiring. Remaining open: HW/frontend test coverage and the roadmap-tier features
-> (SSR, signed appliance image, equity/i18n, supply-chain, doc-drift). The honest
+> **Current status (2026-07-30) — supersedes the 2026-07-15 snapshot below.**
+> Remediation from the 2026-07-02 `FA-*` audit merged to `main` (PR #19), as did
+> the tech-debt/refactor batch (PR #20) and a 2026-07-24→30 post-audit hardening
+> batch (PR #21): two real production-bug fixes (published records leaking into
+> the drafts list; record locks expiring mid-edit), the core-002
+> hook→WorkflowEngine wiring, supply-chain scanning + a dependency-vulnerability
+> remediation (94 → 2 osv-scanner advisories), and the Test & CI health closeout.
+> `main` is unfrozen with **branch protection** (required `build-test` +
+> `audit-truth-check`); CodeQL SAST is landing via PR #22. The live tracker is
+> **`docs/backlog/2026-07-post-audit-hardening.md`** (it supersedes the branch/PR
+> details in the older banners below); its Tiers A–D, Improvements,
+> Refactors/tech-debt, Test & CI health, and supply-chain sections are all closed.
+> Remaining open: HW-repo work, frontend test coverage, and the roadmap-tier
+> features (SSR, signed appliance image, equity/i18n, doc-drift). The honest
 > v0.2.x answer below still holds — functional for early pilots, expect breaking
 > changes through v0.3.x.
 >
