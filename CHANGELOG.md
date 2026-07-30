@@ -61,6 +61,12 @@ and this project adheres to
   `IndexingOptions.rebuild`). It was never wired to any behavior — every index
   generation already performs a full scan — so it was dropped rather than left
   as a misleading switch.
+- **Removed the never-wired storage failover, retry, and metrics subsystems.**
+  Their configuration setters had no callers, so the managers were never
+  constructed and those code paths were unreachable; the advertised-but-inert
+  `retry_*` keys were dropped from the default `storage.yml` and the storage
+  config type. The live circuit breaker, health checks, timeouts, quota, usage
+  reporting, and lifecycle management are unaffected.
 
 ### Fixed
 
@@ -74,6 +80,13 @@ and this project adheres to
   holder, so the editor's periodic lock-refresh silently 409'd and the lock
   lapsed after its timeout while the user was still editing. Different-user
   conflict detection is unchanged.
+- **`civic cleanup --force` now works and targets the real data locations.** The
+  `--force` path requires `--yes-i-know`, but an option-name mismatch meant the
+  acknowledgement was never detected, so every non-interactive run was refused.
+  Cleanup also deleted hardcoded repo-relative paths; it now resolves the data
+  dir, system-data dir, and `.civicrc` through the core config (honoring a
+  relocated `dataDir` / `CIVIC_DATA_DIR`) and removes the whole `.system-data`
+  (database plus secret and storage credentials), not just `civic.db`.
 
 ### Security
 

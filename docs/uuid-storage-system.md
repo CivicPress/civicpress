@@ -207,10 +207,6 @@ global:
   health_checks: true
   health_check_interval: 60000  # 1 minute
   health_check_timeout: 5000    # 5 seconds
-  retry_attempts: 3
-  retry_initial_delay: 1000     # 1 second
-  retry_max_delay: 30000        # 30 seconds
-  retry_backoff_multiplier: 2
   max_concurrent_uploads: 5
   max_concurrent_downloads: 10
   max_concurrent_deletes: 10
@@ -298,23 +294,18 @@ civic storage:migrate-to-uuid
 
 ### Reliability Features
 
-1. **Retry with Exponential Backoff** - Automatic retry for transient failures
-2. **Automatic Failover** - Seamless switching between storage providers on
-   failure
-3. **Circuit Breaker** - Prevents cascading failures by blocking requests to
-   failing providers
-4. **Health Checks** - Periodic monitoring of provider health status
-5. **Timeout Handling** - Configurable timeouts for all operations
+1. **Circuit Breaker** - Fails fast when a provider is repeatedly erroring
+   instead of hammering it with timeouts
+2. **Health Checks** - Periodic health probes of the configured providers
+3. **Timeout Handling** - Configurable timeouts for all operations
 
 ### Observability & Management
 
-1. **Metrics Collection** - Comprehensive metrics for operations, latency, and
-   errors
-2. **Usage Reporting** - Storage usage by folder and provider with caching
-3. **Quota Enforcement** - Global and per-folder storage quotas
-4. **Orphaned File Cleanup** - Identify and clean up files without database
+1. **Usage Reporting** - Storage usage by folder and provider with caching
+2. **Quota Enforcement** - Global and per-folder storage quotas
+3. **Orphaned File Cleanup** - Identify and clean up files without database
    records
-5. **Lifecycle Management** - Automated retention, archival, and deletion
+4. **Lifecycle Management** - Automated retention, archival, and deletion
    policies
 
 ### Error Handling
