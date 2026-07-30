@@ -106,7 +106,9 @@ describe('cloud-uuid-storage internals — generateStoredFilename* (W2-T18 chara
   // stored key is always a safe identifier (base slugged, id separated by "_").
   it('slugs the basename and appends the id: "<slug>_<id>.ext"', () => {
     const file = { originalname: 'document.pdf' } as MulterFile;
-    expect(generateStoredFilename(file, 'abc-123')).toBe('document_abc-123.pdf');
+    expect(generateStoredFilename(file, 'abc-123')).toBe(
+      'document_abc-123.pdf'
+    );
   });
 
   it('slugs interior dots in multi-dot names (only the last is the extension)', () => {
@@ -254,7 +256,12 @@ describe('cloud-uuid-storage internals — getLocalStoragePath (W2-T18 character
   ): StorageHostLike {
     return {
       basePath,
-      logger: { info: vi.fn(), debug: vi.fn(), warn: vi.fn(), error: vi.fn() } as any,
+      logger: {
+        info: vi.fn(),
+        debug: vi.fn(),
+        warn: vi.fn(),
+        error: vi.fn(),
+      } as any,
       config: {
         active_provider: 'local',
         providers,
@@ -283,7 +290,10 @@ describe('cloud-uuid-storage internals — getLocalStoragePath (W2-T18 character
   });
 
   it('defaults to "storage" subpath when local provider exists with no explicit path', () => {
-    const host = makeHost({ local: { type: 'local' } as any }, '/tmp/civic-base');
+    const host = makeHost(
+      { local: { type: 'local' } as any },
+      '/tmp/civic-base'
+    );
     expect(getLocalStoragePath(host)).toBe('/tmp/civic-base/storage');
   });
 });
@@ -450,9 +460,9 @@ describe('StorageValidation — validateBatchUpload (W2-T18 characterization)', 
       files,
     } as any);
     expect(result.valid).toBe(false);
-    expect(
-      result.errors.some((e) => /Total batch size exceeds/i.test(e))
-    ).toBe(true);
+    expect(result.errors.some((e) => /Total batch size exceeds/i.test(e))).toBe(
+      true
+    );
   });
 
   it('aggregates per-file errors with the originalname prefix', () => {
@@ -482,13 +492,9 @@ describe('CloudUuidStorageService orchestrator — public API surface (W2-T18 ch
     'setDatabaseService',
     'setCacheManager',
     'setConcurrencyLimiter',
-    'setRetryManager',
-    'setFailoverManager',
     'setCircuitBreakerManager',
     'setHealthChecker',
     'getHealthChecker',
-    'setMetricsCollector',
-    'getMetricsCollector',
     'getUsageReporter',
     'getQuotaManager',
     'setQuotaManager',

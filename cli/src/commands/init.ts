@@ -1577,7 +1577,6 @@ async function setupStorage(
           max_file_size: '100MB',
           health_checks: true,
           health_check_interval: 5,
-          retry_attempts: 3,
           cross_provider_backup: false,
           backup_providers: [],
         },

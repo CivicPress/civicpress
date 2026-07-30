@@ -737,7 +737,6 @@ export function createStorageConfig(config: TestConfig) {
       max_file_size: '100MB',
       health_checks: false,
       health_check_interval: 30,
-      retry_attempts: 1,
       cross_provider_backup: false,
       backup_providers: [],
     },

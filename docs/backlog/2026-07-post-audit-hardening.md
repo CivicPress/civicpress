@@ -1083,9 +1083,32 @@ they are pre-existing gaps the audit made visible.
 
 **Dead-code cleanup (low)**
 
-- [ ] Storage failover / retry / metrics are unit-tested state machines but
-      their setters are **never called outside tests** (only the circuit breaker
-      is live, pointless without failover behind it).
+- [x] **Storage failover / retry / metrics — DELETED 2026-07-30.** Even deader
+      than described: the wiring setters (`setRetryManager` /
+      `setFailoverManager` / `setMetricsCollector`) had **zero** callers
+      anywhere, so `retryManager` / `failoverManager` / `metricsCollector` were
+      permanently `null` and every `if (host.X)` branch in the ops files was
+      unreachable. Removed the 3 manager classes + their 4 test files (55 tests)
+      + the setters/fields + the dead ops-branches (keeping the live
+      circuit-breaker + direct-provider path) + the barrel exports, and the
+      advertised-but-dead retry config (`retry_attempts` + `retry_initial_delay`
+      / `retry_max_delay` / `retry_backoff_multiplier` / `retryable_errors`) from
+      `storage.types.ts` / `storage.yml` / `civic init` — `42ab1f0` had just made
+      the API apply storage.yml, so those keys were loaded-then-ignored. The
+      circuit breaker stays (live, 18 tests; fail-fast on a down provider has
+      standalone value). Verified 276 tests green across the storage unit suite
+      (183), the characterization + API upload/download/delete/range suite (65),
+      and the CLI storage suite (28). See follow-up below re: the now-orphaned
+      health checker.
+- [ ] **Follow-up (surfaced by the deletion above):** with the failover manager
+      gone, `StorageHealthChecker` + `providerProbes` + the `failover_providers`
+      config are now **live-but-orphaned** — the checker is still constructed
+      (when `health_checks: true`) and probes each provider, but its only output
+      method `getProviderHealth` has **no live reader** (its sole consumer was the
+      failover recovery loop). Left in place this pass (removing it deletes
+      user-facing default config — `health_checks`, `failover_providers` — which
+      is beyond the scoped "failover/retry" cleanup). Decide: wire it to a
+      diagnostics/health surface, or remove the health-check subsystem too.
 - [x] **Realtime `PresenceManager` + `awareness.ts` — DELETED 2026-07-30.** Both
       were unwired dead code, reachable only through the `index.ts` barrel and
       never constructed in any live path (live presence runs through
