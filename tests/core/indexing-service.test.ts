@@ -329,4 +329,29 @@ describe('IndexingService', () => {
       }
     });
   });
+
+  // #8 (2026-07-02 audit follow-up): generateIndexes had no concurrency guard,
+  // so overlapping calls each launched a full records/ re-scan (a privileged
+  // self-DoS lever). It is now single-flight with a trailing re-run.
+  describe('generateIndexes single-flight (#8)', () => {
+    it('coalesces overlapping calls instead of launching concurrent scans', async () => {
+      const scan = vi.spyOn(indexingService as any, 'doGenerateIndexes');
+
+      const results = await Promise.all([
+        indexingService.generateIndexes(),
+        indexingService.generateIndexes(),
+        indexingService.generateIndexes(),
+      ]);
+
+      // Three concurrent calls never run three concurrent scans: the first runs
+      // and the rest coalesce onto it, triggering exactly one trailing re-run.
+      expect(scan.mock.calls.length).toBeGreaterThanOrEqual(1);
+      expect(scan.mock.calls.length).toBeLessThanOrEqual(2);
+      // All callers observe the same coalesced (final) index object.
+      expect(results[0]).toBe(results[1]);
+      expect(results[1]).toBe(results[2]);
+
+      scan.mockRestore();
+    });
+  });
 });

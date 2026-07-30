@@ -1549,7 +1549,6 @@ export async function createAPITestContext(): Promise<APITestContext> {
     // Generate the index after creating sample records and initializing the API
     if (civicPress && typeof civicPress.getIndexingService === 'function') {
       await civicPress.getIndexingService().generateIndexes({
-        rebuild: true,
         syncDatabase: true,
         conflictResolution: 'file-wins',
       });

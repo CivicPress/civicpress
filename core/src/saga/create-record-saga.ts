@@ -447,7 +447,6 @@ class QueueIndexingStep extends BaseSagaStep<CreateRecordContext, void> {
       this.indexingService
         .generateIndexes({
           types: [context.record.type],
-          rebuild: false,
         })
         .catch((error) => {
           // Log but don't fail - indexing is derived state

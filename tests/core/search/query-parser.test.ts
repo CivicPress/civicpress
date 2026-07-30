@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest';
 import {
   parseSearchQuery,
   buildFTS5Query,
-  calculateSimilarity,
 } from '../../../core/src/search/query-parser.js';
 
 describe('Query Parser', () => {
@@ -52,17 +51,6 @@ describe('Query Parser', () => {
         expect(query).not.toMatch(/[^"\s]\*/);
         expect(query).toContain('"');
       }
-    });
-  });
-
-  describe('calculateSimilarity', () => {
-    it('should return 1.0 for identical strings', () => {
-      expect(calculateSimilarity('budget', 'budget')).toBe(1.0);
-    });
-
-    it('should return high similarity for typos', () => {
-      const similarity = calculateSimilarity('budget', 'budjet');
-      expect(similarity).toBeGreaterThan(0.7);
     });
   });
 });

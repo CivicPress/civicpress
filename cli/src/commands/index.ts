@@ -8,7 +8,6 @@ import { cliSuccess, cliError, cliInfo, cliWarn } from '../utils/cli-output.js';
 export const indexCommand = (cli: CAC) => {
   cli
     .command('index', 'Generate and manage civic record indexes')
-    .option('--rebuild', 'Rebuild all indexes from scratch')
     .option('--module <module>', 'Generate index for specific module')
     .option('--type <type>', 'Filter by record type')
     .option('--status <status>', 'Filter by record status')
@@ -65,7 +64,6 @@ export const indexCommand = (cli: CAC) => {
 
 async function handleGenerate(indexingService: any, options: any) {
   const indexingOptions = {
-    rebuild: options.rebuild,
     modules: options.module ? [options.module] : undefined,
     types: options.type ? [options.type] : undefined,
     statuses: options.status ? [options.status] : undefined,
