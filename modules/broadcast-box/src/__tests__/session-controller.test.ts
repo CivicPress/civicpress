@@ -443,6 +443,73 @@ describe('SessionController', () => {
     });
   });
 
+  // #5 (2026-07-02 audit follow-up): quick-start spread a client-supplied
+  // meetingId into linked_records unchecked, so a caller could link a session
+  // draft to any arbitrary or nonexistent id. The linkage is now validated
+  // against a real `meeting` record before anything is created.
+  describe('quickStartSession — meeting linkage guard (#5)', () => {
+    const primeConnectedIdleDevice = () => {
+      mockDeviceManager.getDevice.mockResolvedValue({
+        id: 'device-id',
+        status: 'active',
+      });
+      mockConnectionTracker.isConnected.mockReturnValue(true);
+      mockConnectionTracker.getConnectionState.mockReturnValue({
+        state: { status: 'idle' },
+      });
+    };
+
+    it('rejects a meetingId that resolves to no record (maps to 404)', async () => {
+      primeConnectedIdleDevice();
+      mockRecordManager.createRecord = vi.fn();
+      mockRecordManager.getRecord.mockResolvedValue(null);
+
+      await expect(
+        sessionController.quickStartSession({
+          deviceId: 'device-id',
+          meetingId: 'nonexistent-meeting',
+        })
+      ).rejects.toThrow(/Meeting not found/);
+
+      // No orphan draft: the record is never created when the linkage is bad.
+      expect(mockRecordManager.createRecord).not.toHaveBeenCalled();
+    });
+
+    it('rejects a meetingId that points to a non-meeting record', async () => {
+      primeConnectedIdleDevice();
+      mockRecordManager.createRecord = vi.fn();
+      mockRecordManager.getRecord.mockResolvedValue({
+        id: 'bylaw-1',
+        type: 'bylaw',
+      });
+
+      await expect(
+        sessionController.quickStartSession({
+          deviceId: 'device-id',
+          meetingId: 'bylaw-1',
+        })
+      ).rejects.toThrow(/Meeting not found/);
+      expect(mockRecordManager.createRecord).not.toHaveBeenCalled();
+    });
+
+    it('skips the meeting lookup entirely when no meetingId is supplied', async () => {
+      primeConnectedIdleDevice();
+      // Fail fast right after the (skipped) guard so we only observe that no
+      // meeting lookup ran; a sentinel error distinguishes this from the guard.
+      mockRecordManager.createRecord = vi
+        .fn()
+        .mockRejectedValue(new Error('stop-after-guard'));
+
+      await expect(
+        sessionController.quickStartSession({ deviceId: 'device-id' })
+      ).rejects.toThrow('stop-after-guard');
+
+      // getRecord is only used by the meeting-linkage guard here; with no
+      // meetingId it must not run before createRecord.
+      expect(mockRecordManager.getRecord).not.toHaveBeenCalled();
+    });
+  });
+
   describe('stopSession', () => {
     it('should stop a recording session', async () => {
       const sessionId = 'session-id';

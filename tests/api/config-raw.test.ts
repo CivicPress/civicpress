@@ -100,4 +100,39 @@ describe('Config RAW endpoints', () => {
     expect(res.status).toBe(400);
     expect(res.body?.error?.message).toMatch(/invalid config type/i);
   });
+
+  // #6 (2026-07-02 audit follow-up): the raw PUT stored arbitrary bytes with no
+  // validation, so an admin could persist unparseable YAML that then 500s the
+  // PUBLIC GET /info when CentralConfigManager loads it. Reject on parse failure.
+  it('rejects unparseable YAML on raw PUT with 400 (validate-on-save)', async () => {
+    const authRes = await request(context.api.getApp())
+      .post('/api/v1/auth/simulated')
+      .send({ username: 'admin-user', role: 'admin' });
+    const token = authRes.body?.data?.session?.token as string;
+
+    const res = await request(context.api.getApp())
+      .put('/api/v1/config/raw/org-config')
+      .set('Authorization', `Bearer ${token}`)
+      .set('Content-Type', 'text/yaml')
+      .send('name: "unterminated\n');
+    expect(res.status).toBe(400);
+    expect(res.body?.error?.code).toBe('INVALID_YAML');
+  });
+
+  // #3 (FA-API-017 follow-up): credential-bearing config (notifications) stays
+  // admin-only via an extra system:admin gate. This regression check proves the
+  // gate does not block a genuine admin; the future-proofing block path (a
+  // delegated config:manage role lacking system:admin) has no default role to
+  // exercise it here.
+  it('still allows an admin to read credential-bearing config (notifications)', async () => {
+    const authRes = await request(context.api.getApp())
+      .post('/api/v1/auth/simulated')
+      .send({ username: 'admin-user', role: 'admin' });
+    const token = authRes.body?.data?.session?.token as string;
+
+    const res = await request(context.api.getApp())
+      .get('/api/v1/config/raw/notifications')
+      .set('Authorization', `Bearer ${token}`);
+    expect(res.status).toBe(200);
+  });
 });

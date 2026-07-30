@@ -107,6 +107,18 @@ export class SessionController {
       throw new Error(`Device ${request.deviceId} is already recording`);
     }
 
+    // Validate the optional meeting linkage before creating anything. A
+    // client-supplied meetingId was previously spread into linked_records
+    // unchecked, so a caller could link a session draft to any arbitrary or
+    // nonexistent id (polluting getSessionsForMeeting). Require it to resolve
+    // to a real `meeting` record; the API handler maps 'not found' to 404.
+    if (request.meetingId) {
+      const meeting = await this.recordManager.getRecord(request.meetingId);
+      if (!meeting || meeting.type !== 'meeting') {
+        throw new Error(`Meeting not found: ${request.meetingId}`);
+      }
+    }
+
     const user = request.user ?? {
       id: 1,
       username: 'broadcast-box',

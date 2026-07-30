@@ -1,5 +1,10 @@
-import express, { Router } from 'express';
-import { ConfigurationService, CentralConfigManager } from '@civicpress/core';
+import express, { Router, Request, Response, NextFunction } from 'express';
+import {
+  ConfigurationService,
+  CentralConfigManager,
+  userCan,
+} from '@civicpress/core';
+import { parse as parseYAML } from 'yaml';
 import { readFile, writeFile, mkdir } from 'fs/promises';
 import { join, dirname } from 'path';
 import { authMiddleware, requirePermission } from '../middleware/auth.js';
@@ -164,10 +169,58 @@ router.post(
 // Secured configuration routes: require authenticated admin permission
 router.use((req, res, next) => {
   const civicPress = req.civicPress;
-  if (!civicPress) return next();
+  if (!civicPress) {
+    // Fail closed: without a CivicPress instance the auth middleware cannot be
+    // constructed, so deny rather than fall through unauthenticated. This
+    // branch was previously `return next()` — only saved from being fail-open
+    // by the requirePermission gate immediately below.
+    res.status(503).json({
+      success: false,
+      error: {
+        message: 'Authentication service unavailable',
+        code: 'AUTH_UNAVAILABLE',
+      },
+    });
+    return;
+  }
   return authMiddleware(civicPress)(req, res, next);
 });
 router.use(requirePermission('config:manage'));
+
+// FA-API-017 follow-up: some config types (notifications) hold credentials —
+// SMTP passwords, API keys. `config:manage` is admin-only today, but keep
+// credential-bearing config admin-only even if that permission is ever
+// delegated to a broader role: a generic config editor must not read or write
+// secrets. Applied per-route to the `:type` handlers that touch values.
+const SECRET_CONFIG_TYPES = new Set(['notifications']);
+
+function isSecretConfigType(type: string | undefined): boolean {
+  const key = (type || '').toLowerCase().trim();
+  const canonical = key.startsWith('notif') ? 'notifications' : key;
+  return SECRET_CONFIG_TYPES.has(canonical);
+}
+
+async function guardSecretConfig(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  if (!isSecretConfigType(req.params.type)) {
+    next();
+    return;
+  }
+  if (req.user && (await userCan(req.user, 'system:admin'))) {
+    next();
+    return;
+  }
+  res.status(403).json({
+    success: false,
+    error: {
+      message: 'Admin access required for credential-bearing configuration',
+      code: 'INSUFFICIENT_PERMISSIONS',
+    },
+  });
+}
 
 /**
  * GET /api/config/list
@@ -193,7 +246,7 @@ router.get('/list', async (req, res) => {
  * GET /api/config/metadata/:type
  * Get configuration metadata for form generation
  */
-router.get('/metadata/:type', async (req, res) => {
+router.get('/metadata/:type', guardSecretConfig, async (req, res) => {
   try {
     const { type } = req.params;
     const metadata =
@@ -237,7 +290,7 @@ function resolveRawPaths(type: string) {
  * RAW: GET /api/config/raw/:type
  * Return raw YAML content without transforms
  */
-router.get('/raw/:type', async (req, res) => {
+router.get('/raw/:type', guardSecretConfig, async (req, res) => {
   try {
     const { type } = req.params;
     const { userPath, defaultPath } = resolveRawPaths(type);
@@ -273,6 +326,7 @@ router.get('/raw/:type', async (req, res) => {
  */
 router.put(
   '/raw/:type',
+  guardSecretConfig,
   express.text({ type: '*/*', limit: '5mb' }),
   async (req, res) => {
     try {
@@ -282,6 +336,21 @@ router.put(
         return res
           .status(400)
           .json({ success: false, error: { message: 'YAML content is required', code: 'YAML_CONTENT_IS_REQUIRED' } });
+      }
+
+      // Reject YAML that cannot be parsed before persisting it. This is the
+      // only config write path that stores arbitrary bytes, and an unparseable
+      // file makes the PUBLIC GET /info 500 when CentralConfigManager loads it.
+      try {
+        parseYAML(yamlContent);
+      } catch (parseError) {
+        return res.status(400).json({
+          success: false,
+          error: {
+            message: `Invalid YAML: ${parseError instanceof Error ? parseError.message : String(parseError)}`,
+            code: 'INVALID_YAML',
+          },
+        });
       }
 
       const { userPath } = resolveRawPaths(type);
@@ -349,7 +418,7 @@ router.get('/status', async (req, res) => {
  * GET /api/config/:type
  * Load a specific configuration file
  */
-router.get('/:type', async (req, res) => {
+router.get('/:type', guardSecretConfig, async (req, res) => {
   try {
     const { type } = req.params;
     const config = await getConfigurationService().loadConfiguration(type);
@@ -371,7 +440,7 @@ router.get('/:type', async (req, res) => {
  * PUT /api/config/:type
  * Save a configuration file
  */
-router.put('/:type', async (req, res) => {
+router.put('/:type', guardSecretConfig, async (req, res) => {
   try {
     const { type } = req.params;
     const content = req.body;
@@ -414,7 +483,7 @@ router.put('/:type', async (req, res) => {
  * POST /api/config/:type/reset
  * Reset a configuration to defaults
  */
-router.post('/:type/reset', async (req, res) => {
+router.post('/:type/reset', guardSecretConfig, async (req, res) => {
   try {
     const { type } = req.params;
 

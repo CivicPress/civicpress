@@ -95,6 +95,23 @@ export class GeographyManager {
     _user: AuthUser
   ): Promise<GeographyFile> {
     try {
+      // Defense-in-depth (FA-API-003 follow-up): `type` and `category` become
+      // filesystem path segments in the path.join below, so reject anything
+      // that is not a bare name before it can traverse (`../`, separators, NUL,
+      // absolute). The API layer already allowlists these, but the core must be
+      // self-defending for any other caller (CLI, scripts, a future endpoint).
+      const SAFE_SEGMENT = /^[a-z0-9-]+$/;
+      if (
+        !SAFE_SEGMENT.test(request.type ?? '') ||
+        !SAFE_SEGMENT.test(request.category ?? '')
+      ) {
+        throw new GeographyValidationError('Invalid geography type or category', {
+          valid: false,
+          errors: ['type and category must be bare names matching [a-z0-9-]+'],
+          warnings: [],
+        });
+      }
+
       // Validate the content
       const validation = await this.validateGeographyContent(
         request.content,
