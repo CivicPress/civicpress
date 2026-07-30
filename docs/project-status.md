@@ -1,940 +1,124 @@
 # CivicPress Project Status
 
-> **Current status (2026-07-30) — supersedes the 2026-07-15 snapshot below.**
-> Remediation from the 2026-07-02 `FA-*` audit merged to `main` (PR #19), as did
-> the tech-debt/refactor batch (PR #20) and a 2026-07-24→30 post-audit hardening
-> batch (PR #21): two real production-bug fixes (published records leaking into
-> the drafts list; record locks expiring mid-edit), the core-002
-> hook→WorkflowEngine wiring, supply-chain scanning + a dependency-vulnerability
-> remediation (94 → 2 osv-scanner advisories), and the Test & CI health
-> closeout. `main` is unfrozen with **branch protection** (required
-> `build-test` + `audit-truth-check`); CodeQL SAST **landed** via PR #22 (merged
-> to `main`, now at `e4f64bd`). `develop` is 5 commits ahead pending the next
-> develop→main PR — a housekeeping refresh, a CHANGELOG consolidation, and a
-> **security-tail** batch that audited the audit's five deferred carry-forward
-> surfaces (no live vulns) and applied the residual **Low** defense-in-depth
-> hardening + dead-code cleanup, so that tier is now closed on `develop`. The
-> live tracker is **`docs/backlog/2026-07-post-audit-hardening.md`** (it
-> supersedes the branch/PR details in the older banners below); its Tiers A–D,
-> Improvements, Refactors/tech-debt, Test & CI health, and supply-chain sections
-> are all closed. Remaining open: HW-repo work, frontend test coverage, and the
-> roadmap-tier features (SSR, signed appliance image, equity/i18n). The honest
-> v0.2.x answer below still holds — functional for early pilots, expect breaking
-> changes through v0.3.x.
->
-> **Prior snapshot (2026-07-15) — supersedes the 2026-06-03 snapshot below.** A
-> second, full two-repo audit landed 2026-07-02
-> (`docs/audits/2026-07-02-full-audit.md`, `FA-*` registry — the authoritative
-> tracker). Its remediation is essentially complete: **all 4 Criticals, all 22
-> Highs, and the entire actionable Medium/Low security + correctness tail are
-> CLOSED** across the monorepo (`refactor/phase-6c-audit-mediums`) and the
-> BroadcastBox hardware repo (`refactor/phase-4-enrollment-hardening`). Only
-> **FA-OPS-001** (this tracking-doc reconciliation) and the residual **Low**
-> defense-in-depth tier remain. `origin/main` is still **frozen** pending a
-> confirming pre-merge re-audit; the remediation lives on the feature branches /
-> open PRs. The Phase 2/3 narrative below is retained for history but is no
-> longer the current state — trust the `FA-*` registry for the live picture.
-
-- **Last Updated**: 2026-07-30 (post-audit-hardening arc + security-tail + this
-  doc-drift sweep)
-- **Current Version**: v0.2.0 (Alpha)
-- **Overall Status**: Alpha — functional for early pilots; expect breaking
-  changes through v0.3.x. The 2026-05 base refactor (Phases 2a–2d + realtime /
-  hardware audit / broadcast-box reintegration) and the authoritative 2026-07-02
-  `FA-*` audit are both complete — every finding closed or an explicit
-  accepted-deferral. The post-audit-hardening arc (PRs #19–#22) is merged to
-  `main` (`e4f64bd`); `develop` is 5 commits ahead (security-tail +
-  housekeeping), pending the next develop→main PR.
-- **Test Suite**: full suite green in parallel in CI (~700+ tests across the
-  core / api / cli / ui / storage workspaces). The `--fileParallelism=false`
-  workaround was dropped, the skip backlog was burned down, and fake-timers
-  retired the hardcoded-expiry "date-bomb" tests. The per-workspace counts
-  further below are a historical 2026-05 snapshot.
-- **Implementation**: v0.2.0. Both the 2026-05 manifesto-fit audit (205
-  findings) and the 2026-07-02 `FA-*` audit are fully remediated. **Everything
-  below this header is a 2026-06-03 snapshot, retained as history** — for the
-  live picture trust this header, the `FA-*` registry
-  (`docs/audits/2026-07-02-full-audit.md`), and
-  `docs/backlog/2026-07-post-audit-hardening.md`.
-
-**Website:** [civicpress.io](https://civicpress.io) | **Contact:**
-[hello@civicpress.io](mailto:hello@civicpress.io)
-
-## Audit findings (2026-05)
-
-The 2026-05 manifesto-fit audit identified **205 findings (20 Critical, 65 High,
-79 Medium, 41 Low)**. A post-audit base refactor is in progress; tracker at:
-
-- `docs/audits/2026-05-16-manifesto-fit-findings.md` — full registry with Status
-  column
-- `docs/audits/phase-2a-closure-report.md` — Phase 2a Bleed-Stop summary (18
-  closed, 5 deferred by design)
-- `docs/audits/phase-2c-closure-report.md` — Phase 2c Foundation Cleanup summary
-- `docs/audits/phase-2c.5-closure-note.md` — Phase 2c.5 cleanup follow-ups
-- `docs/audits/phase-2d-closure-report.md` — Phase 2d Structural Hardening
-  summary (13 closed across W0+W1+W2+W3+W4)
-- `docs/audits/phase-2d-type-cast-inventory.md` — Phase 2d W3 type-safety
-  inventory + progress log (1,621 → 223 casts, 86% cleared)
-- `docs/audits/spec-stability-triage.md` — spec-by-spec honest status (61 specs
-  reviewed in Phase 2b Task 1)
-- `docs/plans/2026-05-17-base-refactor-master-plan.md` — 7-phase roadmap (~3-5
-  months total)
-
-This file is **the public answer to "is it ready?"** The honest answer for
-v0.2.x is: **functional for early pilots; not yet production-grade by municipal
-procurement standards; expect breaking changes through v0.3.x as the refactor
-lands.**
-
-## Current Status
-
-CivicPress is a **working alpha** civic technology platform. The core
-record-management, Git-engine, CLI, API, and UI surfaces function for the v0.2.0
-feature set. Post-audit refactor progress to date (2026-05-17 through
-2026-05-25):
-
-- **Phase 2a (Bleed-Stop)** closed 15 Critical findings (auth gates wired, XSS
-  sanitized, quotas enforced, audit logs made truthful, stub routers demoted to
-  501). Merged to local `main`.
-- **Phase 2b (Truth Restoration)** + **Phase 2c (Foundation Cleanup)** + **Phase
-  2c.5 (cleanup followups)** merged to local `dev`. Truth meter advanced from 18
-  → 51 of 205 findings closed; orphaned subsystems delete-or-wired; audit-trail
-  unified via the `AuditChannel`.
-- **Phase 2d (Structural Hardening) fully closed** on a local-only branch (89
-  commits). W0 cleared all 28 carry-forward storage test failures and surfaced +
-  fixed 9 reliability-primitive bugs. W1 shipped the canonical module contract +
-  `ModuleResolver`. W2 decomposed all 18 named god-files + 3 surfaced extras
-  (largest: `cloud-uuid-storage-service.ts` 2,711 → 539 LoC). W3 drove 1,621
-  `: any`/`as any` casts to an annotated-allowlist 223 (86% cleared) and
-  surfaced + fixed 6 latent bugs in the process. W4 made every workspace declare
-  every imported package + flipped `.npmrc` to strict hoist + moved cloud SDKs
-  to `optionalDependencies` (with lazy SDK loader) + generated
-  `docs/licenses.md` (1,460 packages catalogued). Closure report at
-  `docs/audits/phase-2d-closure-report.md`.
-- **Phase 2d-followup `ui-002` v3→v4 migration closed 2026-05-28** on a
-  local-only branch. Swapped paid `@nuxt/ui-pro ^3.3.7` + free `@nuxt/ui ^3.3.7`
-  (both v3) for the single MIT-licensed `@nuxt/ui ^4.8.0` (v4 folded Pro
-  components into the free package — the separate `@nuxt/ui-pro` package was
-  dropped upstream). Closed 2 original-205 findings: `ui-002` (Critical, vendor
-  lock-in) and `deps-009` (Medium, paid-commercial dep). v4 was a near-drop-in
-  for our usage: 138/138 UI tests green throughout, only one real source change
-  (drop the `ui.theme.colors` useHead workaround in `nuxt.config.ts:15-20`).
-  Baseline run surfaced + fixed a pre-existing Phase-2d-W4-T2 audit-coverage gap
-  (root workspace not scanned by `audit-package-imports.mjs`) before T0 could
-  complete — sibling-branch fix at `a92b842`, merged to `dev` at `7f08521`.
-- **Phase 2d-followup `lint-rule-rollout` closed 2026-06-02** (merge `656adb5`
-  on local `dev`). The deferred Phase 2d W3-T6
-  `@typescript-eslint/no-explicit-any: error` enforcement landed across all 5
-  production workspaces (`core`, `cli`, `modules/api`, `modules/ui`,
-  `modules/storage`); baseline went from **1,488 errors → 0**. ~120 production
-  cast sites annotated; 114 test-mock casts covered by the test-file `warn`
-  override; `modules/ui` switched to `@nuxt/eslint`'s Option A integration with
-  a `STYLE_RULES_DEFERRED` map silencing ~30 vue/nuxt style rules out of scope.
-  No CI gate (per the project's no-CI/CD posture); root `pnpm lint` script
-  signals locally. Closure report at `docs/audits/phase-2d-closure-report.md` §
-  "Deferred to dedicated lint-hygiene session" (CLOSED line back-filled at
-  `21da688`).
-- **4 of 6 lint-rollout sub-followups closed 2026-06-02 / 2026-06-03** on local
-  `dev`. `#3 modules/ui cruft deps` (merge `3103a74`) dropped `@eslint/js`,
-  `vue-eslint-parser`, and `@typescript-eslint/parser` from
-  `modules/ui/package.json` (the last is transitively provided by
-  `@nuxt/eslint`); also bumped declared `packageManager` from `pnpm@8.15.0` to
-  `pnpm@9.15.9` after discovering the lockfile was already in v9 format.
-  `#2 Vue-template `no-explicit-any` blind spot` (merge `d7447b4`) refactored 13
-  `as any` casts inside `<template>` regions of `modules/ui/app/**/*.vue` to
-  `<script setup>` or removed them by typing the source; introduced one new
-  composable (`composables/useTypedI18n.ts` with `tPlural(key, count)`) and one
-  types bridge (`types/nuxt-ui-bridge.ts`). `#1.1 core unused-vars cleanup`
-  (merge `60d91e8`) cleared 170 sites across
-  `core/src/{diagnostics,saga,records,di,database,geography,templates,utils}` +
-  top-level files; rule promoted from `warn` to `error` in both production and
-  test config blocks of `core/eslint.config.cjs`. `#1.2 cli unused-vars cleanup`
-  (merge `961547d`) cleared 110 sites across `cli/src/commands/**` (including a
-  301-line strip of a superseded validation pipeline in `validate.ts`); rule
-  promoted to `error` in both blocks of `cli/eslint.config.cjs`. 8 surfaced
-  findings recorded for separate triage (sanitizer-not-wired, missing-assertion
-  test patterns, stub-pattern methods, orphan operation logging) — see
-  [[lint-followups-before-phase-3]] / `lint-rollout-2026-06-02-followups`
-  memory.
-
-The platform is suitable for early pilots and development; it is not yet
-production-grade by the standards a municipal procurement reviewer would apply.
-The lint-rollout followups closed first per the sequencing rule; **Phase 3
-(realtime reintroduction, Yjs-only) is then complete on the local
-`refactor/phase-3-realtime` branch (pending `--no-ff` merge to `dev`)**. Phases
-4 (hardware audit) and 5 (broadcast-box reintegration) follow. Other Phase 2d
-carry-forwards still pending: realtime-012 (handled inside Phase 3), test-suite
-repair session (date-bomb + lock-endpoints flake + surfaced missing-assertions
-in cli/saga test files). Branch is local-only per the `refactor-push-policy` —
-nothing in the refactor pushes to any origin until all 7 phases finish.
-
-### What's Working
-
-#### **Core Platform (Working in v0.2.0)**
-
-- **CLI Interface**: Complete command-line interface with 25+ commands
-- **REST API**: Comprehensive API with 25+ endpoints and authentication
-- **Authentication**: Multi-method auth (OAuth, password, simulated)
-- **Database**: SQLite with Git integration and full CRUD operations
-- **Testing**: 1305 root-runner cases passing (1 known §9.1 date-bomb, 19
-  skipped); 114/114 UI workspace; 216/216 storage workspace. Coverage is uneven
-  across surfaces — see the **Test Coverage Summary** table below for the honest
-  per-component breakdown.
-- **File Attachments**: Complete system for linking files to records
-- **Configuration Management**: Dynamic UI with full backend integration
-
-#### **Record Management (Working in v0.2.0)**
-
-- **Record CRUD**: Create, read, update, delete operations
-- **Directory Layout**: Records stored under `data/records/<type>/<year>/...` to
-  avoid oversized folders over time
-- **Standardized Format**: Unified markdown format with section comments and ISO
-  8601 timestamps
-- **Lifecycle Management**: Draft → Pending Review → Under Review → Approved →
-  Published → Archived flow
-- **Search System**: Full-text search with filtering and ranking
-- **Record Summary API**: `/api/v1/records/summary` exposes aggregate counts for
-  type and status filters
-- **Record Presentation**: UI preserves markdown line breaks and rewrites
-  internal `.md` links to in-app routes for seamless navigation
-- **Validation**: Config-driven validation with dynamic type/status checking
-- **RecordParser**: Central parsing/serialization ensuring format consistency
-- **Templates**: Complete template management system with API, service layer,
-  caching, and security
-  - Full CRUD API endpoints for template management
-  - Template service layer with file watching and cache invalidation
-  - Security hardening (path traversal prevention, variable sanitization)
-  - UI integration with template selection, preview, and loading
-  - Comprehensive unit tests and API usage documentation
-- **Geography Data**: Spatial data support with SRID, coordinates, and
-  attachments
-- **File Attachments**: Link existing files to records with categorization
-- **Secure Downloads**: Authenticated file access with proper error handling
-- **Record Editor**: Professional markdown editor with simplified button system
-  - Single "Save changes" split-button with contextual dropdown menu
-  - Status dropdown in Details sidebar
-  - Raw YAML preview accordion
-  - Word wrap enabled, flat document design
-  - Complete internationalization (English/French)
-- **Source Tracking**: Legacy document tracking with reference, original_title,
-  original_filename
-- **Schema Validation**: JSON Schema-based validation with dynamic schema
-  composition
-- **Commit Linkage**: Git traceability fields (commit_ref, commit_signature) for
-  archival
-- **Extensions Support**: Flexible metadata.extensions object for custom fields
-
-#### **User Management (Working in v0.2.0)**
-
-- **Role-Based Access Control**: Granular permissions system
-- **User CRUD**: Complete user management operations
-- **Authentication**: Multiple auth methods with JWT tokens
-- **Authorization**: Permission-based access control
-
-#### **Development Tools (Working in v0.2.0)**
-
-- **Build System**: pnpm workspaces with TypeScript
-- **Testing Framework**: Vitest with comprehensive test suite
-- **Development Server**: Hot reload for API and UI development
-- **Documentation**: Comprehensive guides and specifications
-- **Storage Module**: File management system with API and CLI
-- **Diagnostic Tools**: Comprehensive system diagnostics with auto-fix
-  - `civic diagnose` command with component-specific checks (database, search,
-    config, filesystem, system)
-  - `--fix` flag provides automated repair for fixable issues
-  - Auto-fix capabilities with backup creation and rollback support
-  - Centralized output system (all commands support `--json`, `--silent`)
-- **Sort Options API**: Database-level sorting with kind priority
-  - Sort parameter on `/api/v1/records` and `/api/v1/search` endpoints
-  - Supports `updated_desc`, `created_desc`, `title_asc`, `title_desc`,
-    `relevance`
-  - Database indexes for optimal sort performance
-- **Unified Error Handling**: Type-safe error system with correlation IDs
-  - Error hierarchy with domain-specific error types
-  - Automatic error recognition in API layer
-  - Correlation ID tracking for debugging
-  - Enhanced UI error handling with dev mode visibility
-  - Test coverage per the Phase 2a verified run: 1213 passing / 1 known flake /
-    27 skipped (API+core); 67/67 passing (UI). Component coverage is sparse and
-    expanding in Phase 2b/2d.
-
-#### **Realtime Collaborative Editing (shipped in refactor Phase 3, local `dev`)**
-
-- Module: `modules/realtime/` (`@civicpress/realtime`); shared schema:
-  `packages/editor-schema/` (`@civicpress/editor-schema`).
-- Status: complete on the local `refactor/phase-3-realtime` branch (pending the
-  `--no-ff` merge to `dev`; not yet on `main`). Local-only per the
-  `refactor-push-policy`.
-- What it does: **collaborative record editing** over a **binary y-protocols**
-  (Yjs CRDT over WebSocket) server, run **in-process with the API** on its own
-  port (default 3001, gated by `realtime.enabled`). The server serializes the
-  Yjs doc to Markdown and writes it back to a **review-gated DB draft**
-  (`record_drafts.markdown_body`, authored `realtime-snapshot`) through the
-  records-draft pipeline — it does **not** auto-commit to Git. **Markdown-in-Git
-  stays the durable archive**, produced on human _publish_. Ephemeral 48h-TTL
-  snapshot blobs are reconnection merge-aids only.
-- Findings closed: 14 (realtime-001 … realtime-014). Exit criteria met:
-  `realtime-server.ts` 3,581 → 1,495 LoC (target <1,500);
-  offline-edit-then-reconnect and collab-edit-writes-Markdown-draft tests green.
-- Tests: realtime module 148 passing / 1 skipped; `@civicpress/editor-schema`
-  32; repo-level `tests/realtime/` exit-criteria; UI vitest 186/186.
-- Known limits: **single-node** deploy (no multi-node Redis adapter — a
-  documented future option, not shipped); **browser E2E pending** a follow-up
-  (integration tests use simulated y-protocols clients); collaborative
-  writebacks are not yet auditable Git civic events (deferred follow-up);
-  block-level civic-refs round-trip only inline. Details in
-  `docs/audits/phase-3-closure-report.md`.
-
-### In Progress
-
-#### **Search & Discovery (80% Complete)**
-
-- Full-text search implementation
-- Search API with filtering
-- Frontend search integration
-- Advanced search features (fuzzy matching, relevance ranking) - In Progress
-
-#### **Configuration System (100% Complete)**
-
-- Record types configuration (config-driven, dynamic loading)
-- Record statuses configuration (config-driven, dynamic loading)
-- API endpoints for configuration
-- Frontend configuration management
-- Config-driven validation (RecordValidator loads from config.yml)
-- System routes load types/statuses dynamically from config
-
-#### **UI Development (95% Complete)**
-
-- Nuxt 4 setup with Nuxt UI v4 (MIT)
-- Basic page structure
-- API integration setup
-- Records listing page with search, filtering, and pagination
-- Single record detail page with Markdown rendering
-- URL state management for filters and pagination
-- Reusable composables (useMarkdown, useRecordUtils, useRecordTypes,
-  useRecordStatuses)
-- Loading states and error handling
-- Record creation/editing with geography fields and template loading
-- Geography data display in record views
-- **Complete Internationalization (i18n)**: Full English/French translation
-  support across all UI components
-- **Account Creation**: User registration page and workflow implemented
-- Password reset functionality - In Progress
-- Admin dashboard - In Progress
-
-#### **BroadcastBox Hardware Appliance (Alpha — Phase 4)**
-
-The meeting-capture hardware appliance lives in a **separate repository**
-(`civicpress-broadcast-box`, Python, AGPL-3.0-or-later). It is **alpha, not
-pilot-ready**:
-
-- **Working:** video capture, encoding (incl. Raspberry Pi `h264_v4l2m2m`
-  hardware encoder), WebRTC preview, AP-mode enrollment, and CivicPress API
-  integration.
-- **Not yet there (the mission gap):** recordings produce `.mp4` only — **no
-  Markdown civic record** (transcript, motions, attendees, speaker turns) is
-  generated yet. There is also no clerk-installable appliance image.
-- **Status:** refactor **Phase 4** is auditing and fixing the hardware repo
-  (canonical cross-repo protocol artifact, the video→Markdown civic-artifact
-  pipeline, and a real install path). See
-  `docs/plans/2026-06-18-base-refactor-phase-4-broadcast-box-hw.md`.
-
-### Recently Completed Features
-
-#### **Google Cloud Storage (GCS) Provider Support (January 2025)**
-
-- **Status**: Implemented in v0.2.0 (alpha — see Audit findings section)
-- **Complete GCS Integration**: Full support for Google Cloud Storage as a
-  storage provider
-  - Service account key file authentication
-  - Application Default Credentials (ADC) support
-  - Standard `gs://` URI scheme for provider paths
-  - Bucket creation and existence checking
-  - Graceful handling when service account lacks bucket.get permission
-- **Integration**: Fully integrated with existing storage infrastructure
-  - Failover system support (automatic switching to backup providers)
-  - Retry logic with exponential backoff
-  - Circuit breaker pattern for fault tolerance
-  - Comprehensive metrics collection
-  - Health check monitoring
-- **Configuration**: Complete configuration support via `storage.yml`
-  - Project ID and bucket configuration
-  - Location and storage class options
-  - Optional bucket auto-creation
-- **Testing**: Successfully tested with real GCS bucket and service account
-- **Documentation**: Updated storage system documentation with GCS examples
-
-#### **Diagnostic & Repair System (January 2025)**
-
-- **Status**: Implemented in v0.2.0 (alpha)
-- **Diagnostic Command**: `civic diagnose` with component-specific checks
-  - Database diagnostics (integrity, schema, indexes, FTS5)
-  - Search diagnostics (index sync, performance, cache)
-  - Configuration diagnostics (validation, migration status)
-  - Filesystem diagnostics (file integrity, Git health)
-  - System diagnostics (memory, CPU, disk space)
-- **Auto-Fix Capabilities**: `--fix` flag provides automated repair
-  - Database: Missing indexes, FTS5 rebuild, VACUUM, schema fixes
-  - Search: Index rebuild, cache clearing, synchronization
-  - Config: YAML syntax fixes (limited)
-  - Filesystem: Directory structure, permissions
-  - Backup creation before fixes with rollback support
-- **Centralized Output**: All diagnostic output uses centralized functions
-  - Respects `--json` and `--silent` flags
-  - Consistent formatting across all commands
-
-#### **Sort Options API (January 2025)**
-
-- **Status**: Implemented in v0.2.0 (alpha)
-- **API Endpoints**: Sort parameter added to records and search endpoints
-  - `/api/v1/records`: `updated_desc`, `created_desc`, `title_asc`, `title_desc`
-  - `/api/v1/search`: `relevance`, `updated_desc`, `created_desc`, `title_asc`,
-    `title_desc`
-- **Database Implementation**: Database-level sorting with kind priority
-  - Kind priority always primary sort (root > chapter > other)
-  - User sort is secondary within same kind priority
-  - Database indexes created for optimal performance
-  - Comprehensive test coverage
-
-#### **Internationalization (i18n) System (December 2025)**
-
-- **Status**: Implemented in v0.2.0 (alpha — see Audit findings section)
-- **Complete UI Translation**: All UI components, pages, and messages translated
-  to English and French
-- **Translation Coverage**:
-  - All pages: Records, Geography, Settings (Profile, Users, Configuration,
-    Notifications, Storage, Activity)
-  - All components: Forms, Selectors, Browsers, Modals, Alerts, Toasts
-  - All navigation: Sidebar, breadcrumbs, buttons, labels
-  - All error messages and validation feedback
-- **Implementation Details**:
-  - Using `@nuxtjs/i18n` with `vue-i18n` for Vue 3
-  - JSON-based translation files (`en.json`, `fr.json`)
-  - ICU MessageFormat for pluralization support
-  - Dynamic content translation via `useConfigTranslations` composable
-  - Proper fallback mechanisms for missing translations
-- **Key Features**:
-  - Language toggle support (ready for implementation)
-  - Pluralization for file counts, record counts, etc.
-  - Context-aware translations (e.g., "Records" vs "Registres" in French)
-  - Consistent translation patterns across all components
-  - Translation keys organized by feature area (auth, records, geography,
-    settings, etc.)
-- **Translation Files**:
-  - `modules/ui/i18n/locales/en.json` - English translations
-  - `modules/ui/i18n/locales/fr.json` - French translations
-- **Components Translated**:
-  - All page components (records, geography, settings, auth)
-  - All form components (RecordForm, UserForm, GeographyForm)
-  - All selector components (FileBrowser, GeographySelector, RecordLinkSelector)
-  - All display components (RecordList, GeographyLinkDisplay, etc.)
-  - System components (SystemFooter, SecuritySettings, etc.)
-- **Documentation**: Translation keys follow consistent naming patterns and are
-  fully documented
-
-#### **Record Format Standardization (November 2025)**
-
-- **Status**: Implemented in v0.2.0 (alpha — see Audit findings section)
-- **Comprehensive Standardization**: Unified markdown format across all record
-  types
-- **RecordParser Class**: Central parsing/serialization with backward
-  compatibility
-- **RecordValidator Class**: Config-driven validation (no code changes for new
-  types/statuses)
-- **Standardized Frontmatter**: Single block with section comments for
-  readability
-- **ISO 8601 Timestamps**: Consistent date/time format throughout
-- **Authors Field**: Support for both simple `author` (username) and detailed
-  `authors` array
-- **Source Tracking**: New `source` field for legacy document tracking
-  (reference, original_title, original_filename, url, type, imported_at,
-  imported_by)
-- **New Record Types**: Added `geography` and `session` record types
-- **Config-Driven**: Record types and statuses loaded dynamically from
-  `data/.civic/config.yml`
-- **Template Updates**: All 5 template files updated to new format
-- **Demo Data Updates**: All 12 demo data files converted to standardized format
-- **Test Suite Updates**: All test fixtures and test records updated to new
-  format
-- **Documentation**: format specified by the record-type JSON schemas under
-  `core/src/schemas/`
-- **Implementation Plan**: Detailed 7-phase implementation documented
-- **Backward Compatibility**: Parser handles old format gracefully during
-  transition
-- **Key Features**:
-  - Required fields: id, title, type, status, author, created, updated
-  - Optional fields: authors (array), source (object), tags, metadata,
-    geography, attachedFiles, linkedRecords
-  - Section comments for frontmatter organization
-  - Dynamic validation from configuration
-  - Consistent structure across all record types
-
-#### **File Attachment System (September 2025)**
-
-- **Record Integration**: Link existing files from storage to any record type
-- **Database Schema**: New `attached_files` JSON column with automatic migration
-- **UI Components**: FileBrowserPopover for intuitive file selection
-- **Categorization**: Organize attachments by type (Reference, Financial, Legal,
-  etc.)
-- **Secure Access**: Authenticated downloads with proper error handling
-- **API Support**: Complete REST endpoints with validation for file operations
-- **Configuration**: attachment-types.yml for customizable categorization
-- **Data Persistence**: Files stored in database and markdown frontmatter
-- **TypeScript**: Full type safety for attachment data structures
-
-#### **Record Linking System (September 2025)**
-
-- **Record Integration**: Link records to other records with relationship
-  categorization
-- **Database Schema**: New `linked_records` JSON column with automatic migration
-- **UI Components**: RecordLinkSelector and LinkedRecordList for intuitive
-  record linking
-- **Categorization**: Organize relationships by type (related, supersedes,
-  amends, references, etc.)
-- **Dynamic Categories**: API-driven category loading with configuration support
-- **API Support**: Complete REST endpoints with validation for linked record
-  operations
-- **Configuration**: link-categories.yml for customizable relationship types
-- **Data Persistence**: Linked records stored in database and markdown
-  frontmatter
-- **TypeScript**: Full type safety for LinkedRecord data structures
-- **Inline Editing**: Edit descriptions and categories directly in the record
-  view
-
-#### **UUID Storage System (August 2025, Enhanced January 2025)**
-
-- **Unique Identifiers**: UUID-based file tracking and management
-- **Multi-Provider**: Support for local, S3, Azure Blob Storage, and Google
-  Cloud Storage (GCS)
-- **Enhanced UI**: FileBrowser, FileUpload, and MediaPlayer components
-- **API Endpoints**: New `/api/v1/storage/files/*` UUID-based operations
-- **Database Integration**: Complete file metadata tracking
-- **Documentation**: Comprehensive system documentation
-- **Test Coverage**: Full API test suite for UUID operations
-- **GCS Support (January 2025)**: Complete Google Cloud Storage integration
-  - Service account key and Application Default Credentials support
-  - Standard `gs://` URI scheme for provider paths
-  - Integrated with failover, retry, circuit breaker, and metrics systems
-  - Graceful handling of permission limitations (bucket.get vs object
-    operations)
-
-#### **Configuration Management System (July 2025)**
-
-- **Dynamic UI**: Single page generates forms from file metadata
-- **Complete Backend**: Central configuration service with validation
-- **API Integration**: Full REST endpoints for all configuration operations
-- **File Format**: New `_metadata` format with descriptions and validation
-- **Template System**: Default templates from `core/src/defaults/`
-- **Architecture**: Clear separation of public and private configuration
-- **CLI Support**: Configuration management commands
-
-#### **Geography Data Management System (January 2025)**
-
-- **Centralized Geography Management**: Complete system for managing geography
-  files in `data/geography/`
-- **Text Box Input System**: Paste GeoJSON/KML content with API validation and
-  file generation
-- **Live Preview**: Real-time map preview with Leaflet showing parsed data
-- **Public Access**: Geography files accessible at `/geography/` for citizen
-  transparency
-- **Geography Linking**: Link geography files to civic records (similar to file
-  attachments)
-- **Data Validation**: Comprehensive validation of geographic data (geometry,
-  SRID, bounds)
-- **Interactive Maps**: Leaflet integration throughout the system
-- **Standardized Structure**: API-enforced consistent data structure and naming
-- **Git Versioning**: Built-in version control through data/ folder
-- **Role-Based Access**: Public view, admin edit, specialized permissions
-
-#### **Legacy Geography Data System (June 2025)**
-
-- **Spatial Data Support**: SRID, zone references, bounding boxes, center
-  coordinates
-- **Database Integration**: Automatic schema migration with backward
-  compatibility
-- **Frontend Forms**: Geography fields with validation and optional submission
-- **Record Views**: Dedicated geography display sections
-- **CLI Tools**: Validation, scanning, and normalization commands
-- **Data Persistence**: Geography saved to both database and Markdown
-  frontmatter
-
-#### **Template Loading System (May 2025)**
-
-- **Template Selection**: Dropdown with available templates by record type
-- **Confirmation Modal**: Template details and content replacement warning
-- **Variable Substitution**: Dynamic content with form data integration
-- **User Experience**: Always visible template section with progressive
-  disclosure
-
-### Planned Features
-
-#### **Phase 3: Advanced Features**
-
-- Plugin system for extensibility
-- Federation for multi-node support
-- Advanced workflow engine
-- Civic-specific modules (voting, feedback, legal register)
-
-#### **Phase 4: Enterprise Features**
-
-- Multi-tenant support
-- Advanced security features
-- Comprehensive audit trails
-- Federation and synchronization
-
-## Testing Status
-
-### Test Coverage Summary
-
-Post Phase 2d closure (2026-05-25):
-
-| Component         | Test files                                                                                         | Cases                                    | Component coverage                                                                                                                                                                                                                                                                                   |
-| ----------------- | -------------------------------------------------------------------------------------------------- | ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **CLI**           | 12 (`cli/src/commands/__tests__/`) + 10 integration (`tests/cli/`)                                 | ~84 unit + integration cases             | Phase 2b Tasks 10+11 closed `cli-001` (test theatre): 13 → 84 honest cases. Tier 1/2 commands covered; rest still uneven.                                                                                                                                                                            |
-| **API**           | ~50 integration files (`tests/api/`)                                                               | 270 passing in workspace runner          | Integration coverage strong; per-route unit coverage uneven. 22 retroactive characterization tests added in Phase 2d for `records-service.ts` post-decomposition.                                                                                                                                    |
-| **Core**          | bundled with API in `tests/` + `core/src/**/__tests__/`                                            | 357+ passing                             | Integration coverage strong; Phase 2d W2 added characterization tests for `template-engine`, `database-checker`, `sqlite-search` (26 + 5 + 8 = 39 cases). Phase 2d W3 added 17 indexing integration tests. Storage W0 triage added 4 rewritten unit tests + closed 9 reliability bugs.               |
-| **UI**            | 7+ component/composable files (`tests/ui/`)                                                        | 138 passing under `vitest.config.ui.mjs` | Phase 2b Tasks 8+9 closed `ui-005` (test theatre): 47 new component tests for forms + record viewing. Phase 2d added 24 char-tests for `useFileBrowser` (T14).                                                                                                                                       |
-| **Storage**       | 17 unit files (`modules/storage/src/__tests__/`) + 1 char-test (`tests/storage/characterization/`) | 216 unit-runner passing + 37 char-tests  | Phase 2d W0 cleared all 28 carry-forward failures + surfaced/closed 9 reliability bugs (retry, timeout, circuit-breaker, batch ops, lifecycle, stream errors, error inheritance). W2 added 37 char-tests for `cloud-uuid-storage-service` post-decomposition. W3 + W4 maintained 216/216 throughout. |
-| **Notifications** | 1 integration                                                                                      | (audited 2026-05)                        | Phase 2c routed notifications through the unified `AuditChannel`; Phase 2b Task 7 added ~10 unit cases. No new Phase 2d work.                                                                                                                                                                        |
-
-> **Note:** The previous version of this table claimed CLI 120+ / 90%, API 200+
-> / 90%, Core 160+ / 90%, UI 80+ / 85%, Total 600+ / 90%. The 2026-05
-> manifesto-fit audit (findings `cli-001`, `ui-005`) showed those numbers were
-> not substantiated by files on disk. The honest counts above replace them. See
-> `docs/audits/2026-05-16-manifesto-fit-findings.md` and
-> `docs/audits/phase-2a-closure-report.md` for the full audit trail.
-
-### Test Categories
-
-- **Unit Tests**: Core functionality and utilities
-- **Integration Tests**: API endpoints and database operations
-- **CLI Tests**: Command-line interface functionality
-- **Authentication Tests**: Auth flows and permissions
-- **Record Management Tests**: CRUD operations and validation
-- **File Attachment Tests**: File linking and download functionality
-- **Geography Data Tests**: Geography file management and validation
-- **UUID Storage Tests**: Storage system operations
-- **Configuration Tests**: Dynamic configuration management
-
-## Development Environment
-
-### Prerequisites
-
-```bash
-# Node.js 22+ and pnpm 9+ (root `engines`: node >=22, pnpm >=9)
-node --version  # v22.0.0 or higher
-pnpm --version  # 9.0.0 or higher
-```
-
-### Quick Setup
-
-```bash
-# Clone and setup
-git clone https://github.com/CivicPress/civicpress.git
-cd civicpress
-pnpm install
-pnpm run build
-
-# Initialize with demo data
-civic init --demo-data "Springfield"
-
-# Authenticate (development)
-civic auth:simulated --username admin --role admin
-
-# Run tests
-pnpm run test:run
-
-# Start development
-pnpm run dev
-```
-
-### Development Commands
-
-```bash
-# Build everything
-pnpm run build
-
-# Run all tests
-pnpm run test:run
-
-# Start both API and UI in watch mode (recommended)
-pnpm run dev
-
-# API development (watch mode by default)
-pnpm run dev:api
-
-# UI development
-pnpm run dev:ui
-
-# All services in parallel
-pnpm run dev:parallel
-```
-
-**Note**: Both `pnpm run dev` and `pnpm run dev:api` run in watch mode by
-default, automatically restarting when files change.
-
-### Additional Commands
-
-```bash
-# Lint code
-pnpm run lint
-
-# Type check
-pnpm run type-check
-
-# Clean build artifacts
-pnpm run clean
-```
-
-## Performance Metrics
-
-### API Performance
-
-- **Response Time**: < 100ms for most operations
-- **Throughput**: 1000+ requests/second
-- **Memory Usage**: < 100MB for typical deployments
-- **Database**: SQLite with Git integration
-
-### CLI Performance
-
-- **Command Execution**: < 1s for most commands
-- **JSON Output**: Optimized for automation
-- **Memory Usage**: < 50MB for CLI operations
-
-## Security Status
-
-**Security Implementation**: Working alpha — 2026-05 audit identified 20
-Critical findings (15 closed in Phase 2a, 5 deferred to Phase 4/5 by design).
-Trust-restoration work (api-001/2/3/4, ui-001/3, storage-001/2,
-notifications-001/2/3) landed in Phase 2a; see
-`docs/audits/phase-2a-closure-report.md`.
-
-### Comprehensive Security System
-
-#### **Multi-Layer Authentication & Authorization**
-
-- JWT-based authentication with secure token handling
-- Multi-provider support (password, GitHub, Google OAuth)
-- Role-based access control with granular permissions
-- External auth provider security guards and restrictions
-
-#### **Advanced Security Features**
-
-- **Email Validation Service**: RFC 5321 compliant with uniqueness enforcement
-- **Secure Email Change Workflow**: Token-based verification with expiration
-- **External Auth Protection**: Prevents password management for OAuth users
-- **Security Guards**: Multi-layer enforcement across API, UI, and CLI
-- **Audit Logging**: Comprehensive security event tracking
-
-#### **Data Protection & Validation**
-
-- Input validation and sanitization across all interfaces
-- SQL injection prevention with parameterized queries
-- XSS protection with proper output encoding
-- Password hashing with bcrypt (12 salt rounds)
-- Secure token generation for all operations
-
-#### **Security Infrastructure**
-
-- CORS configuration for cross-origin security
-- Rate limiting (basic implementation)
-- HTTPS enforcement in production
-- Secure session management
-- Database security with foreign key constraints
-
-### Security Testing & Validation
-
-#### **Security test coverage (post-Phase-2a)**
-
-- **Core Security Tests**: Email validation, security guards, auth flows
-  (verified passing in Phase 2a test run)
-- **API Security Tests**: Endpoint protection, permission enforcement (Phase 2a
-  Task 2 closed api-001/2/3 — auth gates now actually enforce; previously some
-  mounts skipped auth)
-- **CLI Security Tests**: Phase 2b Tasks 10-11 closed `cli-001` and expanded
-  coverage to ~84 unit/integration cases across Tier 1/2 commands; broader
-  28-command coverage still rolls into a later phase.
-- **UI Security Tests**: Phase 2a Task 4 added 8 XSS-pinning tests for
-  `useMarkdown` (DOMPurify). Phase 2b Tasks 8-9 added 47 component-level tests
-  (closed `ui-005`).
-
-> **Note:** The previous version of this section claimed "85+ security tests" as
-> a count. The 2026-05 audit (finding `ui-005`) showed UI security claims were
-> unsubstantiated; the count above is the honest tally as of Phase 2a closure.
-> Total test count: see Testing Status table.
-
-#### **Security Verification**
-
-- External auth users cannot bypass password restrictions
-- Email addresses maintain uniqueness and proper validation
-- Permission enforcement works across all interfaces
-- Security violations produce appropriate error messages
-- Audit trails capture all security-related operations
-
-### Production Security Features
-
-- **Simulated auth disabled** in production environment
-- **Secure token handling** with proper expiration
-- **Permission validation** on all API endpoints
-- **Comprehensive audit logging** for security compliance
-- **Multi-interface consistency** (API, UI, CLI security alignment)
-- **Error handling** with security-aware messaging
-
-## Documentation Status
-
-### Complete Documentation
-
-- **API Documentation**: Complete with examples and security endpoints
-- **CLI Documentation**: Comprehensive command reference with security commands
-- **Security System Guide**: Complete security architecture and implementation
-- **Manual Testing Guide**: Comprehensive security testing scenarios
-- **Authentication Guide**: Multi-method auth documentation
-- **Bootstrap Guide**: Complete setup instructions
-- **Development Guidelines**: Standards and practices
-
-### In Progress Documentation
-
-- **UI Documentation**: Frontend development guide (internationalization section
-  added)
-- **Plugin Development**: Plugin system documentation
-- **Deployment Guide**: Production deployment instructions
-
-## Next Steps
-
-### Immediate Priorities (Next 2 Weeks)
-
-1. **Complete Search Implementation**
-   - Advanced search features
-   - Frontend search integration
-   - Search result ranking
-
-2. **Finish Configuration System**
-   - Frontend configuration management
-   - Dynamic configuration updates
-   - Configuration validation
-
-3. **UI Development**
-   - Account creation interface (complete)
-   - Password reset interface
-   - Basic admin dashboard
-
-### Short-term Goals (Next Month)
-
-1. **Plugin System Foundation**
-   - Plugin architecture design
-   - Basic plugin API
-   - Plugin development tools
-
-2. **Advanced Workflows**
-   - Workflow engine implementation
-   - Configurable approval processes
-   - Event-driven workflows
-
-3. **Enhanced Security**
-   - Advanced audit logging
-   - Cryptographic verification
-   - Compliance features
-
-### Long-term Vision (Next Quarter)
-
-1. **Federation Support**
-   - Multi-node architecture
-   - Data synchronization
-   - Distributed governance
-
-2. **Civic Modules**
-   - Legal register module
-   - Voting system
-   - Feedback system
-   - Meeting management
-
-3. **Enterprise Features**
-   - Multi-tenant support
-   - Advanced security
-   - Comprehensive audit trails
-
-## Known Issues
-
-### Minor Issues
-
-- Some CLI tests return mock failures (by design for development)
-- UI development in early stages
-- Documentation needs some updates for latest features
-
-### No Critical Issues
-
-- All core functionality is working
-- All tests are passing
-- Security is properly implemented
-- Performance is acceptable
-
-## Success Metrics
-
-### Technical Metrics (post-Phase-2a, 2026-05-17)
-
-- 1213 + 67 tests passing across API/core/UI suites (verified Phase 2a run); 1
-  known pre-existing flake (`database-integration session-mgmt`) tracked for a
-  dedicated session
-- `pnpm audit`: 0 Critical / 10 High (all transitive in dev/test paths) — down
-  from 4 / 73 pre-Phase-2a
-- 2026-05 audit Criticals: **15 of 20 closed**, 5 deferred to Phase 4/5 by
-  design (see findings registry)
-- API response times: not currently measured under load — claim removed pending
-  Phase 2c benchmarking
-- Test coverage: per-module honest counts in the Testing Status table above;
-  aggregate percentage not currently produced
-
-### Development Metrics
-
-- v0.2.0 core feature set implemented (audit Criticals being closed across the
-  7-phase refactor)
-- Documentation truth-restoration in progress (Phase 2b); 39 specs demoted from
-  `stable` to `partial`/`planned` per `docs/audits/spec-stability-triage.md`
-- Active development on `dev` branch off `main` (post-Phase-2a merge `0e40ea3`)
-- Clear refactor roadmap: `docs/plans/2026-05-17-base-refactor-master-plan.md`
-
-## Contributing
-
-### Getting Started
-
-1. **Fork the repository**
-2. **Set up development environment** (see Quick Setup above)
-3. **Run tests** to ensure everything works
-4. **Create feature branch** for your changes
-5. **Submit pull request** with tests and documentation
-
-### Development Guidelines
-
-- Follow the existing code style and patterns
-- Add tests for new functionality
-- Update documentation for API changes
-- Use conventional commit messages
-- Ensure all tests pass before submitting
-
-### Areas for Contribution
-
-- **UI Development**: Frontend interface improvements
-- **Plugin Development**: New civic modules and extensions
-- **Documentation**: Guides, examples, and tutorials
-- **Testing**: Additional test coverage and scenarios
-- **Performance**: Optimization and scalability improvements
-
-## Support
-
-### Getting Help
-
-- **Documentation**: Comprehensive guides in `/docs/`
-- **Issues**: GitHub issues for bugs and feature requests
-- **Discussions**: GitHub discussions for questions and ideas
-- **Code**: Well-documented codebase with examples
-
-### Community
-
-- **Contributors**: Active development community
-- **Testing**: Comprehensive test suite for validation
-- **Documentation**: Extensive guides and specifications
-- **Roadmap**: Clear development priorities and timeline
+> **Current state — 2026-07-30.** CivicPress is a **working alpha**
+> civic-records platform (v0.2.0, MIT). This document is the honest answer to
+> _"is it ready?"_ and is verified feature-by-feature against the code
+> (2026-07-30), not aspirational claims. Authoritative trackers: the `FA-*`
+> security registry (`docs/audits/2026-07-02-full-audit.md`), the hardening
+> backlog (`docs/backlog/2026-07-post-audit-hardening.md`), the roadmap
+> (`docs/roadmap.md`), and `CHANGELOG.md`. Project history lives in the
+> per-phase closure reports under `docs/audits/` and the git log — it is no
+> longer inlined here.
+
+## Is it ready?
+
+**Functional for early pilots with support; not yet production-grade by
+municipal procurement standards; expect breaking changes through v0.3.x.**
+
+The core is real and tested end-to-end: record management, Git-backed
+versioning, a genuinely robust saga/transaction layer with crash recovery,
+role-based auth, the REST API, the CLI, and the web UI. Several advanced areas
+are **partial or stubbed** — the workflow _engine_, non-GeoJSON geography, cloud
+storage providers, and multi-channel notifications. Those are named plainly
+below; nothing important is hidden behind a green checkmark.
+
+**At a glance**
+
+- **Version:** v0.2.0 (Alpha) · **License:** MIT
+- **Stack:** TypeScript / Node, pnpm monorepo, Nuxt 4 + `@nuxt/ui` v4 (MIT),
+  SQLite, Git (`simple-git`), Markdown / YAML / JSON / GeoJSON
+- **Engines:** node ≥ 22, pnpm ≥ 9 (`packageManager: pnpm@9.15.9`)
+- **Tests:** ~265 test files (~2,500 cases) run in parallel in CI; required
+  checks `build-test` + `audit-truth-check`; `main` is branch-protected
+- **Live demo:** <https://demo.civicpress.io>
+
+## What works today
+
+Legend — **Working**: implemented and tested. **Partial**: the core works with
+named gaps. **Stub/Planned**: advertised but not yet functional.
+
+| Area                             | Status      | Honest notes                                                                                                                                                                                                                                                                                                                                      |
+| -------------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Records & Git versioning         | **Working** | Markdown-on-disk is the source of truth, mirrored to SQLite; every op is a real git commit. Full saga pipeline (create/update/publish) with crash recovery.                                                                                                                                                                                       |
+| Editorial workflow & drafts      | **Working** | `record_drafts` staging table (DB-only); `workflowState` cleared on publish; status/transition validation via `WorkflowConfigManager` (draft→…→archived).                                                                                                                                                                                         |
+| Workflow _engine_ (programmable) | **Partial** | Only one real built-in workflow (`update-index`, wired via hooks in core-002); the old approval/publication/archival stubs were removed. User `.js` workflows are spec-only (no loader/sandbox exists).                                                                                                                                           |
+| Search                           | **Working** | Real SQLite **FTS5** + BM25 ranking, snippets, facets, autocomplete. Caveat: "typo tolerance" only re-ranks substring title suggestions, not the main query; no `field:value` syntax.                                                                                                                                                             |
+| Indexing                         | **Working** | `generateIndexes` (global + per-module `index.yml`, optional DB sync with conflict strategies), single-flight guarded.                                                                                                                                                                                                                            |
+| Geography                        | **Partial** | **GeoJSON** only — KML / GPX / Shapefile appear in the type enums but throw "not yet implemented". Leaflet map + CRUD + presets work; the DB mirror is write-only.                                                                                                                                                                                |
+| Storage                          | **Partial** | Local FS provider works and is tested. S3 / GCS / Azure are real SDK code but **untested**, and the **API ignores `storage.yml`** (always local); the CLI honors it. Failover/retry are wired only in tests.                                                                                                                                      |
+| Backup / restore                 | **Working** | Real `tar.gz` create + extract round-trip, SHA-256 verified. Backs up local-provider bytes only; the git-bundle path is untested.                                                                                                                                                                                                                 |
+| Notifications                    | **Partial** | One real email channel wired into the account-verification flow — but **off by default**, and a real SMTP failure is currently audited as success. SMS/Slack are config-only. Mostly scaffold.                                                                                                                                                    |
+| REST API                         | **Working** | 25 routers, standardized response envelope, real supertest coverage; helmet + rate-limit + fail-closed CORS + CSRF wired. Exactly 4 honest `501` stubs: `workflows`, `hooks`, `import`, `export`.                                                                                                                                                 |
+| CLI                              | **Working** | 31 commands (~74 subcommands), `withCli`/`--json` migration complete, envelope mirrors the API; 28/31 substantive. Shipped stubs: `auto-index` (mostly), `cache:list`, `notify:retry`, `init` PostgreSQL, `export --format pdf`.                                                                                                                  |
+| Web UI                           | **Working** | ~80–90% on core surfaces: records CRUD + CodeMirror editor, geography + Leaflet, 14/15 admin pages, auth, genuine EN/FR translation. Stubs: forgot-password (no backend), config import/export, activity feed. No page/browser-e2e tests.                                                                                                         |
+| Realtime collaborative editing   | **Partial** | Yjs sync, Markdown writeback to draft, and snapshots work (CI-verified). Default-off. Gap: per-record **authorization** in `onConnect` is a stub (authentication _is_ enforced) — any authenticated user can open any record room.                                                                                                                |
+| BroadcastBox (optional)          | **Working** | The strongest-verified module: ack-gated recording, a fail-closed redaction pipeline tested against **real ffmpeg** (published bytes proven black + silent in hidden windows), Ed25519 manifest verification, revocable enrollment. Transcription is delegated to `services/transcription`; the clerk-installable appliance image is out-of-repo. |
+| Auth & security                  | **Working** | Roles (admin/clerk/public) via `userCan`, signed sessions + API keys with mandatory signatures, HKDF-derived scoped secrets, CSRF, login lockout, bcrypt-12 password policy — all tested end-to-end.                                                                                                                                              |
+
+## Security & quality posture
+
+- **Audit:** the 2026-07-02 two-repo `FA-*` audit is **fully remediated** —
+  every finding is closed or an explicit accepted-deferral (`FA-CLI-006`
+  `--no-emoji`; `FA-API-019` CSRF non-session-binding). A follow-up sweep
+  audited the five deferred carry-forward surfaces (no live vulnerabilities
+  found) and applied Low defense-in-depth hardening.
+- **Supply chain:** osv-scanner (PR diff-gate + weekly) and CodeQL SAST
+  (report-only) run in CI; dependency advisories were remediated 94 → 2 (the
+  residual two are a brace-expansion DoS not reachable from the request
+  surface); a `SECURITY.md` disclosure policy is published.
+- **Tests & CI:** ~265 test files (~2,500 cases) run green in parallel in CI.
+  Honest coverage gaps: six API routers (`cache`, `diagnose`, `diff`, `info`,
+  `notifications`, `templates`) plus `/validation` have no HTTP integration
+  tests; there are no UI page or browser-e2e tests; the realtime _module_ unit
+  suite (13 files) is not in the CI include (its 3 integration tests are); cloud
+  storage providers are untested.
+
+## In progress / next (Roadmap-tier — need scoping)
+
+- **`ui-003`** — server-side rendering for the UI.
+- **Signed appliance image** — a reproducible, clerk-installable deploy image
+  (`docker/` is currently empty).
+- **Hardware / device-repo work** — capture decomposition + test coverage in the
+  sibling BroadcastBox firmware repo.
+- **Equity / i18n polish** and **device-repo branch protection** (admin).
+
+## Known limitations & honest caveats
+
+Beyond the **Partial/Stub** areas above, the notable ones a reader should know:
+
+- **Notifications can silently no-op or mis-report.** Email is disabled by
+  default, and the service ignores channel failure — a real SMTP error is
+  currently recorded as a successful send. (Tracked for a fix.)
+- **Cloud storage is not reachable via the API.** The API server always runs the
+  local provider; S3/GCS/Azure selection and `storage.yml` tuning work only
+  through the CLI. Failover/retry/metrics exist but are wired only in tests.
+- **Realtime lacks per-record authorization.** Authentication is enforced, but
+  any authenticated user can open/edit any record room; the real check exists as
+  dead code and its test is skipped.
+- **Workflow config over-advertises.** `hooks.yml` references `validate-record`
+  and `notify-*` workflows that are not registered, so they are silently
+  skipped.
+- **Geography accepts only GeoJSON** despite KML/GPX/Shapefile appearing in the
+  type enums.
+- **The web UI has no automated page/browser tests**, and a couple of surfaces
+  ship rough edges (a debug artifact on structured-config fields; a
+  non-functional geography category dropdown).
+
+These are the current honest edges of an alpha, not blockers for a supported
+pilot — but they should be closed (or scoped as accepted) before any
+unsupervised production use.
+
+## Project history
+
+The v0.1.x foundation milestones, the 2026-05 manifesto-fit base refactor
+(Phases 2a–2d plus the realtime, hardware-audit, and broadcast-box reintegration
+phases), and the 2026-07 post-audit-hardening arc (PRs #19–#22 on `main`, plus
+the develop-pending security-tail + doc reconciliation) are recorded in the
+per-phase closure reports under `docs/audits/`, in `CHANGELOG.md`, and in the
+git history. This file previously inlined ~800 lines of that phase-tracking; it
+now points to those dated records instead.
 
 ---
 
-**CivicPress is ready for development and testing. The core platform is stable,
-well-tested, and provides a solid foundation for civic technology innovation.**
+**Website:** [civicpress.io](https://civicpress.io) · **Contact:**
+[hello@civicpress.io](mailto:hello@civicpress.io) · **License:** MIT
