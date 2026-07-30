@@ -341,7 +341,6 @@ export class StorageConfigManager {
       // New multi-provider configuration
       providers: config.providers || undefined,
       active_provider: config.active_provider || undefined,
-      failover_providers: config.failover_providers || undefined,
       global: config.global || undefined,
 
       // Existing fields

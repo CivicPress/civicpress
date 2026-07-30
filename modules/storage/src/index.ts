@@ -7,7 +7,6 @@ export {
   CircuitBreaker,
   CircuitBreakerManager,
 } from './circuit-breaker/circuit-breaker.js';
-export { StorageHealthChecker } from './health/storage-health-checker.js';
 export { StorageUsageReporter } from './reporting/storage-usage-reporter.js';
 export { QuotaManager } from './quota/quota-manager.js';
 export { OrphanedFileCleaner } from './cleanup/orphaned-file-cleaner.js';

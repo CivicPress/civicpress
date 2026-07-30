@@ -493,8 +493,6 @@ describe('CloudUuidStorageService orchestrator — public API surface (W2-T18 ch
     'setCacheManager',
     'setConcurrencyLimiter',
     'setCircuitBreakerManager',
-    'setHealthChecker',
-    'getHealthChecker',
     'getUsageReporter',
     'getQuotaManager',
     'setQuotaManager',

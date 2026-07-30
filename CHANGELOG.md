@@ -61,12 +61,15 @@ and this project adheres to
   `IndexingOptions.rebuild`). It was never wired to any behavior — every index
   generation already performs a full scan — so it was dropped rather than left
   as a misleading switch.
-- **Removed the never-wired storage failover, retry, and metrics subsystems.**
-  Their configuration setters had no callers, so the managers were never
-  constructed and those code paths were unreachable; the advertised-but-inert
-  `retry_*` keys were dropped from the default `storage.yml` and the storage
-  config type. The live circuit breaker, health checks, timeouts, quota, usage
-  reporting, and lifecycle management are unaffected.
+- **Removed the never-wired storage failover, retry, metrics, and health-check
+  subsystems.** Their configuration setters had no callers, so the managers were
+  never constructed and those code paths were unreachable — and once failover
+  was gone, the health checker just ran a background probe timer whose output
+  nothing read. Dropped the advertised-but-inert config keys (`retry_*`,
+  `failover_providers`, `health_checks`, `health_check_interval`,
+  `health_check_timeout`) from the default `storage.yml` and the storage config
+  type. The live circuit breaker, timeouts, quota, usage reporting, and
+  lifecycle management are unaffected.
 
 ### Fixed
 

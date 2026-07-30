@@ -736,11 +736,8 @@ export function createStorageConfig(config: TestConfig) {
       },
     },
     active_provider: 'local',
-    failover_providers: ['local'],
     global: {
       max_file_size: '100MB',
-      health_checks: false,
-      health_check_interval: 30,
       cross_provider_backup: false,
       backup_providers: [],
     },

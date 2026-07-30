@@ -1062,11 +1062,11 @@ they are pre-existing gaps the audit made visible.
     accepted value echoed back, actual ascending/descending title ordering,
     invalid → 400, `relevance` → 400). Noted in passing that the handler's
     `INVALID_SORT_CONTEXT` branch is unreachable dead code — the validator's
-    `isIn` allowlist rejects `relevance` first (left as-is; behavior is correct).
-    `pagination-sql-side.test.ts` is a legitimate service-layer test (drives
-    `RecordsService` directly, real DB) — **relocated** to `tests/integration/`
-    (alongside `draft-publish-workflow.test.ts`) so `tests/api/` honestly means
-    HTTP; content unchanged.
+    `isIn` allowlist rejects `relevance` first (left as-is; behavior is
+    correct). `pagination-sql-side.test.ts` is a legitimate service-layer test
+    (drives `RecordsService` directly, real DB) — **relocated** to
+    `tests/integration/` (alongside `draft-publish-workflow.test.ts`) so
+    `tests/api/` honestly means HTTP; content unchanged.
 - [ ] **No UI page-component or browser-e2e tests** (no Playwright/Cypress); the
       API-critical composables (`useRecordEditorActions`, `useRecordLock`,
       `useRecordDetail`, `useCsrf`, `useAuth`) are untested.
@@ -1105,40 +1105,49 @@ they are pre-existing gaps the audit made visible.
       `setFailoverManager` / `setMetricsCollector`) had **zero** callers
       anywhere, so `retryManager` / `failoverManager` / `metricsCollector` were
       permanently `null` and every `if (host.X)` branch in the ops files was
-      unreachable. Removed the 3 manager classes + their 4 test files (55 tests)
-      + the setters/fields + the dead ops-branches (keeping the live
+      unreachable. Removed the 3 manager classes + their 4 test files (55
+      tests) + the setters/fields + the dead ops-branches (keeping the live
       circuit-breaker + direct-provider path) + the barrel exports, and the
       advertised-but-dead retry config (`retry_attempts` + `retry_initial_delay`
-      / `retry_max_delay` / `retry_backoff_multiplier` / `retryable_errors`) from
-      `storage.types.ts` / `storage.yml` / `civic init` — `42ab1f0` had just made
-      the API apply storage.yml, so those keys were loaded-then-ignored. The
-      circuit breaker stays (live, 18 tests; fail-fast on a down provider has
-      standalone value). Verified 276 tests green across the storage unit suite
-      (183), the characterization + API upload/download/delete/range suite (65),
-      and the CLI storage suite (28). See follow-up below re: the now-orphaned
-      health checker.
-- [ ] **Follow-up (surfaced by the deletion above):** with the failover manager
-      gone, `StorageHealthChecker` + `providerProbes` + the `failover_providers`
-      config are now **live-but-orphaned** — the checker is still constructed
-      (when `health_checks: true`) and probes each provider, but its only output
-      method `getProviderHealth` has **no live reader** (its sole consumer was the
-      failover recovery loop). Left in place this pass (removing it deletes
-      user-facing default config — `health_checks`, `failover_providers` — which
-      is beyond the scoped "failover/retry" cleanup). Decide: wire it to a
-      diagnostics/health surface, or remove the health-check subsystem too.
+      / `retry_max_delay` / `retry_backoff_multiplier` / `retryable_errors`)
+      from `storage.types.ts` / `storage.yml` / `civic init` — `42ab1f0` had
+      just made the API apply storage.yml, so those keys were
+      loaded-then-ignored. The circuit breaker stays (live, 18 tests; fail-fast
+      on a down provider has standalone value). Verified 276 tests green across
+      the storage unit suite (183), the characterization + API
+      upload/download/delete/range suite (65), and the CLI storage suite (28).
+      See follow-up below re: the now-orphaned health checker.
+- [x] **Follow-up — REMOVED 2026-07-30.** `StorageHealthChecker` +
+      `providerProbes` + `ProviderInit.performHealthCheck` + the dead config
+      (`failover_providers`, `health_checks`, `health_check_interval`,
+      `health_check_timeout`) were the failover subsystem's last leftovers — the
+      checker ran a background `setInterval` probing providers, but
+      `getProviderHealth` / `getHealthChecker` had **zero callers** (its sole
+      consumer was the deleted failover recovery loop). **Removed** rather than
+      wired: health-probing a single local-FS provider on a timer is near-zero
+      value, and wiring it would mean inventing a consumer to keep
+      failover-shaped code. If provider-health diagnostics is ever wanted, the
+      right vehicle is an on-demand `StorageDiagnosticChecker` in the diagnose
+      router (like the DB/search/config checkers), not this background timer —
+      so removing it doesn't foreclose that. Also swept the stale
+      `### Health & Metrics` doc section in `uuid-storage-system.md` (documented
+      `/storage/health`, `/storage/metrics`, `/storage/usage` — **none of which
+      exist**; metrics was removed in the prior pass, health now, usage never
+      built). Circuit breaker stays. Verified: storage unit 166 +
+      characterization/API/CLI 93; full api+integration+storage suite green.
 - [x] **Realtime `PresenceManager` + `awareness.ts` — DELETED 2026-07-30.** Both
       were unwired dead code, reachable only through the `index.ts` barrel and
       never constructed in any live path (live presence runs through
       `y-protocols/awareness` in `yjs-sync.ts`). Removed the two files + the
-      barrel exports + the 26-test `presence-manager.test.ts` (`awareness.ts` had
-      **0** tests — untested dead code, not "false confidence"). ⚠️ The second
-      half of this item was **stale**: `revokeUserConnections` is real AND core
-      DOES emit `auth:sessions:revoked` (added `b82825b`, 2026-07-20) —
+      barrel exports + the 26-test `presence-manager.test.ts` (`awareness.ts`
+      had **0** tests — untested dead code, not "false confidence"). ⚠️ The
+      second half of this item was **stale**: `revokeUserConnections` is real
+      AND core DOES emit `auth:sessions:revoked` (added `b82825b`, 2026-07-20) —
       `SessionOps.deleteUserSessions` fires it on the HookSystem `AuthService`
       receives via `initializeHooks()`, so the teardown is live end-to-end.
       Corrected the two comments that still claimed "core never emits"
-      (`realtime-server.ts` + `session-revocation.test.ts`). Realtime suite green
-      (12 files / 131 tests).
+      (`realtime-server.ts` + `session-revocation.test.ts`). Realtime suite
+      green (12 files / 131 tests).
 - [x] **CLI `cleanup.ts` — routed through core 2026-07-30.** It's a live,
       legitimate command (factory-reset complementing `civic init`), so **fixed,
       not deleted.** It now resolves its delete targets through
@@ -1148,14 +1157,15 @@ they are pre-existing gaps the audit made visible.
       command run from a real install rather than the monorepo — targets the
       actual project. Dropped the stale `modules/api/{data,.civic}` hardcodes
       (unreferenced in source) and now removes the WHOLE `.system-data` dir
-      (secret + storage creds too — the old code deleted only `civic.db` and left
-      crypto material behind, so a re-init silently reused the old secret).
+      (secret + storage creds too — the old code deleted only `civic.db` and
+      left crypto material behind, so a re-init silently reused the old secret).
       ⚠️ The smoke test uncovered a **pre-existing** bug: cac camelizes
       `--yes-i-know` to the key `yesI-know`, so `options.yesIKnow` was always
       undefined and the FA-CLI-002 `--force` guard **refused every
       non-interactive run** (the documented CI path never worked) — fixed with a
-      defensive `isForceAcknowledged()` read. Extracted `resolveCleanupTargets()`
-      + `isForceAcknowledged()` as testable helpers; added `cleanup.test.ts` (8
-      tests) — the command had zero behavioral coverage before. Verified: a real
-      relocated-`dataDir` project wipes + recreates the right locations; CLI
-      suite green (12 files / 89), characterization test green (17).
+      defensive `isForceAcknowledged()` read. Extracted
+      `resolveCleanupTargets()` + `isForceAcknowledged()` as testable helpers;
+      added `cleanup.test.ts` (8 tests) — the command had zero behavioral
+      coverage before. Verified: a real relocated-`dataDir` project wipes +
+      recreates the right locations; CLI suite green (12 files / 89),
+      characterization test green (17).

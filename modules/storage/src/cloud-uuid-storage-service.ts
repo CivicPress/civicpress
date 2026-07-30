@@ -7,8 +7,7 @@
  *   - internals.ts       — module-level pure helpers + host-coupled
  *                          `getLocalStoragePath` / `logOperation`
  *   - validation.ts      — StorageValidation (file + batch validation)
- *   - provider-init.ts   — ProviderInit (per-provider SDK client bootstrap
- *                          + performHealthCheck)
+ *   - provider-init.ts   — ProviderInit (per-provider SDK client bootstrap)
  *   - upload-ops.ts      — UploadOps (uploadFile + per-provider helpers)
  *   - download-ops.ts    — DownloadOps (getFileById / getFileContent /
  *                          listFiles + per-provider helpers)
@@ -52,7 +51,6 @@ import {
   type ConcurrencyLimits,
 } from './limiter/concurrency-limiter.js';
 import { CircuitBreakerManager } from './circuit-breaker/circuit-breaker.js';
-import { StorageHealthChecker } from './health/storage-health-checker.js';
 import { type TimeoutConfig } from './utils/timeout.js';
 import { StorageUsageReporter } from './reporting/storage-usage-reporter.js';
 import { QuotaManager } from './quota/quota-manager.js';
@@ -101,10 +99,6 @@ export class CloudUuidStorageService {
   cacheAdapter: StorageMetadataCacheAdapter | null = null;
   concurrencyLimiter: ConcurrencyLimiter | null = null;
   circuitBreakerManager: CircuitBreakerManager | null = null;
-  healthChecker: StorageHealthChecker | null = null;
-  // Per-provider lightweight probes consumed by the health checker (when
-  // enabled) to monitor each configured provider.
-  providerProbes: Map<string, (provider: string) => Promise<void>> = new Map();
   timeoutConfig: TimeoutConfig = {};
   usageReporter: StorageUsageReporter | null = null;
   quotaManager: QuotaManager | null = null;
@@ -167,9 +161,7 @@ export class CloudUuidStorageService {
     }
 
     // Wire collaborators eagerly — they hold back-refs to `this` so any
-    // setter mutations made post-construction stay visible. Must happen
-    // before `providerProbes` is populated since the probes invoke
-    // providerInit.performHealthCheck.
+    // setter mutations made post-construction stay visible.
     this.validation = new StorageValidation({ getConfig: () => this.config });
     this.providerInit = new ProviderInit({ host: this });
     this.uploadOps = new UploadOps({ host: this });
@@ -177,32 +169,6 @@ export class CloudUuidStorageService {
     this.fileMgmtOps = new FileMgmtOps({ host: this });
     this.batchOps = new BatchOps({ host: this });
     this.streamingOps = new StreamingOps({ host: this });
-
-    // Build per-provider probe map consumed by the health checker (when
-    // enabled) to monitor each configured provider.
-    const allProviders = [
-      config.active_provider || 'local',
-      ...(config.failover_providers || []),
-    ];
-    allProviders.forEach((providerName) => {
-      const provider = config.providers?.[providerName];
-      if (provider) {
-        this.providerProbes.set(providerName, async (p: string) => {
-          // Simple health check: try to list files in a test folder
-          // This is a lightweight read operation
-          await this.providerInit.performHealthCheck(p);
-        });
-      }
-    });
-
-    // Initialize health checker if enabled
-    if (globalConfig?.health_checks) {
-      this.healthChecker = new StorageHealthChecker(
-        config,
-        this.providerProbes,
-        this.logger
-      );
-    }
 
     // Initialize timeout configuration
     this.timeoutConfig = {
@@ -335,20 +301,6 @@ export class CloudUuidStorageService {
   }
 
   /**
-   * Set health checker
-   */
-  setHealthChecker(healthChecker: StorageHealthChecker): void {
-    this.healthChecker = healthChecker;
-  }
-
-  /**
-   * Get health checker
-   */
-  getHealthChecker(): StorageHealthChecker | null {
-    return this.healthChecker;
-  }
-
-  /**
    * Get usage reporter
    */
   getUsageReporter(): StorageUsageReporter | null {
@@ -415,11 +367,6 @@ export class CloudUuidStorageService {
    * Shutdown the storage service and clean up clients
    */
   async shutdown(): Promise<void> {
-    // Shutdown health checker if active
-    if (this.healthChecker) {
-      this.healthChecker.shutdown();
-    }
-
     // Note: AWS S3 and Azure SDK clients don't require explicit cleanup
     // The SDKs handle connection pooling internally via HTTP agents
     // We just clear the references for garbage collection

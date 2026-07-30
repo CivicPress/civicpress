@@ -7,7 +7,6 @@
  *   - initializeS3Storage    (AWS S3 client + credentials)
  *   - initializeAzureStorage (Azure Blob client + container)
  *   - initializeGCSStorage   (Google Cloud Storage client + bucket)
- *   - performHealthCheck     (per-provider lightweight probe)
  *
  * The ops collaborators (upload/download/file-mgmt/streaming) call back
  * into the orchestrator's lazy-init paths when an SDK client is missing —
@@ -21,7 +20,6 @@ import {
   loadAzureBlobSdk,
   loadGcsStorageSdk,
 } from './sdk-loader.js';
-import { getLocalStoragePath } from './internals.js';
 import type { CloudUuidStorageService } from '../cloud-uuid-storage-service.js';
 import type {
   StorageProvider,
@@ -52,9 +50,7 @@ export class ProviderInit {
         );
       }
 
-      host.logger.info(
-        `Initializing storage with provider: ${activeProvider}`
-      );
+      host.logger.info(`Initializing storage with provider: ${activeProvider}`);
 
       switch (provider.type) {
         case 'local':
@@ -283,68 +279,5 @@ export class ProviderInit {
     host.logger.info(
       `Initialized GCS storage: project=${storageOptions.projectId}, bucket=${bucketName}`
     );
-  }
-
-  /**
-   * Perform health check for a provider
-   */
-  async performHealthCheck(providerName: string): Promise<void> {
-    const host = this.deps.host;
-    const provider = host.config.providers?.[providerName];
-    if (!provider) {
-      throw new Error(`Provider '${providerName}' not found`);
-    }
-
-    // Perform a lightweight operation to check provider health
-    // For local: check if storage path exists
-    // For S3: try to list objects (with limit 1)
-    // For Azure: try to list blobs (with limit 1)
-
-    switch (provider.type) {
-      case 'local': {
-        // Check if storage path exists
-        const localPath = getLocalStoragePath(host);
-        const exists = await fs.pathExists(localPath);
-        if (!exists) {
-          throw new Error(`Local storage path does not exist: ${localPath}`);
-        }
-        break;
-      }
-      case 's3': {
-        if (!host.s3Client) {
-          await this.initializeS3Storage(provider);
-        }
-        // Try to list objects (limit 1)
-        const { ListObjectsV2Command } = await loadAwsS3Sdk();
-        const listCommand = new ListObjectsV2Command({
-          Bucket: provider.bucket,
-          MaxKeys: 1,
-        });
-        await host.s3Client!.send(listCommand);
-        break;
-      }
-      case 'azure': {
-        if (!host.azureContainerClient) {
-          await this.initializeAzureStorage(provider);
-        }
-        // Try to list blobs (limit 1)
-        const blobs = host.azureContainerClient!.listBlobsFlat();
-        await blobs.next(); // Just check if we can access the container
-        break;
-      }
-      case 'gcs': {
-        if (!host.gcsBucket) {
-          await this.initializeGCSStorage(provider);
-        }
-        // Try to list files (limit 1)
-        const [_files] = await host.gcsBucket!.getFiles({ maxResults: 1 });
-        // Just check if we can access the bucket
-        break;
-      }
-      default:
-        throw new Error(
-          `Unsupported provider type for health check: ${provider.type}`
-        );
-    }
   }
 }
