@@ -1054,9 +1054,19 @@ they are pre-existing gaps the audit made visible.
       every default call (`git.log({author:undefined,since:undefined})` →
       malformed git args); the API fixture never seeded `.civic/org-config.yml`
       (500'd public `/info`); the fixture admin role lacked `templates:view`
-      (production admin has it). Full `tests/api/` suite green (38 files). ⏳
-      Still open: the two mislabeled in-process "HTTP" tests (`sort-api`,
-      `pagination-sql-side`) should be relabeled or upgraded to real supertest.
+      (production admin has it). Full `tests/api/` suite green (38 files).
+  - **Mislabeled-tests follow-up — DONE 2026-07-30.** `sort-api.test.ts` was a
+    placeholder that asserted inline logic (a locally-defined `getKindPriority`,
+    `typeof sort === 'string'`) and hit no real code — **upgraded** to a real
+    supertest suite over `GET /records?sort=` (default `created_desc`, each
+    accepted value echoed back, actual ascending/descending title ordering,
+    invalid → 400, `relevance` → 400). Noted in passing that the handler's
+    `INVALID_SORT_CONTEXT` branch is unreachable dead code — the validator's
+    `isIn` allowlist rejects `relevance` first (left as-is; behavior is correct).
+    `pagination-sql-side.test.ts` is a legitimate service-layer test (drives
+    `RecordsService` directly, real DB) — **relocated** to `tests/integration/`
+    (alongside `draft-publish-workflow.test.ts`) so `tests/api/` honestly means
+    HTTP; content unchanged.
 - [ ] **No UI page-component or browser-e2e tests** (no Playwright/Cypress); the
       API-critical composables (`useRecordEditorActions`, `useRecordLock`,
       `useRecordDetail`, `useCsrf`, `useAuth`) are untested.
