@@ -998,6 +998,14 @@ follow-up. (Storage, config+CLI, API-routes clusters + saga/BB/notifications.)
 
 ## Discovered during the 2026-07-30 status-doc verification
 
+> **RESOLVED 2026-07-30** — the four highlighted issues (plus the concrete
+> honesty/UI items in the bundle) are FIXED and pushed to `develop`: `b77974a`
+> notifications-truthfulness, `42ab1f0` storage.yml-applied, `9e81c9a` realtime
+> per-record authz + realtime tests now run in CI, `0268ce7` advertised-but-stub
+>
+> - UI defects. The remaining `[ ]` items below are the test-coverage gaps and
+>   dead-code cleanup, which were out of that scope.
+
 The `project-status.md` rewrite ran three parallel read-only feature audits
 across the whole platform. They confirmed the honest status now in that doc and
 surfaced these **real** (non-doc) findings — captured here so they become
@@ -1006,7 +1014,7 @@ they are pre-existing gaps the audit made visible.
 
 **Correctness / truthfulness (worth fixing)**
 
-- [ ] **Notifications mis-report SMTP failures as success.**
+- [x] **Notifications mis-report SMTP failures as success.**
       `NotificationService` ignores `ChannelResponse.success`
       (`notification-service.ts:286-297`) and the adapters catch SMTP errors and
       `return {success:false}` instead of throwing — so a real delivery failure
@@ -1015,18 +1023,18 @@ they are pre-existing gaps the audit made visible.
       returns the token anyway, so "verification email sent" can succeed with no
       send. (Ironic given the truth-check culture — this is a real
       audit-truthfulness bug.)
-- [ ] **API ignores `storage.yml`.** `initializeStorageService`
+- [x] **API ignores `storage.yml`.** `initializeStorageService`
       (`storage-services.ts:114-160`) loads the config then discards it
       (`:150`), so the API always runs the local provider; S3/GCS/Azure and
       `global.*` tuning are unreachable via the API (the CLI honors them).
-- [ ] **Realtime has no per-record authorization.**
+- [x] **Realtime has no per-record authorization.**
       `RecordRoomHandler.onConnect` (`record-room-handler.ts:136-139`) is
       `return {success:true}` — authentication is enforced (`validateSession`),
       but any authenticated user can open/edit any record room (incl. a
       nonexistent id). The real `authenticateConnection` (`auth.ts:36`) is dead
       code, its test skipped (`realtime-server.test.ts:390`, the "W5" item).
       Client even has 4003/4004 close-code copy the server never emits.
-- [ ] **`hooks.yml` advertises unregistered workflows.** Default config
+- [x] **`hooks.yml` advertises unregistered workflows.** Default config
       references `validate-record` / `notify-council` / `notify-stakeholders` /
       `notify-author` (`hook-system.ts:191-217`) but only `update-index` is
       registered, so those 4 are silently skipped — 1 of 5 default hooks does
@@ -1034,7 +1042,7 @@ they are pre-existing gaps the audit made visible.
 
 **CI / test-coverage gaps**
 
-- [ ] **Realtime module unit suite (13 files, ~5,200 LoC) does not run in CI.**
+- [x] **Realtime module unit suite (13 files, ~5,200 LoC) does not run in CI.**
       `modules/realtime/src/**/__tests__` is not in the root vitest `include`
       and there is no realtime CI step; only the 3 `tests/realtime/` integration
       tests gate CI. Add a realtime test step / include.
@@ -1050,10 +1058,10 @@ they are pre-existing gaps the audit made visible.
 
 **UI rough edges (quick)**
 
-- [ ] `ConfigurationField.vue:19` ships a debug artifact —
+- [x] `ConfigurationField.vue:19` ships a debug artifact —
       `<pre class="…bg-amber-200">{{ fieldType }} ??</pre>` on every structured
       config field.
-- [ ] `GeographySelector.vue:25` uses `:options` (should be `:items` for
+- [x] `GeographySelector.vue:25` uses `:options` (should be `:items` for
       `@nuxt/ui` v4) → dead category dropdown; `canDeleteGeography` hardcoded
       `true`.
 - [ ] The nicer structured config editor is orphaned —
@@ -1063,13 +1071,13 @@ they are pre-existing gaps the audit made visible.
 
 **Advertised-but-stub (honesty — either implement or stop advertising)**
 
-- [ ] Geography **KML / GPX / Shapefile** appear in every API/UI/CLI type enum
+- [x] Geography **KML / GPX / Shapefile** appear in every API/UI/CLI type enum
       but `createGeographyFile` throws "not yet implemented" — GeoJSON is the
       only real type.
-- [ ] Search **"typo tolerance"** only re-ranks substring title suggestions, not
+- [x] Search **"typo tolerance"** only re-ranks substring title suggestions, not
       the main FTS query; `enable_typo_tolerance` / `enable_accent_insensitive`
       are dead options.
-- [ ] User `.js` **programmable workflows** (`workflow-engine.ts:64` comment)
+- [x] User `.js` **programmable workflows** (`workflow-engine.ts:64` comment)
       have no loader and no JS sandbox — spec-only (`docs/specs/workflows.md` is
       unimplemented design).
 
