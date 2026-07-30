@@ -1099,6 +1099,23 @@ they are pre-existing gaps the audit made visible.
       Corrected the two comments that still claimed "core never emits"
       (`realtime-server.ts` + `session-revocation.test.ts`). Realtime suite green
       (12 files / 131 tests).
-- [ ] CLI `cleanup.ts` calls no core service and does destructive `fs.rmSync` on
-      hardcoded repo paths (`data/`, `.system-data/civic.db`) — bypasses core's
-      data-dir abstraction.
+- [x] **CLI `cleanup.ts` — routed through core 2026-07-30.** It's a live,
+      legitimate command (factory-reset complementing `civic init`), so **fixed,
+      not deleted.** It now resolves its delete targets through
+      `CentralConfigManager` (new `getProjectRoot()` + `getDataDir()` /
+      `getSystemDataDir()`) instead of paths hardcoded relative to the CLI's
+      install location, so a relocated `dataDir` / `CIVIC_DATA_DIR` — or the
+      command run from a real install rather than the monorepo — targets the
+      actual project. Dropped the stale `modules/api/{data,.civic}` hardcodes
+      (unreferenced in source) and now removes the WHOLE `.system-data` dir
+      (secret + storage creds too — the old code deleted only `civic.db` and left
+      crypto material behind, so a re-init silently reused the old secret).
+      ⚠️ The smoke test uncovered a **pre-existing** bug: cac camelizes
+      `--yes-i-know` to the key `yesI-know`, so `options.yesIKnow` was always
+      undefined and the FA-CLI-002 `--force` guard **refused every
+      non-interactive run** (the documented CI path never worked) — fixed with a
+      defensive `isForceAcknowledged()` read. Extracted `resolveCleanupTargets()`
+      + `isForceAcknowledged()` as testable helpers; added `cleanup.test.ts` (8
+      tests) — the command had zero behavioral coverage before. Verified: a real
+      relocated-`dataDir` project wipes + recreates the right locations; CLI
+      suite green (12 files / 89), characterization test green (17).

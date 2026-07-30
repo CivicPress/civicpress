@@ -3,13 +3,74 @@ import { CAC } from 'cac';
 import { cliSuccess, cliError, cliInfo, cliWarn } from '../utils/cli-output.js';
 import { withCli } from '../utils/with-cli.js';
 import { readFileSync, existsSync, rmSync, mkdirSync } from 'fs';
-import { join, resolve } from 'path';
-import { fileURLToPath } from 'url';
-import { dirname } from 'path';
+import { join } from 'path';
 import { parse as parseYaml } from 'yaml';
+import { CentralConfigManager } from '@civicpress/core';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+/** The on-disk locations a full `civic cleanup` removes and recreates. */
+export interface CleanupTargets {
+  /** Directory holding `.civicrc` (or cwd when none) — the deletion anchor. */
+  projectRoot: string;
+  /** Core-resolved record data directory. */
+  dataDir: string;
+  /** Core-resolved system-data dir (DB + secret + storage credentials). */
+  systemDataDir: string;
+  /** Absolute path to the root `.civicrc`. */
+  civicrcPath: string;
+  /** Everything to remove, in order (dataDir, systemDataDir, .civicrc). */
+  pathsToRemove: string[];
+}
+
+/**
+ * Resolve what `civic cleanup` should delete THROUGH core's config authority
+ * (honoring `.civicrc` / CIVIC_DATA_DIR and the project-root anchor) rather than
+ * from the CLI's own install location. A relocated dataDir — or the command run
+ * from a real install instead of the monorepo checkout — then targets the actual
+ * project instead of wiping the wrong directory and missing the real one. The
+ * getters fall back to project-root-relative defaults so a partially-initialized
+ * or config-less project can still be reset.
+ */
+export function resolveCleanupTargets(): CleanupTargets {
+  const projectRoot = CentralConfigManager.getProjectRoot();
+  let dataDir: string;
+  try {
+    dataDir = CentralConfigManager.getDataDir();
+  } catch {
+    dataDir = join(projectRoot, 'data');
+  }
+  let systemDataDir: string;
+  try {
+    systemDataDir = CentralConfigManager.getSystemDataDir();
+  } catch {
+    systemDataDir = join(projectRoot, '.system-data');
+  }
+  const civicrcPath = join(projectRoot, '.civicrc');
+  // Everything a fresh `civic init` would recreate: the records (dataDir), the
+  // WHOLE system-data dir (database + secret + storage credentials — the
+  // previous version deleted only civic.db and left the crypto material behind,
+  // so a re-init silently reused the old secret), and the root config file.
+  return {
+    projectRoot,
+    dataDir,
+    systemDataDir,
+    civicrcPath,
+    pathsToRemove: [dataDir, systemDataDir, civicrcPath],
+  };
+}
+
+/**
+ * Whether the caller supplied the `--yes-i-know` acknowledgement that
+ * FA-CLI-002 requires alongside `--force`. Read defensively: cac camelizes
+ * `--yes-i-know` to the key `yesI-know` (it only transforms the first hyphen
+ * segment), so the intuitive `options.yesIKnow` lookup is ALWAYS undefined —
+ * which silently made the guard refuse every non-interactive `--force` run
+ * (the documented CI path never worked). Accept every plausible spelling.
+ */
+export function isForceAcknowledged(options: Record<string, unknown>): boolean {
+  return Boolean(
+    options.yesIKnow ?? options['yes-i-know'] ?? options['yesI-know']
+  );
+}
 
 const normalizeChallenge = (value: string): string =>
   value
@@ -21,10 +82,14 @@ const normalizeChallenge = (value: string): string =>
  * FA-CLI-002: derive the deletion challenge from the configured ORGANIZATION,
  * not from the CLI's own package.json name (which is the constant "civicpress"
  * for every install — no protection at all). Falls back to the package name
- * only when no org config is present.
+ * only when no org config is present. `dataDir` is the core-resolved data
+ * directory (org config lives at `<dataDir>/.civic/org-config.yml`).
  */
-const resolveOrgChallengeName = (projectRoot: string): string => {
-  const orgConfigPath = join(projectRoot, 'data', '.civic', 'org-config.yml');
+const resolveOrgChallengeName = (
+  dataDir: string,
+  projectRoot: string
+): string => {
+  const orgConfigPath = join(dataDir, '.civic', 'org-config.yml');
   try {
     if (existsSync(orgConfigPath)) {
       const parsed = parseYaml(readFileSync(orgConfigPath, 'utf-8')) as
@@ -77,21 +142,21 @@ export const cleanupCommand = (cli: CAC) => {
         },
         async ({ globalOptions, logger }, options: any) => {
           const globalOpts = globalOptions;
-          // Get project root
-          const projectRoot = resolve(__dirname, '../../../');
 
-          // Define paths to clean up
-          const pathsToRemove = [
-            '.system-data/civic.db',
-            '.civicrc',
-            'data',
-            'modules/api/data',
-            'modules/api/.civic',
-          ];
+          // Resolve the REAL on-disk locations through core (see
+          // resolveCleanupTargets) instead of paths hardcoded relative to where
+          // the CLI happens to be installed.
+          const {
+            projectRoot,
+            dataDir,
+            systemDataDir,
+            civicrcPath,
+            pathsToRemove,
+          } = resolveCleanupTargets();
 
           // Check if any of these paths exist
           const existingPaths = pathsToRemove.filter((path) =>
-            existsSync(join(projectRoot, path))
+            existsSync(path)
           );
 
           if (existingPaths.length === 0) {
@@ -119,7 +184,7 @@ export const cleanupCommand = (cli: CAC) => {
             // FA-CLI-002: --force alone must NOT wipe a municipality's records.
             // Require an explicit second flag so a stray --force (CI, shell
             // history, fat-finger) can't irreversibly delete everything.
-            if (!options.yesIKnow) {
+            if (!isForceAcknowledged(options)) {
               cliError(
                 '--force requires --yes-i-know to confirm irreversible deletion of all CivicPress data. ' +
                   'Re-run with both flags, or omit --force to be prompted.',
@@ -133,16 +198,17 @@ export const cleanupCommand = (cli: CAC) => {
           } else {
             // FA-CLI-002: challenge on the configured ORGANIZATION name, not the
             // constant CLI package name.
-            const expectedCity = resolveOrgChallengeName(projectRoot);
+            const expectedCity = resolveOrgChallengeName(dataDir, projectRoot);
 
             if (!globalOpts.silent) {
               logger.warn(
                 '⚠️  This will permanently delete all CivicPress data:'
               );
-              logger.warn('   - Database files (civic.db)');
-              logger.warn('   - Configuration files (.civicrc)');
-              logger.warn('   - All record data (data/ directory)');
-              logger.warn('   - API module data and temporary files');
+              logger.warn(`   - Record data (${dataDir})`);
+              logger.warn(
+                `   - System data — database, secret, storage credentials (${systemDataDir})`
+              );
+              logger.warn(`   - Configuration file (${civicrcPath})`);
               logger.warn('');
               logger.warn('This action cannot be undone!');
               logger.warn('');
@@ -201,10 +267,9 @@ export const cleanupCommand = (cli: CAC) => {
           let errors: string[] = [];
 
           for (const path of existingPaths) {
-            const fullPath = join(projectRoot, path);
             try {
-              if (existsSync(fullPath)) {
-                rmSync(fullPath, { recursive: true, force: true });
+              if (existsSync(path)) {
+                rmSync(path, { recursive: true, force: true });
                 cleanedPaths.push(path);
               }
             } catch (error) {
@@ -216,9 +281,8 @@ export const cleanupCommand = (cli: CAC) => {
             }
           }
 
-          // Create fresh data directory structure
+          // Recreate the fresh data directory structure at the resolved location
           try {
-            const dataDir = join(projectRoot, 'data');
             if (!existsSync(dataDir)) {
               mkdirSync(dataDir, { recursive: true });
             }

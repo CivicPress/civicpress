@@ -381,6 +381,19 @@ export class CentralConfigManager {
   }
 
   /**
+   * Absolute path to the project root — the directory that holds `.civicrc`,
+   * or the current working directory when none is found (the same anchor
+   * dataDir / systemDataDir resolve against). Callers that need to act on the
+   * on-disk project layout (e.g. `civic cleanup`) should resolve paths through
+   * this — never from their own install location — so a relocated dataDir or a
+   * command invoked outside the repo still targets the real project.
+   */
+  static getProjectRoot(): string {
+    const configPath = this.findConfigFile();
+    return configPath ? path.dirname(configPath) : process.cwd();
+  }
+
+  /**
    * Load YAML if it exists; otherwise return null
    */
   /**
