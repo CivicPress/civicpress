@@ -1086,9 +1086,19 @@ they are pre-existing gaps the audit made visible.
 - [ ] Storage failover / retry / metrics are unit-tested state machines but
       their setters are **never called outside tests** (only the circuit breaker
       is live, pointless without failover behind it).
-- [ ] Realtime `PresenceManager` + `awareness.ts` are unwired dead code (30
-      passing tests give false confidence); `revokeUserConnections` is real but
-      core never emits `auth:sessions:revoked`.
+- [x] **Realtime `PresenceManager` + `awareness.ts` — DELETED 2026-07-30.** Both
+      were unwired dead code, reachable only through the `index.ts` barrel and
+      never constructed in any live path (live presence runs through
+      `y-protocols/awareness` in `yjs-sync.ts`). Removed the two files + the
+      barrel exports + the 26-test `presence-manager.test.ts` (`awareness.ts` had
+      **0** tests — untested dead code, not "false confidence"). ⚠️ The second
+      half of this item was **stale**: `revokeUserConnections` is real AND core
+      DOES emit `auth:sessions:revoked` (added `b82825b`, 2026-07-20) —
+      `SessionOps.deleteUserSessions` fires it on the HookSystem `AuthService`
+      receives via `initializeHooks()`, so the teardown is live end-to-end.
+      Corrected the two comments that still claimed "core never emits"
+      (`realtime-server.ts` + `session-revocation.test.ts`). Realtime suite green
+      (12 files / 131 tests).
 - [ ] CLI `cleanup.ts` calls no core service and does destructive `fs.rmSync` on
       hardcoded repo paths (`data/`, `.system-data/civic.db`) — bypasses core's
       data-dir abstraction.
