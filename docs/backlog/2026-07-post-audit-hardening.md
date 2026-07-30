@@ -841,7 +841,19 @@ follow-up. (Storage, config+CLI, API-routes clusters + saga/BB/notifications.)
     DoS is not exploitable in the request surface. Left at the highest safe same-major versions
     (1.1.16 / 2.1.2 / 5.0.8); revisit when the old CJS minimatch consumers age out. The scheduled
     osv-scanner (report-only) will keep it visible.
+- [x] **CodeQL SAST + Node-pin reconcile — DONE 2026-07-30 (finishes the supply-chain bundle).**
+  - **CodeQL** (`.github/workflows/codeql.yml`): SHA-pinned `github/codeql-action` v3, language
+    `javascript-typescript`, `build-mode: none` (JS/TS needs no compile, no dep install; a fresh
+    checkout has no node_modules/dist so only first-party source is scanned). REPORT-ONLY —
+    the analyze step succeeds even with alerts, so it never gates CI (only build-test +
+    audit-truth-check are required). Runs on PRs to main/develop, pushes to main, weekly, and
+    `workflow_dispatch`. Findings land in Security > Code scanning (SARIF, same channel osv-scanner
+    already proved works).
+  - **Node-pin reconcile**: added `engines` to the root `package.json` (`node: ">=22"`,
+    `pnpm: ">=9"`) — previously absent. Now all Node/pnpm pins agree: `.nvmrc` 22.22.3, `.npmrc`
+    `use-node-version=22.22.3`, CI `node-version-file: .nvmrc`, `packageManager pnpm@9.15.9`, and
+    the new `engines` floor. Metadata-only (no `engine-strict`), so it declares the requirement
+    without breaking installs on patch drift.
 - [ ] `ui-003` SSR; signed appliance image;
   HW config-apply/reboot/button; equity/i18n; uncleared-surface follow-up
-  (quick-start/by-meeting authz, FTS injection, config reflection);
-  CodeQL SAST + Node-pin reconcile (remainder of supply-chain); doc-drift sweep
+  (quick-start/by-meeting authz, FTS injection, config reflection); doc-drift sweep
