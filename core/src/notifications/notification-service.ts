@@ -192,7 +192,9 @@ export class NotificationService {
 
       await this.audit.logNotification({
         id: notificationId,
-        action: allSucceeded ? 'notification_sent' : 'notification_partial_or_failed',
+        action: allSucceeded
+          ? 'notification_sent'
+          : 'notification_partial_or_failed',
         details: {
           channels: sentChannels,
           failedChannels,
@@ -282,13 +284,24 @@ export class NotificationService {
       );
     }
 
-    // Send via channel
-    await channel.send({
+    // Send via channel. Per the NotificationChannel contract, send() reports a
+    // delivery failure by RETURNING { success:false } (the auth email adapter
+    // catches SMTP errors this way) rather than throwing. An unchecked await
+    // therefore counted a failed send as delivered — Promise.allSettled saw it
+    // "fulfilled", so the row was audited success:true (a notifications-001
+    // regression on the actual auth path). Honor the contract: a success:false
+    // response is a failure, so throw and let it land in failedChannels.
+    const response = await channel.send({
       to: recipient,
       content: request.content,
       data: request.data,
       priority: request.priority || 'normal',
     });
+    if (response && response.success === false) {
+      throw new Error(
+        response.error || `Channel '${channelName}' reported a delivery failure`
+      );
+    }
 
     coreDebug(`Channel ${channelName} sent successfully`, {
       operation: 'notification:send',
