@@ -87,6 +87,15 @@ and this project adheres to
   dir, system-data dir, and `.civicrc` through the core config (honoring a
   relocated `dataDir` / `CIVIC_DATA_DIR`) and removes the whole `.system-data`
   (database plus secret and storage credentials), not just `civic.db`.
+- **`GET /diff/:recordId/commits` no longer 500s on the default call.** It
+  passed `author: undefined` / `since: undefined` straight into simple-git's
+  `git.log()`, which builds malformed git arguments and throws whenever those
+  filters are omitted (the common case). The optional filters are now only
+  included when supplied.
+- **`403 Forbidden` responses now include `success: false`.** The
+  `requirePermission` middleware's 403 body omitted the standard envelope flag
+  that every other error response sets, so clients keying on
+  `body.success === false` misread permission denials.
 
 ### Security
 
