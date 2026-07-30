@@ -103,7 +103,7 @@ export function createGeographyRouter(
     query('category')
       .optional()
       .isIn(['zone', 'boundary', 'district', 'facility', 'route']),
-    query('type').optional().isIn(['geojson', 'kml', 'gpx', 'shapefile']),
+    query('type').optional().isIn(['geojson']),
     query('page').optional().isInt({ min: 1 }),
     query('limit').optional().isInt({ min: 1, max: 100 }),
     async (req: Request, res: Response) => {
@@ -136,9 +136,7 @@ export function createGeographyRouter(
     '/',
     requirePermission('geography:manage'),
     body('name').isString().notEmpty().withMessage('Name is required'),
-    body('type')
-      .isIn(['geojson', 'kml', 'gpx', 'shapefile'])
-      .withMessage('Invalid type'),
+    body('type').isIn(['geojson']).withMessage('Invalid type'),
     body('category')
       .isIn(['zone', 'boundary', 'district', 'facility', 'route'])
       .withMessage('Invalid category'),
@@ -201,9 +199,7 @@ export function createGeographyRouter(
   router.post(
     '/validate',
     body('content').isString().notEmpty().withMessage('Content is required'),
-    body('type')
-      .isIn(['geojson', 'kml', 'gpx', 'shapefile'])
-      .withMessage('Invalid type'),
+    body('type').isIn(['geojson']).withMessage('Invalid type'),
     async (req: Request, res: Response) => {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {

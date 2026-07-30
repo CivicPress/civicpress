@@ -2,12 +2,20 @@
 # This file defines event-driven hooks, their workflows, and settings
 
 _metadata:
-  name: "Event Hooks & Workflows"
-  description: "Configure event-driven hooks, associated workflows, and execution settings"
-  version: "1.0.0"
+  name: 'Event Hooks & Workflows'
+  description:
+    'Configure event-driven hooks, associated workflows, and execution settings'
+  version: '1.0.0'
   editable: true
 
 # Event Hooks Definition
+#
+# Implementation status: of the workflow names referenced below, only
+# `update-index` is currently implemented by the WorkflowEngine. The others
+# (`validate-record`, `notify-council`, `notify-stakeholders`, `notify-author`)
+# are PLANNED — the hook system accepts them but silently skips any workflow
+# that is not registered (see core/src/workflows/workflow-engine.ts and
+# docs/specs/workflows.md). They are kept here to document intended behaviour.
 hooks:
   record:created:
     enabled:
@@ -146,9 +154,10 @@ settings:
   defaultMode:
     value: 'async'
     type: 'array'
-    options: [
-      { value: 'sync', label: 'Synchronous' },
-      { value: 'async', label: 'Asynchronous' }
-    ]
+    options:
+      [
+        { value: 'sync', label: 'Synchronous' },
+        { value: 'async', label: 'Asynchronous' },
+      ]
     description: 'Default execution mode for hooks'
-    required: true 
+    required: true

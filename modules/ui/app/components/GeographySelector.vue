@@ -22,7 +22,7 @@
           />
           <USelectMenu
             v-model="selectedCategory"
-            :options="categoryOptions"
+            :items="categoryOptions"
             :placeholder="t('records.geography.allCategories')"
             class="w-full"
           />
@@ -292,7 +292,9 @@ const loadGeographyFiles = async () => {
     loading.value = true;
     error.value = null;
 
-    const response = (await useNuxtApp().$civicApi('/api/v1/geography')) as ApiResponse;
+    const response = (await useNuxtApp().$civicApi(
+      '/api/v1/geography'
+    )) as ApiResponse;
 
     if (response.success && response.data?.files) {
       geographyFiles.value = response.data.files;

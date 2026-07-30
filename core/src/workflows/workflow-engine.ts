@@ -5,11 +5,7 @@
  * Manages approval processes, lifecycle transitions, and business rules.
  */
 import { IndexingService } from '../indexing/indexing-service.js';
-import {
-  coreInfo,
-  coreWarn,
-  coreError,
-} from '../utils/core-output.js';
+import { coreInfo, coreWarn, coreError } from '../utils/core-output.js';
 
 /**
  * Workflow payload type — polymorphic by design (each workflow takes a
@@ -60,9 +56,10 @@ export class WorkflowEngine {
     // TODO log-only stubs registered as if functional. They were removed rather
     // than left advertised — nothing triggered them (no hook config references
     // them), and the engine has no auth/notification/record services to
-    // implement them against. Programmable civic workflows are specified as
-    // sandboxed user `.js` files in `data/.civic/workflows/` (see
-    // docs/specs/workflows.md), not hardcoded engine methods, so these stubs
+    // implement them against. Programmable civic workflows are DESIGNED (spec
+    // only — there is no `.js` loader or sandbox executor yet; see
+    // docs/specs/workflows.md) as sandboxed user files in
+    // `data/.civic/workflows/`, not hardcoded engine methods, so these stubs
     // were not the real implementation path.
     this.registerWorkflow('update-index', this.updateIndexWorkflow.bind(this));
   }
@@ -188,7 +185,7 @@ export class WorkflowEngine {
         'record' in data &&
         typeof (data as { record?: unknown }).record === 'object' &&
         (data as { record?: unknown }).record !== null
-          ? ((data as { record: Record<string, unknown> }).record)
+          ? (data as { record: Record<string, unknown> }).record
           : null;
 
       coreInfo('Auto-indexing workflow started', {

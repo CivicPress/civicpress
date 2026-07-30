@@ -16,9 +16,6 @@
         Required
       </UBadge>
     </div>
-    <pre class="text-xs text-gray-500 dark:text-gray-400 p-4 bg-amber-200"
-      >{{ fieldType }} ??</pre
-    >
     <!-- Dynamic form field based on type -->
     <div class="space-y-4">
       <!-- String input -->
