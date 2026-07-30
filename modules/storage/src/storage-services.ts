@@ -127,32 +127,30 @@ export async function initializeStorageService(
     );
   }
 
-  // Try to load actual configuration, but fall back to defaults if file doesn't exist
-  // This is important for test environments where config files may not be created
+  // Load the actual configuration and APPLY it to the service. The service was
+  // created with default (local) config at registration; previously the loaded
+  // config was discarded and only `initialize()` ran, so the API always used
+  // the local provider regardless of storage.yml (S3/GCS/Azure selection and
+  // `global.*` tuning were unreachable via the API — the CLI honored them).
+  // `updateConfig` merges the loaded config and re-initializes the provider
+  // stack from it.
   try {
-    await configManager.loadConfig();
+    const loadedConfig = await configManager.loadConfig();
+    await storageService.updateConfig(loadedConfig);
   } catch (error: unknown) {
-    // If config file doesn't exist, use default config (service was created with defaults)
-    // This is expected in test environments and fresh installations
+    // If the config file doesn't exist (fresh install / test env), keep the
+    // registration defaults and initialize as-is.
     const errMessage = error instanceof Error ? error.message : String(error);
     if (
       errMessage.includes('not found') ||
       errMessage.includes('Storage configuration not found')
     ) {
-      // Default config already used during registration — nothing to do here
+      await storageService.initialize();
     } else {
       // Re-throw other errors (permission issues, invalid YAML, etc.)
       throw error;
     }
   }
-
-  // Update service config if it changed (service was created with defaults)
-  // Note: CloudUuidStorageService doesn't have a setConfig method, so we need
-  // to check if re-initialization is needed. For now, we'll just initialize.
-  // In a future version, we might want to add a method to update config.
-
-  // Initialize the service
-  await storageService.initialize();
 
   // Mark as initialized
   storageService._initialized = true;
