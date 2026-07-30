@@ -428,7 +428,7 @@ interface SearchService {
 2. Reindex existing records using CLI:
 
    ```bash
-   civic index --sync-db --rebuild
+   civic index --sync-db
    ```
 
 3. Verify search functionality

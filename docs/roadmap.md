@@ -5,16 +5,33 @@ alpha toward a stable, production-grade civic infrastructure platform._
 
 **Current Version:** v0.2.0 (Alpha)
 
-> **Current status (2026-07-15) — supersedes the 2026-06-03 snapshot in the
-> line below.** The 2026-07-02 two-repo audit (`docs/audits/2026-07-02-full-audit.md`,
-> `FA-*` registry) is the authoritative tracker. Phases 4–6 landed: all
-> Criticals + Highs + the actionable Medium/Low security & correctness tail are
-> CLOSED on `refactor/phase-6c-audit-mediums` (monorepo) and
-> `refactor/phase-4-enrollment-hardening` (BroadcastBox HW). Only FA-OPS-001 +
-> the residual Low tier remain; `origin/main` stays frozen pending a confirming
-> pre-merge re-audit. The Phase 2/3 snapshot below is historical.
+> **Current status (2026-07-30) — supersedes every snapshot below.** The
+> 2026-07-02 two-repo audit (`docs/audits/2026-07-02-full-audit.md`, `FA-*`
+> registry) is the authoritative findings tracker and is **fully remediated** —
+> every finding closed or an explicit accepted-deferral. Since the 2026-07-15
+> snapshot, an entire post-audit-hardening arc landed on `main` (PRs #19–#22,
+> `main` at `e4f64bd`): audit Tiers A–D and test-health phases 7e–7j (#19);
+> tech-debt refactors (withCli, API-envelope standardization, config/dataDir
+> anchoring) (#20); two production-bug fixes (published records leaking into
+> drafts; record locks expiring mid-edit), the core-002 hook→WorkflowEngine
+> wiring, supply-chain scanning (osv-scanner, CodeQL, `SECURITY.md`), and a 94→2
+> osv-advisory dependency remediation (#21); and CodeQL SAST with a Node/pnpm
+> `engines` reconcile (#22). `develop` carries a further security-tail batch —
+> the audit's deferred carry-forward surfaces audited (no live vulnerabilities),
+> plus Low defense-in-depth hardening and dead-code cleanup — pending the next
+> develop→main PR. **Genuinely open (Roadmap-tier, need scoping):** `ui-003`
+> SSR; signed appliance image; HW/device-repo work; equity/i18n; device-repo
+> required-status-checks branch protection. The phase-tracking and status
+> snapshots below are historical; the forward-looking milestone sections stand.
 
-**Status:** v0.2.0 shipped; **post-audit base refactor in progress** (2026-06-03 snapshot). Phase 2a merged to local `main`; Phase 2b + 2c + 2c.5 + 2d merged to local `dev`. **Phase 2d-followup `ui-002` v3→v4 migration closed 2026-05-28** (+2 original-205 findings: ui-002 + deps-009). **Phase 2d-followup `lint-rule-rollout` closed 2026-06-02** (merge `656adb5`); **all 4 numbered followups + Tier C cleanup CLOSED 2026-06-03**: `#1 unused-vars umbrella` (`82e3c1b`, 459 sites across 5 workspaces, rule = `error` repo-wide), `#2 Vue-template no-explicit-any blind spot` (`d7447b4`, 13 sites), `#3 modules/ui cruft deps + pnpm 8→9 prereq` (`3103a74`), `#4 STYLE_RULES_DEFERRED triage` (`c30e62c`, 27 rules into 4 tiers + 31 violations fixed + 89 deferred Tier C), **Tier C cleanup** (`3afd39a`, 89 → 0). **modules/ui ESLint: 0 errors, 0 warnings** (from 102). **66 of 205 original audit findings closed (32%) + 47 refactor-surfaced closures = 113 total measurable progress items** (lint rollout + followups + Tier C are procedural, not finding-counted). Per the "finish lint followups first" sequencing rule, **Phase 3 (realtime, Yjs-only) is now UNBLOCKED**. After: Phase 4 (hardware audit) and Phase 5 (broadcast-box reintegration). v0.3.x scope rebalanced to follow the refactor master plan at `docs/plans/2026-05-17-base-refactor-master-plan.md`. See `docs/audits/2026-05-16-manifesto-fit-findings.md` for the full registry and the per-phase closure reports under `docs/audits/`.
+**Status (2026-06-03 snapshot — historical; superseded by the 2026-07-30 banner
+above).** The post-audit base refactor (Phases 2a–2d + the lint-rule rollout,
+then Phase 3 realtime / Phase 4 hardware audit / Phase 5 broadcast-box
+reintegration) has since completed — see the per-phase closure reports under
+`docs/audits/`. The original 205-finding manifesto-fit tracker
+(`docs/audits/2026-05-16-manifesto-fit-findings.md`) is the historical
+base-refactor registry; the 2026-07-02 full audit is the current authoritative
+one.
 
 ---
 
@@ -57,19 +74,20 @@ architecture, core concepts, and overall feasibility of the platform.
 These achievements conclude the "Shadow Town Demo" milestone and establish the
 technical baseline for the next phases.
 
-### Collaborative Record Editing (added in refactor Phase 3, local `dev`)
+### Collaborative Record Editing (added in refactor Phase 3; merged to `main`)
 
-Shipped on the local `refactor/phase-3-realtime` branch (pending the `--no-ff`
-merge to `dev`; not yet on `main`), with deliberately scoped, honest claims:
+Shipped in `@civicpress/realtime` and merged to `main` — it runs in-process with
+the API and is exercised in CI — with deliberately scoped, honest claims:
 
 - **Collaborative record editing** via `@civicpress/realtime` — a **binary
   y-protocols** (Yjs CRDT over WebSocket) server. It runs **in-process with the
   API** on its own port (default 3001), gated by `realtime.enabled`.
 - **Server-side Markdown writeback to a review-gated DRAFT.** The server
-  serializes the room's Yjs doc to Markdown (via `@civicpress/editor-schema`) and
-  writes it to the record's draft (`record_drafts.markdown_body`) through the
-  records-draft pipeline. It does **not** auto-commit to Git; **Markdown-in-Git
-  remains the durable archive**, produced when a human *publishes* the draft.
+  serializes the room's Yjs doc to Markdown (via `@civicpress/editor-schema`)
+  and writes it to the record's draft (`record_drafts.markdown_body`) through
+  the records-draft pipeline. It does **not** auto-commit to Git;
+  **Markdown-in-Git remains the durable archive**, produced when a human
+  _publishes_ the draft.
 - **Ephemeral snapshot blobs** (integrity-hashed, 48h TTL) act as reconnection
   merge-aids; on corruption/format-skew the server re-seeds from the record's
   Markdown.
@@ -115,7 +133,13 @@ Each phase includes objectives and expected deliverables.
 
 **Focus:** Indexing, search, architecture cleanup, reliability improvements.
 
-**Status:** v0.2.0 shipped 2025-01-30. The 2026-05 manifesto-fit audit identified gaps (20 Critical findings) that were aspirational in earlier marks of "complete." Phase 2a of the post-audit refactor (2026-05-17) closed 18 findings; Phase 2b — Truth Restoration — is in progress. **Some items previously marked ✅ here were aspirational** — see the audit findings registry for the gap.
+**Status:** v0.2.0 shipped 2025-12-19. The 2026-05 manifesto-fit audit
+identified gaps (20 Critical findings) that were aspirational in earlier marks
+of "complete"; the subsequent post-audit base refactor (Phases 2a–2d) and the
+2026-07-02 full audit closed them — the `FA-*` registry
+(`docs/audits/2026-07-02-full-audit.md`) is now fully remediated. **Some items
+previously marked ✅ here were aspirational** — that gap is now closed; see the
+registry.
 
 ### Goals (audited 2026-05)
 
@@ -128,17 +152,17 @@ Each phase includes objectives and expected deliverables.
   circuit breaker, and metrics integrated). 🟡 Quota enforcement was specified
   but not wired in v0.2.0 — closed in Phase 2a (storage-001).
 - Add CLI improvements (diagnostics, repair, validation) ✅ (Diagnostics with
-  --fix flag provides repair functionality, validation command implemented).
-  🟡 CLI test coverage claim ("120+ / 95%") was unsubstantiated — `cli-001`
-  in the registry; honest counts in `docs/project-status.md`. Phase 2b
-  Tasks 10+11 add real Tier 1/2 CLI tests.
+  --fix flag provides repair functionality, validation command implemented). 🟡
+  CLI test coverage claim ("120+ / 95%") was unsubstantiated — `cli-001` in the
+  registry; honest counts in `docs/project-status.md`. Phase 2b Tasks 10+11 add
+  real Tier 1/2 CLI tests.
 - Improve error handling and logs ✅ (Unified error handling system implemented
   with type-safe error hierarchy, correlation IDs, and comprehensive test
   coverage)
 - Polish UI navigation and list views ✅ (Page-based pagination, improved search
   UX, sort options API implemented). 🟡 UI **component test coverage** (~0% in
-  v0.2.0) was overclaimed at "80+ tests / 85%" — `ui-005` in the registry;
-  Phase 2b Tasks 8+9 add Tier 1/2 component tests.
+  v0.2.0) was overclaimed at "80+ tests / 85%" — `ui-005` in the registry; Phase
+  2b Tasks 8+9 add Tier 1/2 component tests.
 - Add basic documentation for architecture ✅ (Comprehensive architecture.md
   with 1,600+ lines, ADRs, visual diagrams, and related documentation)
 
@@ -153,11 +177,11 @@ Each phase includes objectives and expected deliverables.
 - ✅ Improved demo dataset tooling
 - ✅ Indexed civic records (searchable by metadata and content)
 - 🟡 Security system (SecretsManager, CSRF Protection landed; 2026-05 audit
-  identified 20 Critical issues — 15 closed in Phase 2a including
-  XSS-via-record sanitization (`ui-001`), auth-gate enforcement
-  (`api-001/2/3`), truthful notification audit log (`notifications-001`),
-  storage quotas (`storage-001`), public-folder bypass (`storage-002`)).
-  Trust-restored; not yet enterprise-grade.
+  identified 20 Critical issues — 15 closed in Phase 2a including XSS-via-record
+  sanitization (`ui-001`), auth-gate enforcement (`api-001/2/3`), truthful
+  notification audit log (`notifications-001`), storage quotas (`storage-001`),
+  public-folder bypass (`storage-002`)). Trust-restored; not yet
+  enterprise-grade.
 - ✅ Comprehensive architecture documentation with visual diagrams
 
 ---
@@ -168,8 +192,8 @@ Each phase includes objectives and expected deliverables.
 compelling for demonstrations and municipal outreach. **Couples with the
 post-audit base refactor** (Phases 2b → 2c → 2d → 3 of the master plan):
 truth-restored docs, foundation cleanup, structural hardening, and a clean
-reintroduction of realtime collaboration. By the time v0.3.x ships, every
-spec under `docs/specs/` should match implementation reality (per
+reintroduction of realtime collaboration. By the time v0.3.x ships, every spec
+under `docs/specs/` should match implementation reality (per
 `docs/audits/spec-stability-triage.md`).
 
 ### Goals
@@ -332,23 +356,30 @@ CivicPress toward full digital governance infrastructure.
 Per the master plan's "make truth true again" spine, every refactor sub-phase
 ships its truth meter:
 
-| Phase | Findings closed | Findings deferred (with target phase) |
-|---|---|---|
-| 2a Bleed-Stop | 18 (15 Critical + 3 High) | 4 Critical pending (broadcast-box-002/007 → Phase 5; BB-HW-001/3 → Phase 4) — ~~ui-002~~ closed 2026-05-28 on 2d-followup |
-| 2b Truth Restoration | 9 (legal-register-001/006, notifications-007, site-001/003, BB-HW-008, ui-005, cli-001, site-002 → wontfix-by-phase) + 6 surfaced closures | spec-frontmatter sweep demoted 39 of 61 stable-claiming specs to honest `partial`/`planned` |
-| 2c Foundation Cleanup | 17 (core-001/4/5/6/10/13, api-008, storage-003/4/9, notifications-005/6/8/13, plus realtime-007/8 → Phase 3, BB-003 → Phase 4/5, BB-013 → Phase 5) + 4 Phase-2c.5-surfaced | _closed 2026-05-19; report at `docs/audits/phase-2c-closure-report.md`_ |
-| 2d Structural Hardening | **13** (W1: legal-register-002/005; W2: core-008/api-013/ui-008; W3: api-009/ui-011/storage-015; W4: storage-006/deps-008/api-007/deps-010/deps-011) + 9 W0-surfaced + 21 W2-decomp + 6 W3-latent-bugs | _closed 2026-05-25; report at `docs/audits/phase-2d-closure-report.md`._ Carry-forwards still pending: realtime-012 → Phase 3. ~~Lint-rule rollout (dedicated session)~~ closed 2026-06-02 (merge `656adb5`). |
-| 2d-followup ui-002 | 2 (ui-002 + deps-009) + 1 Phase-2d-W4-T2-root-audit-gap surfaced (closed by `a92b842`) | _closed 2026-05-28; commit `ec5a9a0` on `refactor/ui-002-nuxt-ui-v4-migration`._ Migrated paid `@nuxt/ui-pro` v3 + free `@nuxt/ui` v3 → MIT `@nuxt/ui` v4.8.0 (single package). Near-drop-in upgrade; only real source change was the `ui.theme.colors` useHead workaround removal (`cd725d5`). |
-| 2d-followup lint-rule-rollout | Phase 2d W3-T6 — `@typescript-eslint/no-explicit-any: error` enforced across 5 workspaces; baseline 1,488 errors → 0 | _closed 2026-06-02; merge `656adb5` on local `dev`._ Sub-followups: ~~#3 modules/ui cruft deps~~ closed (`3103a74`); ~~#2 Vue-template explicit-any blind spot~~ closed (`d7447b4`, 13 sites); ~~#1.1 core unused-vars~~ closed (`60d91e8`, 170 sites + rule→error); ~~#1.2 cli unused-vars~~ closed (`961547d`, 110 sites + rule→error). Remaining: #1.3 modules/ui (102), #1.4 modules/storage (45), #1.5 modules/api (32), ~30 vue/nuxt style rules. See `lint-rollout-2026-06-02-followups` memory for detail + 8 surfaced findings deferred for separate triage. |
-| 3 Reintroduce realtime | **14** (realtime-001 … realtime-014) + the `packages/editor-schema` workspace; `realtime-server.ts` 3,581 → 1,495 LoC | _DONE on local `refactor/phase-3-realtime` (pending `--no-ff` merge to `dev`); report at `docs/audits/phase-3-closure-report.md`._ Carry-forwards: collab-edits-as-Git-civic-events writeback (deferred); multi-node Redis adapter; browser E2E. |
-| 4 Audit + fix broadcast-box hardware | **In progress.** Quick-wins closed: BB-HW-002 (license), 011 (AP-mode timeout), 012 (credential encryption — recon), 015 (version/status). **W0 unblock+green** (HW repo `23b87c9`): BB-HW-007 (hardware appliance now documented in roadmap + project-status) + scoping findings N1–N4 (pyproject dependency drift, headless OpenCV, V4L2 encoder-detection test bug, gitignore). A clean `pip install -e ".[dev]"` now yields **283 passed / 7 skipped / 0 failed** on the dev VM. Plan: `docs/plans/2026-06-18-base-refactor-phase-4-broadcast-box-hw.md`. | W1: BB-HW-001/004/005/006 (canonical protocol artifact + dispatch table); W2: BB-HW-003 (video→Markdown civic-artifact pipeline — the mission); W3: BB-HW-009 (clerk-installable path); W4: BB-HW-010/013 (security), 014/016/017 (docs + 2nd UI); workspace-003 (git remote) |
-| 5 Reintroduce broadcast-box to monorepo | _pending_ | _pending_ |
+> _Historical (base refactor, 2026-05 → 06). Phases 3–5 have since closed — see
+> the per-phase closure reports under `docs/audits/`; Phase 3 realtime is merged
+> to `main`. The 2026-07-02 `FA-*` audit is the current authoritative registry._
 
-**Cumulative (end of Phase 2d):** 64 of 205 original-audit findings closed (31%). Plus 46 refactor-surfaced closures (separately tracked) for 110 total measurable progress items.
+| Phase                                   | Findings closed                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | Findings deferred (with target phase)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2a Bleed-Stop                           | 18 (15 Critical + 3 High)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | 4 Critical pending (broadcast-box-002/007 → Phase 5; BB-HW-001/3 → Phase 4) — ~~ui-002~~ closed 2026-05-28 on 2d-followup                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| 2b Truth Restoration                    | 9 (legal-register-001/006, notifications-007, site-001/003, BB-HW-008, ui-005, cli-001, site-002 → wontfix-by-phase) + 6 surfaced closures                                                                                                                                                                                                                                                                                                                                                                                                                    | spec-frontmatter sweep demoted 39 of 61 stable-claiming specs to honest `partial`/`planned`                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| 2c Foundation Cleanup                   | 17 (core-001/4/5/6/10/13, api-008, storage-003/4/9, notifications-005/6/8/13, plus realtime-007/8 → Phase 3, BB-003 → Phase 4/5, BB-013 → Phase 5) + 4 Phase-2c.5-surfaced                                                                                                                                                                                                                                                                                                                                                                                    | _closed 2026-05-19; report at `docs/audits/phase-2c-closure-report.md`_                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| 2d Structural Hardening                 | **13** (W1: legal-register-002/005; W2: core-008/api-013/ui-008; W3: api-009/ui-011/storage-015; W4: storage-006/deps-008/api-007/deps-010/deps-011) + 9 W0-surfaced + 21 W2-decomp + 6 W3-latent-bugs                                                                                                                                                                                                                                                                                                                                                        | _closed 2026-05-25; report at `docs/audits/phase-2d-closure-report.md`._ Carry-forwards still pending: realtime-012 → Phase 3. ~~Lint-rule rollout (dedicated session)~~ closed 2026-06-02 (merge `656adb5`).                                                                                                                                                                                                                                                                                                                                                         |
+| 2d-followup ui-002                      | 2 (ui-002 + deps-009) + 1 Phase-2d-W4-T2-root-audit-gap surfaced (closed by `a92b842`)                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | _closed 2026-05-28; commit `ec5a9a0` on `refactor/ui-002-nuxt-ui-v4-migration`._ Migrated paid `@nuxt/ui-pro` v3 + free `@nuxt/ui` v3 → MIT `@nuxt/ui` v4.8.0 (single package). Near-drop-in upgrade; only real source change was the `ui.theme.colors` useHead workaround removal (`cd725d5`).                                                                                                                                                                                                                                                                       |
+| 2d-followup lint-rule-rollout           | Phase 2d W3-T6 — `@typescript-eslint/no-explicit-any: error` enforced across 5 workspaces; baseline 1,488 errors → 0                                                                                                                                                                                                                                                                                                                                                                                                                                          | _closed 2026-06-02; merge `656adb5` on local `dev`._ Sub-followups: ~~#3 modules/ui cruft deps~~ closed (`3103a74`); ~~#2 Vue-template explicit-any blind spot~~ closed (`d7447b4`, 13 sites); ~~#1.1 core unused-vars~~ closed (`60d91e8`, 170 sites + rule→error); ~~#1.2 cli unused-vars~~ closed (`961547d`, 110 sites + rule→error). Remaining: #1.3 modules/ui (102), #1.4 modules/storage (45), #1.5 modules/api (32), ~30 vue/nuxt style rules. See `lint-rollout-2026-06-02-followups` memory for detail + 8 surfaced findings deferred for separate triage. |
+| 3 Reintroduce realtime                  | **14** (realtime-001 … realtime-014) + the `packages/editor-schema` workspace; `realtime-server.ts` 3,581 → 1,495 LoC                                                                                                                                                                                                                                                                                                                                                                                                                                         | _DONE on local `refactor/phase-3-realtime` (pending `--no-ff` merge to `dev`); report at `docs/audits/phase-3-closure-report.md`._ Carry-forwards: collab-edits-as-Git-civic-events writeback (deferred); multi-node Redis adapter; browser E2E.                                                                                                                                                                                                                                                                                                                      |
+| 4 Audit + fix broadcast-box hardware    | **In progress.** Quick-wins closed: BB-HW-002 (license), 011 (AP-mode timeout), 012 (credential encryption — recon), 015 (version/status). **W0 unblock+green** (HW repo `23b87c9`): BB-HW-007 (hardware appliance now documented in roadmap + project-status) + scoping findings N1–N4 (pyproject dependency drift, headless OpenCV, V4L2 encoder-detection test bug, gitignore). A clean `pip install -e ".[dev]"` now yields **283 passed / 7 skipped / 0 failed** on the dev VM. Plan: `docs/plans/2026-06-18-base-refactor-phase-4-broadcast-box-hw.md`. | W1: BB-HW-001/004/005/006 (canonical protocol artifact + dispatch table); W2: BB-HW-003 (video→Markdown civic-artifact pipeline — the mission); W3: BB-HW-009 (clerk-installable path); W4: BB-HW-010/013 (security), 014/016/017 (docs + 2nd UI); workspace-003 (git remote)                                                                                                                                                                                                                                                                                         |
+| 5 Reintroduce broadcast-box to monorepo | _pending_                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | _pending_                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+
+**Cumulative (end of Phase 2d):** 64 of 205 original-audit findings closed
+(31%). Plus 46 refactor-surfaced closures (separately tracked) for 110 total
+measurable progress items.
 
 See `docs/audits/2026-05-16-manifesto-fit-findings.md` for the per-finding
-tracker (Status column on every finding row); each closure includes a commit
-SHA per the finding-tracking convention (`docs/plans/finding-tracking-convention.md`).
+tracker (Status column on every finding row); each closure includes a commit SHA
+per the finding-tracking convention
+(`docs/plans/finding-tracking-convention.md`).
 
 ---
 
@@ -361,5 +392,4 @@ This roadmap will evolve as:
 - feedback and civic needs shape priorities
 - the post-2026-05 refactor lands its phases
 
-For contributions or roadmap suggestions:
-Contact: **<hello@civicpress.io>**
+For contributions or roadmap suggestions: Contact: **<hello@civicpress.io>**

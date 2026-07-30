@@ -259,7 +259,7 @@ public‑sector software.
 - **TypeScript / Node.js** — predictable, safe, and widely adopted
 - **pnpm workspaces / monorepo** — efficient dependency management and modular
   development
-- **Nuxt 4 + Nuxt UI Pro** — fast, accessible, and easy to extend for
+- **Nuxt 4 + Nuxt UI** (MIT, v4) — fast, accessible, and easy to extend for
   clerk‑friendly interfaces
 - **SQLite** — zero‑maintenance, file‑based database, perfect for local‑first
   deployments (with future support for PostgreSQL and other databases)

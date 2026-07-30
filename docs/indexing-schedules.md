@@ -19,7 +19,7 @@ volume, and performance requirements.
 ```bash
 # Manual commands
 civic index                    # Generate all indexes
-civic index --rebuild          # Force complete rebuild
+civic index          # Force complete rebuild
 civic index --type bylaw       # Partial rebuild
 civic index --validate         # Validate existing indexes
 ```
@@ -78,7 +78,7 @@ include_module_indexes: true
 - ❌ Can slow down commit process
 - ❌ Requires Git workflow
 
-## Strategy 3: Scheduled Indexing**
+## Strategy 3: Scheduled Indexing\*\*
 
 **Best for:** Medium to large cities, production systems
 
@@ -92,7 +92,7 @@ include_module_indexes: true
 0 * * * * cd /path/to/civicpress && civic index --silent
 
 # Or daily for small updates
-0 2 * * * cd /path/to/civicpress && civic index --rebuild --silent
+0 2 * * * cd /path/to/civicpress && civic index --silent
 ```
 
 ### Systemd Service (Linux)
@@ -171,7 +171,6 @@ const response = await fetch('/api/v1/indexing/generate', {
     'Authorization': `Bearer ${token}`
   },
   body: JSON.stringify({
-    rebuild: true,
     syncDatabase: true
   })
 });
@@ -199,7 +198,7 @@ documentation.
 
 ```bash
 # Monitor indexing performance
-time civic index --rebuild
+time civic index
 
 # Check index file sizes
 ls -lh data/records/index.yml
@@ -301,7 +300,7 @@ export class SmartIndexingService extends IndexingService {
     this.isIndexing = true;
 
     try {
-      await this.generateIndexes({ rebuild: false });
+      await this.generateIndexes();
       // Use centralized output system instead of console.log
       // logger.info(`Indexed ${this.indexingQueue.length} changes`);
     } catch (error) {
@@ -325,7 +324,7 @@ export class SmartIndexingService extends IndexingService {
 
 ```bash
 # Manual indexing only
-civic index --rebuild  # When needed
+civic index  # When needed
 ```
 
 ### **Small Town (< 1000 records)**
@@ -347,7 +346,7 @@ git hooks/post-commit  # Auto-index on commit
 ```bash
 # Event-driven + scheduled backup
 # Real-time updates + daily rebuild
-0 2 * * * civic index --rebuild --silent  # Daily rebuild
+0 2 * * * civic index --silent  # Daily rebuild
 ```
 
 ## **Monitoring and Alerts**
@@ -370,7 +369,7 @@ MAX_AGE_SECONDS=$((MAX_AGE_HOURS * 3600))
 
 if [ $INDEX_AGE -gt $MAX_AGE_SECONDS ]; then
   echo "WARNING: Index file is older than $MAX_AGE_HOURS hours"
-  civic index --rebuild --silent
+  civic index --silent
 fi
 ```
 

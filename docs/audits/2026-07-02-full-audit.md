@@ -474,11 +474,18 @@ bugs (fixed in `2a1f3af`).
   `@nuxt/ui-pro` to MIT `@nuxt/ui` v4 (Dashboard components merged into the free
   package); typecheck + build pass with no licence key.
 
-**Still open after 2026-07-15:** only **FA-OPS-001** (tracking-doc drift) and
-the residual **Low** tier (defense-in-depth / latent / polish — FA-API-019/020/
-021, FA-BB-011/012/013 partials, FA-CORE-013/016, FA-CLI-006 deferred, etc.).
-All Criticals, Highs, and the actionable Medium/Low security + correctness tail
-across both repos are now closed.
+**Update (2026-07-30 — supersedes the "still open after 2026-07-15" note that
+was here).** The residual **Low** tier was closed on 2026-07-15 (`db5acb0`
+FA-CORE-013 + FA-API-019/020/021, `65b0a82` FA-BB-011/013, `deacb35` FA-BB-012)
+and **FA-OPS-001** was first reconciled by `59fd24f` — see the authoritative
+"Status tracker" note further below. FA-OPS-001 is _tracking-doc drift_, which
+recurs by nature: after the post-audit-hardening arc landed on `main` (PRs
+#19–#22, `main` at `e4f64bd`) plus the develop-pending security-tail batch, a
+fresh sweep on **2026-07-30** re-reconciled `project-status.md`, `roadmap.md`,
+and this registry. All Criticals, Highs, and the Medium/Low security +
+correctness tail across both repos are closed; only Roadmap-tier work remains
+(`ui-003` SSR, signed appliance image, HW/device-repo, equity/i18n, device-repo
+branch protection).
 
 ---
 
