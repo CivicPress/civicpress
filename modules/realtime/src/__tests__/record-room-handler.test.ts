@@ -91,9 +91,11 @@ function makeMocks(opts?: {
   record?: RecordData | null;
 }): Mocks {
   const draftPersistence = {
-    getDraft: vi.fn().mockResolvedValue(
-      opts?.existingDraft === undefined ? null : opts.existingDraft
-    ),
+    getDraft: vi
+      .fn()
+      .mockResolvedValue(
+        opts?.existingDraft === undefined ? null : opts.existingDraft
+      ),
     createDraft: vi.fn().mockResolvedValue(undefined),
     updateDraft: vi.fn().mockResolvedValue(undefined),
   } as Mocks['draftPersistence'];
@@ -126,19 +128,75 @@ describe('RecordRoomHandler', () => {
   });
 
   describe('conformance', () => {
-    it('declares roomType "records" and a passthrough onConnect', async () => {
+    it('declares roomType "records"', () => {
       const { deps } = makeMocks();
       const handler = new RecordRoomHandler(deps);
       expect(handler.roomType).toBe('records');
-      const result = await handler.onConnect?.({
-        roomId: 'rec-1',
-      } as never);
-      expect(result).toEqual({ success: true });
     });
 
     it('can be constructed with no deps (DI registers, wiring lands later)', () => {
       const handler = new RecordRoomHandler();
       expect(handler.roomType).toBe('records');
+    });
+
+    // W5: onConnect now enforces per-record AUTHORIZATION (it was previously a
+    // passthrough stub that returned success:true for anyone, on any/nonexistent
+    // record). Without the authz deps wired it fails CLOSED.
+    it('onConnect fails closed when the authz deps are not wired', async () => {
+      const { deps } = makeMocks();
+      const handler = new RecordRoomHandler(deps);
+      const result = await handler.onConnect?.({
+        roomId: 'rec-1',
+        token: 't',
+      } as never);
+      expect(result?.success).toBe(false);
+      expect(result?.errorCode).toBe('AUTHZ_UNAVAILABLE');
+    });
+
+    it('onConnect authorizes an existing record for a permitted user', async () => {
+      const authService = {
+        validateSession: vi
+          .fn()
+          .mockResolvedValue({ id: 7, username: 'clerk', role: 'clerk' }),
+        userCan: vi.fn().mockResolvedValue(true),
+      } as never;
+      const recordManager = {
+        getRecord: vi.fn().mockResolvedValue(makeRecord('rec-1')),
+      } as never;
+      const handler = new RecordRoomHandler({
+        authService,
+        recordManager,
+        logger: mockLogger,
+      });
+      const result = await handler.onConnect?.({
+        roomId: 'rec-1',
+        token: 'valid-token',
+      } as never);
+      expect(result?.success).toBe(true);
+      expect(result?.userAuth?.userId).toBe(7);
+      expect(result?.userAuth?.permissions.canEdit).toBe(true);
+    });
+
+    it('onConnect rejects a connection to a non-existent record', async () => {
+      const authService = {
+        validateSession: vi
+          .fn()
+          .mockResolvedValue({ id: 7, username: 'clerk', role: 'clerk' }),
+        userCan: vi.fn().mockResolvedValue(true),
+      } as never;
+      const recordManager = {
+        getRecord: vi.fn().mockResolvedValue(null), // record does not exist
+      } as never;
+      const handler = new RecordRoomHandler({
+        authService,
+        recordManager,
+        logger: mockLogger,
+      });
+      const result = await handler.onConnect?.({
+        roomId: 'ghost',
+        token: 'valid-token',
+      } as never);
+      expect(result?.success).toBe(false);
     });
   });
 
@@ -167,7 +225,10 @@ describe('RecordRoomHandler', () => {
         record: makeRecord('rec-2'),
       });
       const handler = new RecordRoomHandler(mocks.deps);
-      const room = makePopulatedRoom('records:rec-2', 'New collaborative text.');
+      const room = makePopulatedRoom(
+        'records:rec-2',
+        'New collaborative text.'
+      );
 
       await handler.snapshot(room);
 
@@ -212,9 +273,7 @@ describe('RecordRoomHandler', () => {
       // The persisted blob must round-trip back to the same doc state.
       const restored = new Y.Doc();
       Y.applyUpdate(restored, req.blob);
-      expect(
-        restored.getXmlFragment('default').length
-      ).toBeGreaterThan(0);
+      expect(restored.getXmlFragment('default').length).toBeGreaterThan(0);
     });
 
     it('coalesces concurrent snapshots: draft write fires once', async () => {
@@ -231,9 +290,7 @@ describe('RecordRoomHandler', () => {
         });
         return { promise, release };
       })();
-      mocks.draftPersistence.updateDraft.mockImplementation(
-        () => gate.promise
-      );
+      mocks.draftPersistence.updateDraft.mockImplementation(() => gate.promise);
       const handler = new RecordRoomHandler(mocks.deps);
       const room = makePopulatedRoom('records:rec-5');
 

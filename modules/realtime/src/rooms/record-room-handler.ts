@@ -41,8 +41,17 @@ import type {
   DisconnectContext,
   AuthResult,
 } from '../types/handler-registry.types.js';
-import type { DraftRow, RecordData } from '@civicpress/core';
+import type {
+  DraftRow,
+  RecordData,
+  AuthService,
+  RecordManager,
+  DatabaseService,
+  Logger,
+} from '@civicpress/core';
 import { coreWarn, coreError } from '@civicpress/core';
+import { authenticateConnection } from '../auth.js';
+import { AuthenticationFailedError } from '../errors/realtime-errors.js';
 import type { YjsRoom } from './yjs-room.js';
 import * as Y from 'yjs';
 
@@ -116,6 +125,18 @@ export interface RecordRoomHandlerDeps {
   getSnapshotManager?: () => SnapshotPersister | null;
   /** Optional event emitter for snapshot lifecycle observation. */
   hookBus?: RecordSnapshotHookBus;
+  /**
+   * Per-record authorization (W5). `onConnect` passes these to
+   * {@link authenticateConnection} to validate the session, confirm the record
+   * exists (published or draft), and check view/edit permission. Optional so the
+   * DI registration can still `new RecordRoomHandler()` — but when they are
+   * absent `onConnect` FAILS CLOSED (rejects) rather than admitting everyone,
+   * because record-room access is a security boundary, not an optional feature.
+   */
+  authService?: AuthService;
+  recordManager?: RecordManager;
+  databaseService?: DatabaseService;
+  logger?: Logger;
 }
 
 /** Author tag for collaborative writebacks (distinguishable from human edits). */
@@ -133,9 +154,56 @@ export class RecordRoomHandler implements RoomTypeHandler {
     this.deps = deps;
   }
 
-  async onConnect(_ctx: ConnectionContext): Promise<AuthResult> {
-    // Generic auth already runs in realtime-server.ts before the handler is called.
-    return { success: true };
+  async onConnect(ctx: ConnectionContext): Promise<AuthResult> {
+    // Per-record authorization (W5). The generic session check already ran in
+    // realtime-server.ts, but that only proves *authentication*. This is where
+    // *authorization* happens: the record must exist (published or draft) and
+    // the connecting user must have view access to THIS record. Previously this
+    // returned success:true unconditionally, so any authenticated user could
+    // open/edit any (or a nonexistent) record room.
+    const { authService, recordManager, logger, databaseService } = this.deps;
+    if (!authService || !recordManager || !logger) {
+      // Fail closed: without the authz deps we cannot enforce the boundary, so
+      // deny rather than admit everyone (the old stub's behaviour).
+      return {
+        success: false,
+        error: 'Record-room authorization is not available',
+        errorCode: 'AUTHZ_UNAVAILABLE',
+      };
+    }
+
+    const recordId = this.extractRecordId(ctx.roomId);
+    try {
+      const { user, permissions } = await authenticateConnection(
+        ctx.token,
+        recordId,
+        authService,
+        recordManager,
+        logger,
+        databaseService
+      );
+      return {
+        success: true,
+        userAuth: {
+          userId: user.id,
+          username: user.username,
+          role: user.role,
+          permissions,
+        },
+      };
+    } catch (error) {
+      // authenticateConnection throws AuthenticationFailedError (bad token) or
+      // PermissionDeniedError (record missing / no access). Either way the
+      // server closes the socket 4003; surface which for the log + client.
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'authorization failed',
+        errorCode:
+          error instanceof AuthenticationFailedError
+            ? 'AUTH_FAILED'
+            : 'PERMISSION_DENIED',
+      };
+    }
   }
 
   async onMessage(_ctx: MessageContext): Promise<void> {

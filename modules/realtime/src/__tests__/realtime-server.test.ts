@@ -162,7 +162,17 @@ describe('RealtimeServer', () => {
     // W1 made connection routing handler-only: a records:* connection is closed
     // with 4004 unless a handler is registered for the room type. Register the
     // records handler so the generic Yjs sync + lifecycle paths actually run.
-    realtimeServer.registerRoomTypeHandler(new RecordRoomHandler());
+    realtimeServer.registerRoomTypeHandler(
+      new RecordRoomHandler({
+        // W5: wire the per-record authorization deps so onConnect enforces
+        // record-existence + view/edit permission (see the non-existent-record
+        // test below). Without these the handler fails closed.
+        authService: mockAuthService,
+        recordManager: mockRecordManager,
+        databaseService: mockDatabaseService,
+        logger: mockLogger,
+      })
+    );
 
     // Mock database methods needed for snapshot table creation
     (mockDatabaseService.query as any).mockResolvedValue([]);
@@ -381,13 +391,11 @@ describe('RealtimeServer', () => {
       });
     });
 
-    // W2: generic server auth is identity-only (validateSession). Record
-    // existence + per-record permission is RecordRoomHandler.onConnect's job,
-    // which is a stub until W5 (per the Phase-3 plan; the ~29 record refs move
-    // into the handler in W5). Skipped until W5 wires that authorization;
-    // un-skip there. NOT a regression — this asserts not-yet-implemented W5
-    // behavior, not deleted behavior.
-    it.skip('should reject connection to non-existent record (W5: RecordRoomHandler perms)', async () => {
+    // W5 (now wired): generic server auth is identity-only (validateSession);
+    // record existence + per-record permission is RecordRoomHandler.onConnect's
+    // job, which now calls authenticateConnection. A connection to a record that
+    // does not exist (published or draft) must be rejected.
+    it('should reject connection to non-existent record (W5: RecordRoomHandler perms)', async () => {
       await realtimeServer.initialize();
       (mockRecordManager.getRecord as any).mockResolvedValueOnce(null);
       await new Promise((resolve) => setTimeout(resolve, 200));
