@@ -57,6 +57,10 @@ and this project adheres to
   - 13 new tests covering draft detection, edit mode, and permission handling
   - Tests verify proper behavior for authenticated and public users
   - All existing tests remain passing
+- **Removed the no-op `civic index --rebuild` flag** (and the underlying
+  `IndexingOptions.rebuild`). It was never wired to any behavior — every index
+  generation already performs a full scan — so it was dropped rather than left
+  as a misleading switch.
 
 ### Fixed
 
@@ -81,6 +85,16 @@ and this project adheres to
 - **Added supply-chain scanning to CI.** osv-scanner (PR diff-gate + weekly
   lockfile scan) and CodeQL SAST (report-only), plus a `SECURITY.md`
   vulnerability-disclosure policy.
+- **Hardened the audit carry-forward surfaces (defense-in-depth).** An audit of
+  the surfaces the 2026-07-02 pass had deferred found no live vulnerability;
+  hardening was applied regardless: a length cap on the public search query; a
+  `system:admin` gate keeping credential-bearing config (`notifications`)
+  admin-only even if `config:manage` is delegated; fail-closed auth on the
+  config router; YAML-parse validation on raw config writes (an invalid file
+  could 500 the public `/info`); a core-layer path-segment guard on geography
+  `type`/`category`; validation that a broadcast `quick-start` `meetingId`
+  references a real meeting; and a single-flight guard on index generation so
+  overlapping calls can't launch concurrent full re-scans.
 
 ## [0.2.0] - 2025-01-30
 

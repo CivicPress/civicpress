@@ -166,19 +166,20 @@ management), plus a persistent backdoor user. **Fix:** fail-closed — enable on
 when `NODE_ENV==='development'|'test'` **and** an explicit opt-in flag
 (`CIVIC_ALLOW_SIMULATED_AUTH`); never treat unset as non-production. Prefer not
 mounting the route at all absent the dev flag. **Fixed (shipped `da2ff38`):**
-new core helper `isSimulatedAuthEnabled()` — allowed only under `NODE_ENV==='test'`
-or `NODE_ENV==='development'` **with** `CIVIC_ALLOW_SIMULATED_AUTH=true`; unset /
-`production` / anything else denied. Enforced in the API route, the CLI twin
-(`FA-CLI-001`), and core `authenticateWithSimulatedAccount` (throws) as a
-defense-in-depth backstop. Tests: 6 policy unit cases + API 403 cases for both
-unset `NODE_ENV` and `production`.
+new core helper `isSimulatedAuthEnabled()` — allowed only under
+`NODE_ENV==='test'` or `NODE_ENV==='development'` **with**
+`CIVIC_ALLOW_SIMULATED_AUTH=true`; unset / `production` / anything else denied.
+Enforced in the API route, the CLI twin (`FA-CLI-001`), and core
+`authenticateWithSimulatedAccount` (throws) as a defense-in-depth backstop.
+Tests: 6 policy unit cases + API 403 cases for both unset `NODE_ENV` and
+`production`.
 
 ### FA-BB-002 · Critical · L · Closed-session (in-camera) video recorded, uploaded, and served publicly unauthenticated
 
 > **CLOSED 2026-07-13.** Full fail-closed redaction pipeline, Commits A–G
-> (`a046f73`, `99da16b`, `ba9f711`, `32b53cb`, `8275a3c`, `30e68da`,
-> `782f406`); live dev backfilled + redacted; closed window verified black +
-> silent on the PUBLISHED bytes. Design + closure detail:
+> (`a046f73`, `99da16b`, `ba9f711`, `32b53cb`, `8275a3c`, `30e68da`, `782f406`);
+> live dev backfilled + redacted; closed window verified black + silent on the
+> PUBLISHED bytes. Design + closure detail:
 > `docs/specs/2026-07-07-fa-bb-002-redaction-design.md`.
 
 End-to-end trace (both repos, all links verified):
@@ -216,11 +217,11 @@ End-to-end trace (both repos, all links verified):
 
 ### FA-BB-001 · Critical · M · `session.manifest` has no device-ownership check (cross-session capture tampering)
 
-> **CLOSED 2026-07-13.** Ownership check `4da2f51`; manifest can no longer
-> bind `av_file` (FA-BB-013, `99da16b`); Ed25519-signed manifests (CP
-> `e90dbc4` + HW `c38a0c6`): device key registered at enrollment (migration
-> 004), signature over the exact wire bytes verified with replay/freshness
-> checks, unsigned manifests dropped once a key is on record.
+> **CLOSED 2026-07-13.** Ownership check `4da2f51`; manifest can no longer bind
+> `av_file` (FA-BB-013, `99da16b`); Ed25519-signed manifests (CP `e90dbc4` + HW
+> `c38a0c6`): device key registered at enrollment (migration 004), signature
+> over the exact wire bytes verified with replay/freshness checks, unsigned
+> manifests dropped once a key is on record.
 
 `device-room-handler.ts` (~567-613) reads `payload.session_id` +
 `payload.capture` from an authenticated device and calls
@@ -241,11 +242,10 @@ and reject unless its `deviceId` matches the authenticated device; validate
 ### FA-HW-001 · Critical · M · Device config API binds `0.0.0.0` unauthenticated (LAN takeover of enrollment credentials)
 
 > **CLOSED 2026-07-13** (HW repo `e249fc9`). Loopback-only default bind
-> (`AP_MODE_BIND_HOST` opt-in for LAN setup); mandatory per-boot setup token
-> on every `/api` route except `/api/health` (console/journal +
-> `data/setup_token` 0600); CORS credentials off; enrollment code never
-> returned once enrolled; frontend carries the token via `?token=` →
-> `X-Setup-Token`.
+> (`AP_MODE_BIND_HOST` opt-in for LAN setup); mandatory per-boot setup token on
+> every `/api` route except `/api/health` (console/journal + `data/setup_token`
+> 0600); CORS credentials off; enrollment code never returned once enrolled;
+> frontend carries the token via `?token=` → `X-Setup-Token`.
 
 `web_server.py:103-109` binds uvicorn `0.0.0.0:8443` plain HTTP; `:59-65` sets
 CORS `allow_origins=['*'] allow_credentials=True`; **no auth dependency on any
@@ -266,30 +266,30 @@ token (shown on local console/QR) enforced on every `/api` route;
 
 ## Findings — High
 
-| ID          | Effort | Area           | Finding                                                                                                                                                                                                                                                                                                                                                           | Old ref                      |
-| ----------- | ------ | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- |
-| FA-API-002  | S      | API auth       | `BYPASS_AUTH=true` makes `middleware/auth.ts:26-37` trust the `X-Mock-User` header verbatim as the user (incl. `role`), with **no `NODE_ENV` hard-guard** — latent full bypass if the env var ever ships (e.g. leaked from CI). Not default-active.                                                                                                               | —                            |
-| FA-API-003  | S      | API authz      | Geography `POST/PUT/DELETE` (`geography.ts:101/335/388`, mounted `optionalAuth` `index.ts:314`) check only `if(!req.user)` — **no `requirePermission`**; `GeographyManager` takes the user as an unused `_user`. Any self-registered `public` user can create/overwrite/**delete** municipal boundary GeoJSON.                                                    | —                            |
-| FA-API-004  | S      | API infoleak   | Unauthenticated `GET /api/status`, `/status/git`, `/status/records` (`status.ts`, mounted no-auth `index.ts:335`) expose git file paths + **commit messages/authors**, **draft/pending/rejected record ids & filenames**, the `.civic` config listing, and `process.memoryUsage()`/`NODE_ENV`.                                                                    | —                            |
-| FA-API-005  | S      | API traversal  | `POST /api/validation/record` (`validation.ts:342-357,401-421`, only `records:view`) path-joins a caller `recordId` containing `../` and `readFileSync`s the result — a self-registered `public` user reads arbitrary `.md` incl. closed-session minutes. Same shape in `diff/record-paths.ts`.                                                                   | —                            |
-| FA-API-006  | S      | API hardening  | `helmet` + `express-rate-limit` + `compression` are declared in `modules/api/package.json` but **never wired** (zero call sites) — no security headers (HSTS/CSP/X-Frame/nosniff) and no rate limiting on the internet-exposed API.                                                                                                                               | api-005                      |
-| FA-API-007  | M      | API DoS        | No lockout/throttle on `/auth/login`, `/auth/password`, `/users/register`; the `maxLoginAttempts`/`lockoutDuration` in `auth-config.ts:125-130` are **dead config**. bcrypt(12) on unauthenticated `/register` enables cheap CPU-amplification DoS + unlimited credential stuffing.                                                                               | —                            |
-| FA-API-008  | M      | API authz      | Status-transition authorization is enforced only on `POST /:id/status` (`listing.ts:123-139` calls `validateTransition`). `PUT /:id`, `POST /:id/publish`, and create write `status` **verbatim** with only a coarse `records:edit` check — a restricted `clerk`/`legal_dept` role can fabricate an `approved`/`archived` record, bypassing separation-of-duties. | core-002                     |
-| FA-CORE-001 | M      | Saga integrity | Crash-recovery **never runs** — `getStuckSagas`/`getFailedSagas` exist but have no production caller and there is no `SagaRecovery`. A process death between the SQLite write (step 1) and git commit (step 3) leaves SQLite and git **permanently divergent**, with the saga row stuck `executing`.                                                              | core-004                     |
-| FA-STOR-001 | S      | Storage        | `GET /api/v1/storage/folders/recordings/files` (`listing-handlers.ts:61-209`, `optionalAuth`) **enumerates every recording's UUID unauthenticated** for any `access:'public'` folder — nullifying UUID-unguessability for `FA-BB-002` and leaking even unpublished/draft recordings.                                                                              | storage-002 (over-corrected) |
-| FA-STOR-002 | S      | Storage        | The default `private` folder is readable/listable by the lowest-priv `public` role: handlers gate non-public folders only on `userCan('storage:download')`, which `roles.yml` grants to `public`, and `private` is treated identically to `authenticated`. "Authorized users only" confers no protection.                                                         | —                            |
-| FA-BB-003   | S      | BB upload      | Device-controlled `fileName` (`uploads.ts:44`, only `isString`) flows into `path.join(uploadDir, fileName)` in `upload-processor.ts:98/218` — `../` escapes; attacker-controlled chunk bytes are written to an arbitrary path **before** the SHA-256 check → arbitrary file write (config/hook overwrite → plausible RCE) by a compromised/MITM'd device.         | —                            |
-| FA-BB-004   | S      | BB enrollment  | `registerDevice` (`device-manager.ts:104-368`) looks the code up by hash and **never compares the client `deviceUuid` to the code's bound UUID** (the line-112 comment admits it). An intercepted one-time code lets an attacker register a rogue device **first** and receive a valid device token, locking out the real appliance. Defeats BB-HW-013's intent.  | BB-HW-013                    |
-| FA-HW-002   | M      | HW privacy     | `POST /api/preview/offer` (`routes.py:662-684`, no auth) streams a live camera+mic WebRTC feed of the chamber to any LAN client; if AP mode overlaps a closed session, in-camera A/V leaks.                                                                                                                                                                       | —                            |
-| FA-HW-003   | S      | HW DoS         | `POST /api/factory-reset` (`routes.py:586-626`) gates only on the constant string `"RESET"` (no auth) and wipes device identity + enrollment — any LAN user takes the appliance offline (recording DoS).                                                                                                                                                          | —                            |
-| FA-HW-004   | S      | HW secrets     | The Fernet key is stored in the **same** SQLite `device_config` table as the token ciphertext (`credentials.py:44-78`) — the docstring admits it. Anyone who reads the DB recovers the long-lived device token.                                                                                                                                                   | BB-HW-013                    |
-| FA-HW-005   | S      | HW secrets     | `state/manager.py:28-60` creates the DB dir/file with default umask (world-readable) and no `chmod 0600`, holding the key + ciphertext + **plaintext enrollment code + plaintext Wi-Fi password**. Any local unprivileged process reads them → device-identity takeover + LAN Wi-Fi disclosure.                                                                   | BB-HW-013                    |
-| FA-HW-006   | S      | HW traversal   | Server-supplied `session_id` (`command_handler.py:1059`) flows unsanitized into `storage_root/<session_id>/…` and the ffmpeg output path (`:1117-1123`, `storage/service.py:58/95`) — `../` writes MP4s/dirs outside `storage_root` as the appliance user (malicious/compromised server).                                                                         | —                            |
-| FA-HW-007   | S      | HW injection   | Server RTMP `url` is used as an ffmpeg **output target** with only a presence check (`command_handler.py:1920-1936` → `rtmp_service.py:76-88` → `ffmpeg_capture.py:1307-1308`); a `file:`/bare-path value makes ffmpeg overwrite an arbitrary file with FLV data.                                                                                                 | —                            |
-| FA-HW-008   | S      | HW hijack      | `update_config` (`command_handler.py:1198-1213`) writes **any** server-supplied config key with no allowlist — a compromised/MITM server persistently overwrites `civicpress_url` (permanent redirect) or `encryption_key`.                                                                                                                                       | —                            |
-| FA-HW-009   | M      | HW transport   | No TLS floor: `main.py:363` picks `ws` for any non-`https://` URL (the documented example is `http://`), and the token/enrollment code are then sent; there is **no refusal or warning** on cleartext. Bearer token + one-time code + uploads travel unencrypted across the (untrusted) network.                                                                  | —                            |
-| FA-UI-001   | M      | UI XSS         | `app/app.vue:62-135` fetches `/api/v1/info` and **re-materializes `<script>` elements** from `analytics.inject_head/body_*` into `<head>`/`<body>` with no sanitization/allow-list/CSP; combined with JWT+CSRF in `localStorage` (`stores/auth.ts:115`, `useCsrf.ts`) any injected script exfiltrates tokens. Still-present.                                      | ui-004                       |
-| FA-CLI-001 · **closed** (`da2ff38`) | S | CLI auth | `civic auth:simulated` is gated only by `NODE_ENV==='production'` (`cli/src/commands/auth.ts:328`), and core `authenticateWithSimulatedAccount` has no env check — on a host with `NODE_ENV` unset, `--role admin` mints a real admin token with no credential (the CLI twin of `FA-API-001`). **Fixed** with the shared `isSimulatedAuthEnabled()` gate + core backstop. | cli-010 |
+| ID                                  | Effort | Area           | Finding                                                                                                                                                                                                                                                                                                                                                                   | Old ref                      |
+| ----------------------------------- | ------ | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- |
+| FA-API-002                          | S      | API auth       | `BYPASS_AUTH=true` makes `middleware/auth.ts:26-37` trust the `X-Mock-User` header verbatim as the user (incl. `role`), with **no `NODE_ENV` hard-guard** — latent full bypass if the env var ever ships (e.g. leaked from CI). Not default-active.                                                                                                                       | —                            |
+| FA-API-003                          | S      | API authz      | Geography `POST/PUT/DELETE` (`geography.ts:101/335/388`, mounted `optionalAuth` `index.ts:314`) check only `if(!req.user)` — **no `requirePermission`**; `GeographyManager` takes the user as an unused `_user`. Any self-registered `public` user can create/overwrite/**delete** municipal boundary GeoJSON.                                                            | —                            |
+| FA-API-004                          | S      | API infoleak   | Unauthenticated `GET /api/status`, `/status/git`, `/status/records` (`status.ts`, mounted no-auth `index.ts:335`) expose git file paths + **commit messages/authors**, **draft/pending/rejected record ids & filenames**, the `.civic` config listing, and `process.memoryUsage()`/`NODE_ENV`.                                                                            | —                            |
+| FA-API-005                          | S      | API traversal  | `POST /api/validation/record` (`validation.ts:342-357,401-421`, only `records:view`) path-joins a caller `recordId` containing `../` and `readFileSync`s the result — a self-registered `public` user reads arbitrary `.md` incl. closed-session minutes. Same shape in `diff/record-paths.ts`.                                                                           | —                            |
+| FA-API-006                          | S      | API hardening  | `helmet` + `express-rate-limit` + `compression` are declared in `modules/api/package.json` but **never wired** (zero call sites) — no security headers (HSTS/CSP/X-Frame/nosniff) and no rate limiting on the internet-exposed API.                                                                                                                                       | api-005                      |
+| FA-API-007                          | M      | API DoS        | No lockout/throttle on `/auth/login`, `/auth/password`, `/users/register`; the `maxLoginAttempts`/`lockoutDuration` in `auth-config.ts:125-130` are **dead config**. bcrypt(12) on unauthenticated `/register` enables cheap CPU-amplification DoS + unlimited credential stuffing.                                                                                       | —                            |
+| FA-API-008                          | M      | API authz      | Status-transition authorization is enforced only on `POST /:id/status` (`listing.ts:123-139` calls `validateTransition`). `PUT /:id`, `POST /:id/publish`, and create write `status` **verbatim** with only a coarse `records:edit` check — a restricted `clerk`/`legal_dept` role can fabricate an `approved`/`archived` record, bypassing separation-of-duties.         | core-002                     |
+| FA-CORE-001                         | M      | Saga integrity | Crash-recovery **never runs** — `getStuckSagas`/`getFailedSagas` exist but have no production caller and there is no `SagaRecovery`. A process death between the SQLite write (step 1) and git commit (step 3) leaves SQLite and git **permanently divergent**, with the saga row stuck `executing`.                                                                      | core-004                     |
+| FA-STOR-001                         | S      | Storage        | `GET /api/v1/storage/folders/recordings/files` (`listing-handlers.ts:61-209`, `optionalAuth`) **enumerates every recording's UUID unauthenticated** for any `access:'public'` folder — nullifying UUID-unguessability for `FA-BB-002` and leaking even unpublished/draft recordings.                                                                                      | storage-002 (over-corrected) |
+| FA-STOR-002                         | S      | Storage        | The default `private` folder is readable/listable by the lowest-priv `public` role: handlers gate non-public folders only on `userCan('storage:download')`, which `roles.yml` grants to `public`, and `private` is treated identically to `authenticated`. "Authorized users only" confers no protection.                                                                 | —                            |
+| FA-BB-003                           | S      | BB upload      | Device-controlled `fileName` (`uploads.ts:44`, only `isString`) flows into `path.join(uploadDir, fileName)` in `upload-processor.ts:98/218` — `../` escapes; attacker-controlled chunk bytes are written to an arbitrary path **before** the SHA-256 check → arbitrary file write (config/hook overwrite → plausible RCE) by a compromised/MITM'd device.                 | —                            |
+| FA-BB-004                           | S      | BB enrollment  | `registerDevice` (`device-manager.ts:104-368`) looks the code up by hash and **never compares the client `deviceUuid` to the code's bound UUID** (the line-112 comment admits it). An intercepted one-time code lets an attacker register a rogue device **first** and receive a valid device token, locking out the real appliance. Defeats BB-HW-013's intent.          | BB-HW-013                    |
+| FA-HW-002                           | M      | HW privacy     | `POST /api/preview/offer` (`routes.py:662-684`, no auth) streams a live camera+mic WebRTC feed of the chamber to any LAN client; if AP mode overlaps a closed session, in-camera A/V leaks.                                                                                                                                                                               | —                            |
+| FA-HW-003                           | S      | HW DoS         | `POST /api/factory-reset` (`routes.py:586-626`) gates only on the constant string `"RESET"` (no auth) and wipes device identity + enrollment — any LAN user takes the appliance offline (recording DoS).                                                                                                                                                                  | —                            |
+| FA-HW-004                           | S      | HW secrets     | The Fernet key is stored in the **same** SQLite `device_config` table as the token ciphertext (`credentials.py:44-78`) — the docstring admits it. Anyone who reads the DB recovers the long-lived device token.                                                                                                                                                           | BB-HW-013                    |
+| FA-HW-005                           | S      | HW secrets     | `state/manager.py:28-60` creates the DB dir/file with default umask (world-readable) and no `chmod 0600`, holding the key + ciphertext + **plaintext enrollment code + plaintext Wi-Fi password**. Any local unprivileged process reads them → device-identity takeover + LAN Wi-Fi disclosure.                                                                           | BB-HW-013                    |
+| FA-HW-006                           | S      | HW traversal   | Server-supplied `session_id` (`command_handler.py:1059`) flows unsanitized into `storage_root/<session_id>/…` and the ffmpeg output path (`:1117-1123`, `storage/service.py:58/95`) — `../` writes MP4s/dirs outside `storage_root` as the appliance user (malicious/compromised server).                                                                                 | —                            |
+| FA-HW-007                           | S      | HW injection   | Server RTMP `url` is used as an ffmpeg **output target** with only a presence check (`command_handler.py:1920-1936` → `rtmp_service.py:76-88` → `ffmpeg_capture.py:1307-1308`); a `file:`/bare-path value makes ffmpeg overwrite an arbitrary file with FLV data.                                                                                                         | —                            |
+| FA-HW-008                           | S      | HW hijack      | `update_config` (`command_handler.py:1198-1213`) writes **any** server-supplied config key with no allowlist — a compromised/MITM server persistently overwrites `civicpress_url` (permanent redirect) or `encryption_key`.                                                                                                                                               | —                            |
+| FA-HW-009                           | M      | HW transport   | No TLS floor: `main.py:363` picks `ws` for any non-`https://` URL (the documented example is `http://`), and the token/enrollment code are then sent; there is **no refusal or warning** on cleartext. Bearer token + one-time code + uploads travel unencrypted across the (untrusted) network.                                                                          | —                            |
+| FA-UI-001                           | M      | UI XSS         | `app/app.vue:62-135` fetches `/api/v1/info` and **re-materializes `<script>` elements** from `analytics.inject_head/body_*` into `<head>`/`<body>` with no sanitization/allow-list/CSP; combined with JWT+CSRF in `localStorage` (`stores/auth.ts:115`, `useCsrf.ts`) any injected script exfiltrates tokens. Still-present.                                              | ui-004                       |
+| FA-CLI-001 · **closed** (`da2ff38`) | S      | CLI auth       | `civic auth:simulated` is gated only by `NODE_ENV==='production'` (`cli/src/commands/auth.ts:328`), and core `authenticateWithSimulatedAccount` has no env check — on a host with `NODE_ENV` unset, `--role admin` mints a real admin token with no credential (the CLI twin of `FA-API-001`). **Fixed** with the shared `isSimulatedAuthEnabled()` gate + core backstop. | cli-010                      |
 
 **Closed on `refactor/phase-6b-audit-highs` (2026-07-13):**
 
@@ -297,7 +297,8 @@ token (shown on local console/QR) enforced on every `/api` route;
   geography POST/PUT/DELETE (granted to admin + clerk); `generateFilename`
   sanitization confirmed.
 - **FA-API-005** — `0e9f858`: `resolveInsideRecordsRoot` containment guard on
-  every caller-influenced record-path join (`validation.ts` + `diff/record-paths.ts`).
+  every caller-influenced record-path join (`validation.ts` +
+  `diff/record-paths.ts`).
 - **FA-API-006** — `a6439dd`: `helmet` (CORP cross-origin for media),
   `express-rate-limit` (global + a strict auth window — also partial
   `FA-API-007`), and `compression` wired.
@@ -308,11 +309,11 @@ token (shown on local console/QR) enforced on every `/api` route;
 - **FA-UI-001** — `0086dfa`: analytics injection no longer executes inline
   scripts; external scripts need an https/same-origin `src` + attribute
   allowlist, other markup passes DOMPurify.
-- **FA-API-002** — `5421ea1`: `BYPASS_AUTH`/`X-Mock-User` (auth + the CSRF
-  skip) gated behind the fail-closed `isSimulatedAuthEnabled()` policy — inert
-  in production even if the env var leaks.
-- **FA-API-004** — `eb482ca`: `/api/status*` diagnostics moved behind
-  auth + `system:admin` (were unauthenticated); liveness stays on `/health`.
+- **FA-API-002** — `5421ea1`: `BYPASS_AUTH`/`X-Mock-User` (auth + the CSRF skip)
+  gated behind the fail-closed `isSimulatedAuthEnabled()` policy — inert in
+  production even if the env var leaks.
+- **FA-API-004** — `eb482ca`: `/api/status*` diagnostics moved behind auth +
+  `system:admin` (were unauthenticated); liveness stays on `/health`.
 - **FA-API-008** — `99158f5`: create/update/publish now enforce the
   workflow-transition rules (via `getControlledStatuses`), not just
   `POST /:id/status` — no more fabricating an approved/archived record.
@@ -320,11 +321,12 @@ token (shown on local console/QR) enforced on every `/api` route;
   `login_attempts` table) after N failed logins; complements the FA-API-006
   per-IP limit.
 - **FA-CORE-001 / FA-CORE-006** — `22aa44c`: `SagaRecoveryService` runs at
-  startup — releases orphaned locks + flags crashed-mid-flight sagas out of
-  the permanent `executing` limbo; also fixed the `getFailedSagas` precedence
-  bug it relies on.
+  startup — releases orphaned locks + flags crashed-mid-flight sagas out of the
+  permanent `executing` limbo; also fixed the `getFailedSagas` precedence bug it
+  relies on.
 
-**Closed in the BroadcastBox HW repo (`refactor/phase-4-enrollment-hardening`, 2026-07-13):**
+**Closed in the BroadcastBox HW repo (`refactor/phase-4-enrollment-hardening`,
+2026-07-13):**
 
 - **FA-HW-004/005** — `bba2113`: Fernet key moved to a 0600 `device_key` file
   outside the DB (legacy key migrated + cleared); state DB dir/file chmod'd
@@ -337,49 +339,47 @@ token (shown on local console/QR) enforced on every `/api` route;
 
 ### Medium/Low tail — saga cluster CLOSED (2026-07-14, monorepo `f37f2a7`)
 
-- **FA-CORE-007** — resource-lock TTL defaults to saga timeout + 30 s
-  (was 30 s vs 300 s); a concurrent saga on the same record now reliably
-  gets `SagaLockError` for the whole run.
-- **FA-CORE-008** — idempotency is real: auto keys = SHA-256 of stable
-  operation content (user + target + request payload), not the per-call
-  timestamp; explicit keys scoped per saga type + user; retry of a
-  completed run returns the cached result (5-min auto / 24-h explicit
-  window); identical in-flight op → new `SagaDuplicateError` (409);
-  failed runs stay retryable.
+- **FA-CORE-007** — resource-lock TTL defaults to saga timeout + 30 s (was 30 s
+  vs 300 s); a concurrent saga on the same record now reliably gets
+  `SagaLockError` for the whole run.
+- **FA-CORE-008** — idempotency is real: auto keys = SHA-256 of stable operation
+  content (user + target + request payload), not the per-call timestamp;
+  explicit keys scoped per saga type + user; retry of a completed run returns
+  the cached result (5-min auto / 24-h explicit window); identical in-flight op
+  → new `SagaDuplicateError` (409); failed runs stay retryable.
 - **FA-CORE-009** — UpdateRecord compensation always reverts
-  `geography`/`attachedFiles`/`linkedRecords`/`linkedGeographyFiles`;
-  fields *added* by the failed update are reset to SQL NULL.
-- **FA-CORE-010** — archive `CommitToGit` stages the original path's
-  deletion alongside the archive copy; committed tree verified via
-  `git ls-tree` in the integration test.
+  `geography`/`attachedFiles`/`linkedRecords`/`linkedGeographyFiles`; fields
+  _added_ by the failed update are reset to SQL NULL.
+- **FA-CORE-010** — archive `CommitToGit` stages the original path's deletion
+  alongside the archive copy; committed tree verified via `git ls-tree` in the
+  integration test.
 - **FA-CORE-015** — CreateRecord contexts carry a pre-generated
-  `metadata.recordId`, so creates acquire a resource lock like
-  update/archive (double-submit creates also covered by FA-CORE-008).
+  `metadata.recordId`, so creates acquire a resource lock like update/archive
+  (double-submit creates also covered by FA-CORE-008).
 
-Tests: `core/src/saga/__tests__/saga-hardening.integration.test.ts`
-(9 cases, real SQLite) + FA-CORE-009/010 cases in the update/archive
-saga integration suites.
+Tests: `core/src/saga/__tests__/saga-hardening.integration.test.ts` (9 cases,
+real SQLite) + FA-CORE-009/010 cases in the update/archive saga integration
+suites.
 
 ### Medium/Low tail — BroadcastBox server mediums CLOSED (2026-07-14, monorepo `08fb4f7`)
 
 - **FA-BB-005** — device-token signature compare is `crypto.timingSafeEqual`
   (length checked first), no longer `===`.
-- **FA-BB-006** — token-level revocation: `broadcast_revoked_device_tokens`
-  jti denylist (migration 005) checked on every validation, **fail-closed**
-  on DB errors; refresh revokes the rotated-out jti (old token no longer
-  valid until exp); `DeviceAuthService.revokeToken()` for leaked tokens.
+- **FA-BB-006** — token-level revocation: `broadcast_revoked_device_tokens` jti
+  denylist (migration 005) checked on every validation, **fail-closed** on DB
+  errors; refresh revokes the rotated-out jti (old token no longer valid until
+  exp); `DeviceAuthService.revokeToken()` for leaked tokens.
 - **FA-BB-007** — declared `fileSize` capped (16 GiB default,
-  `BROADCAST_BOX_MAX_UPLOAD_BYTES` override) and enforced as a hard budget
-  per chunk (overflow fails + cleans the upload); finalize verifies the
-  combined bytes equal the declaration; `chunkNumber` validated.
+  `BROADCAST_BOX_MAX_UPLOAD_BYTES` override) and enforced as a hard budget per
+  chunk (overflow fails + cleans the upload); finalize verifies the combined
+  bytes equal the declaration; `chunkNumber` validated.
 - **FA-BB-009** — `redactSecretFields` strips `stream_key`/token/password/
   secret from `device_events` writes and logs; the INFO full-command
-  serialization removed; migration 006 scrubs historical rows via
-  `json_set`.
+  serialization removed; migration 006 scrubs historical rows via `json_set`.
 - **FA-BB-010** — `extractToken` no longer accepts `?token=` (header/
-  subprotocol only; explicit rejection warning); device WS auth no longer
-  logs a token prefix. HW device (Authorization header) and UI
-  (`auth.<token>` subprotocol) already complied — no client change needed.
+  subprotocol only; explicit rejection warning); device WS auth no longer logs a
+  token prefix. HW device (Authorization header) and UI (`auth.<token>`
+  subprotocol) already complied — no client change needed.
 
 Tests: device-auth, upload-processor, redact-secret-fields, realtime auth
 suites + full module and repo e2e runs green.
@@ -415,15 +415,15 @@ suites + full module and repo e2e runs green.
   shared `RecordsService` + paginates + bounds the scan; per-request
   `api_access` audit is fire-and-forget and opt-out; uploads buffer to a temp
   DIR (`multer.diskStorage`) and stream into storage via `uploadFileStream`
-  (opened only after folder validation + quota pass; temp files unlinked).
-  Also fixed three pre-existing geography-preset bugs exposed when `core/dist`
-  was rebuilt (get echoes key; apply accepts null mappings; apply always
-  returns both mapping keys as JSON-safe null).
+  (opened only after folder validation + quota pass; temp files unlinked). Also
+  fixed three pre-existing geography-preset bugs exposed when `core/dist` was
+  rebuilt (get echoes key; apply accepts null mappings; apply always returns
+  both mapping keys as JSON-safe null).
 - **FA-CLI-002/003/004** — `b3df3e8`: `cleanup --force` also requires
   `--yes-i-know`, and the interactive challenge is the configured org name (not
-  the constant `civicpress`); tokens resolve from `--token` /
-  `CIVIC_TOKEN` / `~/.civicpress/token` (argv `--token` warned as deprecated);
-  `create`/`status` validate against config-driven type/status keys.
+  the constant `civicpress`); tokens resolve from `--token` / `CIVIC_TOKEN` /
+  `~/.civicpress/token` (argv `--token` warned as deprecated); `create`/`status`
+  validate against config-driven type/status keys.
 - **FA-STOR-003** — `171790d`: lifecycle `archive` no longer reports a phantom
   `archived: N` — an `archiveAfterDays` policy is honestly ignored (warned once)
   and produces no action; real archival drift stays with `OrphanedFileCleaner`.
@@ -450,8 +450,8 @@ bugs (fixed in `2a1f3af`).
   `reconstructFromManifests()` rebuilds the `storage_files` rows from disk after
   a metadata-DB loss — closing the "lose the DB → files unreachable" gap.
 - **FA-CLI-005** — `65d2a7d`: the duplicated init default record-type/status
-  config blocks are hoisted to two module constants (kept CLI-local — core's
-  set has drifted larger; importing it would change what `init` seeds). Seeded
+  config blocks are hoisted to two module constants (kept CLI-local — core's set
+  has drifted larger; importing it would change what `init` seeds). Seeded
   `.civicrc` verified byte-identical.
 - **FA-CLI-006** — **DEFERRED (accepted):** `--json` already emits emoji-free
   structured output; a minimal `--no-emoji` would still leak emoji from the many
@@ -541,23 +541,23 @@ _(node-tar path-traversal advisories are build-time-only via
 > `d5fd484`. FA-CLI-006 (`--no-emoji`) and FA-API-019 (CSRF non-session-binding)
 > are accepted deferrals — see the Status tracker.
 
-| ID          | Area    | Finding                                                                                                                                                                                                           | Status           |
-| ----------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------- |
-| FA-CORE-012 | auth    | `verifyCurrentEmail` deletes by signed token but the DB stores the hash — the token is not consumed (single-use broken).                                                                                          | confirmed        |
-| FA-CORE-013 | boot    | Boot storage-module loader imports from a `process.cwd()`-derived path under a broad silent `catch`.                                                                                                              | mitigated        |
-| FA-CORE-014 | diag    | Diagnostics auto-fix ignores `dryRun` — a "preview" request mutates the DB (VACUUM/DDL).                                                                                                                          | confirmed        |
+| ID          | Area    | Finding                                                                                                                                                                                                           | Status               |
+| ----------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------- |
+| FA-CORE-012 | auth    | `verifyCurrentEmail` deletes by signed token but the DB stores the hash — the token is not consumed (single-use broken).                                                                                          | confirmed            |
+| FA-CORE-013 | boot    | Boot storage-module loader imports from a `process.cwd()`-derived path under a broad silent `catch`.                                                                                                              | mitigated            |
+| FA-CORE-014 | diag    | Diagnostics auto-fix ignores `dryRun` — a "preview" request mutates the DB (VACUUM/DDL).                                                                                                                          | confirmed            |
 | FA-CORE-015 | saga    | CreateRecord saga acquires no resource lock (context omits `metadata.recordId`).                                                                                                                                  | **closed** `f37f2a7` |
-| FA-CORE-016 | audit   | `core-001` (updateRecord audit without `userId`) is now written with `userId`.                                                                                                                                    | mitigated/closed |
-| FA-CORE-017 | storage | Two divergent stored-filename generators; the upload path does not sanitize the base name.                                                                                                                        | confirmed        |
-| FA-API-019  | CSRF    | CSRF tokens non-session-bound (defense-in-depth only; Bearer API has no cookie CSRF surface).                                                                                                                     | mitigated        |
-| FA-API-020  | header  | `Content-Disposition` echoes unsanitized `original_name` — CRLF blocked by Node; residual quote/param spoofing.                                                                                                   | mitigated        |
-| FA-API-021  | secrets | Hardcoded JWT secret fallback (`auth-config.ts:114`) is latent — the opaque-token path never consumes it.                                                                                                         | mitigated        |
-| FA-BB-011   | BB auth | Hardcoded fallback device-token secret latent (prod DI always injects a real `SecretsManager`, which throws if unregistered).                                                                                     | mitigated        |
-| FA-BB-012   | BB      | Leaked `FileHandle` on every upload finalize (`fs.open('w')` never used/closed).                                                                                                                                  | confirmed        |
-| FA-BB-013   | BB      | Device-controlled `capture.av_file` steers the transcription fetch + temp-write name — arbitrary existing-blob selection; path-traversal on the write is latent (gated by the same ownership fix as `FA-BB-001`). | partial          |
-| FA-CLI-005  | CLI     | `init.ts` duplicates the full default-config literal block 4–5×.                                                                                                                                                  | confirmed        |
-| FA-CLI-006  | CLI     | CLI output is English + emoji only, no `--no-emoji`/i18n.                                                                                                                                                         | confirmed        |
-| FA-DEP-006  | license | Device is AGPL-3.0-or-later, monorepo is MIT — confirmed; note the network-copyleft obligation for anyone deploying the appliance.                                                                                | note             |
+| FA-CORE-016 | audit   | `core-001` (updateRecord audit without `userId`) is now written with `userId`.                                                                                                                                    | mitigated/closed     |
+| FA-CORE-017 | storage | Two divergent stored-filename generators; the upload path does not sanitize the base name.                                                                                                                        | confirmed            |
+| FA-API-019  | CSRF    | CSRF tokens non-session-bound (defense-in-depth only; Bearer API has no cookie CSRF surface).                                                                                                                     | mitigated            |
+| FA-API-020  | header  | `Content-Disposition` echoes unsanitized `original_name` — CRLF blocked by Node; residual quote/param spoofing.                                                                                                   | mitigated            |
+| FA-API-021  | secrets | Hardcoded JWT secret fallback (`auth-config.ts:114`) is latent — the opaque-token path never consumes it.                                                                                                         | mitigated            |
+| FA-BB-011   | BB auth | Hardcoded fallback device-token secret latent (prod DI always injects a real `SecretsManager`, which throws if unregistered).                                                                                     | mitigated            |
+| FA-BB-012   | BB      | Leaked `FileHandle` on every upload finalize (`fs.open('w')` never used/closed).                                                                                                                                  | confirmed            |
+| FA-BB-013   | BB      | Device-controlled `capture.av_file` steers the transcription fetch + temp-write name — arbitrary existing-blob selection; path-traversal on the write is latent (gated by the same ownership fix as `FA-BB-001`). | partial              |
+| FA-CLI-005  | CLI     | `init.ts` duplicates the full default-config literal block 4–5×.                                                                                                                                                  | confirmed            |
+| FA-CLI-006  | CLI     | CLI output is English + emoji only, no `--no-emoji`/i18n.                                                                                                                                                         | confirmed            |
+| FA-DEP-006  | license | Device is AGPL-3.0-or-later, monorepo is MIT — confirmed; note the network-copyleft obligation for anyone deploying the appliance.                                                                                | note                 |
 
 ---
 
@@ -695,6 +695,45 @@ _(node-tar path-traversal advisories are build-time-only via
 
 ## Carry-forward — not audited this pass (recommend follow-up)
 
+> **2026-07-30 follow-up — AUDITED + hardened.** The five code surfaces below
+> were audited (four parallel read-only passes + verification). Outcome: **no
+> live vulnerability on any of them** — prior fixes (FA-CORE-003/005, FA-UI-001,
+> FA-API-003/004/012) plus admin-only gating already hold the line. Low /
+> defense-in-depth hardening was applied anyway:
+>
+> - **`core/src/search` FTS5** — every `MATCH` is parameter-bound and
+>   phrase-quoted (empirically verified against SQLite 3.44.2, including the
+>   empty-phrase-prefix edge); no injection / query-DoS / error-oracle. Added a
+>   512-char cap on the two PUBLIC search endpoints; removed dead
+>   `buildPostgreSQLQuery` + the unused JS Levenshtein.
+> - **`core/src/indexing` rebuild** — `rebuild=true` was a DEAD flag (never
+>   read; removed everywhere); the generate/sync path is admin-only
+>   (`records:import`). Added a single-flight guard so overlapping calls cannot
+>   launch concurrent full re-scans (the only residual self-DoS lever,
+>   admin-gated).
+> - **`config.ts` reflection** — no live XSS (writes are admin-only; the one
+>   raw-HTML sink is DOMPurify'd at render). Added: fail-closed auth (the
+>   `!civicPress` branch was fail-open-shaped), a `system:admin` gate on
+>   credential-bearing config (`notifications`) so it stays admin-only even if
+>   `config:manage` is ever delegated, and YAML parse-validation on raw writes
+>   (an invalid file used to 500 the PUBLIC `GET /info`).
+> - **geography `generateFilename`** — CONFIRMED safe (allowlist strip;
+>   FA-API-003 already gates the route with `geography:manage`). Added a
+>   core-layer `type`/`category` path-segment guard so the core self-defends
+>   regardless of caller (CLI / scripts / future endpoints).
+> - **`quick-start` / `by-meeting` authz** — already authenticated +
+>   permissioned (admin/clerk; hardened in `acbd999`, which pre-dates this audit
+>   — "not audited" meant the auditors did not review it, not that it was open).
+>   Added validation that a supplied `meetingId` resolves to a real `meeting`
+>   record. By-design notes (neither a gap): quick-start's `createRecord`
+>   bypasses the per-type `can_create` ACL; `by-meeting` `:view` is
+>   coarse-grained / global.
+>
+> A sixth _suspected_ item raised during the audit — `POST /diagnose/fix`
+> missing a permission check — was a **false positive**: the diagnose router is
+> admin-only via `requireDiagnosticAuth` (verified from source). Full batch +
+> tests: `docs/backlog/2026-07-post-audit-hardening.md`.
+
 - `core/src/indexing` rebuild logic (FTS injection / `rebuild=true` resource
   exhaustion).
 - `modules/api/src/routes/config.ts` value reflection/sanitization beyond the
@@ -739,12 +778,12 @@ essentially complete — the per-finding closure banners above (and their
   FA-API-023 / FA-HW-014–017.
 - **Medium/Low security + correctness tail (closed 2026-07-14/15):** the saga
   cluster (FA-CORE-007/008/009/010/015), BB server mediums
-  (FA-BB-005/006/007/009/010), the API/CORE/CLI/storage batch
-  (FA-DEP-001/002, FA-API-009–018, FA-CORE-002/003/004/005/011/012/014/017,
+  (FA-BB-005/006/007/009/010), the API/CORE/CLI/storage batch (FA-DEP-001/002,
+  FA-API-009–018, FA-CORE-002/003/004/005/011/012/014/017,
   FA-CLI-002/003/004/005, FA-STOR-003/004, FA-BB-008), the HW tail
   (FA-HW-010/011/012/013, FA-DEP-004/005/006), and — finally — the **Low
-  defense-in-depth tier** (`db5acb0` FA-CORE-013 + FA-API-019/020/021,
-  `65b0a82` FA-BB-011/013, `deacb35` FA-BB-012, `59fd24f` FA-OPS-001).
+  defense-in-depth tier** (`db5acb0` FA-CORE-013 + FA-API-019/020/021, `65b0a82`
+  FA-BB-011/013, `deacb35` FA-BB-012, `59fd24f` FA-OPS-001).
 - **Remaining OPEN: none.** Every `FA-*` finding is closed or an explicit
   accepted-deferral (**FA-CLI-006** `--no-emoji`, since `--json` already emits
   emoji-free output; **FA-API-019** CSRF non-session-binding, documented as
@@ -758,29 +797,28 @@ frozen pending a confirming pre-merge re-audit.
 
 ## Pre-merge re-audit + sign-off (2026-07-15)
 
-The confirming pre-merge re-audit ran as an adversarial, finding-driven pass
-(12 cluster verifiers trying to REFUTE each closure + a fresh-eyes sweep for
-issues the remediation introduced). It was **not** a rubber stamp: **75 of 82
-closures held on the first pass**, and it caught **7 gaps + 9 new issues**,
-including two Critical-class controls that did not actually hold and four
-defects the remediation itself introduced. All were then fixed and
-re-verified:
+The confirming pre-merge re-audit ran as an adversarial, finding-driven pass (12
+cluster verifiers trying to REFUTE each closure + a fresh-eyes sweep for issues
+the remediation introduced). It was **not** a rubber stamp: **75 of 82 closures
+held on the first pass**, and it caught **7 gaps + 9 new issues**, including two
+Critical-class controls that did not actually hold and four defects the
+remediation itself introduced. All were then fixed and re-verified:
 
 - **FA-API-008 (High) — was BYPASSABLE.** The transition guard sat on
   `createRecord`/publish, but `POST /api/records` uses `createDraft` (stored
-  status verbatim) and an empty-body publish skipped the guard, so a clerk
-  could draft-then-publish straight to `approved`. Fixed (`bb1bd21`): a shared
+  status verbatim) and an empty-body publish skipped the guard, so a clerk could
+  draft-then-publish straight to `approved`. Fixed (`bb1bd21`): a shared
   `assertStatusWritableByRole` now guards createDraft/updateDraft and the
   EFFECTIVE publish status.
 - **FA-BB-002 (Critical, privacy) — fail-closed invariant did NOT hold.** Two
   fail-OPEN paths: `fullCover` measured the manifest-declared duration (a media
-  file longer than declared was copied out RAW), and the mixed-visibility
-  branch published uncovered gaps. Fixed (`a66307f`, `b34d057`): `hidden` is
-  the complement of *effective-public* over the *actual probed* duration, with
-  the fullCover start clamped to exactly 0.
+  file longer than declared was copied out RAW), and the mixed-visibility branch
+  published uncovered gaps. Fixed (`a66307f`, `b34d057`): `hidden` is the
+  complement of _effective-public_ over the _actual probed_ duration, with the
+  fullCover start clamped to exactly 0.
 - **HW factory-reset (High, introduced).** The new FA-HW-010 enrolled-skip
-  turned a reset that retained `device_credentials` into a re-enrollment
-  BRICK + token-retention. Fixed (`7e7b861`): reset invalidates credentials.
+  turned a reset that retained `device_credentials` into a re-enrollment BRICK +
+  token-retention. Fixed (`7e7b861`): reset invalidates credentials.
 - **FA-HW-013 incomplete** (ffmpeg stderr still leaked the RTMP key) `12cdc77`;
   **storage download fd-leak** + **FA-STOR-002 non-fail-closed listing**
   `9a8d120`; **FA-API-018 CSRF path-match**, **CSRF token length-guard**,
@@ -790,9 +828,9 @@ re-verified:
   create saga edge (`37ae600`, documented), S3/Azure size-0 stream upload,
   legacy no-DCS FSM path. FA-CLI-006 / FA-API-019 remain deferrals.
 
-A focused adversarial **re-verification of the fixes** (skeptics trying to
-break the fixes) returned **all HOLD**; the only remaining residuals are
-theoretical and unreachable under the real configuration.
+A focused adversarial **re-verification of the fixes** (skeptics trying to break
+the fixes) returned **all HOLD**; the only remaining residuals are theoretical
+and unreachable under the real configuration.
 
 **Verdict: CLEAR to unfreeze `origin/main`.** All 4 Criticals, all Highs, and
 the entire actionable Medium/Low tail across both repos are closed and
