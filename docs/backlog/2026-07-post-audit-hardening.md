@@ -1046,10 +1046,17 @@ they are pre-existing gaps the audit made visible.
       `modules/realtime/src/**/__tests__` is not in the root vitest `include`
       and there is no realtime CI step; only the 3 `tests/realtime/` integration
       tests gate CI. Add a realtime test step / include.
-- [ ] Six working API routers (`cache`, `diagnose`, `diff`, `info`,
-      `notifications`, `templates`) plus `/validation` (710 LoC) have **no HTTP
-      integration tests**; a few `tests/api/*` files are in-process unit tests
-      mislabeled as HTTP (`sort-api`, `pagination-sql-side`).
+- [x] **Seven routers now have HTTP tests — DONE 2026-07-30.** Added supertest
+      integration suites for `info` (5), `cache` (7), `notifications` (4),
+      `diagnose` (7), `diff` (6), `templates` (6), and `validation` (9) — 44
+      tests. Surfaced + fixed 4 real defects: `requirePermission`'s 403 dropped
+      `success:false` (broken envelope); `GET /diff/:recordId/commits` 500'd on
+      every default call (`git.log({author:undefined,since:undefined})` →
+      malformed git args); the API fixture never seeded `.civic/org-config.yml`
+      (500'd public `/info`); the fixture admin role lacked `templates:view`
+      (production admin has it). Full `tests/api/` suite green (38 files). ⏳
+      Still open: the two mislabeled in-process "HTTP" tests (`sort-api`,
+      `pagination-sql-side`) should be relabeled or upgraded to real supertest.
 - [ ] **No UI page-component or browser-e2e tests** (no Playwright/Cypress); the
       API-critical composables (`useRecordEditorActions`, `useRecordLock`,
       `useRecordDetail`, `useCsrf`, `useAuth`) are untested.

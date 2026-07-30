@@ -916,6 +916,7 @@ export function createRolesConfig(config: TestConfig) {
             'workflows:manage',
             'records:import',
             'records:export',
+            'templates:view',
             'templates:manage',
             'hooks:manage',
             'config:manage',

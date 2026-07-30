@@ -97,7 +97,11 @@ export function registerDiffRoutes(router: Router): void {
           await git.show([commit1 as string]);
           await git.show([commit2 as string]);
         } catch {
-          throw new HttpError(400, 'One or both commits not found', 'COMMIT_NOT_FOUND');
+          throw new HttpError(
+            400,
+            'One or both commits not found',
+            'COMMIT_NOT_FOUND'
+          );
         }
 
         const result = await compareRecordVersions(
@@ -116,7 +120,11 @@ export function registerDiffRoutes(router: Router): void {
         );
 
         if (!result) {
-          throw new HttpError(404, 'Record not found or no changes', 'NO_CHANGES');
+          throw new HttpError(
+            404,
+            'Record not found or no changes',
+            'NO_CHANGES'
+          );
         }
 
         sendSuccess(result, req, res, {
@@ -220,8 +228,12 @@ export function registerDiffRoutes(router: Router): void {
         const log = await git.log({
           file: recordPath,
           maxCount: parseInt(limit.toString()),
-          author: author as string,
-          since: since as string,
+          // Only pass the optional filters when supplied — simple-git turns
+          // `author: undefined` / `since: undefined` into malformed git args,
+          // so the whole log call throws and the default (unfiltered) request
+          // 500s.
+          ...(author ? { author: author as string } : {}),
+          ...(since ? { since: since as string } : {}),
         });
 
         const commits = log.all.map((commit) => ({
