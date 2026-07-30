@@ -10,6 +10,54 @@ and this project adheres to
 
 <!-- markdownlint-disable MD024 -->
 
+### Added
+
+- **Unpublished Changes Badge**: Added visual indicator for records with
+  unpublished draft changes
+  - Badge displays on record list page and single record view page
+  - Only visible to authenticated users with `records:edit` permission
+  - Badge shows "Unpublished changes" with edit icon
+  - API endpoints now include `hasUnpublishedChanges` flag in responses
+
+- **Draft Detection API**: Added automatic draft detection for listing and
+  search endpoints
+  - `GET /api/v1/records` now includes `hasUnpublishedChanges` flag for
+    authenticated editors
+  - `GET /api/v1/search` now includes `hasUnpublishedChanges` flag for
+    authenticated editors
+  - Efficient batch querying of drafts to minimize database calls
+  - Field only included for users with `records:edit` permission
+
+- **Edit Mode Query Parameter**: Added `?edit=true` parameter to single record
+  endpoint
+  - `GET /api/v1/records/:id?edit=true` returns draft version if available (for
+    authenticated editors)
+  - `GET /api/v1/records/:id` (default) always returns published version
+  - Allows frontend to fetch draft content when editing, published content when
+    viewing
+  - Public users always receive published version regardless of parameter
+
+### Changed
+
+- **Auto-indexing now runs through the workflow engine (core-002).** The hook
+  system is wired to the `WorkflowEngine`: a record update fires the
+  `update-index` workflow (fire-and-forget) to refresh search indexes. The
+  former log-only `approval` / `publication` / `archival` workflow stubs —
+  registered as if functional — were removed.
+- **Record View Behavior**: Single record endpoint now differentiates between
+  view and edit modes
+  - View mode (default): Always returns published record, includes
+    `hasUnpublishedChanges` flag for editors
+  - Edit mode (`?edit=true`): Returns draft if available for authenticated
+    editors with permission
+  - Ensures published content is always shown to public users and in view
+    contexts
+- **Test Coverage**: Added comprehensive test suite for unpublished changes
+  feature
+  - 13 new tests covering draft detection, edit mode, and permission handling
+  - Tests verify proper behavior for authenticated and public users
+  - All existing tests remain passing
+
 ### Fixed
 
 - **Published records no longer leak into the drafts list.** Publishing a draft
@@ -18,26 +66,18 @@ and this project adheres to
   the unpublished/drafts listing; the read path also coerced a cleared (`null`)
   workflowState back to `'draft'`. Both are fixed.
 - **Record locks no longer expire mid-edit.** A lock holder can now reacquire
-  (renew) their own lock. Previously the atomic acquire rejected the same holder,
-  so the editor's periodic lock-refresh silently 409'd and the lock lapsed after
-  its timeout while the user was still editing. Different-user conflict detection
-  is unchanged.
-
-### Changed
-
-- **Auto-indexing now runs through the workflow engine (core-002).** The hook
-  system is wired to the `WorkflowEngine`: a record update fires the
-  `update-index` workflow (fire-and-forget) to refresh search indexes. The former
-  log-only `approval` / `publication` / `archival` workflow stubs — registered as
-  if functional — were removed.
+  (renew) their own lock. Previously the atomic acquire rejected the same
+  holder, so the editor's periodic lock-refresh silently 409'd and the lock
+  lapsed after its timeout while the user was still editing. Different-user
+  conflict detection is unchanged.
 
 ### Security
 
-- **Remediated known dependency vulnerabilities.** A centralized `pnpm.overrides`
-  block takes the dependency tree from 94 osv-scanner advisories (3 Critical, 45
-  High) down to 2 (a brace-expansion DoS not reachable from the request surface).
-  Includes major bumps verified against their consumers (nodemailer, multer, tar,
-  markdown-it, uuid).
+- **Remediated known dependency vulnerabilities.** A centralized
+  `pnpm.overrides` block takes the dependency tree from 94 osv-scanner
+  advisories (3 Critical, 45 High) down to 2 (a brace-expansion DoS not
+  reachable from the request surface). Includes major bumps verified against
+  their consumers (nodemailer, multer, tar, markdown-it, uuid).
 - **Added supply-chain scanning to CI.** osv-scanner (PR diff-gate + weekly
   lockfile scan) and CodeQL SAST (report-only), plus a `SECURITY.md`
   vulnerability-disclosure policy.
@@ -99,56 +139,6 @@ All v0.2.x "Core Maturity and Stability" goals have been completed:
 - **Caching**: Unified caching layer with multiple strategies and metrics
 - **Module Integration**: Storage module fully integrated with DI container
 - **Documentation**: Visual architecture diagrams and comprehensive guides
-
----
-
-## [Unreleased]
-
-<!-- markdownlint-disable MD024 -->
-
-### Added
-
-- **Unpublished Changes Badge**: Added visual indicator for records with
-  unpublished draft changes
-  - Badge displays on record list page and single record view page
-  - Only visible to authenticated users with `records:edit` permission
-  - Badge shows "Unpublished changes" with edit icon
-  - API endpoints now include `hasUnpublishedChanges` flag in responses
-
-- **Draft Detection API**: Added automatic draft detection for listing and
-  search endpoints
-  - `GET /api/v1/records` now includes `hasUnpublishedChanges` flag for
-    authenticated editors
-  - `GET /api/v1/search` now includes `hasUnpublishedChanges` flag for
-    authenticated editors
-  - Efficient batch querying of drafts to minimize database calls
-  - Field only included for users with `records:edit` permission
-
-- **Edit Mode Query Parameter**: Added `?edit=true` parameter to single record
-  endpoint
-  - `GET /api/v1/records/:id?edit=true` returns draft version if available (for
-    authenticated editors)
-  - `GET /api/v1/records/:id` (default) always returns published version
-  - Allows frontend to fetch draft content when editing, published content when
-    viewing
-  - Public users always receive published version regardless of parameter
-
-### Changed
-
-- **Record View Behavior**: Single record endpoint now differentiates between
-  view and edit modes
-  - View mode (default): Always returns published record, includes
-    `hasUnpublishedChanges` flag for editors
-  - Edit mode (`?edit=true`): Returns draft if available for authenticated
-    editors with permission
-  - Ensures published content is always shown to public users and in view
-    contexts
-
-- **Test Coverage**: Added comprehensive test suite for unpublished changes
-  feature
-  - 13 new tests covering draft detection, edit mode, and permission handling
-  - Tests verify proper behavior for authenticated and public users
-  - All existing tests remain passing
 
 ## [0.1.4] - 2025-01-27
 
@@ -351,6 +341,8 @@ All v0.2.x "Core Maturity and Stability" goals have been completed:
 
 ## [0.1.1] - 2025-11-19
 
+<!-- markdownlint-disable MD024 -->
+
 ### Added
 
 - **Internationalization (i18n)**: Added full i18n support to Nuxt UI module
@@ -371,6 +363,28 @@ All v0.2.x "Core Maturity and Stability" goals have been completed:
     alongside geographic data
   - Consistent with CivicPress record format for unified Git versioning
   - Human-readable and editable format
+- **Backup Compression**: Added tarball compression support for backups
+  - Backups now create `.tar.gz` archives by default alongside backup
+    directories
+  - Compression enabled by default, can be disabled with `--no-compress` flag
+  - Significantly reduces backup size and simplifies demo data distribution
+  - Restore automatically detects and extracts tarballs when present
+  - Maintains backward compatibility with uncompressed backups
+- **Demo Data Archives**: Created compressed demo data backups for quick
+  onboarding
+  - Richmond, QC, Canada demo data (French) - `richmond-quebec.tar.gz`
+  - Springfield, VA, USA demo data (English) - `springfield-usa.tar.gz`
+  - Both archives include complete data, Git history, storage files, and
+    metadata
+  - Clean Git history with single initial commit for each demo dataset
+  - `civic init` now uses these compressed archives for demo data loading
+- **Developer Bootstrap Documentation**: Enhanced README with comprehensive
+  setup instructions
+  - Added step-by-step developer bootstrap section
+  - Included `chmod +x` command to fix CLI permission issues
+  - Updated development commands documentation (watch mode defaults)
+  - Added Hoppscotch API collections section with usage instructions
+  - Removed outdated branch checkout instructions
 
 ### Changed
 
@@ -391,6 +405,29 @@ All v0.2.x "Core Maturity and Stability" goals have been completed:
   file linking
 - Improved geography validation with comprehensive geometry and metadata
   checking
+- **Backup/Restore System**: Enhanced backup and restore functionality
+  - Restore now correctly resolves storage paths from active configuration
+  - Improved storage file metadata restoration during backup restore
+  - Better error handling and warning messages during restore operations
+  - Storage configuration path detection improved for production instances
+- **CLI Init Command**: Streamlined initialization process
+  - Removed `repo_url` prompt (feature not yet implemented)
+  - Updated demo data labels for clarity:
+    - "Richmond, QC, Canada - Francais"
+    - "Springfield, VA, USA - English"
+  - Improved environment detection for file path resolution
+- **Storage Configuration**: Updated default storage settings
+  - Icons folder access changed from `authenticated` to `public` by default
+  - Prevents 401 errors on fresh installs for map icons
+  - Updated in both default templates and StorageConfigManager
+- **Development Workflow**: Improved developer experience
+  - `pnpm run dev` now starts both API and UI in watch mode by default
+  - `pnpm run dev:api` runs in watch mode by default
+  - Removed redundant watch-specific commands from documentation
+- **Home Page Customization**: Added guidance for users
+  - Default home page text now includes note about customization
+  - Directs users to `data/.civic/org-config.yml` for customization
+  - Updated both default config and UI display text
 
 ### Fixed
 
@@ -467,84 +504,6 @@ All v0.2.x "Core Maturity and Stability" goals have been completed:
   - Access control validation
   - File type and size restrictions
   - Storage configuration API integration
-
-### Technical Details
-
-- **Core Implementation**: `core/src/geography/geography-manager.ts` with
-  complete file management
-- **API Endpoints**: `/api/v1/geography/*` for CRUD operations and validation
-- **UI Components**: GeographyForm, GeographyMap, GeographySelector,
-  GeographyBrowser
-- **Database Schema**: New geography files table with metadata and relationships
-- **File Storage**: Organized structure in `data/geography/` with category-based
-  subdirectories
-- **TypeScript Types**: Complete type safety for all geography operations
-- **Validation Engine**: Real-time content validation with detailed error
-  reporting
-- **Map Integration**: Leaflet-based interactive maps with feature highlighting
-  and UUID-based icon support
-- **Search System**: Public search by location, category, metadata, and date
-- **Access Control**: Granular permissions for different user roles
-- **Testing**: Comprehensive API test suite for geography and storage systems
-  using Vitest and Supertest
-
-## [0.1.1] - 2025-11-19
-
-<!-- markdownlint-disable MD024 -->
-
-### Added
-
-- **Backup Compression**: Added tarball compression support for backups
-  - Backups now create `.tar.gz` archives by default alongside backup
-    directories
-  - Compression enabled by default, can be disabled with `--no-compress` flag
-  - Significantly reduces backup size and simplifies demo data distribution
-  - Restore automatically detects and extracts tarballs when present
-  - Maintains backward compatibility with uncompressed backups
-- **Demo Data Archives**: Created compressed demo data backups for quick
-  onboarding
-  - Richmond, QC, Canada demo data (French) - `richmond-quebec.tar.gz`
-  - Springfield, VA, USA demo data (English) - `springfield-usa.tar.gz`
-  - Both archives include complete data, Git history, storage files, and
-    metadata
-  - Clean Git history with single initial commit for each demo dataset
-  - `civic init` now uses these compressed archives for demo data loading
-- **Developer Bootstrap Documentation**: Enhanced README with comprehensive
-  setup instructions
-  - Added step-by-step developer bootstrap section
-  - Included `chmod +x` command to fix CLI permission issues
-  - Updated development commands documentation (watch mode defaults)
-  - Added Hoppscotch API collections section with usage instructions
-  - Removed outdated branch checkout instructions
-
-### Changed
-
-- **Backup/Restore System**: Enhanced backup and restore functionality
-  - Restore now correctly resolves storage paths from active configuration
-  - Improved storage file metadata restoration during backup restore
-  - Better error handling and warning messages during restore operations
-  - Storage configuration path detection improved for production instances
-- **CLI Init Command**: Streamlined initialization process
-  - Removed `repo_url` prompt (feature not yet implemented)
-  - Updated demo data labels for clarity:
-    - "Richmond, QC, Canada - Francais"
-    - "Springfield, VA, USA - English"
-  - Improved environment detection for file path resolution
-- **Storage Configuration**: Updated default storage settings
-  - Icons folder access changed from `authenticated` to `public` by default
-  - Prevents 401 errors on fresh installs for map icons
-  - Updated in both default templates and StorageConfigManager
-- **Development Workflow**: Improved developer experience
-  - `pnpm run dev` now starts both API and UI in watch mode by default
-  - `pnpm run dev:api` runs in watch mode by default
-  - Removed redundant watch-specific commands from documentation
-- **Home Page Customization**: Added guidance for users
-  - Default home page text now includes note about customization
-  - Directs users to `data/.civic/org-config.yml` for customization
-  - Updated both default config and UI display text
-
-### Fixed
-
 - **Build System**: Fixed TypeScript compilation issues
   - Removed `composite: true` from `modules/storage/tsconfig.json` to fix build
     errors
@@ -581,6 +540,26 @@ All v0.2.x "Core Maturity and Stability" goals have been completed:
   - Added website and contact information to all agent documentation files
   - Updated project status document with current information
   - Enhanced developer onboarding documentation
+
+### Technical Details
+
+- **Core Implementation**: `core/src/geography/geography-manager.ts` with
+  complete file management
+- **API Endpoints**: `/api/v1/geography/*` for CRUD operations and validation
+- **UI Components**: GeographyForm, GeographyMap, GeographySelector,
+  GeographyBrowser
+- **Database Schema**: New geography files table with metadata and relationships
+- **File Storage**: Organized structure in `data/geography/` with category-based
+  subdirectories
+- **TypeScript Types**: Complete type safety for all geography operations
+- **Validation Engine**: Real-time content validation with detailed error
+  reporting
+- **Map Integration**: Leaflet-based interactive maps with feature highlighting
+  and UUID-based icon support
+- **Search System**: Public search by location, category, metadata, and date
+- **Access Control**: Granular permissions for different user roles
+- **Testing**: Comprehensive API test suite for geography and storage systems
+  using Vitest and Supertest
 
 ## [1.0.0] - 2025-07-02
 
