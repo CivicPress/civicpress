@@ -628,12 +628,14 @@ follow-up. (Storage, config+CLI, API-routes clusters + saga/BB/notifications.)
 
 ## Test & CI health
 
-- [ ] **`actions/checkout` Node-20 deprecation (CI maintenance, low priority).**
-  CI annotates every run: `actions/checkout@v4` is being forced onto Node 24
-  because GitHub is sunsetting Node 20 on its runners. Jobs still pass, so it is
-  cosmetic for now — bump the pinned action across `.github/workflows` (find the
-  new SHA; actions are SHA-pinned). Do it as its own tiny PR, NOT bundled with a
-  feature branch, so it never re-triggers an otherwise-green PR's CI.
+- [x] **`actions/checkout` Node-20 deprecation — DONE 2026-07-24.** `ci.yml` was already
+  SHA-pinned to checkout v6 (Node 24) in the CI batch; the straggler was `truth-check.yml`,
+  still on the bare `actions/checkout@v4` tag (Node 20). Pinned it to the SAME proven v6.0.3
+  SHA `ci.yml` uses (`df4cb1c…`, verified via the actions/checkout tags API) so both workflows
+  match. Committed straight to `develop` rather than a standalone PR — the "its own tiny PR"
+  caveat was to protect PR #20's green CI, and #20 is now MERGED with no open PR on develop, so
+  the concern is moot. (The `v6` tag has since moved to v6.1/`d23441a…`; left ci.yml on its
+  proven pin — routine SHA freshening is Renovate's job.)
 
 - [x] **CLI eslint gate (2026-07-23).** The withCli migration (see the
   `withCli()` item above) tripped the CLI package's error-level
@@ -730,15 +732,116 @@ follow-up. (Storage, config+CLI, API-routes clusters + saga/BB/notifications.)
   tests** (`password`→`newPassword` field, `body.data.message`/`body.error.message`
   paths, verify-email token read via raw DB query NOT `getUserById` — that column
   is a live verification secret).
-- [ ] `isLosslesslyRoundTrippable` tests
-- [ ] FA-BB-002 redaction e2e mandatory in CI (`CIVIC_REQUIRE_FFMPEG=1`)
+- [x] **`isLosslesslyRoundTrippable` tests — already DONE (stale entry, verified 2026-07-24).**
+  `tests/ui/editor/content-loss-guard.test.ts` (16 cases, green under `vitest.config.ui.mjs`)
+  landed with the feature in `0fbb660` (W5-T9): round-trippable path (paragraph/headings/GFM
+  table/civic-ref/lists/code/blockquote/empty/literal-`<`), non-round-trippable fallback (raw
+  HTML block, inline `<span>`/`<br>`, non-civic-ref comment, footnotes), and malformed input
+  (never throws → false). No gap.
+- [x] **FA-BB-002 redaction e2e mandatory in CI — DONE 2026-07-24.** The redaction
+  e2e (`tests/broadcast-box/redaction-e2e.test.ts`) is the only proof that published
+  A/V bytes are actually blanked/silenced, but it was `describe.skipIf(!HAVE_FFMPEG)`
+  — a broken ffmpeg install in CI would drop it out of coverage with a green build.
+  Added a `CIVIC_REQUIRE_FFMPEG` gate: when set (CI sets `=1` on the Root-test-suite
+  step, right where ffmpeg is already apt-installed), a missing ffmpeg now FAILS a
+  guard test loudly instead of skipping; unset (local dev) keeps the clean self-skip.
+  Verified all three modes: required+present → real suite runs+passes (guard skips);
+  required+missing → hard fail; unset+missing → clean skip.
 - [ ] HW capture-builder tests; frontend tests
-- [ ] Triage 36 skips incl. draft→publish flow; fake-timer adoption
+- [x] **Skip triage — DONE (skip portion; 2026-07-24, commit `7502987` on `origin/develop`).**
+  The "36 skips" (2026-07-14/15 count) is burned down: phases 7e–7j cleared the quarantine
+  cluster, and a 2026-07-24 sweep took the draft→publish/workflowState cluster + the
+  fully-disabled Auto-Indexing suite. Un-skipping AGAIN surfaced **2 real prod bugs** —
+  (a) workflowState never cleared on publish (first-publish stored `workflow_state='draft'`
+  via `undefined→'draft'` defaults + a `null||'draft'` read coercion → published records
+  leaked into `listUnpublishedRecords`); (b) record locks never renewed (`acquireLock`'s
+  atomic ON CONFLICT rejected the SAME holder, and the UI's `refreshLock()` re-POSTs the
+  acquire endpoint → every renewal 409'd → holder's own lock silently expired mid-edit).
+  10/12 un-skipped + passing; stale tests fixed (draft-GET needed `?edit=true`; me.test.ts
+  `--silent` asserted a non-existent string → real banner-suppression differential).
+  **Remaining real skip = 1 justified deferral:** `realtime-server.test.ts:390` needs
+  `RecordRoomHandler.onConnect` (W5). (Auto-indexing test 3 was the other deferral; it was
+  **un-skipped once core-002 wired the hook→WorkflowEngine path** — see the core-002 entry
+  below.) Every other skip
+  is an env-gated `skipIf` (ffmpeg/whisper). Test-isolation landmine also fixed: the
+  auto-indexing test's dataDir sat inside the repo, so the record saga git-committed test
+  records into THIS repo → moved to `os.tmpdir()` via `createTestDirectory` + a `.gitignore`
+  guard for repo-root scratch dirs.
+- [x] **fake-timer adoption — DONE 2026-07-24** (the other half of the old "Triage 36 skips"
+  line). Converted the 7 unit-test files whose sleeps were *incidental waits* on a timeout /
+  TTL / duration to `vi.useFakeTimers()` + `advanceTimersByTimeAsync`: both circuit-breakers
+  (core diagnostics + storage), diagnostics cache (TTL), resource-monitor (duration),
+  storage timeout-utils (`withTimeout` race), diagnostics check-executor (single-check
+  timeout), storage health-checker (check timeout + latency). Each went from real 50–600ms
+  sleeps to a few ms and is now deterministic (no more "sleep must out-race the timeout"
+  flakiness). Verified per-file + full suites green (core diagnostics 94, storage 234).
+  **Deliberately left on REAL timers** (documented inline): tests that assert genuine
+  concurrency/periodicity via wall-time — concurrency-limiter, check-executor's
+  max-concurrency, health-checker's periodic-checks — and the integration/e2e suites
+  (realtime/device-ws/saga/upload), which wait on real async I/O, not fakeable clocks.
+- [x] **core-002 — WorkflowEngine wired + made honest — DONE 2026-07-24.** The 2026-05-16
+  manifesto-fit audit flagged `WorkflowEngine.approval/publication/archivalWorkflow` as
+  "log-only stubs registered as if functional" and `HookSystem`'s workflow integration as a
+  stub. Resolution did BOTH halves of the audit's "retire OR wire":
+  - **Wired** the hook→engine path: `HookSystem.setWorkflowEngine` (setter injection in
+    `civic-core-services.ts`, no cycle), and `executeWorkflow` now calls
+    `WorkflowEngine.startWorkflow` — **fire-and-forget** (keeps the record op non-blocking) and
+    **guarded by `hasWorkflow(name)`** so config-only names (`validate-record`, `notify-*`) skip
+    quietly instead of throwing per op. `record:updated → update-index` now really re-indexes;
+    the skipped auto-indexing test 3 is un-skipped and green.
+  - **Retired** the three fake stubs (removed their `registerWorkflow` + methods) — nothing
+    triggered them, and the spec's real design is sandboxed user `.js` (docs/specs/workflows.md),
+    not hardcoded engine methods.
+  - **Dedupe:** dropped `update-record-saga`'s `QueueReIndexingStep` (the hook now re-indexes
+    published-record updates) so an update indexes once, not twice. Create/publish keep their
+    saga indexing (their hooks aren't mapped to `update-index`).
+  - **Capped** `activeWorkflows` (previously never pruned) now that it's driven at record-op
+    volume.
+  Verified: auto-indexing 3/3, hooks+workflows+saga+di+indexing 148 green, record/publish
+  regression 104 green, core builds + lints clean.
 
 ## Roadmap-tier (scope with user before starting)
 
-- [ ] `ui-003` SSR; `core-002` WorkflowEngine stubs; signed appliance image;
+- [x] **Supply-chain CI hardening (dependency scanning + disclosure policy) — DONE 2026-07-25.**
+  Added `.github/SECURITY.md` (private-disclosure policy, supported versions, coordinated-
+  disclosure targets) and a SHA-pinned GitHub Action:
+  - **osv-scanner** (`google/osv-scanner-action` v2.3.8 reusable workflows) — PR diff-scan
+    FAILS on a newly-introduced vuln; weekly `schedule` + `workflow_dispatch` full scan REPORTS
+    to Security > Code scanning (`fail-on-vuln: false`, so a pre-existing advisory surfaces
+    without breaking a build). No `push` trigger, so it can't red-CI `develop` on introduction.
+  - ~~dependency-review~~ **removed** (`404a82c`-era): `actions/dependency-review-action`
+    requires the repo's **Dependency Graph**, which is disabled here (org/repo setting we can't
+    toggle) — it errored "Dependency review is not supported on this repository" on every PR.
+    osv-scanner's PR diff-scan already provides the dependency-vuln gate, so this was dropped
+    rather than left permanently red. Re-add `dependency-review.yml` if Dependency Graph gets
+    enabled (it also brings license checks + an inline PR comment osv-scanner lacks).
+  **Remaining supply-chain sub-items** (folded into the roadmap line below): CodeQL SAST (a
+  code-security axis, distinct from these dependency-focused tools) and the Node-pin reconcile
+  (actions are SHA-pinned; a `.nvmrc`/`engines` audit is still outstanding).
+  **First-scan finding (osv-scanner v2.4.0 on `pnpm-lock.yaml`, 2026-07-25):** the current tree
+  has **94 known vulnerabilities across 36 packages (3 Critical, 45 High, 33 Medium, 13 Low) —
+  all with fixes available.** These pre-date the tooling and are why the full scan runs
+  report-only. Remediation is tracked as its own item ↓.
+- [x] **Dependency vulnerability remediation — DONE 2026-07-25 (94 → 2).** Remediated via a
+  centralized `pnpm.overrides` block (forces non-vulnerable versions tree-wide; Renovate can
+  retire entries as real ranges advance), each batch build+test verified:
+  - **Same-major (semver-safe):** ajv, axios, body-parser, brace-expansion(1/2/5), diff,
+    dompurify, esbuild, fast-uri, form-data(2/4), glob, happy-dom, js-yaml, morgan, nuxt (4.4.7,
+    minimal), postcss, shell-quote, svgo, undici, valibot, vitest+@vitest/ui, yaml.
+  - **Compatible-API majors (tested):** nodemailer 7→9, @tootallnate/once 1→2, uuid 8/9→11,
+    markdown-it 13→14 + linkify-it 4→5, **multer 1→2** (upload paths retested), **tar 6→7**
+    (needed a one-line `import * as tar` fix in `backup-service.ts` — tar 7 dropped its default
+    export; backup create/restore retested).
+  - Verified: all workspaces build; ~350 tests across core/api/integration/storage/bb-upload/
+    backup/editor-schema — all green.
+  - **Residual (2, accepted):** `brace-expansion` GHSA-mh99-v99m-4gvg (CVSS 7.5 DoS) is modelled
+    as a flat range (fixed only in 5.0.8), and 5.x is ESM-only — forcing it under old CJS
+    `minimatch@3`/glob would break foundational pattern-matching. brace-expansion is reached only
+    via INTERNAL glob patterns (test/config/gitignore matching), never user request input, so the
+    DoS is not exploitable in the request surface. Left at the highest safe same-major versions
+    (1.1.16 / 2.1.2 / 5.0.8); revisit when the old CJS minimatch consumers age out. The scheduled
+    osv-scanner (report-only) will keep it visible.
+- [ ] `ui-003` SSR; signed appliance image;
   HW config-apply/reboot/button; equity/i18n; uncleared-surface follow-up
   (quick-start/by-meeting authz, FTS injection, config reflection);
-  supply-chain (dependency-review/CodeQL/osv-scanner, SECURITY.md, Node-pin
-  reconcile — actions SHA-pinning landed with CI batch); doc-drift sweep
+  CodeQL SAST + Node-pin reconcile (remainder of supply-chain); doc-drift sweep

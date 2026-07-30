@@ -2,7 +2,7 @@
  * Unit Tests for Diagnostic Cache
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { DiagnosticCache } from '../cache.js';
 import { ComponentResult } from '../types.js';
 import { Logger } from '../../utils/logger.js';
@@ -12,6 +12,10 @@ describe('DiagnosticCache', () => {
   let mockLogger: Logger;
 
   beforeEach(() => {
+    // Fake timers: entry TTL is checked lazily against Date.now(), so expiry is
+    // an instant clock advance instead of a real sleep.
+    vi.useFakeTimers();
+
     mockLogger = {
       debug: vi.fn(),
       info: vi.fn(),
@@ -24,6 +28,10 @@ describe('DiagnosticCache', () => {
       maxSize: 5,
       logger: mockLogger,
     });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   describe('cache key generation', () => {
@@ -79,7 +87,7 @@ describe('DiagnosticCache', () => {
       cache.set(key, result, 50); // Very short TTL
 
       // Wait for expiration
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      await vi.advanceTimersByTimeAsync(100);
 
       const cached = cache.get(key);
       expect(cached).toBeNull();

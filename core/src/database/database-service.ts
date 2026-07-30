@@ -380,8 +380,19 @@ export class DatabaseService {
     // Atomic acquire in ONE statement — this closes the check-then-insert TOCTOU
     // where two callers both saw "no active lock" (getLock) and both wrote
     // (INSERT OR REPLACE), ending up with two holders of the same record lock.
-    // The row is (re)written only when it does not yet exist OR the existing lock
-    // has already expired; SQLite's `changes` then tells us whether WE won.
+    // The row is (re)written only when it does not yet exist, OR the existing
+    // lock has already expired, OR the existing lock is held by the SAME caller;
+    // SQLite's `changes` then tells us whether WE won.
+    //
+    // The same-holder clause makes acquire idempotent + self-renewing: a caller
+    // re-POSTing a lock it already holds succeeds (and its expiry is pushed
+    // forward). The UI relies on exactly this — its lock-refresh timer re-POSTs
+    // this acquire endpoint (there is no separate refresh route wired up), so
+    // WITHOUT this clause every renewal 409s and the holder's own lock silently
+    // lapses after `lockDurationMinutes` mid-edit. A DIFFERENT caller still loses
+    // to a live lock (both conditions false → 0 changes → false), so the TOCTOU
+    // guarantee is unchanged.
+    //
     // Compare expiry ISO-to-ISO — expires_at is stored via toISOString(), and
     // SQLite's CURRENT_TIMESTAMP ('YYYY-MM-DD HH:MM:SS') does NOT order correctly
     // against the 'T'/'Z' ISO form (the old DELETE-by-CURRENT_TIMESTAMP was a
@@ -393,7 +404,8 @@ export class DatabaseService {
        ON CONFLICT(record_id) DO UPDATE SET
          locked_by = excluded.locked_by,
          expires_at = excluded.expires_at
-       WHERE record_locks.expires_at <= ?`,
+       WHERE record_locks.expires_at <= ?
+          OR record_locks.locked_by = excluded.locked_by`,
       [recordId, lockedBy, expiresAt.toISOString(), nowIso]
     );
 

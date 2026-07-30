@@ -10,6 +10,27 @@ and this project adheres to
 
 <!-- markdownlint-disable MD024 -->
 
+### Fixed
+
+- **Published records no longer leak into the drafts list.** Publishing a draft
+  now clears its internal editorial `workflowState`. Previously a first-publish
+  stored `workflow_state = 'draft'`, so the freshly-published record surfaced in
+  the unpublished/drafts listing; the read path also coerced a cleared (`null`)
+  workflowState back to `'draft'`. Both are fixed.
+- **Record locks no longer expire mid-edit.** A lock holder can now reacquire
+  (renew) their own lock. Previously the atomic acquire rejected the same holder,
+  so the editor's periodic lock-refresh silently 409'd and the lock lapsed after
+  its timeout while the user was still editing. Different-user conflict detection
+  is unchanged.
+
+### Changed
+
+- **Auto-indexing now runs through the workflow engine (core-002).** The hook
+  system is wired to the `WorkflowEngine`: a record update fires the
+  `update-index` workflow (fire-and-forget) to refresh search indexes. The former
+  log-only `approval` / `publication` / `archival` workflow stubs — registered as
+  if functional — were removed.
+
 ## [0.2.0] - 2025-01-30
 
 ### Added

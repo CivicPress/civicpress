@@ -90,7 +90,7 @@ describe('Lock Endpoints', () => {
       // lockedBy may be in error.data or response structure
     });
 
-    it.skip('should allow same user to reacquire lock', async () => {
+    it('should allow same user to reacquire lock', async () => {
       // Admin acquires lock
       const acquire1 = await request(context.api.getApp())
         .post(`/api/v1/records/${testRecordId}/lock`)

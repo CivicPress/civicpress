@@ -9,6 +9,10 @@ import {
   coreDebug,
   coreStartOperation,
 } from '../utils/core-output.js';
+// Type-only import: HookSystem holds a WorkflowEngine reference but never
+// constructs one, so this is erased at compile time and cannot create a runtime
+// import cycle.
+import type { WorkflowEngine } from '../workflows/workflow-engine.js';
 
 /**
  * Hook payload type. Hooks are polymorphic by design — each event type
@@ -63,6 +67,10 @@ export class HookSystem {
   private config: HookConfig | null;
   private configPath: string;
   private logPath: string;
+  /** Optional; injected post-construction via setWorkflowEngine (DI). When
+   *  absent (e.g. unit tests that build a bare HookSystem), executeWorkflow
+   *  no-ops rather than throwing. */
+  private workflowEngine?: WorkflowEngine;
 
   constructor(dataDir?: string) {
     this.listeners = new Map();
@@ -70,6 +78,16 @@ export class HookSystem {
     this.config = null;
     this.configPath = dataDir ? join(dataDir, '.civic', 'hooks.yml') : '';
     this.logPath = dataDir ? join(dataDir, '.civic', 'hooks.log.jsonl') : '';
+  }
+
+  /**
+   * Inject the WorkflowEngine so hook-configured workflows actually run.
+   * Setter injection (mirrors WorkflowEngine.setIndexingService) keeps the
+   * `HookSystem(dataDir)` constructor signature intact for the DI factory,
+   * saga constructors, and tests.
+   */
+  setWorkflowEngine(workflowEngine: WorkflowEngine): void {
+    this.workflowEngine = workflowEngine;
   }
 
   /**
@@ -401,17 +419,37 @@ export class HookSystem {
     data: HookData,
     _context: HookContext
   ): Promise<void> {
-    coreDebug(`Executing workflow: ${workflowName}`, {
-      operation: 'workflow execution',
-      workflowName,
-      dataKeys: Object.keys(data || {}),
-    });
+    if (!this.workflowEngine) {
+      // No engine wired (e.g. a bare HookSystem in a unit test) — nothing to run.
+      coreDebug(`No workflow engine wired; skipping '${workflowName}'`, {
+        operation: 'workflow execution',
+        workflowName,
+      });
+      return;
+    }
 
-    // TODO: Implement workflow engine integration
-    // For now, just log the workflow execution
-    coreInfo(`Workflow executed: ${workflowName}`, {
-      operation: 'workflow execution',
-      workflowName,
+    // Config may reference workflow names that are not registered (e.g.
+    // validate-record, notify-*). Skip them quietly — otherwise startWorkflow
+    // would throw "not found" and spam an error on every record op.
+    if (!this.workflowEngine.hasWorkflow(workflowName)) {
+      coreDebug(`Skipping unregistered workflow '${workflowName}'`, {
+        operation: 'workflow execution',
+        workflowName,
+      });
+      return;
+    }
+
+    // Fire-and-forget: a workflow (e.g. update-index → a full re-index) must not
+    // block the awaited record op. startWorkflow registers its active entry
+    // synchronously before its first await, so observers see it immediately; a
+    // failure is logged here rather than propagated into the record operation.
+    void this.workflowEngine.startWorkflow(workflowName, data).catch((error) => {
+      coreError(
+        `Workflow '${workflowName}' failed`,
+        'WORKFLOW_EXECUTION_FAILED',
+        { error: error instanceof Error ? error.message : String(error) },
+        { operation: 'workflow execution', workflowName }
+      );
     });
   }
 

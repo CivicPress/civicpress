@@ -260,15 +260,6 @@ export class RecordsDrafts {
           ? dbWorkflowState // Otherwise use DB value
           : 'draft'; // Final fallback to default
 
-    // Log for debugging
-    this.deps.logger.debug('Determining workflowState for createDraft response', {
-      id: draft.id,
-      dbWorkflowState,
-      requestedWorkflowState: data.workflowState,
-      finalWorkflowState,
-      hasWorkflowStateInDraft: 'workflow_state' in draft,
-    });
-
     return {
       id: draft.id,
       title: draft.title,
@@ -382,19 +373,6 @@ export class RecordsDrafts {
     const existingDraft = await this.deps.db.getDraft(id);
     const existingWorkflowState = existingDraft?.workflow_state;
 
-    // Log for debugging
-    this.deps.logger.info(
-      'Reading existing draft for workflowState preservation',
-      {
-        id,
-        existingWorkflowState,
-        hasWorkflowState: 'workflow_state' in (existingDraft || {}),
-        existingDraftKeys: existingDraft ? Object.keys(existingDraft) : [],
-        draftWorkflowState: existingDraft?.workflow_state,
-        draftWorkflowStateType: typeof existingDraft?.workflow_state,
-      }
-    );
-
     // Update draft
     // Only include workflow_state if it's explicitly provided (not undefined)
     const draftUpdates: DraftUpdates = {
@@ -423,11 +401,6 @@ export class RecordsDrafts {
       data.workflowState !== ''
     ) {
       draftUpdates.workflow_state = data.workflowState;
-      this.deps.logger.info('Including workflow_state in draft update', {
-        id,
-        workflowState: data.workflowState,
-        draftUpdatesKeys: Object.keys(draftUpdates),
-      });
     } else if (
       existingWorkflowState !== undefined &&
       existingWorkflowState !== null &&
@@ -435,13 +408,6 @@ export class RecordsDrafts {
     ) {
       // Preserve existing workflowState if not being updated
       draftUpdates.workflow_state = existingWorkflowState;
-      this.deps.logger.info(
-        'Preserving existing workflow_state in draft update',
-        {
-          id,
-          workflowState: existingWorkflowState,
-        }
-      );
     }
 
     await this.deps.db.updateDraft(id, draftUpdates);
@@ -452,17 +418,6 @@ export class RecordsDrafts {
       throw new Error(`Draft not found after update: ${id}`);
     }
 
-    // Debug: Log workflow_state value to verify it's being saved
-    if (updatedDraft) {
-      this.deps.logger.info('Draft workflow_state after update', {
-        id,
-        workflow_state: updatedDraft.workflow_state,
-        workflow_state_type: typeof updatedDraft.workflow_state,
-        has_workflow_state: 'workflow_state' in updatedDraft,
-        allKeys: Object.keys(updatedDraft),
-      });
-    }
-
     // Determine workflowState value with priority:
     // 1. Explicitly provided value (highest priority)
     // 2. Preserved value from existing draft
@@ -470,75 +425,45 @@ export class RecordsDrafts {
     // 4. Default 'draft' (lowest priority)
     let workflowStateValue = 'draft'; // Default
 
-    // Priority 1: If workflowState was explicitly provided in the update, use it
     if (
       data.workflowState !== undefined &&
       data.workflowState !== null &&
       data.workflowState !== ''
     ) {
+      // Priority 1: explicitly provided in the update
       workflowStateValue = data.workflowState;
-      this.deps.logger.debug('Using explicit workflowState from update', {
-        id,
-        workflowStateValue,
-      });
-    }
-    // Priority 2: Use the value we read from existing draft (preserved during update)
-    else if (
+    } else if (
       existingWorkflowState !== undefined &&
       existingWorkflowState !== null &&
       existingWorkflowState !== ''
     ) {
+      // Priority 2: preserved from the existing draft
       workflowStateValue = existingWorkflowState;
-      this.deps.logger.debug(
-        'Using preserved workflowState from existing draft',
-        {
-          id,
-          workflowStateValue,
-        }
-      );
-    }
-    // Priority 3: Fallback to DB value if available
-    else if (
+    } else if (
       updatedDraft &&
       'workflow_state' in updatedDraft &&
       updatedDraft.workflow_state !== null &&
       updatedDraft.workflow_state !== undefined &&
       updatedDraft.workflow_state !== ''
     ) {
+      // Priority 3: value from the updated draft row
       workflowStateValue = updatedDraft.workflow_state;
-      this.deps.logger.debug('Using workflowState from updated draft (DB)', {
-        id,
-        workflowStateValue,
-      });
-    }
-    // Priority 4: Use default and log warning
-    else {
-      if (!updatedDraft || !('workflow_state' in updatedDraft)) {
-        this.deps.logger.warn(
-          'workflow_state column does not exist in database - migration may not have run',
-          {
-            id,
-            availableColumns: updatedDraft ? Object.keys(updatedDraft) : [],
-            existingWorkflowState,
-            hasExistingValue:
-              existingWorkflowState !== undefined &&
-              existingWorkflowState !== null,
-          }
-        );
-      } else {
-        this.deps.logger.debug('Using default workflowState', {
+    } else if (!updatedDraft || !('workflow_state' in updatedDraft)) {
+      // Priority 4: default 'draft'. The column being ABSENT means the
+      // migration has not run — surface that. (A present-but-empty column
+      // legitimately falls back to 'draft' and needs no log.)
+      this.deps.logger.warn(
+        'workflow_state column does not exist in database - migration may not have run',
+        {
           id,
-          workflowStateValue,
-        });
-      }
+          availableColumns: updatedDraft ? Object.keys(updatedDraft) : [],
+          existingWorkflowState,
+          hasExistingValue:
+            existingWorkflowState !== undefined &&
+            existingWorkflowState !== null,
+        }
+      );
     }
-
-    this.deps.logger.info('Returning workflowState from updateDraft', {
-      id,
-      workflowStateValue,
-      dbValue: updatedDraft.workflow_state,
-      hasColumn: 'workflow_state' in updatedDraft,
-    });
 
     return {
       id: updatedDraft.id,

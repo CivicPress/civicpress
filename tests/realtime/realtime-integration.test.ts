@@ -9,7 +9,7 @@
 // 3. Snapshot integrity fallback: corrupted snapshot → Markdown seed (not
 //    A's lost edit) is returned to a fresh client.
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   createTestRealtimeServer,
   createSimulatedYClient,
@@ -45,15 +45,25 @@ describe('realtime-001/002: connection-limit churn leaves no leak', () => {
       // Abrupt terminate (simulates a network drop — same path as the real
       // disconnect handler).
       client.disconnect();
-      // Allow the 'close' event on the server side to propagate before the
-      // next iteration. The handler is synchronous once 'close' fires, but
-      // the event loop must turn over once.
-      await ctx.tick(5);
+      // Wait for the server to actually PROCESS the 'close' before the next
+      // cycle — poll the count maps back to empty rather than assuming a fixed
+      // delay is enough. The close handler is synchronous once 'close' fires,
+      // but the event that triggers it is async and, under CI load, can take
+      // well over the old fixed `tick(5)` to arrive — which was the source of
+      // this test's intermittent CI failures. Draining deterministically each
+      // cycle also keeps at most one connection live at a time.
+      await vi.waitFor(
+        () => {
+          expect(ctx.server.getUserConnections().size).toBe(0);
+          expect(ctx.server.getConnectionCounts().size).toBe(0);
+        },
+        { timeout: 5000, interval: 5 }
+      );
     }
 
-    // After all connections are torn down, both count maps must be empty: no
-    // per-IP count, no per-user set. A non-zero size means handleDisconnect
-    // leaked an entry (realtime-001 per-IP or realtime-002 per-user).
+    // Every cycle drained to empty above, so the maps are empty here: no per-IP
+    // count, no per-user set. A non-zero size would mean handleDisconnect leaked
+    // an entry (realtime-001 per-IP or realtime-002 per-user).
     expect(ctx.server.getConnectionCounts().size).toBe(0);
     expect(ctx.server.getUserConnections().size).toBe(0);
   });

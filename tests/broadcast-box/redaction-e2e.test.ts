@@ -54,6 +54,16 @@ function ffmpegInstalled(): boolean {
 }
 const HAVE_FFMPEG = ffmpegInstalled();
 
+// FA-BB-002: this redaction e2e is the ONLY proof that published A/V bytes are
+// actually blanked/silenced. Locally it self-skips when ffmpeg is absent (dev
+// convenience). In CI that silent skip is dangerous — a broken ffmpeg install
+// would drop the security-critical check out of coverage with a green build. So
+// CI sets CIVIC_REQUIRE_FFMPEG=1, which turns "ffmpeg missing" into a hard
+// FAILURE (see the guard below) instead of a skip.
+const REQUIRE_FFMPEG = /^(1|true|yes)$/i.test(
+  process.env.CIVIC_REQUIRE_FFMPEG ?? ''
+);
+
 /**
  * A 15s test recording with unmistakably non-black video (testsrc pattern)
  * and a constant 440Hz tone — so black/silence after redaction is provable.
@@ -86,6 +96,22 @@ function makeTestMp4(outPath: string): void {
     { stdio: 'ignore' }
   );
 }
+
+// Requirement guard: only runs when ffmpeg is REQUIRED (CIVIC_REQUIRE_FFMPEG=1)
+// but missing — in which case it fails loudly so CI cannot go green while the
+// redaction e2e silently skips. A no-op when ffmpeg is present or not required.
+describe.runIf(REQUIRE_FFMPEG && !HAVE_FFMPEG)(
+  'redaction e2e ffmpeg requirement (CIVIC_REQUIRE_FFMPEG)',
+  () => {
+    it('ffmpeg + ffprobe must be installed', () => {
+      throw new Error(
+        'CIVIC_REQUIRE_FFMPEG is set but ffmpeg/ffprobe were not found on PATH. ' +
+          'The FA-BB-002 redaction e2e must actually run (not silently skip) in ' +
+          'CI — install ffmpeg on the runner or unset CIVIC_REQUIRE_FFMPEG.'
+      );
+    });
+  }
+);
 
 describe.skipIf(!HAVE_FFMPEG)(
   'redaction worker e2e (real ffmpeg + real storage)',

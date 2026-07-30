@@ -59,20 +59,38 @@ describe('civic me command', () => {
     );
   });
 
-  it.skip('should suppress output when --silent flag is used', () => {
-    let result = '';
-    try {
-      result = execSync(`node "${cliPath}" auth:me --silent`, {
-        encoding: 'utf8',
-        cwd: testDataDir,
-        stdio: 'pipe',
-      });
-    } catch (e: any) {
-      result = e.stdout || e.message || '';
-    }
-    expect(result).not.toContain('💡 Use --token to provide a session token');
+  it('should suppress the progress banner when --silent flag is used', () => {
+    // auth:me with no token exits 1, so execSync throws and stdout is on e.stdout.
+    const run = (args: string): string => {
+      try {
+        return execSync(`node "${cliPath}" auth:me ${args}`, {
+          encoding: 'utf8',
+          cwd: testDataDir,
+          stdio: 'pipe',
+        });
+      } catch (e: any) {
+        return e.stdout || e.message || '';
+      }
+    };
+    // Baseline: the non-silent run emits the "🔄 Starting: auth:me" progress banner.
+    expect(run('')).toContain('Starting: auth:me');
+    // --silent suppresses that banner. (The auth error + hints still print so the
+    // user still learns why it failed; --silent only quiets progress output.)
+    expect(run('--silent')).not.toContain('Starting: auth:me');
   });
 
+  // SKIPPED (re-deferred 2026-07-26): these two exercise the invalid-token path,
+  // which requires the CLI to fully initialize CivicPress (loadConfig → dataDir →
+  // git engine → authService.validateSession → "Invalid session token"). That
+  // only works when an ambient, git-initialized civic project is resolvable from
+  // the cwd — true on a dev checkout, but NOT in CI's fresh clone, where the
+  // resolved dataDir isn't a usable repo and the CLI fails earlier with
+  // "Authentication failed: ... Cannot use simple-git on a directory that does
+  // not exist". The 2026-07-24 skip-triage un-skipped these on the strength of a
+  // dev-VM pass; CI (PR #21) proved them environment-fragile. Un-skip only with a
+  // hermetic setup — e.g. a per-test `civic init --data-dir` so the CLI resolves
+  // a local, git-initialized project instead of the ambient one. (The no-token
+  // and --silent cases above don't init CivicPress, so they stay enabled.)
   it.skip('should validate session token when --token is provided (invalid token)', () => {
     let result = '';
     try {
@@ -89,6 +107,7 @@ describe('civic me command', () => {
     );
   });
 
+  // SKIPPED — same ambient-project/git-engine fragility as the test above.
   it.skip('should output JSON format when --json flag is used (invalid token)', () => {
     let result = '';
     try {

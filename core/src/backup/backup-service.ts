@@ -3,7 +3,9 @@ import path from 'path';
 import { promisify } from 'util';
 import { execFile } from 'child_process';
 import os from 'os';
-import tar from 'tar';
+// tar v7 exposes named exports only (no default export) — import the namespace
+// so tar.create/tar.extract keep working.
+import * as tar from 'tar';
 import yaml from 'yaml';
 import { Logger } from '../utils/logger.js';
 import { DatabaseConfig } from '../database/database-adapter.js';

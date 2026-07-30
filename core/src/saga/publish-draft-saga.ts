@@ -93,7 +93,7 @@ class MoveToRecordsStep extends BaseSagaStep<PublishDraftContext, RecordData> {
           title: draft.title,
           content: draft.markdown_body,
           status: finalStatus,
-          workflowState: undefined, // Clear editorial state
+          workflowState: null, // Clear editorial state (published records have no workflowState)
           updated_at: new Date().toISOString(),
           metadata: draft.metadata ? JSON.parse(draft.metadata) : {},
           geography: draft.geography ? JSON.parse(draft.geography) : undefined,
@@ -167,7 +167,7 @@ class MoveToRecordsStep extends BaseSagaStep<PublishDraftContext, RecordData> {
             ? JSON.parse(draft.linked_geography_files)
             : undefined,
           status: finalStatus,
-          workflowState: undefined, // Clear editorial state
+          workflowState: null, // Clear editorial state (published records have no workflowState)
           createdAt: draft.created_at,
           updatedAt: new Date().toISOString(),
           skipFileGeneration: true, // Saga will handle file creation separately

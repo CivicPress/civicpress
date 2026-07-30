@@ -591,7 +591,7 @@ describe('API Records Integration', () => {
       expect(response.status).toBe(403); // CSRF middleware returns 403 before auth middleware
     });
 
-    it.skip('should preserve workflowState when updating other fields', async () => {
+    it('should preserve workflowState when updating other fields', async () => {
       // Create draft with workflowState
       await request(context.api.getApp())
         .put('/api/v1/records/draft-preserve-1/draft')
@@ -741,7 +741,7 @@ describe('API Records Integration', () => {
       });
     });
 
-    it.skip('should include workflowState in draft response', async () => {
+    it('should include workflowState in draft response', async () => {
       // Create draft with workflowState
       await request(context.api.getApp())
         .put('/api/v1/records/draft-workflow-get-1/draft')
@@ -753,9 +753,13 @@ describe('API Records Integration', () => {
           workflowState: 'under_review',
         });
 
-      // Get draft
+      // Get draft. Draft-only records (never published) live in the
+      // record_drafts table; the plain GET (view mode) reads only the published
+      // records table and 404s, so edit mode (?edit=true) is required to fetch
+      // the draft — same as the "should return draft if user has permission"
+      // sibling above.
       const response = await request(context.api.getApp())
-        .get('/api/v1/records/draft-workflow-get-1')
+        .get('/api/v1/records/draft-workflow-get-1?edit=true')
         .set('Authorization', `Bearer ${adminToken}`);
 
       expect([200, 201]).toContain(response.status);

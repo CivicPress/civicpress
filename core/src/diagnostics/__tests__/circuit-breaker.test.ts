@@ -2,7 +2,7 @@
  * Unit Tests for Diagnostic Circuit Breaker
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { DiagnosticCircuitBreaker } from '../circuit-breaker.js';
 import { Logger } from '../../utils/logger.js';
 
@@ -11,6 +11,11 @@ describe('DiagnosticCircuitBreaker', () => {
   let mockLogger: Logger;
 
   beforeEach(() => {
+    // Fake timers: both the per-check execution timeout and the reset-timeout
+    // (open→half-open) are timer/clock driven, so the sleeps below become
+    // instant clock advances rather than real 150–200ms waits.
+    vi.useFakeTimers();
+
     mockLogger = {
       debug: vi.fn(),
       info: vi.fn(),
@@ -23,6 +28,10 @@ describe('DiagnosticCircuitBreaker', () => {
       resetTimeout: 100, // Short timeout for testing
       logger: mockLogger,
     });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   describe('initial state', () => {
@@ -103,11 +112,14 @@ describe('DiagnosticCircuitBreaker', () => {
           () => new Promise((resolve) => setTimeout(resolve, 200))
         );
 
-      await expect(
+      const assertion = expect(
         circuitBreaker.execute('test-check', fn, 50)
       ).rejects.toMatchObject({
         code: 'CHECK_TIMEOUT',
       });
+      // Fire the 50ms execution timeout before the fn's 200ms would resolve.
+      await vi.advanceTimersByTimeAsync(50);
+      await assertion;
     });
   });
 
@@ -119,7 +131,7 @@ describe('DiagnosticCircuitBreaker', () => {
       circuitBreaker.recordFailure('test-check');
 
       // Wait for reset timeout
-      await new Promise((resolve) => setTimeout(resolve, 150));
+      await vi.advanceTimersByTimeAsync(150);
 
       const state = circuitBreaker.getState('test-check');
       expect(state).toBe('half-open');
@@ -130,7 +142,7 @@ describe('DiagnosticCircuitBreaker', () => {
       circuitBreaker.recordFailure('test-check');
       circuitBreaker.recordFailure('test-check');
       circuitBreaker.recordFailure('test-check');
-      await new Promise((resolve) => setTimeout(resolve, 150));
+      await vi.advanceTimersByTimeAsync(150);
 
       // Execute successfully
       const fn = vi.fn().mockResolvedValue('success');
@@ -145,7 +157,7 @@ describe('DiagnosticCircuitBreaker', () => {
       circuitBreaker.recordFailure('test-check');
       circuitBreaker.recordFailure('test-check');
       circuitBreaker.recordFailure('test-check');
-      await new Promise((resolve) => setTimeout(resolve, 150));
+      await vi.advanceTimersByTimeAsync(150);
 
       // Fail again
       circuitBreaker.recordFailure('test-check');

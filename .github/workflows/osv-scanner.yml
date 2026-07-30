@@ -1,0 +1,34 @@
+name: osv-scanner
+
+# Supply-chain: scan committed lockfiles against the OSV vulnerability database
+# (github.com/google/osv-scanner). Two modes, via Google's reusable workflows:
+#   - PR: scan only the change and FAIL on a newly-introduced vulnerability
+#     (gates dependency bumps, e.g. from Renovate).
+#   - Weekly schedule / manual: scan the whole tree and REPORT to Security >
+#     Code scanning (fail-on-vuln disabled, so a pre-existing advisory surfaces
+#     in the dashboard without breaking a build).
+# No `push` trigger — the scheduled run (on the default branch) covers ongoing
+# scanning, and the PR run gates new vulns; use `workflow_dispatch` to run the
+# full scan on demand from any branch.
+
+on:
+  pull_request:
+    branches: [main, develop]
+  schedule:
+    - cron: '12 12 * * 1' # Mondays 12:12 UTC
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  security-events: write # upload SARIF to Security > Code scanning
+  contents: read
+
+jobs:
+  scan-full:
+    if: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
+    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@9a498708959aeaef5ef730655706c5a1df1edbc2 # v2.3.8
+    with:
+      fail-on-vuln: false
+  scan-pr:
+    if: ${{ github.event_name == 'pull_request' }}
+    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable-pr.yml@9a498708959aeaef5ef730655706c5a1df1edbc2 # v2.3.8

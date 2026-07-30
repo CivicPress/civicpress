@@ -11,6 +11,10 @@ describe('ResourceMonitor', () => {
   let mockLogger: Logger;
 
   beforeEach(() => {
+    // Fake timers: elapsed `duration` is Date.now()-based, so the sampling wait
+    // is an instant clock advance rather than a real sleep.
+    vi.useFakeTimers();
+
     mockLogger = {
       debug: vi.fn(),
       info: vi.fn(),
@@ -23,6 +27,7 @@ describe('ResourceMonitor', () => {
     if (monitor && monitor.isActive()) {
       monitor.stop();
     }
+    vi.useRealTimers();
   });
 
   describe('initialization', () => {
@@ -100,7 +105,7 @@ describe('ResourceMonitor', () => {
       monitor = new ResourceMonitor({ logger: mockLogger });
       monitor.start();
 
-      await new Promise((resolve) => setTimeout(resolve, 50));
+      await vi.advanceTimersByTimeAsync(50);
 
       const metrics = monitor.getCurrentMetrics();
       expect(metrics.duration).toBeGreaterThanOrEqual(50);
