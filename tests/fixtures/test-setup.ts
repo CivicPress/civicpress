@@ -21,7 +21,11 @@ import {
 import { ensureDirSync } from 'fs-extra';
 import { tmpdir } from 'os';
 import yaml from 'js-yaml';
-import { RecordParser, RecordData, CentralConfigManager } from '@civicpress/core';
+import {
+  RecordParser,
+  RecordData,
+  CentralConfigManager,
+} from '@civicpress/core';
 
 // Test configuration
 export interface TestConfig {
@@ -796,6 +800,29 @@ export function createStorageConfig(config: TestConfig) {
   writeFileSync(storageConfigPath, yaml.dump(storageConfig));
 }
 
+/**
+ * Seed `<dataDir>/.civic/org-config.yml`, mirroring what `civic init` writes.
+ * Without it `CentralConfigManager.getOrgConfig()` throws by design ("require
+ * explicit user config"), which 500s the public `/info` endpoint and any other
+ * org-config-dependent surface — so an "initialized project" fixture must have
+ * it.
+ */
+export function createOrgConfig(config: TestConfig) {
+  const orgConfig = {
+    _metadata: {
+      name: 'Organization Configuration',
+      version: '1.0.0',
+      editable: true,
+    },
+    name: { value: 'Test City', type: 'string' },
+    city: { value: 'Test City', type: 'string' },
+    state: { value: 'Test State', type: 'string' },
+    country: { value: 'Test Country', type: 'string' },
+  };
+  ensureDirSync(config.civicDir);
+  writeFileSync(join(config.civicDir, 'org-config.yml'), yaml.dump(orgConfig));
+}
+
 export function createWorkflowConfig(config: TestConfig) {
   const workflowConfig = {
     statuses: [
@@ -1377,6 +1404,7 @@ export async function createCLITestContext(): Promise<CLITestContext> {
   createWorkflowConfig(config);
   createRolesConfig(config);
   createStorageConfig(config);
+  createOrgConfig(config);
   createSampleRecords(config);
 
   // Ensure CLI is built before executing commands
@@ -1437,6 +1465,7 @@ export async function createAPITestContext(): Promise<APITestContext> {
   createWorkflowConfig(config);
   createRolesConfig(config);
   createStorageConfig(config);
+  createOrgConfig(config);
   createSampleRecords(config);
 
   // Initialize Git repository for the test directory

@@ -182,6 +182,7 @@ export function requirePermission(permission: string | string[]) {
 
       if (!hasPermission) {
         res.status(403).json({
+          success: false,
           error: {
             message: `Permission denied: ${Array.isArray(permission) ? permission.join(' or ') : permission}`,
             code: 'INSUFFICIENT_PERMISSIONS',
@@ -307,13 +308,9 @@ export function requireStoragePermission(
       }
 
       // Use our comprehensive userCan() system with context
-      const hasPermission = await userCan(
-        req.user,
-        `storage:${action}`,
-        {
-          action: action as 'create' | 'edit' | 'delete' | 'view',
-        }
-      );
+      const hasPermission = await userCan(req.user, `storage:${action}`, {
+        action: action as 'create' | 'edit' | 'delete' | 'view',
+      });
 
       if (!hasPermission) {
         res.status(403).json({
