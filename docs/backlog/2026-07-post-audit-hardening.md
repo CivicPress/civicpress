@@ -1081,8 +1081,20 @@ they are pre-existing gaps the audit made visible.
 - [x] `GeographySelector.vue:25` uses `:options` (should be `:items` for
       `@nuxt/ui` v4) → dead category dropdown; `canDeleteGeography` hardcoded
       `true`.
-- [ ] The nicer structured config editor is orphaned —
-      `settings/configuration/index.vue:56` links cards only to `/raw`.
+- [x] **Structured config editor wired 2026-07-31.** The config cards linked
+      only to `/raw`; each now has a primary **Edit** button →
+      `/settings/configuration/:file/edit` (the structured editor) plus the
+      existing **Edit Raw**. The editor + its endpoints
+      (`/config/metadata/:type`, `/config/:type`, `PUT`) already existed and the
+      `[configFile]/index.vue` detail page already redirected to `/edit` — only
+      the cards bypassed it. ⚠️ Found + fixed a real gap in the "nicer" editor:
+      `ConfigurationField.vue` rendered array/select fields with
+      `USelect :options`, but `@nuxt/ui` v4 wants `:items` — so those dropdowns
+      (e.g. org-config `timezone`) were dead (same v4 bug as the fixed
+      `GeographySelector`). Verified: `nuxt typecheck` clean, eslint + prettier
+      clean, endpoints tested by the config API suite. ⚠️ Same
+      `:options`→`:items` v4 bug still lurks in `RecordList.vue:339` (pagination
+      page-size select) — separate component, noted for a follow-up.
 - [ ] `forgot-password.vue` is a `mailto:` stub and **has no backend route** at
       all (confirmed absent).
 

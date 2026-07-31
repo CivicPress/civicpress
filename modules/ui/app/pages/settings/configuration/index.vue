@@ -53,6 +53,11 @@
                   </div>
                   <div class="flex items-center gap-2">
                     <UButton
+                      :to="`/settings/configuration/${cfg.file}/edit`"
+                      size="sm"
+                      >Edit
+                    </UButton>
+                    <UButton
                       :to="`/settings/configuration/${cfg.file}/raw`"
                       variant="outline"
                       size="sm"
@@ -220,10 +225,13 @@ const fetchConfigurations = async () => {
     if (response.success) {
       configurations.value = response.data || [];
     } else {
-      error.value = extractErrorMessage(response) || 'Failed to load configurations';
+      error.value =
+        extractErrorMessage(response) || 'Failed to load configurations';
     }
   } catch (err: unknown) {
-    error.value = (err instanceof Error ? err.message : '') || 'Failed to load configurations';
+    error.value =
+      (err instanceof Error ? err.message : '') ||
+      'Failed to load configurations';
   } finally {
     loading.value = false;
   }

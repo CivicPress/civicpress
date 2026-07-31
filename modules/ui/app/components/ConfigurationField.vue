@@ -77,7 +77,7 @@
       >
         <USelect
           :model-value="value"
-          :options="getSelectOptions(field)"
+          :items="getSelectOptions(field)"
           :placeholder="getPlaceholder(field)"
           @update:model-value="updateValue"
         />

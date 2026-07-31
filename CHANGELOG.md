@@ -99,6 +99,12 @@ and this project adheres to
   `requirePermission` middleware's 403 body omitted the standard envelope flag
   that every other error response sets, so clients keying on
   `body.success === false` misread permission denials.
+- **The structured configuration editor is reachable again.** Each config card
+  on the settings page now offers a primary **Edit** (form-based) action
+  alongside **Edit Raw** — previously the cards linked only to the raw YAML
+  editor, orphaning the structured one. Its array/select fields also render
+  their options again (they used `USelect :options`, but `@nuxt/ui` v4 expects
+  `:items`, so those dropdowns were empty).
 
 ### Security
 
