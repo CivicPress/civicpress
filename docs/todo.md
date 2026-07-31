@@ -306,6 +306,27 @@ V2)
   - **Action**: Replace `t('records.currentUser')` with
     `useAuth().user.value?.name` or similar
 
+#### Notifications & Password Recovery Follow-ups
+
+Deliberate deferrals from the forgot-password / operator notification center
+work (the core feature shipped; these are the acknowledged gaps).
+
+- [ ] **Wire an "update available" producer**
+  - **Current Status**: The operator notification center supports
+    `update_available` (`OperatorNotifier.updateAvailable`, deduped), but no
+    producer calls it — it needs an external version source.
+  - **Priority**: Low - nice to have
+  - **Action**: Add a version check (npm/GitHub releases, on-startup or
+    scheduled, opt-in) that emits `updateAvailable` when a newer release exists.
+
+- [ ] **Cover the email password-reset delivery path with an SMTP mock**
+  - **Current Status**: The console + operator-task paths are unit-tested; the
+    email delivery branch reuses the same `NotificationService` path as
+    email-verification but has no dedicated SMTP-mock test.
+  - **Priority**: Low - the shared path is exercised elsewhere
+  - **Action**: Add a `PasswordRecoveryService` test with an injected fake
+    transport asserting the reset link is delivered via email when configured.
+
 ### Short Term Tasks (v1.4.0 - Next 1-2 months)
 
 #### Plugin System Foundation

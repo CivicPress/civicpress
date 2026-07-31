@@ -55,6 +55,12 @@ const settingsItems = computed<NavigationMenuItem[]>(() => {
 
   if (authStore.hasPermission('system:admin')) {
     items.push({
+      label: t('settings.alerts.title'),
+      icon: 'i-lucide-bell',
+      to: '/settings/alerts',
+      description: t('settings.alerts.description'),
+    });
+    items.push({
       label: t('settings.activityLog'),
       icon: 'i-lucide-activity',
       to: '/settings/activity',
