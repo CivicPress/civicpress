@@ -59,6 +59,15 @@ export interface PasswordRecoveryDeps {
   /** Directory for the console channel's file outbox (dev). */
   outboxDir?: string;
   logger?: Logger;
+  /**
+   * Test/advanced seam: supply a pre-built config + service (e.g. one carrying
+   * a fake email transport, or a shared instance). When either is omitted a
+   * default is built; the real email channel is registered from
+   * notifications.yml ONLY when the service is built here (an injected service
+   * is used exactly as given).
+   */
+  notificationConfig?: NotificationConfig;
+  notificationService?: NotificationService;
 }
 
 const RESET_TEMPLATE_BODY =
@@ -85,9 +94,14 @@ export class PasswordRecoveryService {
 
     // Own NotificationService for the email path — mirrors the proven
     // email-verification setup (its own config + registered email channel).
-    this.notificationConfig = new NotificationConfig();
-    this.notificationService = new NotificationService(this.notificationConfig);
-    if (deps.logger) {
+    this.notificationConfig = deps.notificationConfig ?? new NotificationConfig();
+    const injectedService = !!deps.notificationService;
+    this.notificationService =
+      deps.notificationService ??
+      new NotificationService(this.notificationConfig);
+    // Register the real email channel only when we built the service; an
+    // injected service already carries whatever channels the caller wants.
+    if (!injectedService && deps.logger) {
       registerEmailChannelOn(this.notificationService, deps.logger);
     }
 
