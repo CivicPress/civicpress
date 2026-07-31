@@ -80,43 +80,51 @@
         >
           {{ error }}
         </div>
-        <div v-else class="overflow-auto">
-          <table class="min-w-full text-sm">
-            <thead class="text-left text-gray-600 dark:text-gray-400">
-              <tr>
-                <th class="py-2 pr-4">{{ t('settings.activity.time') }}</th>
-                <th class="py-2 pr-4">{{ t('settings.activity.actor') }}</th>
-                <th class="py-2 pr-4">{{ t('settings.activity.action') }}</th>
-                <th class="py-2 pr-4">{{ t('settings.activity.target') }}</th>
-                <th class="py-2 pr-4">{{ t('settings.activity.outcome') }}</th>
-                <th class="py-2 pr-4">{{ t('settings.activity.message') }}</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr
-                v-for="item in items"
-                :key="item.id"
-                class="border-t border-gray-200 dark:border-gray-800"
+        <div v-else>
+          <div class="overflow-auto max-h-[60vh]">
+            <table class="min-w-full text-sm">
+              <thead
+                class="text-left text-gray-600 dark:text-gray-400 sticky top-0 bg-white dark:bg-gray-900"
               >
-                <td class="py-2 pr-4 whitespace-nowrap">
-                  {{ formatTime(item.timestamp) }}
-                </td>
-                <td class="py-2 pr-4">{{ formatActor(item.actor) }}</td>
-                <td class="py-2 pr-4">{{ item.action }}</td>
-                <td class="py-2 pr-4">{{ formatTarget(item.target) }}</td>
-                <td class="py-2 pr-4">
-                  <UBadge
-                    :color="item.outcome === 'success' ? 'primary' : 'error'"
-                    variant="soft"
-                    >{{ item.outcome }}</UBadge
-                  >
-                </td>
-                <td class="py-2 pr-4 truncate max-w-[320px]">
-                  {{ item.message || '' }}
-                </td>
-              </tr>
-            </tbody>
-          </table>
+                <tr>
+                  <th class="py-2 pr-4">{{ t('settings.activity.time') }}</th>
+                  <th class="py-2 pr-4">{{ t('settings.activity.actor') }}</th>
+                  <th class="py-2 pr-4">{{ t('settings.activity.action') }}</th>
+                  <th class="py-2 pr-4">{{ t('settings.activity.target') }}</th>
+                  <th class="py-2 pr-4">
+                    {{ t('settings.activity.outcome') }}
+                  </th>
+                  <th class="py-2 pr-4">
+                    {{ t('settings.activity.message') }}
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  v-for="item in items"
+                  :key="item.id"
+                  class="border-t border-gray-200 dark:border-gray-800"
+                >
+                  <td class="py-2 pr-4 whitespace-nowrap">
+                    {{ formatTime(item.timestamp) }}
+                  </td>
+                  <td class="py-2 pr-4">{{ formatActor(item.actor) }}</td>
+                  <td class="py-2 pr-4">{{ item.action }}</td>
+                  <td class="py-2 pr-4">{{ formatTarget(item.target) }}</td>
+                  <td class="py-2 pr-4">
+                    <UBadge
+                      :color="item.outcome === 'success' ? 'primary' : 'error'"
+                      variant="soft"
+                      >{{ item.outcome }}</UBadge
+                    >
+                  </td>
+                  <td class="py-2 pr-4 truncate max-w-[320px]">
+                    {{ item.message || '' }}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
           <div class="flex items-center justify-between py-3">
             <UButton :disabled="page <= 0" @click="prevPage" variant="ghost">{{
               t('common.previous')
@@ -209,7 +217,9 @@ const load = async (goTo?: number) => {
       throw new Error('Unexpected response');
     }
   } catch (e: unknown) {
-    error.value = (e instanceof Error ? e.message : '') || t('settings.activity.failedToLoad');
+    error.value =
+      (e instanceof Error ? e.message : '') ||
+      t('settings.activity.failedToLoad');
   } finally {
     loading.value = false;
   }
@@ -217,7 +227,10 @@ const load = async (goTo?: number) => {
 
 const formatTime = (ts: string) => new Date(ts).toLocaleString();
 const formatActor = (
-  a: { username?: string; id?: string | number; role?: string } | null | undefined
+  a:
+    | { username?: string; id?: string | number; role?: string }
+    | null
+    | undefined
 ) => (a ? `${a.username || a.id || ''}${a.role ? ` (${a.role})` : ''}` : '');
 const formatTarget = (
   t: { type?: string; id?: string | number } | null | undefined
