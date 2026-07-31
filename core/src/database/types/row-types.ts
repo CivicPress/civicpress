@@ -187,6 +187,40 @@ export interface EmailVerificationRow extends SqlRow {
   created_at?: string;
 }
 
+export interface PasswordResetTokenRow extends SqlRow {
+  id: number;
+  user_id: number;
+  token_hash: string;
+  expires_at: string;
+  consumed_at?: string;
+  created_ip?: string;
+  created_at?: string;
+}
+
+export type OperatorNotificationSeverity =
+  | 'info'
+  | 'warning'
+  | 'critical'
+  | 'action';
+
+export type OperatorNotificationStatus = 'unread' | 'read' | 'dismissed';
+
+export interface OperatorNotificationRow extends SqlRow {
+  id: number;
+  type: string;
+  severity: OperatorNotificationSeverity;
+  title: string;
+  body?: string;
+  /** JSON TEXT — structured payload (e.g. { username, userId } for a reset). */
+  data?: string;
+  status: OperatorNotificationStatus;
+  audience_role?: string;
+  dedupe_key?: string;
+  created_at?: string;
+  read_at?: string;
+  dismissed_at?: string;
+}
+
 // -- Internal / helper rows --------------------------------------------------
 
 /** `PRAGMA table_info(<table>)` result. */

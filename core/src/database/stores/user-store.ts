@@ -16,6 +16,7 @@ import type {
   SessionWithUserRow,
   LastInsertIdRow,
   CountRow,
+  PasswordResetTokenRow,
 } from '../types/row-types.js';
 
 export class UserStore {
@@ -362,6 +363,80 @@ export class UserStore {
     await this.adapter.execute('DELETE FROM sessions WHERE expires_at <= ?', [
       new Date().toISOString(),
     ]);
+  }
+
+  // Password reset tokens ------------------------------------------------------
+  // Only the hash is ever stored; the plaintext lives once, in the reset link.
+
+  /**
+   * Persist a reset token hash for a user. Existing UNCONSUMED tokens for the
+   * same user are cleared first so only the most recent link is ever live —
+   * requesting a new reset must invalidate the previous one.
+   */
+  async createPasswordResetToken(
+    userId: number,
+    tokenHash: string,
+    expiresAt: Date,
+    createdIp?: string
+  ): Promise<number> {
+    await this.adapter.execute(
+      'DELETE FROM password_reset_tokens WHERE user_id = ? AND consumed_at IS NULL',
+      [userId]
+    );
+    await this.adapter.execute(
+      'INSERT INTO password_reset_tokens (user_id, token_hash, expires_at, created_ip) VALUES (?, ?, ?, ?)',
+      [userId, tokenHash, expiresAt.toISOString(), createdIp ?? null]
+    );
+    const rows = await this.adapter.query<LastInsertIdRow>(
+      'SELECT last_insert_rowid() as id'
+    );
+    return rows[0].id;
+  }
+
+  /**
+   * Look up a LIVE token by hash: unconsumed and unexpired. A consumed or
+   * expired token returns null — the caller cannot tell the two apart, which
+   * is deliberate.
+   */
+  async getLivePasswordResetToken(
+    tokenHash: string
+  ): Promise<PasswordResetTokenRow | null> {
+    const rows = await this.adapter.query<PasswordResetTokenRow>(
+      `SELECT * FROM password_reset_tokens
+        WHERE token_hash = ? AND consumed_at IS NULL AND expires_at > ?`,
+      [tokenHash, new Date().toISOString()]
+    );
+    return rows.length > 0 ? rows[0] : null;
+  }
+
+  /**
+   * Mark a token consumed. Guarded on consumed_at IS NULL so a race between
+   * two redemptions of the same link resolves to exactly one winner: returns
+   * true only for the call that actually flipped the row.
+   */
+  async consumePasswordResetToken(id: number): Promise<boolean> {
+    const result = await this.adapter.execute(
+      `UPDATE password_reset_tokens SET consumed_at = ?
+        WHERE id = ? AND consumed_at IS NULL`,
+      [new Date().toISOString(), id]
+    );
+    return ((result as { changes?: number } | undefined)?.changes ?? 0) > 0;
+  }
+
+  /** Invalidate every unconsumed token for a user (e.g. after a set-password). */
+  async deleteUserPasswordResetTokens(userId: number): Promise<void> {
+    await this.adapter.execute(
+      'DELETE FROM password_reset_tokens WHERE user_id = ?',
+      [userId]
+    );
+  }
+
+  /** Housekeeping: drop consumed or expired tokens. */
+  async cleanupExpiredPasswordResetTokens(): Promise<void> {
+    await this.adapter.execute(
+      'DELETE FROM password_reset_tokens WHERE consumed_at IS NOT NULL OR expires_at <= ?',
+      [new Date().toISOString()]
+    );
   }
 
   /**

@@ -25,6 +25,9 @@ import { RecordManager } from './records/record-manager.js';
 import {
   NotificationService,
   NotificationConfig,
+  OperatorNotifier,
+  PasswordRecoveryService,
+  defaultOutboxDir,
 } from './notifications/index.js';
 import { initializeRoleManager } from './auth/role-utils.js';
 import { coreOutput } from './utils/core-output.js';
@@ -161,6 +164,29 @@ export function registerCivicPressServices(
     const notificationConfig =
       c.resolve<NotificationConfig>('notificationConfig');
     return new NotificationService(notificationConfig);
+  });
+
+  // Operator notification center (the "inbox") — depends on: database, logger
+  container.singleton('operatorNotifier', (c) => {
+    const db = c.resolve<DatabaseService>('database');
+    const logger = c.resolve<Logger>('logger');
+    return new OperatorNotifier(db, logger);
+  });
+
+  // Password recovery orchestration (forgot-password) — depends on: auth
+  // (token issuer), operatorNotifier, logger. The console dev sink writes its
+  // outbox under the system-data dir.
+  container.singleton('passwordRecovery', (c) => {
+    const authService = c.resolve<AuthService>('auth');
+    const operatorNotifier = c.resolve<OperatorNotifier>('operatorNotifier');
+    const logger = c.resolve<Logger>('logger');
+    const cfg = c.resolve<CivicPressConfig>('config');
+    return new PasswordRecoveryService({
+      issuer: authService,
+      operatorNotifier,
+      outboxDir: defaultOutboxDir(resolveSystemDataDir(cfg)),
+      logger,
+    });
   });
 
   // Step 8: Register indexing service placeholder
