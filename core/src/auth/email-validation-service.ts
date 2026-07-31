@@ -269,7 +269,7 @@ export class EmailValidationService {
         type === 'initial' ? 'email_verification' : 'email_change_verification';
 
       try {
-        await this.notificationService.sendNotification({
+        const emailResult = await this.notificationService.sendNotification({
           email: email,
           channels: ['email'],
           template: templateName,
@@ -280,11 +280,24 @@ export class EmailValidationService {
           },
         });
 
-        logger.info(
-          `Email verification token created for user ${userId}, type: ${type}`
-        );
+        // A channel-delivery failure returns { success:false } (it does not
+        // throw), so inspect the result rather than assuming the email was
+        // sent. Token creation still succeeds either way — we never block
+        // account setup on email delivery — but the log must be honest about
+        // whether the email actually went out.
+        if (emailResult.success) {
+          logger.info(
+            `Email verification token created + email sent for user ${userId}, type: ${type}`
+          );
+        } else {
+          logger.warn(
+            `Email verification token created for user ${userId}, type: ${type}, but email delivery failed:`,
+            emailResult.errors ?? emailResult.failedChannels
+          );
+        }
       } catch (emailError) {
-        // Log the error but don't fail the token creation
+        // sendNotification threw (validation / rate-limit / missing template);
+        // the token was still created and returned.
         logger.warn(
           `Email verification token created for user ${userId}, type: ${type}, but email sending failed:`,
           emailError

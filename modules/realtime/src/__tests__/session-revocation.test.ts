@@ -17,9 +17,10 @@
  *  - the connection bookkeeping drains exactly once (no realtime-002 regression),
  *  - a malformed/foreign hook payload is ignored rather than mass-disconnecting.
  *
- * NOTE: nothing in core EMITS `auth:sessions:revoked` yet (AuthService holds no
- * HookSystem), so the subscriber is dormant in production. The hook-driven test
- * below emits it on the same bus core would, which is what pins the contract.
+ * NOTE: core EMITS `auth:sessions:revoked` — `SessionOps.deleteUserSessions`
+ * fires it on the HookSystem that `AuthService` receives via `initializeHooks()`
+ * — so the subscriber is LIVE in production. The hook-driven test below emits it
+ * on the same bus core does, which is what pins the contract.
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';

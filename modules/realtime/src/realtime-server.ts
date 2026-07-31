@@ -62,12 +62,14 @@ import * as Y from 'yjs';
  * still writing edits) until it happens to reconnect. Subscribing to this hook
  * is the defense-in-depth that closes that window.
  *
- * STATUS (2026-07-20): nothing in core EMITS this yet. `SessionOps
- * .deleteUserSessions` (core/src/auth/auth-service/session-ops.ts) deletes the
- * rows and returns, and `AuthService` holds no HookSystem at all — so the
- * subscriber below is dormant until core adds the emission. It is wired now
- * (rather than after) because the in-process host can already drive the same
- * teardown directly via `revokeUserConnections()`, which needs no core change.
+ * STATUS (2026-07-30): core EMITS this. `SessionOps.deleteUserSessions`
+ * (core/src/auth/auth-service/session-ops.ts) fires it on the shared HookSystem
+ * right after deleting the rows — reached via logout-everywhere and password
+ * change (self-service and admin-set). `AuthService` receives that bus through
+ * `initializeHooks()` (wired during civic-core startup), so the subscriber below
+ * is LIVE end-to-end whenever the in-process realtime server has run
+ * `initialize()`. The in-process host can also drive the same teardown directly
+ * via `revokeUserConnections()`.
  */
 export const SESSION_REVOKED_HOOK = 'auth:sessions:revoked';
 

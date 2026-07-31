@@ -232,7 +232,16 @@ describe('Realtime Module Integration', () => {
     // W1 made connection routing handler-only: a records:* connection is closed
     // with 4004 unless a handler is registered for the room type. Register the
     // records handler so multi-client sync/awareness/reconnection paths run.
-    realtimeServer.registerRoomTypeHandler(new RecordRoomHandler());
+    realtimeServer.registerRoomTypeHandler(
+      new RecordRoomHandler({
+        // W5: onConnect now enforces per-record authorization; wire the real
+        // services so connections to the created test record are authorized.
+        authService,
+        recordManager,
+        databaseService,
+        logger,
+      })
+    );
 
     // Initialize realtime server
     await realtimeServer.initialize();

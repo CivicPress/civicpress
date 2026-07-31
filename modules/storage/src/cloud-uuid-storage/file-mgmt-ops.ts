@@ -9,11 +9,8 @@
 
 import fs from 'fs-extra';
 import { loadAwsS3Sdk } from './sdk-loader.js';
-import type { StorageFile , StorageProvider } from '../types/storage.types.js';
-import {
-  withTimeout,
-  getTimeoutForOperation,
-} from '../utils/timeout.js';
+import type { StorageFile, StorageProvider } from '../types/storage.types.js';
+import { withTimeout, getTimeoutForOperation } from '../utils/timeout.js';
 import { logOperation, SIDECAR_SUFFIX } from './internals.js';
 import type { CloudUuidStorageService } from '../cloud-uuid-storage-service.js';
 
@@ -43,9 +40,7 @@ export class FileMgmtOps {
    */
   private async _deleteFile(id: string, userId?: string): Promise<boolean> {
     const host = this.deps.host;
-    const startTime = Date.now();
     let provider: string | undefined;
-    let success = false;
     let error: string | undefined;
 
     try {
@@ -58,7 +53,7 @@ export class FileMgmtOps {
         return false;
       }
 
-      // Delete with failover support
+      // Per-provider delete, wrapped in the provider's circuit breaker.
       const deleteOperation = async (providerName: string): Promise<void> => {
         const provider = host.config.providers?.[providerName];
         if (!provider) {
@@ -98,16 +93,9 @@ export class FileMgmtOps {
         return executeWithTimeout();
       };
 
-      if (host.failoverManager) {
-        await host.failoverManager.executeWithFailover(
-          deleteOperation,
-          'delete'
-        );
-      } else {
-        // No failover - use active provider
-        const activeProvider = host.config.active_provider || 'local';
-        await deleteOperation(activeProvider);
-      }
+      // Delete via the configured active provider (each provider call is
+      // wrapped in its circuit breaker inside deleteOperation).
+      await deleteOperation(host.config.active_provider || 'local');
 
       // Delete from database
       const deleted = await host.databaseService.deleteStorageFile(id);
@@ -117,10 +105,9 @@ export class FileMgmtOps {
         await host.cacheAdapter.invalidateFolder(file.folder);
       }
 
-      // Extract provider name for metrics
+      // Provider name recorded in the audit-log entry below.
       const activeProvider = host.config.active_provider || 'local';
       provider = activeProvider;
-      success = deleted;
 
       logOperation(host, {
         operation: 'delete',
@@ -131,20 +118,10 @@ export class FileMgmtOps {
         metadata: { file_id: id, provider },
       });
 
-      // Record metrics
-      if (host.metricsCollector) {
-        const latency = Date.now() - startTime;
-        host.metricsCollector.recordDelete(success, latency, provider);
-      }
-
       return deleted;
     } catch (err) {
       error = err instanceof Error ? err.message : 'Unknown error';
       host.logger.error('Failed to delete file:', err);
-
-      // Extract provider name for metrics
-      const activeProvider = host.config.active_provider || 'local';
-      provider = activeProvider;
 
       logOperation(host, {
         operation: 'delete',
@@ -154,16 +131,6 @@ export class FileMgmtOps {
         success: false,
         error,
       });
-
-      // Record metrics
-      if (host.metricsCollector) {
-        const latency = Date.now() - startTime;
-        const errorCode =
-          err instanceof Error && (err as Error & { code?: string }).code
-            ? (err as Error & { code?: string }).code
-            : 'UNKNOWN_ERROR';
-        host.metricsCollector.recordDelete(false, latency, provider, errorCode);
-      }
 
       return false;
     }
@@ -183,7 +150,10 @@ export class FileMgmtOps {
   /**
    * Delete file from S3
    */
-  private async deleteFromS3(file: StorageFile, provider: StorageProvider): Promise<void> {
+  private async deleteFromS3(
+    file: StorageFile,
+    provider: StorageProvider
+  ): Promise<void> {
     const host = this.deps.host;
     if (!host.s3Client) {
       throw new Error('S3 client not initialized');
@@ -201,11 +171,6 @@ export class FileMgmtOps {
 
       await host.s3Client!.send(command);
     };
-
-    // Apply retry logic if retry manager is configured
-    if (host.retryManager) {
-      return host.retryManager.withRetry(deleteOperation);
-    }
 
     return deleteOperation();
   }
@@ -234,18 +199,16 @@ export class FileMgmtOps {
       await blockBlobClient.deleteIfExists();
     };
 
-    // Apply retry logic if retry manager is configured
-    if (host.retryManager) {
-      return host.retryManager.withRetry(deleteOperation);
-    }
-
     return deleteOperation();
   }
 
   /**
    * Delete file from Google Cloud Storage
    */
-  private async deleteFromGCS(file: StorageFile, provider: StorageProvider): Promise<void> {
+  private async deleteFromGCS(
+    file: StorageFile,
+    provider: StorageProvider
+  ): Promise<void> {
     const host = this.deps.host;
     if (!host.gcsBucket) {
       throw new Error('GCS bucket not initialized');
@@ -258,11 +221,6 @@ export class FileMgmtOps {
       const gcsFile = host.gcsBucket!.file(fileName);
       await gcsFile.delete();
     };
-
-    // Apply retry logic if retry manager is configured
-    if (host.retryManager) {
-      return host.retryManager.withRetry(deleteOperation);
-    }
 
     return deleteOperation();
   }

@@ -55,7 +55,9 @@ jobs:
           cache: pnpm
 
       - name: Install ffmpeg (broadcast-box / transcription media tests)
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
+        run:
+          sudo apt-get update && sudo apt-get install -y --no-install-recommends
+          ffmpeg
 
       # The integration suites commit to real git repos; a bare runner has no
       # git identity and every git-touching test dies on "empty ident name".
@@ -115,6 +117,10 @@ jobs:
       - name: Broadcast-box module tests
         run: npx vitest run
         working-directory: modules/broadcast-box
+
+      - name: Realtime module tests
+        run: npx vitest run
+        working-directory: modules/realtime
 
       - name: Transcription service tests
         run: npx vitest run

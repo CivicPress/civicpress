@@ -100,7 +100,10 @@ export async function createTestEnvironment(): Promise<TestEnvironment> {
   );
 
   // Create room manager
-  const roomManager = new RoomManager(logger as unknown as Logger, realtimeServer);
+  const roomManager = new RoomManager(
+    logger as unknown as Logger,
+    realtimeServer
+  );
   realtimeServer.setRoomManager(roomManager);
 
   return {
@@ -408,15 +411,23 @@ export async function createTestServer(
   server.setRecordManager(recordManager);
   server.setDatabaseService(databaseService);
 
-  const roomManager = new RoomManager(
-    logger as unknown as Logger,
-    server
-  );
+  const roomManager = new RoomManager(logger as unknown as Logger, server);
   server.setRoomManager(roomManager);
 
   // CRITICAL: register the records room handler, otherwise every records:*
   // connection is closed with 4004 before auth/limits ever run.
-  server.registerRoomTypeHandler(new RecordRoomHandler());
+  server.registerRoomTypeHandler(
+    new RecordRoomHandler({
+      // W5: wire the per-record authz deps so onConnect (which now fails closed
+      // without them) admits authenticated users to existing record rooms in
+      // this harness. The mocks above resolve the token to a user, return a
+      // record for any id, and grant permission.
+      authService,
+      recordManager,
+      databaseService,
+      logger,
+    })
+  );
 
   await server.initialize();
 

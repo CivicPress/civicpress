@@ -247,4 +247,60 @@ describe('NotificationService — truthful audit log (notifications-001)', () =>
     expect(entry.details.success).not.toBe(true);
     expect(entry.details.success).toBe(false);
   });
+
+  // Regression for the real (live-on-the-auth-path) bug: the email adapter in
+  // `email-channel-setup.ts` catches SMTP errors and RETURNS { success:false }
+  // rather than throwing. sendToChannel used to ignore the return value, so
+  // Promise.allSettled saw the promise "fulfilled" and audited the failed send
+  // as success:true. It must now honor the ChannelResponse.success contract.
+  it('a channel that RETURNS { success:false } (not throws) is recorded as failed', async () => {
+    const returnsFailure = {
+      send: vi.fn(async () => ({ success: false, error: 'SMTP 550 rejected' })),
+      isEnabled: () => true,
+      getName: () => 'mock-channel',
+    };
+    service.registerChannel('email', returnsFailure as any);
+
+    const response = await service.sendNotification({
+      email: 'recipient@example.com',
+      channels: ['email'],
+      template: 'test_template',
+      data: { name: 'Frank' },
+    });
+
+    expect(response.success).toBe(false);
+    expect(response.sentChannels).toEqual([]);
+    expect(response.failedChannels).toEqual(['email']);
+
+    const sendCall = auditSpy.mock.calls.find(
+      ([entry]: any) =>
+        entry?.action === 'notification_sent' ||
+        entry?.action === 'notification_partial_or_failed'
+    );
+    const entry = sendCall![0] as any;
+    expect(entry.action).toBe('notification_partial_or_failed');
+    expect(entry.details.success).toBe(false);
+    expect(entry.details.failedChannels).toEqual(['email']);
+    expect(entry.details.errors?.[0]).toMatch(/SMTP 550 rejected/);
+  });
+
+  it('a channel that RETURNS { success:true } is recorded as sent (happy path intact)', async () => {
+    const returnsSuccess = {
+      send: vi.fn(async () => ({ success: true, messageId: 'abc123' })),
+      isEnabled: () => true,
+      getName: () => 'mock-channel',
+    };
+    service.registerChannel('email', returnsSuccess as any);
+
+    const response = await service.sendNotification({
+      email: 'recipient@example.com',
+      channels: ['email'],
+      template: 'test_template',
+      data: { name: 'Grace' },
+    });
+
+    expect(response.success).toBe(true);
+    expect(response.sentChannels).toEqual(['email']);
+    expect(response.failedChannels).toEqual([]);
+  });
 });

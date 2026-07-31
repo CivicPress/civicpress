@@ -87,6 +87,12 @@ export function createRealtimeServer(
     hookBus: {
       emit: (event, payload) => server.emitHook(event, payload),
     },
+    // W5 per-record authorization (onConnect → authenticateConnection):
+    // validate the session, confirm the record exists, check view/edit access.
+    authService,
+    recordManager,
+    databaseService,
+    logger,
   });
   server.registerRoomTypeHandler(recordHandler);
 
@@ -175,6 +181,12 @@ export function registerRealtimeServices(
       hookBus: {
         emit: (event, payload) => server.emitHook(event, payload),
       },
+      // W5 per-record authorization (onConnect → authenticateConnection):
+      // validate the session, confirm the record exists, check view/edit access.
+      authService,
+      recordManager,
+      databaseService,
+      logger,
     });
     server.registerRoomTypeHandler(recordHandler);
 

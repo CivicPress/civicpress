@@ -43,7 +43,6 @@ export interface CivicIndex {
 
 export interface IndexingOptions {
   dataDir?: string;
-  rebuild?: boolean;
   modules?: string[];
   types?: string[];
   statuses?: string[];
@@ -54,6 +53,11 @@ export interface IndexingOptions {
 export class IndexingService {
   private civicPress: CivicPress;
   private dataDir: string;
+  // Single-flight guard for generateIndexes (#8): prevents overlapping full
+  // re-scans (a privileged self-DoS lever) while guaranteeing a trailing run so
+  // a call arriving mid-scan is never lost.
+  private activeIndexRun: Promise<CivicIndex> | null = null;
+  private pendingIndexRerun = false;
 
   constructor(civicPress: CivicPress, dataDir?: string) {
     this.civicPress = civicPress;
@@ -61,9 +65,38 @@ export class IndexingService {
   }
 
   /**
-   * Generate or update civic record indexes
+   * Generate or update civic record indexes.
+   *
+   * Single-flight (#8): overlapping calls never launch concurrent full
+   * re-scans. A call arriving while a run is in progress coalesces onto the
+   * in-flight run and requests exactly one trailing re-run, so the latest
+   * on-disk state is always reflected without unbounded concurrent scans.
    */
   async generateIndexes(options: IndexingOptions = {}): Promise<CivicIndex> {
+    if (this.activeIndexRun) {
+      this.pendingIndexRerun = true;
+      return this.activeIndexRun;
+    }
+    const run = async (): Promise<CivicIndex> => {
+      let result = await this.doGenerateIndexes(options);
+      while (this.pendingIndexRerun) {
+        this.pendingIndexRerun = false;
+        result = await this.doGenerateIndexes(options);
+      }
+      return result;
+    };
+    this.activeIndexRun = run();
+    try {
+      return await this.activeIndexRun;
+    } finally {
+      this.activeIndexRun = null;
+      this.pendingIndexRerun = false;
+    }
+  }
+
+  private async doGenerateIndexes(
+    options: IndexingOptions = {}
+  ): Promise<CivicIndex> {
     const recordsDir = join(this.dataDir, 'records');
 
     if (!existsSync(recordsDir)) {

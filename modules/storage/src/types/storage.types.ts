@@ -2,7 +2,6 @@ export interface StorageConfig {
   backend: StorageBackend; // Legacy support
   providers?: Record<string, StorageProvider>;
   active_provider?: string;
-  failover_providers?: string[];
   global?: GlobalStorageSettings;
   folders: Record<string, StorageFolder>;
   metadata: StorageMetadata;
@@ -43,15 +42,6 @@ export interface StorageProvider {
 
 export interface GlobalStorageSettings {
   max_file_size: string;
-  health_checks: boolean;
-  health_check_interval: number;
-  retry_attempts: number;
-  // Optional retry-manager knobs. Read by `RetryManager` (defaults applied
-  // when omitted). Surfaced here so the config object is fully typed.
-  retry_initial_delay?: number; // ms
-  retry_max_delay?: number; // ms
-  retry_backoff_multiplier?: number;
-  retryable_errors?: string[];
   cross_provider_backup: boolean;
   backup_providers: string[];
   max_concurrent_uploads?: number;
@@ -60,7 +50,6 @@ export interface GlobalStorageSettings {
   circuit_breaker_enabled?: boolean;
   circuit_breaker_failure_threshold?: number;
   circuit_breaker_timeout?: number;
-  health_check_timeout?: number;
   upload_timeout?: number;
   download_timeout?: number;
   delete_timeout?: number;

@@ -7,8 +7,7 @@
  *   - internals.ts       — module-level pure helpers + host-coupled
  *                          `getLocalStoragePath` / `logOperation`
  *   - validation.ts      — StorageValidation (file + batch validation)
- *   - provider-init.ts   — ProviderInit (per-provider SDK client bootstrap
- *                          + performHealthCheck)
+ *   - provider-init.ts   — ProviderInit (per-provider SDK client bootstrap)
  *   - upload-ops.ts      — UploadOps (uploadFile + per-provider helpers)
  *   - download-ops.ts    — DownloadOps (getFileById / getFileContent /
  *                          listFiles + per-provider helpers)
@@ -20,7 +19,7 @@
  *
  * This file is the orchestrator: holds the configuration, the per-provider
  * SDK clients, and all of the optional manager handles that get set after
- * construction (databaseService, cacheAdapter, retryManager, etc.). It
+ * construction (databaseService, cacheAdapter, etc.). It
  * instantiates the collaborators in the constructor — they each hold a
  * back-reference to the orchestrator so mutable setter state stays visible.
  *
@@ -51,12 +50,8 @@ import {
   ConcurrencyLimiter,
   type ConcurrencyLimits,
 } from './limiter/concurrency-limiter.js';
-import { RetryManager } from './retry/retry-manager.js';
-import { StorageFailoverManager } from './failover/storage-failover-manager.js';
 import { CircuitBreakerManager } from './circuit-breaker/circuit-breaker.js';
-import { StorageHealthChecker } from './health/storage-health-checker.js';
 import { type TimeoutConfig } from './utils/timeout.js';
-import { StorageMetricsCollector } from './metrics/storage-metrics-collector.js';
 import { StorageUsageReporter } from './reporting/storage-usage-reporter.js';
 import { QuotaManager } from './quota/quota-manager.js';
 import { OrphanedFileCleaner } from './cleanup/orphaned-file-cleaner.js';
@@ -103,15 +98,8 @@ export class CloudUuidStorageService {
   gcsBucket: Bucket | null = null;
   cacheAdapter: StorageMetadataCacheAdapter | null = null;
   concurrencyLimiter: ConcurrencyLimiter | null = null;
-  retryManager: RetryManager | null = null;
-  failoverManager: StorageFailoverManager | null = null;
   circuitBreakerManager: CircuitBreakerManager | null = null;
-  healthChecker: StorageHealthChecker | null = null;
-  // Per-provider lightweight probes shared by the health checker AND the
-  // failover manager's recovery loop (storage-004 closure).
-  providerProbes: Map<string, (provider: string) => Promise<void>> = new Map();
   timeoutConfig: TimeoutConfig = {};
-  metricsCollector: StorageMetricsCollector | null = null;
   usageReporter: StorageUsageReporter | null = null;
   quotaManager: QuotaManager | null = null;
 
@@ -173,9 +161,7 @@ export class CloudUuidStorageService {
     }
 
     // Wire collaborators eagerly — they hold back-refs to `this` so any
-    // setter mutations made post-construction stay visible. Must happen
-    // before `providerProbes` is populated since the probes invoke
-    // providerInit.performHealthCheck.
+    // setter mutations made post-construction stay visible.
     this.validation = new StorageValidation({ getConfig: () => this.config });
     this.providerInit = new ProviderInit({ host: this });
     this.uploadOps = new UploadOps({ host: this });
@@ -183,34 +169,6 @@ export class CloudUuidStorageService {
     this.fileMgmtOps = new FileMgmtOps({ host: this });
     this.batchOps = new BatchOps({ host: this });
     this.streamingOps = new StreamingOps({ host: this });
-
-    // Build per-provider probe map. Used by the health checker (when
-    // enabled) and by the failover manager's recovery loop. Always
-    // populate it — the failover path needs it even when periodic health
-    // checks are disabled.
-    const allProviders = [
-      config.active_provider || 'local',
-      ...(config.failover_providers || []),
-    ];
-    allProviders.forEach((providerName) => {
-      const provider = config.providers?.[providerName];
-      if (provider) {
-        this.providerProbes.set(providerName, async (p: string) => {
-          // Simple health check: try to list files in a test folder
-          // This is a lightweight read operation
-          await this.providerInit.performHealthCheck(p);
-        });
-      }
-    });
-
-    // Initialize health checker if enabled
-    if (globalConfig?.health_checks) {
-      this.healthChecker = new StorageHealthChecker(
-        config,
-        this.providerProbes,
-        this.logger
-      );
-    }
 
     // Initialize timeout configuration
     this.timeoutConfig = {
@@ -255,10 +213,11 @@ export class CloudUuidStorageService {
 
     // Initialize usage reporter when database service is set
     if (this.cacheAdapter) {
-      const cacheManager =
-        (this.cacheAdapter as unknown as {
+      const cacheManager = (
+        this.cacheAdapter as unknown as {
           cache?: { manager?: UnifiedCacheManager };
-        }).cache?.manager;
+        }
+      ).cache?.manager;
       this.usageReporter = new StorageUsageReporter(
         databaseService,
         cacheManager,
@@ -276,7 +235,11 @@ export class CloudUuidStorageService {
     const globalConfig = this.config.global;
     if (globalConfig?.quota_enforcement !== false && this.usageReporter) {
       // Build quota config from storage config
-      const quotaConfig: { enabled: boolean; folders: Record<string, { limit: number; limitFormatted: string }>; global?: { limit: number; limitFormatted: string } } = {
+      const quotaConfig: {
+        enabled: boolean;
+        folders: Record<string, { limit: number; limitFormatted: string }>;
+        global?: { limit: number; limitFormatted: string };
+      } = {
         enabled: true,
         folders: {},
       };
@@ -331,65 +294,10 @@ export class CloudUuidStorageService {
   }
 
   /**
-   * Set retry manager
-   */
-  setRetryManager(retryManager: RetryManager): void {
-    this.retryManager = retryManager;
-
-    // Initialize failover manager if retry manager is set and failover is configured
-    if (
-      this.config.failover_providers &&
-      this.config.failover_providers.length > 0
-    ) {
-      this.failoverManager = new StorageFailoverManager(
-        retryManager,
-        this.config,
-        this.logger,
-        this.providerProbes
-      );
-    }
-  }
-
-  /**
-   * Set failover manager
-   */
-  setFailoverManager(failoverManager: StorageFailoverManager): void {
-    this.failoverManager = failoverManager;
-  }
-
-  /**
    * Set circuit breaker manager
    */
   setCircuitBreakerManager(circuitBreakerManager: CircuitBreakerManager): void {
     this.circuitBreakerManager = circuitBreakerManager;
-  }
-
-  /**
-   * Set health checker
-   */
-  setHealthChecker(healthChecker: StorageHealthChecker): void {
-    this.healthChecker = healthChecker;
-  }
-
-  /**
-   * Get health checker
-   */
-  getHealthChecker(): StorageHealthChecker | null {
-    return this.healthChecker;
-  }
-
-  /**
-   * Set metrics collector
-   */
-  setMetricsCollector(metricsCollector: StorageMetricsCollector): void {
-    this.metricsCollector = metricsCollector;
-  }
-
-  /**
-   * Get metrics collector
-   */
-  getMetricsCollector(): StorageMetricsCollector | null {
-    return this.metricsCollector;
   }
 
   /**
@@ -433,7 +341,9 @@ export class CloudUuidStorageService {
   /**
    * Get lifecycle manager
    */
-  getLifecycleManager(policies?: import('./lifecycle/lifecycle-manager.js').LifecyclePolicy[]): LifecycleManager | null {
+  getLifecycleManager(
+    policies?: import('./lifecycle/lifecycle-manager.js').LifecyclePolicy[]
+  ): LifecycleManager | null {
     if (!this.databaseService) {
       return null;
     }
@@ -457,16 +367,6 @@ export class CloudUuidStorageService {
    * Shutdown the storage service and clean up clients
    */
   async shutdown(): Promise<void> {
-    // Shutdown health checker if active
-    if (this.healthChecker) {
-      this.healthChecker.shutdown();
-    }
-
-    // Shutdown failover manager if active
-    if (this.failoverManager) {
-      this.failoverManager.shutdown();
-    }
-
     // Note: AWS S3 and Azure SDK clients don't require explicit cleanup
     // The SDKs handle connection pooling internally via HTTP agents
     // We just clear the references for garbage collection

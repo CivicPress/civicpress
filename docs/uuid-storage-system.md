@@ -199,18 +199,9 @@ providers:
       create_bucket: false  # Set to true to auto-create bucket if missing
 
 active_provider: local
-failover_providers:
-  - local
 
 global:
   max_file_size: 100MB
-  health_checks: true
-  health_check_interval: 60000  # 1 minute
-  health_check_timeout: 5000    # 5 seconds
-  retry_attempts: 3
-  retry_initial_delay: 1000     # 1 second
-  retry_max_delay: 30000        # 30 seconds
-  retry_backoff_multiplier: 2
   max_concurrent_uploads: 5
   max_concurrent_downloads: 10
   max_concurrent_deletes: 10
@@ -298,23 +289,17 @@ civic storage:migrate-to-uuid
 
 ### Reliability Features
 
-1. **Retry with Exponential Backoff** - Automatic retry for transient failures
-2. **Automatic Failover** - Seamless switching between storage providers on
-   failure
-3. **Circuit Breaker** - Prevents cascading failures by blocking requests to
-   failing providers
-4. **Health Checks** - Periodic monitoring of provider health status
-5. **Timeout Handling** - Configurable timeouts for all operations
+1. **Circuit Breaker** - Fails fast when a provider is repeatedly erroring
+   instead of hammering it with timeouts
+2. **Timeout Handling** - Configurable timeouts for all operations
 
 ### Observability & Management
 
-1. **Metrics Collection** - Comprehensive metrics for operations, latency, and
-   errors
-2. **Usage Reporting** - Storage usage by folder and provider with caching
-3. **Quota Enforcement** - Global and per-folder storage quotas
-4. **Orphaned File Cleanup** - Identify and clean up files without database
+1. **Usage Reporting** - Storage usage by folder and provider with caching
+2. **Quota Enforcement** - Global and per-folder storage quotas
+3. **Orphaned File Cleanup** - Identify and clean up files without database
    records
-5. **Lifecycle Management** - Automated retention, archival, and deletion
+4. **Lifecycle Management** - Automated retention, archival, and deletion
    policies
 
 ### Error Handling
@@ -366,62 +351,6 @@ Content-Type: application/json
 {
   "fileIds": ["uuid1", "uuid2", "uuid3"],
   "userId": "user-id"
-}
-```
-
-### Health & Metrics
-
-#### Health Check
-
-```http
-GET /api/v1/storage/health
-```
-
-**Response:**
-
-```json
-{
-  "providers": {
-    "local": { "healthy": true, "latency": 15 },
-    "s3": { "healthy": true, "latency": 120 }
-  }
-}
-```
-
-#### Metrics
-
-```http
-GET /api/v1/storage/metrics
-```
-
-**Response:**
-
-```json
-{
-  "uploads": { "total": 1000, "successful": 995, "failed": 5 },
-  "downloads": { "total": 5000, "successful": 4998, "failed": 2 },
-  "latency": { "upload": [100, 150, 200], "download": [50, 75, 100] },
-  "errors": { "byType": {...}, "byProvider": {...} }
-}
-```
-
-#### Usage Report
-
-```http
-GET /api/v1/storage/usage
-```
-
-**Response:**
-
-```json
-{
-  "total": { "files": 1000, "size": 1073741824, "sizeFormatted": "1 GB" },
-  "byFolder": {
-    "public": { "files": 500, "size": 536870912, "sizeFormatted": "512 MB" }
-  },
-  "byProvider": {
-    "local": { "files": 1000, "size": 1073741824, "sizeFormatted": "1 GB" }
-  }
 }
 ```
 

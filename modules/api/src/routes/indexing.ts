@@ -20,7 +20,6 @@ export function createIndexingRouter() {
   router.post(
     '/generate',
     requirePermission('records:import'),
-    body('rebuild').optional().isBoolean(),
     body('modules').optional().isArray(),
     body('types').optional().isArray(),
     body('statuses').optional().isArray(),
@@ -52,7 +51,6 @@ export function createIndexingRouter() {
 
       try {
         const {
-          rebuild = false,
           modules,
           types,
           statuses,
@@ -61,7 +59,6 @@ export function createIndexingRouter() {
         } = req.body;
 
         logger.info('Generating indexes', {
-          rebuild,
           modules,
           types,
           statuses,
@@ -97,7 +94,6 @@ export function createIndexingRouter() {
         }
 
         const options = {
-          rebuild,
           modules,
           types,
           statuses,

@@ -15,8 +15,6 @@ export {
   createRealtimeServer,
 } from './realtime-services.js';
 export type { RealtimeServerDeps } from './realtime-services.js';
-export { PresenceManager } from './presence/presence-manager.js';
-export { AwarenessManager } from './presence/awareness.js';
 export {
   SnapshotManager,
   SnapshotHookBus,

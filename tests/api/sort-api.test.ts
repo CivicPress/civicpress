@@ -1,74 +1,96 @@
 /**
- * Sort API Tests
+ * HTTP integration tests for the `?sort=` parameter on `GET /api/v1/records`.
  *
- * Integration tests for sort parameter functionality
+ * (Replaces an earlier placeholder that asserted inline logic — a locally
+ * defined `getKindPriority`, `typeof sort === 'string'` — and exercised no real
+ * code path.)
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import request from 'supertest';
+import {
+  createAPITestContext,
+  cleanupAPITestContext,
+  setupGlobalTestEnvironment,
+} from '../fixtures/test-setup';
 
-// Note: Full integration tests require API server setup
-// This is a placeholder structure - actual implementation would need:
-// 1. Test database setup
-// 2. API server initialization
-// 3. Test record creation
-// 4. HTTP request testing with supertest
+vi.setConfig({ testTimeout: 30000, hookTimeout: 30000 });
 
-describe('Sort API - Unit Tests', () => {
-  describe('Sort Parameter Validation', () => {
-    it('should validate sort parameter values', () => {
-      const validSorts = [
-        'created_desc',
-        'updated_desc',
-        'title_asc',
-        'title_desc',
-        'relevance', // Only for search
-      ];
+await setupGlobalTestEnvironment();
 
-      // This would test the validation middleware
-      validSorts.forEach((sort) => {
-        expect(typeof sort).toBe('string');
-        expect(sort.length).toBeGreaterThan(0);
-      });
-    });
+describe('API Records — sort parameter (HTTP)', () => {
+  let context: any;
+  let adminToken: string;
 
-    it('should reject invalid sort values', () => {
-      const invalidSorts = ['invalid', 'random', 'date', ''];
-
-      invalidSorts.forEach((sort) => {
-        // Would test validation rejects these
-        expect(sort).not.toMatch(
-          /^(created_desc|updated_desc|title_asc|title_desc|relevance)$/
-        );
-      });
-    });
+  beforeEach(async () => {
+    context = await createAPITestContext();
+    const admin = await request(context.api.getApp())
+      .post('/api/v1/auth/simulated')
+      .send({ username: 'admin', role: 'admin' });
+    adminToken = admin.body.data.session.token;
   });
 
-  describe('Kind Priority Logic', () => {
-    it('should calculate kind priority correctly', () => {
-      const getKindPriority = (kind: string | undefined) => {
-        if (kind === 'root') return 3;
-        if (kind === 'chapter') return 2;
-        return 1; // record or undefined
-      };
+  afterEach(async () => {
+    await cleanupAPITestContext(context);
+  });
 
-      expect(getKindPriority('record')).toBe(1);
-      expect(getKindPriority('chapter')).toBe(2);
-      expect(getKindPriority('root')).toBe(3);
-      expect(getKindPriority(undefined)).toBe(1);
-    });
+  const list = (sort?: string) => {
+    const q = sort ? `?sort=${encodeURIComponent(sort)}&limit=100` : '';
+    return request(context.api.getApp())
+      .get(`/api/v1/records${q}`)
+      .set('Authorization', `Bearer ${adminToken}`);
+  };
 
-    it('should maintain kind priority order', () => {
-      const priorities = [
-        { kind: 'record', priority: 1 },
-        { kind: 'chapter', priority: 2 },
-        { kind: 'root', priority: 3 },
-      ];
+  it('defaults to created_desc when no sort is supplied', async () => {
+    const res = await list();
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.sort).toBe('created_desc');
+  });
 
-      let lastPriority = 0;
-      priorities.forEach(({ priority }) => {
-        expect(priority).toBeGreaterThan(lastPriority);
-        lastPriority = priority;
-      });
-    });
+  it('echoes each accepted sort value back to the caller', async () => {
+    for (const sort of [
+      'created_desc',
+      'updated_desc',
+      'title_asc',
+      'title_desc',
+    ]) {
+      const res = await list(sort);
+      expect(res.status).toBe(200);
+      expect(res.body.data.sort).toBe(sort);
+    }
+  });
+
+  it('orders records ascending by title for title_asc', async () => {
+    const res = await list('title_asc');
+    expect(res.status).toBe(200);
+    const titles: string[] = res.body.data.records.map((r: any) => r.title);
+    expect(titles.length).toBeGreaterThanOrEqual(2); // fixture seeds ≥2 records
+    const ascending = [...titles].sort((a, b) => a.localeCompare(b));
+    expect(titles).toEqual(ascending);
+  });
+
+  it('orders records descending by title for title_desc', async () => {
+    const res = await list('title_desc');
+    expect(res.status).toBe(200);
+    const titles: string[] = res.body.data.records.map((r: any) => r.title);
+    expect(titles.length).toBeGreaterThanOrEqual(2);
+    const descending = [...titles].sort((a, b) => b.localeCompare(a));
+    expect(titles).toEqual(descending);
+  });
+
+  it('400s an invalid sort value', async () => {
+    const res = await list('not-a-sort');
+    expect(res.status).toBe(400);
+    expect(res.body.success).toBe(false);
+  });
+
+  it('rejects relevance sort on the records endpoint (search-only)', async () => {
+    // `relevance` is not in the records `sort` allowlist, so the validator
+    // rejects it with a generic 400 (the handler's INVALID_SORT_CONTEXT branch
+    // is unreachable for that reason — it never sees `relevance`).
+    const res = await list('relevance');
+    expect(res.status).toBe(400);
+    expect(res.body.success).toBe(false);
   });
 });

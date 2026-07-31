@@ -85,4 +85,48 @@ describe('API hardening (FA-API-006)', () => {
       expect(response.status).toBe(200);
     });
   });
+
+  // Carry-forward hardening (2026-07-02 audit, core/src/search follow-up):
+  // the two PUBLIC search endpoints validated `q` as non-empty but with no
+  // upper bound, so a long query built an oversized FTS5 expression on the
+  // event loop. A 512-char cap closes that lever.
+  describe('search query length cap', () => {
+    let context: APITestContext;
+
+    beforeAll(async () => {
+      context = await createAPITestContext();
+    });
+
+    afterAll(async () => {
+      await cleanupAPITestContext(context);
+    });
+
+    const overLong = 'a'.repeat(513);
+
+    it('rejects an over-long q on GET /api/v1/search with 400', async () => {
+      const response = await request(context.api.getApp()).get(
+        `/api/v1/search?q=${overLong}`
+      );
+      expect(response.status).toBe(400);
+      expect(response.body.error.code).toBe('VALIDATION_ERROR');
+      expect(JSON.stringify(response.body.error.details)).toContain(
+        'at most 512'
+      );
+    });
+
+    it('rejects an over-long q on GET /api/v1/search/suggestions with 400', async () => {
+      const response = await request(context.api.getApp()).get(
+        `/api/v1/search/suggestions?q=${overLong}`
+      );
+      expect(response.status).toBe(400);
+      expect(response.body.error.code).toBe('VALIDATION_ERROR');
+    });
+
+    it('accepts a q at the 512-char boundary (not rejected for length)', async () => {
+      const response = await request(context.api.getApp()).get(
+        `/api/v1/search?q=${'a'.repeat(512)}`
+      );
+      expect(response.status).not.toBe(400);
+    });
+  });
 });

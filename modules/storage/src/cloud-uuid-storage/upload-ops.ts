@@ -6,8 +6,8 @@
  * `uploadToLocal/S3/Azure/GCS` helpers.
  *
  * Uses the host-ref strategy: the orchestrator instance is passed in via the
- * deps bag, so mutable state (databaseService, retryManager, cacheAdapter,
- * etc.) that gets set AFTER construction stays visible without re-wiring.
+ * deps bag, so mutable state (databaseService, cacheAdapter, etc.) that gets set
+ * AFTER construction stays visible without re-wiring.
  */
 
 import fs from 'fs-extra';
@@ -22,13 +22,10 @@ import type {
   MulterFile,
   StorageProvider,
 } from '../types/storage.types.js';
-import {
-  withTimeout,
-  getTimeoutForOperation,
-} from '../utils/timeout.js';
+import { withTimeout, getTimeoutForOperation } from '../utils/timeout.js';
 import {
   generateStoredFilename,
-  getLocalStoragePath,
+  resolveLocalStoragePath,
   logOperation,
   writeSidecarManifest,
 } from './internals.js';
@@ -63,7 +60,6 @@ export class UploadOps {
     request: UploadFileRequest
   ): Promise<UploadFileResponse> {
     const host = this.deps.host;
-    const startTime = Date.now();
     let provider: string | undefined;
     let error: string | undefined;
     let fileData: MulterFile | undefined;
@@ -121,7 +117,7 @@ export class UploadOps {
       const storedFilename = generateStoredFilename(fileData, fileId);
       const relativePath = `${request.folder}/${storedFilename}`;
 
-      // Upload with failover support
+      // Per-provider upload, wrapped in the provider's circuit breaker.
       const uploadOperation = async (providerName: string): Promise<string> => {
         const provider = host.config.providers?.[providerName];
         if (!provider) {
@@ -161,17 +157,11 @@ export class UploadOps {
         return executeWithTimeout();
       };
 
-      let providerPath: string;
-      if (host.failoverManager) {
-        providerPath = await host.failoverManager.executeWithFailover(
-          uploadOperation,
-          'upload'
-        );
-      } else {
-        // No failover - use active provider
-        const activeProvider = host.config.active_provider || 'local';
-        providerPath = await uploadOperation(activeProvider);
-      }
+      // Upload via the configured active provider (each provider call is
+      // wrapped in its circuit breaker inside uploadOperation).
+      const providerPath = await uploadOperation(
+        host.config.active_provider || 'local'
+      );
 
       // Create storage file record
       const storageFile: StorageFile = {
@@ -214,7 +204,7 @@ export class UploadOps {
         await host.cacheAdapter.invalidateFolder(request.folder);
       }
 
-      // Extract provider name for metrics
+      // Provider name recorded in the audit-log entry below.
       const activeProvider = host.config.active_provider || 'local';
       provider = activeProvider;
 
@@ -233,30 +223,13 @@ export class UploadOps {
         },
       });
 
-      const result = {
+      return {
         success: true,
         file: storageFile,
       };
-
-      // Record metrics
-      if (host.metricsCollector) {
-        const latency = Date.now() - startTime;
-        host.metricsCollector.recordUpload(
-          true,
-          fileData.size,
-          latency,
-          provider
-        );
-      }
-
-      return result;
     } catch (err) {
       error = err instanceof Error ? err.message : 'Unknown error';
       host.logger.error('File upload failed:', err);
-
-      // Extract provider name for metrics
-      const activeProvider = host.config.active_provider || 'local';
-      provider = activeProvider;
 
       logOperation(host, {
         operation: 'upload',
@@ -267,29 +240,10 @@ export class UploadOps {
         error,
       });
 
-      const result = {
+      return {
         success: false,
         error,
       };
-
-      // Record metrics
-      if (host.metricsCollector) {
-        const latency = Date.now() - startTime;
-        const errorCode =
-          err instanceof Error && (err as Error & { code?: string }).code
-            ? (err as Error & { code?: string }).code
-            : 'UNKNOWN_ERROR';
-        const fileSize = (fileData as MulterFile | undefined)?.size || 0;
-        host.metricsCollector.recordUpload(
-          false,
-          fileSize,
-          latency,
-          provider || host.config.active_provider || 'local',
-          errorCode
-        );
-      }
-
-      return result;
     } finally {
       // Release the reserved headroom whether the upload landed or failed. On
       // the success path this runs after createStorageFile, so the bytes are
@@ -307,7 +261,7 @@ export class UploadOps {
     relativePath: string
   ): Promise<string> {
     const host = this.deps.host;
-    const fullPath = path.join(getLocalStoragePath(host), relativePath);
+    const fullPath = resolveLocalStoragePath(host, relativePath);
 
     // Ensure directory exists
     await fs.ensureDir(path.dirname(fullPath));
@@ -353,11 +307,6 @@ export class UploadOps {
       return `s3://${provider.bucket}/${key}`;
     };
 
-    // Apply retry logic if retry manager is configured
-    if (host.retryManager) {
-      return host.retryManager.withRetry(uploadOperation);
-    }
-
     return uploadOperation();
   }
 
@@ -398,11 +347,6 @@ export class UploadOps {
       return `azure://${provider.account_name}/${provider.container_name}/${blobName}`;
     };
 
-    // Apply retry logic if retry manager is configured
-    if (host.retryManager) {
-      return host.retryManager.withRetry(uploadOperation);
-    }
-
     return uploadOperation();
   }
 
@@ -439,11 +383,6 @@ export class UploadOps {
 
       return `gs://${provider.bucket}/${fileName}`;
     };
-
-    // Apply retry logic if retry manager is configured
-    if (host.retryManager) {
-      return host.retryManager.withRetry(uploadOperation);
-    }
 
     return uploadOperation();
   }

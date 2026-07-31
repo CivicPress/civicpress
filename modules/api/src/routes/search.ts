@@ -19,7 +19,9 @@ searchRouter.get(
     query('q')
       .isString()
       .notEmpty()
-      .withMessage('Query parameter "q" is required'),
+      .withMessage('Query parameter "q" is required')
+      .isLength({ max: 512 })
+      .withMessage('Query parameter "q" must be at most 512 characters'),
     query('type').optional().isString().withMessage('Type must be a string'),
     query('status')
       .optional()
@@ -151,7 +153,9 @@ searchRouter.get(
     query('q')
       .isString()
       .notEmpty()
-      .withMessage('Query parameter "q" is required'),
+      .withMessage('Query parameter "q" is required')
+      .isLength({ max: 512 })
+      .withMessage('Query parameter "q" must be at most 512 characters'),
     query('limit')
       .optional()
       .isInt({ min: 1, max: 20 })

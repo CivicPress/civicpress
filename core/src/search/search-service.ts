@@ -34,8 +34,6 @@ export interface SearchOptions {
   limit?: number;
   offset?: number;
   sort?: string;
-  enable_typo_tolerance?: boolean;
-  enable_accent_insensitive?: boolean;
 }
 
 export interface SearchSuggestions {

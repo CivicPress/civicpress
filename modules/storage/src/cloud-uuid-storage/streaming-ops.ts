@@ -25,7 +25,7 @@ import type {
 import { StorageFileNotFoundError } from '../errors/storage-errors.js';
 import {
   generateStoredFilenameFromName,
-  getLocalStoragePath,
+  resolveLocalStoragePath,
   logOperation,
   writeSidecarManifest,
 } from './internals.js';
@@ -140,7 +140,6 @@ export class StreamingOps {
 
       let providerPath: string;
       let actualSize = request.size || 0;
-      const startTime = Date.now();
 
       // Validation + quota have passed — now (and only now) open the source.
       if (!sourceStream) {
@@ -173,95 +172,63 @@ export class StreamingOps {
         return { stream: piped, getSize: () => byteCount };
       };
 
-      try {
-        // Upload to provider using stream
-        switch (provider.type) {
-          case 'local': {
-            providerPath = await this.uploadStreamToLocal(
-              sourceStream,
-              relativePath
-            );
-            // Authoritative on-disk size.
-            const fullPath = path.join(
-              getLocalStoragePath(host),
-              relativePath
-            );
-            const stats = await fs.stat(fullPath);
-            actualSize = stats.size;
-            break;
-          }
-          case 's3': {
-            const counted = makeCountedStream();
-            providerPath = await this.uploadStreamToS3(
-              counted.stream,
-              relativePath,
-              provider,
-              request.contentType ||
-                mime.lookup(request.filename) ||
-                'application/octet-stream',
-              request.options?.metadata
-            );
-            actualSize = counted.getSize();
-            break;
-          }
-          case 'azure': {
-            const counted = makeCountedStream();
-            providerPath = await this.uploadStreamToAzure(
-              counted.stream,
-              relativePath,
-              provider,
-              request.contentType ||
-                mime.lookup(request.filename) ||
-                'application/octet-stream',
-              request.options?.metadata
-            );
-            actualSize = counted.getSize();
-            break;
-          }
-          case 'gcs': {
-            const counted = makeCountedStream();
-            providerPath = await this.uploadStreamToGCS(
-              counted.stream,
-              relativePath,
-              provider,
-              request.contentType ||
-                mime.lookup(request.filename) ||
-                'application/octet-stream',
-              request.options?.metadata
-            );
-            actualSize = counted.getSize();
-            break;
-          }
-          default:
-            throw new Error(`Unsupported provider type: ${provider.type}`);
-        }
-      } catch (uploadErr) {
-        // Record the failure in the same metrics the buffer path uses — the
-        // streaming path previously reported nothing.
-        if (host.metricsCollector) {
-          const errorCode =
-            uploadErr instanceof Error &&
-            (uploadErr as Error & { code?: string }).code
-              ? (uploadErr as Error & { code?: string }).code
-              : 'UNKNOWN_ERROR';
-          host.metricsCollector.recordUpload(
-            false,
-            request.size || 0,
-            Date.now() - startTime,
-            activeProvider,
-            errorCode
+      // Upload to provider using stream
+      switch (provider.type) {
+        case 'local': {
+          providerPath = await this.uploadStreamToLocal(
+            sourceStream,
+            relativePath
           );
+          // Authoritative on-disk size.
+          const fullPath = resolveLocalStoragePath(host, relativePath);
+          const stats = await fs.stat(fullPath);
+          actualSize = stats.size;
+          break;
         }
-        throw uploadErr;
-      }
-
-      if (host.metricsCollector) {
-        host.metricsCollector.recordUpload(
-          true,
-          actualSize,
-          Date.now() - startTime,
-          activeProvider
-        );
+        case 's3': {
+          const counted = makeCountedStream();
+          providerPath = await this.uploadStreamToS3(
+            counted.stream,
+            relativePath,
+            provider,
+            request.contentType ||
+              mime.lookup(request.filename) ||
+              'application/octet-stream',
+            request.options?.metadata
+          );
+          actualSize = counted.getSize();
+          break;
+        }
+        case 'azure': {
+          const counted = makeCountedStream();
+          providerPath = await this.uploadStreamToAzure(
+            counted.stream,
+            relativePath,
+            provider,
+            request.contentType ||
+              mime.lookup(request.filename) ||
+              'application/octet-stream',
+            request.options?.metadata
+          );
+          actualSize = counted.getSize();
+          break;
+        }
+        case 'gcs': {
+          const counted = makeCountedStream();
+          providerPath = await this.uploadStreamToGCS(
+            counted.stream,
+            relativePath,
+            provider,
+            request.contentType ||
+              mime.lookup(request.filename) ||
+              'application/octet-stream',
+            request.options?.metadata
+          );
+          actualSize = counted.getSize();
+          break;
+        }
+        default:
+          throw new Error(`Unsupported provider type: ${provider.type}`);
       }
 
       // Create storage file record
@@ -427,7 +394,7 @@ export class StreamingOps {
     relativePath: string
   ): Promise<string> {
     const host = this.deps.host;
-    const fullPath = path.join(getLocalStoragePath(host), relativePath);
+    const fullPath = resolveLocalStoragePath(host, relativePath);
 
     // Ensure directory exists
     await fs.ensureDir(path.dirname(fullPath));

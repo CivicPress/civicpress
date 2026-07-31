@@ -8,11 +8,8 @@
 
 import fs from 'fs-extra';
 import { loadAwsS3Sdk } from './sdk-loader.js';
-import type { StorageFile , StorageProvider } from '../types/storage.types.js';
-import {
-  withTimeout,
-  getTimeoutForOperation,
-} from '../utils/timeout.js';
+import type { StorageFile, StorageProvider } from '../types/storage.types.js';
+import { withTimeout, getTimeoutForOperation } from '../utils/timeout.js';
 import { dbRecordToStorageFile } from './internals.js';
 import { StorageFileNotFoundError } from '../errors/storage-errors.js';
 import type { CloudUuidStorageService } from '../cloud-uuid-storage-service.js';
@@ -51,9 +48,6 @@ export class DownloadOps {
    */
   async getFileContent(id: string): Promise<Buffer | null> {
     const host = this.deps.host;
-    const startTime = Date.now();
-    let success = false;
-    let provider: string = host.config.active_provider || 'local';
 
     try {
       const file = await this.getFileById(id);
@@ -61,7 +55,7 @@ export class DownloadOps {
         return null;
       }
 
-      // Download with failover support
+      // Per-provider download, wrapped in the provider's circuit breaker.
       const downloadOperation = async (
         providerName: string
       ): Promise<Buffer | null> => {
@@ -93,7 +87,7 @@ export class DownloadOps {
         // Apply circuit breaker if configured. A 404 (object absent on this
         // provider) is NOT a provider fault — exempt it so repeated
         // missing-object reads don't trip the breaker OPEN against a healthy
-        // provider (the same reasoning the failover manager applies).
+        // provider.
         const isNotFound = (err: unknown) =>
           err instanceof StorageFileNotFoundError ||
           (err as { statusCode?: number })?.statusCode === 404;
@@ -105,52 +99,15 @@ export class DownloadOps {
         return executeWithTimeout();
       };
 
-      let result: Buffer | null;
-      if (host.failoverManager) {
-        result = await host.failoverManager.executeWithFailover(
-          downloadOperation,
-          'download'
-        );
-      } else {
-        // No failover - use active provider
-        const activeProvider = host.config.active_provider || 'local';
-        provider = activeProvider;
-        result = await downloadOperation(activeProvider);
-      }
-
-      success = result !== null;
-      const fileSize = result?.length || 0;
-
-      // Record metrics
-      if (host.metricsCollector) {
-        const latency = Date.now() - startTime;
-        host.metricsCollector.recordDownload(
-          success,
-          fileSize,
-          latency,
-          provider
-        );
-      }
+      // Download via the configured active provider (each provider call is
+      // wrapped in its circuit breaker inside downloadOperation).
+      const result = await downloadOperation(
+        host.config.active_provider || 'local'
+      );
 
       return result;
     } catch (err) {
       host.logger.error('Failed to get file content:', err);
-
-      // Record metrics
-      if (host.metricsCollector) {
-        const latency = Date.now() - startTime;
-        const errorCode =
-          err instanceof Error && (err as Error & { code?: string }).code
-            ? (err as Error & { code?: string }).code
-            : 'UNKNOWN_ERROR';
-        host.metricsCollector.recordDownload(
-          false,
-          0,
-          latency,
-          provider,
-          errorCode
-        );
-      }
 
       return null;
     }
@@ -163,9 +120,10 @@ export class DownloadOps {
     file: StorageFile
   ): Promise<Buffer | null> {
     if (!(await fs.pathExists(file.provider_path))) {
-      // Absent on THIS provider — throw (not return null) so failover tries
-      // the next provider. Returning null read as "success" to the failover
-      // manager, so it never failed over to a provider holding the object.
+      // Absent on this provider — throw (not return null) so a genuine
+      // not-found stays distinguishable from a real read fault. The circuit
+      // breaker exempts StorageFileNotFoundError (see isNotFound in
+      // getFileContent), so repeated missing-object reads don't trip it OPEN.
       throw new StorageFileNotFoundError(file.id, {
         folder: file.folder,
         provider: 'local',
@@ -201,7 +159,8 @@ export class DownloadOps {
       const response = await host.s3Client!.send(command);
 
       if (!response.Body) {
-        // Absent/empty on S3 — throw so failover proceeds (see local).
+        // Absent/empty on S3 — throw (not null) so a real not-found stays
+        // distinguishable from a read fault (see local).
         throw new StorageFileNotFoundError(file.id, {
           folder: file.folder,
           provider: 's3',
@@ -236,11 +195,6 @@ export class DownloadOps {
       return Buffer.alloc(0);
     };
 
-    // Apply retry logic if retry manager is configured
-    if (host.retryManager) {
-      return host.retryManager.withRetry(downloadOperation);
-    }
-
     return downloadOperation();
   }
 
@@ -269,8 +223,8 @@ export class DownloadOps {
       const downloadResponse = await blockBlobClient.download();
 
       if (!downloadResponse.readableStreamBody) {
-        // Empty body ~ absent on Azure — throw (not null) so failover
-        // proceeds, consistent with local/S3/GCS.
+        // Empty body ~ absent on Azure — throw (not null) so a real not-found
+        // stays distinguishable, consistent with local/S3/GCS.
         throw new StorageFileNotFoundError(file.id, {
           folder: file.folder,
           provider: 'azure',
@@ -294,14 +248,8 @@ export class DownloadOps {
       return Buffer.concat(chunks);
     };
 
-    // Apply retry logic if retry manager is configured
-    if (host.retryManager) {
-      return host.retryManager.withRetry(downloadOperation);
-    }
-
-    // Let errors propagate — the failover manager (and getFileContent's
-    // top-level catch) decide the outcome. Swallowing to null here defeated
-    // failover, the same bug as the provider absence-returns.
+    // Let errors propagate to getFileContent's top-level catch — swallowing to
+    // null here would hide a real read fault (the provider-absence bug).
     return await downloadOperation();
   }
 
@@ -326,7 +274,8 @@ export class DownloadOps {
       // Check if file exists
       const [exists] = await gcsFile.exists();
       if (!exists) {
-        // Absent on GCS — throw so failover proceeds (see local).
+        // Absent on GCS — throw (not null) so a real not-found stays
+        // distinguishable from a read fault (see local).
         throw new StorageFileNotFoundError(file.id, {
           folder: file.folder,
           provider: 'gcs',
@@ -339,12 +288,8 @@ export class DownloadOps {
       return Buffer.from(buffer);
     };
 
-    // Apply retry logic if retry manager is configured
-    if (host.retryManager) {
-      return host.retryManager.withRetry(downloadOperation);
-    }
-
-    // Let errors propagate (see Azure) — swallowing to null defeated failover.
+    // Let errors propagate (see Azure) — swallowing to null would hide a real
+    // read fault.
     return await downloadOperation();
   }
 
@@ -353,9 +298,6 @@ export class DownloadOps {
    */
   async listFiles(folderName: string): Promise<StorageFile[]> {
     const host = this.deps.host;
-    const startTime = Date.now();
-    let provider: string | undefined;
-    let success = false;
 
     try {
       const listOperation = async () => {
@@ -390,31 +332,9 @@ export class DownloadOps {
       const timeout = getTimeoutForOperation('list', host.timeoutConfig);
       const result = await withTimeout(listOperation, timeout, 'list');
 
-      success = true;
-      const activeProvider = host.config.active_provider || 'local';
-      provider = activeProvider;
-
-      // Record metrics
-      if (host.metricsCollector) {
-        const latency = Date.now() - startTime;
-        host.metricsCollector.recordList(success, latency, provider);
-      }
-
       return result;
     } catch (err) {
       host.logger.error('Failed to list files:', err);
-
-      // Record metrics
-      if (host.metricsCollector) {
-        const latency = Date.now() - startTime;
-        const activeProvider = host.config.active_provider || 'local';
-        provider = activeProvider;
-        const errorCode =
-          err instanceof Error && (err as Error & { code?: string }).code
-            ? (err as Error & { code?: string }).code
-            : 'UNKNOWN_ERROR';
-        host.metricsCollector.recordList(false, latency, provider, errorCode);
-      }
 
       return [];
     }

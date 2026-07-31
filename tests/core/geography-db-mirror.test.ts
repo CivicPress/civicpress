@@ -87,4 +87,36 @@ describe('GeographyManager DB mirror (FA-CORE-011)', () => {
     await manager.deleteGeographyFile(file.id);
     expect(await db.getGeographyFileRow(file.id)).toBeNull();
   });
+
+  // #7 (FA-API-003 follow-up): the core must self-defend against a path-traversal
+  // type/category (which become filesystem path segments) independently of the
+  // API-layer allowlist. Legitimate values are bare names; anything else throws
+  // before any file is written.
+  it('rejects a path-traversal type before touching the filesystem', async () => {
+    await expect(
+      manager.createGeographyFile(
+        {
+          name: 'Evil',
+          type: '../../../../etc' as unknown as 'geojson',
+          category: 'boundary',
+          content: geoJson,
+        },
+        user
+      )
+    ).rejects.toThrow(/type or category/i);
+  });
+
+  it('rejects a path-traversal category before touching the filesystem', async () => {
+    await expect(
+      manager.createGeographyFile(
+        {
+          name: 'Evil',
+          type: 'geojson',
+          category: '..' as unknown as 'boundary',
+          content: geoJson,
+        },
+        user
+      )
+    ).rejects.toThrow(/type or category/i);
+  });
 });

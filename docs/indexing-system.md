@@ -442,7 +442,7 @@ jobs:
           node-version: '18'
       - run: npm install
       - run: civic index --validate
-      - run: civic index --rebuild
+      - run: civic index
 ```
 
 ## Security Considerations
@@ -499,7 +499,7 @@ civic index --validate
 
 # Rebuild all indexes
 
-civic index --rebuild
+civic index
 
 # Validate after rebuild
 
@@ -514,7 +514,7 @@ civic index --validate
 export CIVIC_DEBUG=indexing
 
 # Run with verbose output
-civic index --rebuild --verbose
+civic index --verbose
 ````
 
 ## Related Documentation
