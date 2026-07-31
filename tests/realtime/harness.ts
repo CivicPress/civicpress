@@ -364,6 +364,15 @@ export async function createTestRealtimeServer(
       draftPersistence: draftStore,
       recordSource: recordManager,
       getSnapshotManager: () => server.getSnapshotManager(),
+      // W5 per-record authorization (9e81c9a): onConnect FAILS CLOSED without
+      // these, so the simulated clients could never connect and every
+      // exit-criterion test timed out. The mocks above satisfy
+      // authenticateConnection: validateSession decodes the bearer token,
+      // getRecord makes the record "exist", and userCan grants view/edit.
+      authService,
+      recordManager,
+      logger,
+      databaseService,
     })
   );
 
