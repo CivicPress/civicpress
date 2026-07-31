@@ -210,6 +210,33 @@ export function getLocalStoragePath(host: StorageHostLike): string {
 }
 
 /**
+ * Resolve a storage-relative path (`<folder>/<storedFilename>`) to an absolute
+ * path UNDER the local storage root, rejecting any result that escapes it.
+ *
+ * Callers already build safe inputs — the folder is validated against the
+ * configured `folders` and the stored filename is sanitized by
+ * `generateStoredFilenameFromName` (path separators stripped, FA-CORE-017) — so
+ * a traversal cannot reach here in practice. This makes that guarantee explicit
+ * and local to every filesystem access (defense-in-depth) and gives the taint
+ * tracker an unmistakable containment barrier on the `getLocalStoragePath`
+ * joins (CodeQL `js/path-injection`).
+ */
+export function resolveLocalStoragePath(
+  host: StorageHostLike,
+  relativePath: string
+): string {
+  const root = getLocalStoragePath(host);
+  const resolved = path.resolve(root, relativePath);
+  const rel = path.relative(root, resolved);
+  if (rel === '..' || rel.startsWith('..' + path.sep) || path.isAbsolute(rel)) {
+    throw new Error(
+      `Resolved storage path escapes the storage root: ${relativePath}`
+    );
+  }
+  return resolved;
+}
+
+/**
  * FA-STOR-004: write a `<file>.meta.json` sidecar next to a locally-stored file.
  * Best-effort — a sidecar failure must never fail the upload (the DB row is
  * still authoritative), so callers log and continue. No-op for non-local
@@ -221,10 +248,7 @@ export async function writeSidecarManifest(
 ): Promise<void> {
   const activeProvider = host.config.active_provider || 'local';
   if (activeProvider !== 'local') return;
-  const fullPath = path.join(
-    getLocalStoragePath(host),
-    storageFile.relative_path
-  );
+  const fullPath = resolveLocalStoragePath(host, storageFile.relative_path);
   const manifest = {
     id: storageFile.id,
     original_name: storageFile.original_name,
@@ -261,8 +285,7 @@ export async function deleteSidecarManifest(
 ): Promise<void> {
   const activeProvider = host.config.active_provider || 'local';
   if (activeProvider !== 'local') return;
-  const fullPath =
-    path.join(getLocalStoragePath(host), relativePath) + SIDECAR_SUFFIX;
+  const fullPath = resolveLocalStoragePath(host, relativePath) + SIDECAR_SUFFIX;
   await fs.rm(fullPath, { force: true });
 }
 

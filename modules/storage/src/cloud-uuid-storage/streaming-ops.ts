@@ -25,7 +25,7 @@ import type {
 import { StorageFileNotFoundError } from '../errors/storage-errors.js';
 import {
   generateStoredFilenameFromName,
-  getLocalStoragePath,
+  resolveLocalStoragePath,
   logOperation,
   writeSidecarManifest,
 } from './internals.js';
@@ -180,7 +180,7 @@ export class StreamingOps {
             relativePath
           );
           // Authoritative on-disk size.
-          const fullPath = path.join(getLocalStoragePath(host), relativePath);
+          const fullPath = resolveLocalStoragePath(host, relativePath);
           const stats = await fs.stat(fullPath);
           actualSize = stats.size;
           break;
@@ -394,7 +394,7 @@ export class StreamingOps {
     relativePath: string
   ): Promise<string> {
     const host = this.deps.host;
-    const fullPath = path.join(getLocalStoragePath(host), relativePath);
+    const fullPath = resolveLocalStoragePath(host, relativePath);
 
     // Ensure directory exists
     await fs.ensureDir(path.dirname(fullPath));

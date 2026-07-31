@@ -25,7 +25,7 @@ import type {
 import { withTimeout, getTimeoutForOperation } from '../utils/timeout.js';
 import {
   generateStoredFilename,
-  getLocalStoragePath,
+  resolveLocalStoragePath,
   logOperation,
   writeSidecarManifest,
 } from './internals.js';
@@ -261,7 +261,7 @@ export class UploadOps {
     relativePath: string
   ): Promise<string> {
     const host = this.deps.host;
-    const fullPath = path.join(getLocalStoragePath(host), relativePath);
+    const fullPath = resolveLocalStoragePath(host, relativePath);
 
     // Ensure directory exists
     await fs.ensureDir(path.dirname(fullPath));
