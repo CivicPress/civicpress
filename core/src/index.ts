@@ -391,6 +391,17 @@ export type {
   PasswordRecoveryDeps,
 } from './notifications/index.js';
 
+// System / update checking
+export {
+  UpdateChecker,
+  isNewerVersion,
+  fetchLatestReleaseTag,
+} from './system/update-checker.js';
+export type {
+  UpdateCheckResult,
+  UpdateNotifierSink,
+} from './system/update-checker.js';
+
 // Configuration Management
 export {
   configurationService,
