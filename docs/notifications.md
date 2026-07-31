@@ -308,15 +308,22 @@ writes a file outbox under `.system-data/outbox/`.
 ## Operator notification center
 
 A durable, admin-only, channel-free feed for signal that needs an operator's
-attention — undeliverable password-reset requests, backup failures, and
-account-lockout security alerts. It is stored in the database (not Git) and is
-the zero-config fallback sink.
+attention — undeliverable password-reset requests, backup failures,
+account-lockout security alerts, and available updates. It is stored in the
+database (not Git) and is the zero-config fallback sink.
 
 - **API:** `GET /api/v1/admin/notifications` (+ `/unread-count`, `/:id/read`,
   `/:id/dismiss`, `/read-all`), gated by `system:admin`.
 - **CLI:** `civic notifications:list|read|dismiss|read-all`,
   `civic users:reset-requests`.
 - **UI:** `/settings/alerts`, with a live unread badge in the sidebar.
+
+**Producers** (what writes to it): undeliverable password resets; a failed
+`civic backup`; a fresh account lockout; and `civic system:check-updates`
+(compares the running version to the newest GitHub release and files a deduped
+`update_available` entry — local/cron-friendly, `--latest` for offline). To emit
+your own, call
+`civicPress.getOperatorNotifier().notify|systemError|securityAlert|updateAvailable(...)`.
 
 ### Hook System
 

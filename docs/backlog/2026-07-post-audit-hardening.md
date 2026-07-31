@@ -1074,17 +1074,18 @@ they are pre-existing gaps the audit made visible.
       S3/Azure/GCS SDK code (reachable via the API since `42ab1f0` applied
       `storage.yml`) had zero coverage — every prior suite drove
       `active_provider:'local'`. Added two hermetic suites (38 tests) that mock
-      the `sdk-loader` seam so they never import the real, often-absent cloud SDKs
-      (Azure/GCS are `optionalDependencies` and were not installed on the VM):
+      the `sdk-loader` seam so they never import the real, often-absent cloud
+      SDKs (Azure/GCS are `optionalDependencies` and were not installed on the
+      VM):
   - `cloud-provider-ops.test.ts` (21) — upload/download/delete/stream across all
-    three providers: provider_path formatting, prefix handling, not-found → null,
-    S3 `transformToByteArray` vs async-iterable Body, Range headers, streamed
-    byte-count sizing, and the GCS-stream-download-unsupported → null limitation
-    (pinned explicitly rather than left silent).
+    three providers: provider_path formatting, prefix handling, not-found →
+    null, S3 `transformToByteArray` vs async-iterable Body, Range headers,
+    streamed byte-count sizing, and the GCS-stream-download-unsupported → null
+    limitation (pinned explicitly rather than left silent).
   - `provider-init.test.ts` (17) — client bootstrap: S3
     creds/endpoint/sessionToken/forcePathStyle, Azure connection-string vs
-    shared-key, GCS bucket exists/create/keyFilename, and every missing-credential
-    error path.
+    shared-key, GCS bucket exists/create/keyFilename, and every
+    missing-credential error path.
   - Storage suite now 204 green (was 166); `tsc --noEmit` + eslint clean. The UI
     page-component/composable gap above remains open.
 
@@ -1116,8 +1117,12 @@ they are pre-existing gaps the audit made visible.
       `GeographySelector` v-model type (added `value-key="value"` + typed the
       ref `GeographyCategory | null`), and the API dev-default CORS origin now
       includes the UI dev port `:3030` (was `:3000`-only, blocking `pnpm dev`).
-- [ ] `forgot-password.vue` is a `mailto:` stub and **has no backend route** at
-      all (confirmed absent).
+- [x] **DONE 2026-07-31.** `forgot-password.vue` was a `mailto:` stub with no
+      backend route. Now a real self-service reset flow (channel-by-audience:
+      email/console deliver a token link, else an operator task) + a reset page,
+      backing API (`/auth/forgot-password`, `/auth/reset-password`), the
+      operator notification center, and CLI. On `origin/develop`
+      (`7f7ef4d`→`8795802`).
 
 **Advertised-but-stub (honesty — either implement or stop advertising)**
 

@@ -34,6 +34,10 @@ and this project adheres to
     `civic users:reset-requests`.
   - UI: an admin notifications page (`/settings/alerts`) with a live unread
     badge in the sidebar.
+- **Update check.** `civic system:check-updates` compares the running version
+  against the newest GitHub release and records a deduped `update_available`
+  entry in the operator notification center when a newer version exists. Local
+  and cron-friendly (no auth); `--latest` skips the network for offline use.
 - **Console notification channel.** A user-facing dev sink (default-on in
   development/test, off in production unless `CIVIC_CONSOLE_NOTIFICATIONS=true`)
   that prints rendered messages and writes a file outbox under the system-data

@@ -309,23 +309,22 @@ V2)
 #### Notifications & Password Recovery Follow-ups
 
 Deliberate deferrals from the forgot-password / operator notification center
-work (the core feature shipped; these are the acknowledged gaps).
+work — both now closed.
 
-- [ ] **Wire an "update available" producer**
-  - **Current Status**: The operator notification center supports
-    `update_available` (`OperatorNotifier.updateAvailable`, deduped), but no
-    producer calls it — it needs an external version source.
-  - **Priority**: Low - nice to have
-  - **Action**: Add a version check (npm/GitHub releases, on-startup or
-    scheduled, opt-in) that emits `updateAvailable` when a newer release exists.
+- [x] **Wire an "update available" producer — DONE.** Added
+      `core/src/system/update-checker.ts` (`UpdateChecker` + minimal semver
+      `isNewerVersion` + `fetchLatestReleaseTag`) and the
+      `civic system:check-updates` CLI command (local/cron-friendly, no auth;
+      `--latest` for offline). It emits the deduped `updateAvailable` operator
+      notification when a newer GitHub release exists. 9 core tests + 2 CLI
+      tests.
 
-- [ ] **Cover the email password-reset delivery path with an SMTP mock**
-  - **Current Status**: The console + operator-task paths are unit-tested; the
-    email delivery branch reuses the same `NotificationService` path as
-    email-verification but has no dedicated SMTP-mock test.
-  - **Priority**: Low - the shared path is exercised elsewhere
-  - **Action**: Add a `PasswordRecoveryService` test with an injected fake
-    transport asserting the reset link is delivered via email when configured.
+- [x] **Cover the email password-reset delivery path with an SMTP mock — DONE.**
+      `PasswordRecoveryService` gained an injectable `notificationService` /
+      `notificationConfig` seam; two `PasswordRecoveryService` tests now assert
+      the reset link is delivered via email (fake transport) when the email
+      channel is configured, and that a channel-configured-but-no-address user
+      falls through to the operator task.
 
 ### Short Term Tasks (v1.4.0 - Next 1-2 months)
 
