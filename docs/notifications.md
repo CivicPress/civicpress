@@ -24,7 +24,9 @@ Notification configuration is stored in `.system-data/notifications.yml`
 
 ### Environment Variables (Preferred)
 
-For a complete example of all available environment variables, see [`notifications-credentials.example`](./notifications-credentials.example). Copy the relevant variables to your `.env.local` file.
+For a complete example of all available environment variables, see
+[`notifications-credentials.example`](./notifications-credentials.example). Copy
+the relevant variables to your `.env.local` file.
 
 ### Configuration Structure
 
@@ -265,9 +267,56 @@ civic notify:queue --json
 The notification system integrates with authentication workflows:
 
 - Email verification for new accounts
-- Password reset functionality
+- Password reset functionality (see below)
 - Two-factor authentication
 - Security alerts
+
+## Password recovery (forgot-password)
+
+CivicPress ships with **no** communication channel enabled by default, so
+password recovery is designed to work out of the box regardless of what is
+configured. A reset is delivered by **audience**:
+
+1. **A user-facing channel can reach the account owner** → a single-use, hashed,
+   1-hour reset token is minted and a self-service link is delivered:
+   - `email`, when the email channel is configured, **or**
+   - `console` (below), the development sink.
+2. **No user-facing channel** (the default production posture) → **no token is
+   minted**. Instead an actionable task is filed in the operator notification
+   center, and an administrator fulfills it with
+   `civic users:set-password <username>` (relaying the new credential
+   out-of-band). OAuth-only accounts are ineligible (no local password).
+
+The request endpoint (`POST /api/v1/auth/forgot-password`) is anti-enumeration —
+it responds identically whether or not an account matched — and is rate-limited
+by the `/auth` window. Setting a new password revokes every existing session.
+
+The reset link points at the UI's `/auth/reset-password` page. Its base comes
+from `BASE_URL` (default `http://localhost:3030`).
+
+### Console channel (development sink)
+
+The `console` channel makes the email-shaped flows runnable without SMTP: it
+prints the rendered message (including any reset link) to the server console and
+writes a file outbox under `.system-data/outbox/`.
+
+- **On by default** in `development` and `test`.
+- **Off in production** unless `CIVIC_CONSOLE_NOTIFICATIONS=true` — printing a
+  reset link to server stdout is a credential-in-logs hazard, so production
+  falls through to the operator notification center instead.
+
+## Operator notification center
+
+A durable, admin-only, channel-free feed for signal that needs an operator's
+attention — undeliverable password-reset requests, backup failures, and
+account-lockout security alerts. It is stored in the database (not Git) and is
+the zero-config fallback sink.
+
+- **API:** `GET /api/v1/admin/notifications` (+ `/unread-count`, `/:id/read`,
+  `/:id/dismiss`, `/read-all`), gated by `system:admin`.
+- **CLI:** `civic notifications:list|read|dismiss|read-all`,
+  `civic users:reset-requests`.
+- **UI:** `/settings/alerts`, with a live unread badge in the sidebar.
 
 ### Hook System
 

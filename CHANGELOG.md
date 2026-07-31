@@ -12,6 +12,32 @@ and this project adheres to
 
 ### Added
 
+- **Self-service password reset that works with zero comms configuration.**
+  `POST /api/v1/auth/forgot-password` + `/auth/reset-password` back a real UI
+  (`/auth/forgot-password`, `/auth/reset-password`) in place of the previous
+  "coming soon" stub. Reset tokens are single-use, hashed at rest, 1-hour TTL,
+  and revoke every session on use. The request endpoint is anti-enumeration
+  (identical response for any input) and rate-limited by the existing `/auth`
+  window.
+  - **Channel-by-audience delivery:** a token is minted and a self-service link
+    delivered only when a user-facing channel can reach the account — email (if
+    configured), else the new **console** dev sink. With no channel (the default
+    production posture), no token is minted; instead an actionable task is filed
+    in the operator notification center for an admin to fulfill via
+    `civic users:set-password`. OAuth-only accounts are ineligible.
+- **Operator notification center (the "inbox").** A durable, admin-only,
+  channel-free feed for signal that needs an operator's attention: undeliverable
+  password-reset requests, backup failures, and account-lockout security alerts.
+  - API: `GET /api/v1/admin/notifications` (+ `/unread-count`, `/:id/read`,
+    `/:id/dismiss`, `/read-all`), gated by `system:admin`.
+  - CLI: `civic notifications:list|read|dismiss|read-all` and
+    `civic users:reset-requests`.
+  - UI: an admin notifications page (`/settings/alerts`) with a live unread
+    badge in the sidebar.
+- **Console notification channel.** A user-facing dev sink (default-on in
+  development/test, off in production unless `CIVIC_CONSOLE_NOTIFICATIONS=true`)
+  that prints rendered messages and writes a file outbox under the system-data
+  dir — so the email-shaped flows are exercisable out of the box without SMTP.
 - **Unpublished Changes Badge**: Added visual indicator for records with
   unpublished draft changes
   - Badge displays on record list page and single record view page
