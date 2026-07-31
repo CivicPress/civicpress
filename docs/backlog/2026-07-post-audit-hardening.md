@@ -1091,10 +1091,16 @@ they are pre-existing gaps the audit made visible.
       `ConfigurationField.vue` rendered array/select fields with
       `USelect :options`, but `@nuxt/ui` v4 wants `:items` — so those dropdowns
       (e.g. org-config `timezone`) were dead (same v4 bug as the fixed
-      `GeographySelector`). Verified: `nuxt typecheck` clean, eslint + prettier
-      clean, endpoints tested by the config API suite. ⚠️ Same
-      `:options`→`:items` v4 bug still lurks in `RecordList.vue:339` (pagination
-      page-size select) — separate component, noted for a follow-up.
+      `GeographySelector`). Verified end-to-end with a live browser smoke test
+      (Nuxt UI + API): the structured form renders and the `default_role`
+      dropdown populates (Administrator / Clerk / Public). `nuxt typecheck` +
+      eslint + prettier clean; endpoints covered by the config API suite. The
+      smoke test also surfaced two more `@nuxt/ui` v4 `:options` selects + a
+      dev-CORS papercut — **all fixed 2026-07-31 (`bcd24ee`)**:
+      `RecordList.vue:339` pagination select (`:options`→`:items`),
+      `GeographySelector` v-model type (added `value-key="value"` + typed the
+      ref `GeographyCategory | null`), and the API dev-default CORS origin now
+      includes the UI dev port `:3030` (was `:3000`-only, blocking `pnpm dev`).
 - [ ] `forgot-password.vue` is a `mailto:` stub and **has no backend route** at
       all (confirmed absent).
 
