@@ -1070,8 +1070,23 @@ they are pre-existing gaps the audit made visible.
 - [ ] **No UI page-component or browser-e2e tests** (no Playwright/Cypress); the
       API-critical composables (`useRecordEditorActions`, `useRecordLock`,
       `useRecordDetail`, `useCsrf`, `useAuth`) are untested.
-- [ ] Cloud storage providers (S3/GCS/Azure) are real SDK code with **zero test
-      coverage** (every test uses `active_provider:'local'`).
+- [x] **Cloud storage providers now covered — DONE 2026-07-31 (PR #23).** The
+      S3/Azure/GCS SDK code (reachable via the API since `42ab1f0` applied
+      `storage.yml`) had zero coverage — every prior suite drove
+      `active_provider:'local'`. Added two hermetic suites (38 tests) that mock
+      the `sdk-loader` seam so they never import the real, often-absent cloud SDKs
+      (Azure/GCS are `optionalDependencies` and were not installed on the VM):
+  - `cloud-provider-ops.test.ts` (21) — upload/download/delete/stream across all
+    three providers: provider_path formatting, prefix handling, not-found → null,
+    S3 `transformToByteArray` vs async-iterable Body, Range headers, streamed
+    byte-count sizing, and the GCS-stream-download-unsupported → null limitation
+    (pinned explicitly rather than left silent).
+  - `provider-init.test.ts` (17) — client bootstrap: S3
+    creds/endpoint/sessionToken/forcePathStyle, Azure connection-string vs
+    shared-key, GCS bucket exists/create/keyFilename, and every missing-credential
+    error path.
+  - Storage suite now 204 green (was 166); `tsc --noEmit` + eslint clean. The UI
+    page-component/composable gap above remains open.
 
 **UI rough edges (quick)**
 
