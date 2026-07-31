@@ -23,6 +23,7 @@
           <USelectMenu
             v-model="selectedCategory"
             :items="categoryOptions"
+            value-key="value"
             :placeholder="t('records.geography.allCategories')"
             class="w-full"
           />
@@ -193,7 +194,7 @@ const loading = ref(false);
 const error = ref<string | null>(null);
 const geographyFiles = ref<GeographyFile[]>([]);
 const searchQuery = ref('');
-const selectedCategory = ref<string | null>(null);
+const selectedCategory = ref<GeographyCategory | null>(null);
 
 // Composables
 const { t, tPlural } = useTypedI18n();

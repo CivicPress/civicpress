@@ -226,7 +226,9 @@ export class CivicPressAPI {
     if (corsOriginEnv) {
       corsOrigin = corsOriginEnv.split(',').map((s) => s.trim());
     } else if (isDevOrTest) {
-      corsOrigin = ['http://localhost:3000'];
+      // The Nuxt UI dev server runs on :3030 (modules/ui nuxt.config
+      // devServer.port); :3000 covers same-origin / proxied setups.
+      corsOrigin = ['http://localhost:3030', 'http://localhost:3000'];
     } else {
       corsOrigin = false; // production / unset NODE_ENV: no cross-origin allowlist
       logger.warn(

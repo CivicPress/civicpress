@@ -336,7 +336,7 @@ const handlePageSizeChange = (value: any) => {
             </span>
             <USelectMenu
               :model-value="props.pageSize"
-              :options="[10, 25, 50, 100]"
+              :items="[10, 25, 50, 100]"
               @update:model-value="handlePageSizeChange"
               class="w-20"
             />

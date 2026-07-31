@@ -105,6 +105,12 @@ and this project adheres to
   editor, orphaning the structured one. Its array/select fields also render
   their options again (they used `USelect :options`, but `@nuxt/ui` v4 expects
   `:items`, so those dropdowns were empty).
+- **The record-list page-size selector shows its options again** (10 / 25 / 50
+  / 100) — same `@nuxt/ui` v4 `:options`→`:items` fix.
+- **Dev CORS now allows the Nuxt UI dev origin.** The API's development default
+  CORS allowlist was `http://localhost:3000`, but the Nuxt UI dev server runs on
+  `:3030`, so direct browser calls were blocked out of the box; `:3030` is now
+  included (alongside `:3000`).
 
 ### Security
 
