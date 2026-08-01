@@ -32,6 +32,11 @@ export default defineConfig({
     setupFiles: ['./tests/ui/setup.ts'],
     alias: {
       '@civicpress/core': join(__dirname, 'core', 'dist/'),
+      // Composables that import Nuxt helpers directly from '#app' (e.g.
+      // useRecordLock's `import { useNuxtApp } from '#app'`) resolve to the same
+      // auto-import shim as '#imports' — the previous mapping to modules/ui/app
+      // (a dir with no index) failed to resolve any bare `from '#app'` import.
+      '#app': join(__dirname, 'tests', 'ui', 'nuxt-imports-shim.ts'),
       // editor-schema is a dependency of modules/ui only (consumed by the
       // collaborative editor path) and is not hoisted to the root
       // node_modules, so the bare specifier is unresolvable from the root test
@@ -149,7 +154,7 @@ export default defineConfig({
     alias: {
       '~': resolve(__dirname, 'modules/ui/app'),
       '@': resolve(__dirname, 'modules/ui/app'),
-      '#app': resolve(__dirname, 'modules/ui/app'),
+      '#app': resolve(__dirname, 'tests/ui/nuxt-imports-shim.ts'),
       '#imports': resolve(__dirname, 'tests/ui/nuxt-imports-shim.ts'),
     },
   },
