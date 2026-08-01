@@ -46,7 +46,7 @@
     "pinia-plugin-persistedstate": "^4.7.1",
     "typescript": "^5.9.3",
     "vue": "^3.5.34",
-    "vue-router": "^4.6.4",
+    "vue-router": "^5.1.0",
     "y-websocket": "^3.0.0",
     "yjs": "^13.6.10"
   },
