@@ -1076,13 +1076,14 @@ they are pre-existing gaps the audit made visible.
       `useRecordLock` (acquire/409/release/lost-lock/refresh), and `useAuth` (13
       tests). Also fixed the test config's `#app` alias (was a dir with no index
       → any `from '#app'` import failed to resolve; now points at the
-      nuxt-imports shim like `#imports`). - **Still open:** `useCsrf` +
-      `useRecordDetail` are guarded by `import.meta.client`, which the config's
-      `define` doesn't reach in `.ts` files (their client code returns early in
-      tests) — needs a small harness fix (a transform that replaces
-      `import.meta.client`) before they can be covered. The full records-editor
-      SFC mount, and a browser-e2e layer (Playwright/Cypress) for a few
-      journeys, remain — independent of the `ui-003` SSR decision.
+      nuxt-imports shim like `#imports`). Also ported an `enforce:'pre'` Vite
+      plugin (from the HW frontend harness) that rewrites
+      `import.meta.client`→`true` (space-padded) so client-guarded composables
+      run under test — `useCsrf` (7) and `useRecordDetail` (fetch, link
+      navigation, status-history normalization — 6) are now covered. - **Still
+      open:** the full records-editor SFC mount, and a browser-e2e layer
+      (Playwright/Cypress) for a few journeys — independent of the `ui-003` SSR
+      decision.
 - [x] **Cloud storage providers now covered — DONE 2026-07-31 (PR #23).** The
       S3/Azure/GCS SDK code (reachable via the API since `42ab1f0` applied
       `storage.yml`) had zero coverage — every prior suite drove

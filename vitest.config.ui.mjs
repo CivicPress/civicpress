@@ -3,8 +3,44 @@ import { defineConfig } from 'vitest/config';
 import { join, resolve } from 'path';
 import vue from '@vitejs/plugin-vue';
 
+/**
+ * Nuxt injects `import.meta.client` / `import.meta.server`; Vite's `define`
+ * does NOT substitute them under Vitest's transform pipeline (they arrive as
+ * `undefined`, so every `if (import.meta.client)` branch silently dead-ends
+ * and its code never runs under test — while the suite still passes, giving
+ * false confidence). Rewrite them in source instead.
+ *
+ * The replacements are space-padded to the same 18-char width as what they
+ * replace, so line/column positions — and therefore stack traces — stay
+ * accurate without needing a sourcemap. Ported from the BroadcastBox HW
+ * frontend harness (civicpress-broadcast-box/frontend/vitest.config.ts).
+ */
+function nuxtImportMeta() {
+  const pad = (value, width) => value.padEnd(width, ' ');
+  return {
+    name: 'civic-nuxt-import-meta',
+    enforce: 'pre',
+    transform(code, id) {
+      if (!/\.(ts|js|vue)($|\?)/.test(id) || id.includes('node_modules'))
+        return;
+      if (
+        !code.includes('import.meta.client') &&
+        !code.includes('import.meta.server')
+      )
+        return;
+      return {
+        code: code
+          .replace(/import\.meta\.client/g, pad('true', 18))
+          .replace(/import\.meta\.server/g, pad('false', 18)),
+        map: null,
+      };
+    },
+  };
+}
+
 export default defineConfig({
   plugins: [
+    nuxtImportMeta(),
     vue({
       script: {
         defineModel: true,
@@ -17,17 +53,17 @@ export default defineConfig({
   ],
   test: {
     globals: true,
-        // Limit how many worker threads Vitest uses
+    // Limit how many worker threads Vitest uses
     pool: 'threads',
     poolOptions: {
       threads: {
-        maxThreads: 2,     // try 1–4; start with 2
+        maxThreads: 2, // try 1–4; start with 2
         minThreads: 1,
       },
     },
     // Also reduce how many test files run concurrently
     fileParallelism: 2,
-    
+
     environment: 'happy-dom',
     setupFiles: ['./tests/ui/setup.ts'],
     alias: {
@@ -140,15 +176,8 @@ export default defineConfig({
         'vue-i18n'
       ),
     },
-    include: [
-      'tests/ui/**/*.test.ts',
-      'tests/ui/**/*.spec.ts',
-    ],
-    exclude: [
-      '**/node_modules/**',
-      '**/dist/**',
-      '**/build/**',
-    ],
+    include: ['tests/ui/**/*.test.ts', 'tests/ui/**/*.spec.ts'],
+    exclude: ['**/node_modules/**', '**/dist/**', '**/build/**'],
   },
   resolve: {
     alias: {

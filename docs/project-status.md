@@ -100,10 +100,9 @@ Beyond the **Partial/Stub** areas above, the notable ones a reader should know:
   skipped.
 - **Geography accepts only GeoJSON** despite KML/GPX/Shapefile appearing in the
   type enums.
-- **The web UI has component tests for the auth flow + editor composables**
-  (record editor actions, lock, auth), but no browser-e2e tests and no full
-  editor-SFC mount; the CSRF and record-detail composables remain untested
-  (blocked on an `import.meta.client` test-harness gap).
+- **The web UI has component tests for the auth flow + the API-critical
+  composables** (record editor actions, lock, detail, CSRF, auth). Still
+  missing: a full editor-SFC mount and a browser-e2e layer.
 
 These are the current honest edges of an alpha, not blockers for a supported
 pilot — but they should be closed (or scoped as accepted) before any
