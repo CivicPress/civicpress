@@ -1092,12 +1092,29 @@ they are pre-existing gaps the audit made visible.
       `vi.mock('~/components/RecordForm.vue')`, but `new.vue` _auto-imports_ it
       (no import statement in the SFC) — `vi.mock` can't intercept an
       auto-import, so there RecordForm must be a global stub component or the
-      mount fails to resolve it. UI suite 239→256. - **Still open:** a
-      browser-e2e layer (Playwright/Cypress) for a few journeys — independent of
-      the `ui-003` SSR decision — plus the remaining page tail that belongs to
-      the broader page/panel-coverage slice (record detail `index.vue`, the
-      generic `records/new.vue`, `drafts.vue`, the `_components/*` panels, and
-      the config / users / geography edit pages).
+      mount fails to resolve it. UI suite 239→256. Then the **page tail was
+      covered (2026-08-01, cont.), UI suite 256→331 (+75 across 13 files):** the
+      record **detail cluster** — `records/[type]/[id]/index.vue` (6, mocking
+      the already-tested `useRecordDetail`) plus its seven `_components/*`
+      panels (RecordHeaderInfo, RecordContentBody, LinkedRecordsPanel,
+      AdditionalInfoPanel, AttachmentsPanel, TranscriptViewer,
+      RecordDetailAccordion = 33 tests); the **list/create pages**
+      `records/drafts.vue` (11 — mount-fetch+sort, `confirm()`-gated delete,
+      perm-gated actions) and the generic `records/new.vue` (4); and the **edit
+      pages** `settings/users/[username]/edit.vue` (7 — the self-or-manager
+      onMounted guard + PUT/DELETE), `geography/[id]/edit.vue` (5), and
+      `settings/configuration/[configFile]/edit.vue` (9 — load, field
+      getters/updaters, save + post-save validate, reset, perm gate). ⚠️ Two
+      more harness notes: (a) a component importing `useRoute`/`useRouter`
+      straight from `vue-router` needs a `vue-router` alias in
+      `vitest.config.ui.mjs` (added — same transitive-dep resolution gap as
+      `vue-i18n`) or `vi.mock('vue-router')` silently fails to intercept and the
+      real one throws "injection Symbol(router) not found"; (b) a
+      `<UButton @click="$emit('click')">` stub must declare `emits: ['click']`
+      or `@click` also falls through as a native DOM listener and the handler
+      fires twice. - **Still open:** only the browser-e2e layer
+      (Playwright/Cypress) for a few journeys — independent of the `ui-003` SSR
+      decision.
 - [x] **Cloud storage providers now covered — DONE 2026-07-31 (PR #23).** The
       S3/Azure/GCS SDK code (reachable via the API since `42ab1f0` applied
       `storage.yml`) had zero coverage — every prior suite drove

@@ -175,6 +175,19 @@ export default defineConfig({
         'node_modules',
         'vue-i18n'
       ),
+      // vue-router is a transitive dep (via Nuxt) and unresolvable from the root
+      // test context — same hoisting issue as vue-i18n above. Point it at the
+      // modules/ui resolution so a component importing `useRoute`/`useRouter`
+      // straight from 'vue-router' (e.g. geography/[id]/edit.vue) resolves to the
+      // same module the test does — which is also what lets `vi.mock('vue-router')`
+      // match and intercept it.
+      'vue-router': join(
+        __dirname,
+        'modules',
+        'ui',
+        'node_modules',
+        'vue-router'
+      ),
     },
     include: ['tests/ui/**/*.test.ts', 'tests/ui/**/*.spec.ts'],
     exclude: ['**/node_modules/**', '**/dist/**', '**/build/**'],
