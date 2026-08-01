@@ -1067,9 +1067,16 @@ they are pre-existing gaps the audit made visible.
     (drives `RecordsService` directly, real DB) — **relocated** to
     `tests/integration/` (alongside `draft-publish-workflow.test.ts`) so
     `tests/api/` honestly means HTTP; content unchanged.
-- [ ] **No UI page-component or browser-e2e tests** (no Playwright/Cypress); the
-      API-critical composables (`useRecordEditorActions`, `useRecordLock`,
-      `useRecordDetail`, `useCsrf`, `useAuth`) are untested.
+- [ ] **UI page-component / e2e coverage — STARTED 2026-08-01 (auth flow).**
+      Page-component tests now exist for the auth flow (`login`,
+      `forgot-password`, `reset-password` — 12 tests) using the established
+      `@vue/test-utils` `mount` + `#imports`-shim harness (not
+      `@nuxt/test-utils` `mountSuspended`, which would need a divergent
+      `environment: 'nuxt'` config fighting the root-based setup). **Still
+      open:** the records-editor flow and its API-critical composables
+      (`useRecordEditorActions`, `useRecordLock`, `useRecordDetail`, `useCsrf`,
+      `useAuth`); and a browser-e2e layer (Playwright/Cypress) for a few full
+      journeys — deferred, and independent of the `ui-003` SSR decision.
 - [x] **Cloud storage providers now covered — DONE 2026-07-31 (PR #23).** The
       S3/Azure/GCS SDK code (reachable via the API since `42ab1f0` applied
       `storage.yml`) had zero coverage — every prior suite drove
