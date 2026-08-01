@@ -186,33 +186,37 @@ export class HookSystem {
   private getDefaultConfig(): HookConfig {
     return {
       hooks: {
+        // `update-index` is the only workflow the WorkflowEngine registers;
+        // the previously listed validate-record / notify-* names were never
+        // registered and were skipped silently, so they are not advertised
+        // here. Events still fire + audit with no workflow attached.
         'record:created': {
           enabled: true,
-          workflows: ['validate-record', 'notify-council'],
+          workflows: [],
           audit: true,
           description: 'Triggered when a new record is created',
         },
         'record:updated': {
           enabled: true,
-          workflows: ['validate-record', 'update-index'],
+          workflows: ['update-index'],
           audit: true,
           description: 'Triggered when a record is updated',
         },
         'record:committed': {
           enabled: true,
-          workflows: ['validate-record'],
+          workflows: [],
           audit: true,
           description: 'Triggered when a record is committed to Git',
         },
         'status:changed': {
           enabled: true,
-          workflows: ['notify-stakeholders'],
+          workflows: [],
           audit: true,
           description: 'Triggered when a record status changes',
         },
         'validation:failed': {
           enabled: true,
-          workflows: ['notify-author'],
+          workflows: [],
           audit: true,
           description: 'Triggered when record validation fails',
         },
@@ -443,14 +447,16 @@ export class HookSystem {
     // block the awaited record op. startWorkflow registers its active entry
     // synchronously before its first await, so observers see it immediately; a
     // failure is logged here rather than propagated into the record operation.
-    void this.workflowEngine.startWorkflow(workflowName, data).catch((error) => {
-      coreError(
-        `Workflow '${workflowName}' failed`,
-        'WORKFLOW_EXECUTION_FAILED',
-        { error: error instanceof Error ? error.message : String(error) },
-        { operation: 'workflow execution', workflowName }
-      );
-    });
+    void this.workflowEngine
+      .startWorkflow(workflowName, data)
+      .catch((error) => {
+        coreError(
+          `Workflow '${workflowName}' failed`,
+          'WORKFLOW_EXECUTION_FAILED',
+          { error: error instanceof Error ? error.message : String(error) },
+          { operation: 'workflow execution', workflowName }
+        );
+      });
   }
 
   /**

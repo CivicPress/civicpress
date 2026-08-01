@@ -95,9 +95,6 @@ Beyond the **Partial/Stub** areas above, the notable ones a reader should know:
   `storage.yml` (provider selection + `global.*` tuning), and S3/GCS/Azure
   provider ops + init are covered by 38 tests that mock the SDK boundary — but
   there is no test against real S3/GCS/Azure (or the real SDKs).
-- **Workflow config over-advertises.** `hooks.yml` references `validate-record`
-  and `notify-*` workflows that are not registered, so they are silently
-  skipped.
 - **Geography accepts only GeoJSON** despite KML/GPX/Shapefile appearing in the
   type enums.
 - **The web UI has component tests for the auth flow + the API-critical

@@ -10,12 +10,15 @@ _metadata:
 
 # Event Hooks Definition
 #
-# Implementation status: of the workflow names referenced below, only
-# `update-index` is currently implemented by the WorkflowEngine. The others
-# (`validate-record`, `notify-council`, `notify-stakeholders`, `notify-author`)
-# are PLANNED — the hook system accepts them but silently skips any workflow
-# that is not registered (see core/src/workflows/workflow-engine.ts and
-# docs/specs/workflows.md). They are kept here to document intended behaviour.
+# Implementation status: `update-index` is the only workflow the WorkflowEngine
+# currently implements, so it is the only one wired below (on record:updated).
+# The other events still fire and audit, but ship with no workflows: the
+# examples this file used to list (`validate-record`, `notify-council`,
+# `notify-stakeholders`, `notify-author`) were never registered and were
+# silently skipped, so they were removed rather than advertised as if they ran.
+# To attach a workflow to an event, add its name here once it exists — the hook
+# system runs any registered workflow and quietly skips unregistered ones (see
+# core/src/workflows/workflow-engine.ts and docs/specs/workflows.md).
 hooks:
   record:created:
     enabled:
@@ -24,9 +27,7 @@ hooks:
       description: 'Enable this hook'
       required: true
     workflows:
-      value:
-        - validate-record
-        - notify-council
+      value: []
       type: 'array'
       description: 'Workflows to execute when this hook triggers'
       required: true
@@ -49,7 +50,6 @@ hooks:
       required: true
     workflows:
       value:
-        - validate-record
         - update-index
       type: 'array'
       description: 'Workflows to execute when this hook triggers'
@@ -72,8 +72,7 @@ hooks:
       description: 'Enable this hook'
       required: true
     workflows:
-      value:
-        - validate-record
+      value: []
       type: 'array'
       description: 'Workflows to execute when this hook triggers'
       required: true
@@ -95,8 +94,7 @@ hooks:
       description: 'Enable this hook'
       required: true
     workflows:
-      value:
-        - notify-stakeholders
+      value: []
       type: 'array'
       description: 'Workflows to execute when this hook triggers'
       required: true
@@ -118,8 +116,7 @@ hooks:
       description: 'Enable this hook'
       required: true
     workflows:
-      value:
-        - notify-author
+      value: []
       type: 'array'
       description: 'Workflows to execute when this hook triggers'
       required: true
