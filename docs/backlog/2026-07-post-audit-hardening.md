@@ -1080,10 +1080,24 @@ they are pre-existing gaps the audit made visible.
       plugin (from the HW frontend harness) that rewrites
       `import.meta.client`→`true` (space-padded) so client-guarded composables
       run under test — `useCsrf` (7) and `useRecordDetail` (fetch, link
-      navigation, status-history normalization — 6) are now covered. - **Still
-      open:** the full records-editor SFC mount, and a browser-e2e layer
-      (Playwright/Cypress) for a few journeys — independent of the `ui-003` SSR
-      decision.
+      navigation, status-history normalization — 6) are now covered. Then the
+      **records-editor page SFCs were mounted end-to-end (2026-08-01, cont.):**
+      `records/[type]/[id]/edit.vue` (11 tests — mount-time fetch, published-vs-
+      draft breadcrumbs, loading skeleton, access-denied gating, fetch-failure
+      toast, the `@saved`/`@delete` wiring driven through real child emits,
+      delete→navigate, and the `realtimeEnabled`→`collaborativeMode`
+      passthrough) and `records/[type]/new.vue` (6 tests — role-gated create,
+      POST→navigate on success, and both create-failure paths). ⚠️ Harness
+      gotcha worth remembering: `edit.vue` _imports_ RecordForm so it stubs via
+      `vi.mock('~/components/RecordForm.vue')`, but `new.vue` _auto-imports_ it
+      (no import statement in the SFC) — `vi.mock` can't intercept an
+      auto-import, so there RecordForm must be a global stub component or the
+      mount fails to resolve it. UI suite 239→256. - **Still open:** a
+      browser-e2e layer (Playwright/Cypress) for a few journeys — independent of
+      the `ui-003` SSR decision — plus the remaining page tail that belongs to
+      the broader page/panel-coverage slice (record detail `index.vue`, the
+      generic `records/new.vue`, `drafts.vue`, the `_components/*` panels, and
+      the config / users / geography edit pages).
 - [x] **Cloud storage providers now covered — DONE 2026-07-31 (PR #23).** The
       S3/Azure/GCS SDK code (reachable via the API since `42ab1f0` applied
       `storage.yml`) had zero coverage — every prior suite drove
