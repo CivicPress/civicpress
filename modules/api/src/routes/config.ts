@@ -55,7 +55,10 @@ router.get('/attachment-types', async (req, res) => {
     logApiError('config', error, req);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to get attachment types', code: 'FAILED_TO_GET_ATTACHMENT_TYPES' },
+      error: {
+        message: 'Failed to get attachment types',
+        code: 'FAILED_TO_GET_ATTACHMENT_TYPES',
+      },
     });
   }
 });
@@ -76,7 +79,10 @@ router.get('/link-categories', async (req, res) => {
     logApiError('config', error, req);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to get link categories', code: 'FAILED_TO_GET_LINK_CATEGORIES' },
+      error: {
+        message: 'Failed to get link categories',
+        code: 'FAILED_TO_GET_LINK_CATEGORIES',
+      },
     });
   }
 });
@@ -160,7 +166,10 @@ router.post(
       logApiError('config', error, req);
       res.status(500).json({
         success: false,
-        error: { message: 'Failed to validate configuration', code: 'FAILED_TO_VALIDATE_CONFIGURATION' },
+        error: {
+          message: 'Failed to validate configuration',
+          code: 'FAILED_TO_VALIDATE_CONFIGURATION',
+        },
       });
     }
   }
@@ -237,7 +246,10 @@ router.get('/list', async (req, res) => {
     logApiError('config', error, req);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to get configuration list', code: 'FAILED_TO_GET_CONFIGURATION_LIST' },
+      error: {
+        message: 'Failed to get configuration list',
+        code: 'FAILED_TO_GET_CONFIGURATION_LIST',
+      },
     });
   }
 });
@@ -260,7 +272,10 @@ router.get('/metadata/:type', guardSecretConfig, async (req, res) => {
     logApiError('config', error, req);
     res.status(404).json({
       success: false,
-      error: { message: 'Configuration metadata not found', code: 'CONFIGURATION_METADATA_NOT_FOUND' },
+      error: {
+        message: 'Configuration metadata not found',
+        code: 'CONFIGURATION_METADATA_NOT_FOUND',
+      },
     });
   }
 });
@@ -310,12 +325,18 @@ router.get('/raw/:type', guardSecretConfig, async (req, res) => {
     res.status(200).send(yaml);
   } catch (error) {
     if (error instanceof InvalidConfigTypeError) {
-      return res.status(400).json({ success: false, error: { message: error.message, code: 'INVALID_CONFIG_TYPE' } });
+      return res.status(400).json({
+        success: false,
+        error: { message: error.message, code: 'INVALID_CONFIG_TYPE' },
+      });
     }
     logApiError('config', error, req);
     res.status(404).json({
       success: false,
-      error: { message: 'Raw configuration not found', code: 'RAW_CONFIGURATION_NOT_FOUND' },
+      error: {
+        message: 'Raw configuration not found',
+        code: 'RAW_CONFIGURATION_NOT_FOUND',
+      },
     });
   }
 });
@@ -333,9 +354,13 @@ router.put(
       const { type } = req.params;
       const yamlContent = typeof req.body === 'string' ? req.body : '';
       if (!yamlContent) {
-        return res
-          .status(400)
-          .json({ success: false, error: { message: 'YAML content is required', code: 'YAML_CONTENT_IS_REQUIRED' } });
+        return res.status(400).json({
+          success: false,
+          error: {
+            message: 'YAML content is required',
+            code: 'YAML_CONTENT_IS_REQUIRED',
+          },
+        });
       }
 
       // Reject YAML that cannot be parsed before persisting it. This is the
@@ -383,16 +408,208 @@ router.put(
         message: String(error),
       });
       if (error instanceof InvalidConfigTypeError) {
-        return res.status(400).json({ success: false, error: { message: error.message, code: 'INVALID_CONFIG_TYPE' } });
+        return res.status(400).json({
+          success: false,
+          error: { message: error.message, code: 'INVALID_CONFIG_TYPE' },
+        });
       }
       logApiError('config', error, req);
       res.status(500).json({
         success: false,
-        error: { message: 'Failed to save raw configuration', code: 'FAILED_TO_SAVE_RAW_CONFIGURATION' },
+        error: {
+          message: 'Failed to save raw configuration',
+          code: 'FAILED_TO_SAVE_RAW_CONFIGURATION',
+        },
       });
     }
   }
 );
+
+// Config types that round-trip through the export/import bundle. Deliberately
+// EXCLUDES credential-bearing config (`notifications` — see SECRET_CONFIG_TYPES)
+// and `storage` (may carry cloud provider credentials): a portable bundle must
+// never carry secrets. `isSecretConfigType` is also checked at read/write time
+// below, so the set can only ever narrow, never leak.
+const EXPORTABLE_CONFIG_TYPES = [
+  'org-config',
+  'roles',
+  'workflows',
+  'hooks',
+  'attachment-types',
+  'link-categories',
+  'analytics',
+  'geography-presets',
+];
+
+// Read a config's raw YAML, preferring the instance's user file and falling
+// back to the shipped default (mirrors GET /raw/:type). Returns null if neither
+// exists so the caller can skip it rather than 500 the whole bundle.
+async function readRawConfig(type: string): Promise<string | null> {
+  const { userPath, defaultPath } = resolveRawPaths(type);
+  try {
+    return await readFile(userPath, 'utf-8');
+  } catch {
+    // intentional: user file may not exist; fall back to the default
+  }
+  try {
+    return await readFile(defaultPath, 'utf-8');
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * GET /api/config/export
+ * Export the instance's non-secret configuration as a single JSON bundle of raw
+ * YAML keyed by config type. Credential-bearing config is never included.
+ */
+router.get('/export', async (req, res) => {
+  try {
+    const files: Record<string, string> = {};
+    for (const type of EXPORTABLE_CONFIG_TYPES) {
+      if (isSecretConfigType(type)) continue; // belt-and-suspenders
+      const yaml = await readRawConfig(type);
+      if (yaml != null) files[type] = yaml;
+    }
+
+    res.json({
+      success: true,
+      data: {
+        civicpress_config_export: '1',
+        exported_at: new Date().toISOString(),
+        files,
+      },
+    });
+
+    const actor = req.user;
+    await audit.log({
+      source: 'api',
+      actor: { id: actor?.id, username: actor?.username, role: actor?.role },
+      action: 'config:export',
+      target: { type: 'config', id: 'bundle' },
+      outcome: 'success',
+      metadata: { types: Object.keys(files) },
+    });
+  } catch (error) {
+    logApiError('config', error, req);
+    res.status(500).json({
+      success: false,
+      error: {
+        message: 'Failed to export configuration',
+        code: 'FAILED_TO_EXPORT_CONFIGURATION',
+      },
+    });
+  }
+});
+
+/**
+ * POST /api/config/import
+ * Apply a configuration bundle produced by GET /config/export. Body:
+ * `{ files: { "<type>": "<raw yaml>" } }`. Each entry is validated (bare type
+ * name + parseable YAML) before it is written; secret/credential config is
+ * skipped, and a per-file result set is returned so a partial bundle reports
+ * exactly what applied.
+ */
+router.post('/import', express.json({ limit: '5mb' }), async (req, res) => {
+  const body = req.body as { files?: Record<string, unknown> } | undefined;
+  const files = body?.files;
+  if (!files || typeof files !== 'object' || Array.isArray(files)) {
+    return res.status(400).json({
+      success: false,
+      error: {
+        message: 'Import body must be { files: { <type>: <yaml> } }',
+        code: 'INVALID_IMPORT_BODY',
+      },
+    });
+  }
+
+  const results: Array<{
+    type: string;
+    status: 'applied' | 'skipped' | 'failed';
+    message?: string;
+  }> = [];
+
+  for (const [rawType, value] of Object.entries(files)) {
+    const type = String(rawType);
+
+    // Never import credential-bearing config from a portable bundle.
+    if (isSecretConfigType(type)) {
+      results.push({
+        type,
+        status: 'skipped',
+        message: 'Credential-bearing configuration is not importable',
+      });
+      continue;
+    }
+    if (typeof value !== 'string') {
+      results.push({
+        type,
+        status: 'failed',
+        message: 'Configuration content must be a raw YAML string',
+      });
+      continue;
+    }
+
+    let userPath: string;
+    try {
+      ({ userPath } = resolveRawPaths(type));
+    } catch (err) {
+      results.push({
+        type,
+        status: 'failed',
+        message:
+          err instanceof InvalidConfigTypeError
+            ? err.message
+            : 'Invalid config type',
+      });
+      continue;
+    }
+
+    // Reject unparseable YAML before persisting — a broken config file 500s the
+    // public GET /info when CentralConfigManager later loads it.
+    try {
+      parseYAML(value);
+    } catch (parseError) {
+      results.push({
+        type,
+        status: 'failed',
+        message: `Invalid YAML: ${parseError instanceof Error ? parseError.message : String(parseError)}`,
+      });
+      continue;
+    }
+
+    try {
+      await mkdir(dirname(userPath), { recursive: true });
+      await writeFile(userPath, value, 'utf-8');
+      results.push({ type, status: 'applied' });
+    } catch (err) {
+      results.push({
+        type,
+        status: 'failed',
+        message: err instanceof Error ? err.message : 'Write failed',
+      });
+    }
+  }
+
+  const applied = results.filter((r) => r.status === 'applied').length;
+  const skipped = results.filter((r) => r.status === 'skipped').length;
+  const failed = results.filter((r) => r.status === 'failed').length;
+
+  res.json({
+    success: true,
+    data: { results, applied, skipped, failed },
+  });
+
+  const actor = req.user;
+  await audit.log({
+    source: 'api',
+    actor: { id: actor?.id, username: actor?.username, role: actor?.role },
+    action: 'config:import',
+    target: { type: 'config', id: 'bundle' },
+    outcome: failed > 0 ? 'failure' : 'success',
+    metadata: { applied, skipped, failed, types: results.map((r) => r.type) },
+  });
+});
 
 /**
  * GET /api/config/status
@@ -409,7 +626,10 @@ router.get('/status', async (req, res) => {
     logApiError('config', error, req);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to get configuration status', code: 'FAILED_TO_GET_CONFIGURATION_STATUS' },
+      error: {
+        message: 'Failed to get configuration status',
+        code: 'FAILED_TO_GET_CONFIGURATION_STATUS',
+      },
     });
   }
 });
@@ -431,7 +651,10 @@ router.get('/:type', guardSecretConfig, async (req, res) => {
     logApiError('config', error, req);
     res.status(404).json({
       success: false,
-      error: { message: 'Configuration not found', code: 'CONFIGURATION_NOT_FOUND' },
+      error: {
+        message: 'Configuration not found',
+        code: 'CONFIGURATION_NOT_FOUND',
+      },
     });
   }
 });
@@ -474,7 +697,10 @@ router.put('/:type', guardSecretConfig, async (req, res) => {
     logApiError('config', error, req);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to save configuration', code: 'FAILED_TO_SAVE_CONFIGURATION' },
+      error: {
+        message: 'Failed to save configuration',
+        code: 'FAILED_TO_SAVE_CONFIGURATION',
+      },
     });
   }
 });
@@ -516,7 +742,10 @@ router.post('/:type/reset', guardSecretConfig, async (req, res) => {
     logApiError('config', error, req);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to reset configuration', code: 'FAILED_TO_RESET_CONFIGURATION' },
+      error: {
+        message: 'Failed to reset configuration',
+        code: 'FAILED_TO_RESET_CONFIGURATION',
+      },
     });
   }
 });
@@ -558,7 +787,10 @@ router.get('/validate/all', async (req, res) => {
     logApiError('config', error, req);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to validate configurations', code: 'FAILED_TO_VALIDATE_CONFIGURATIONS' },
+      error: {
+        message: 'Failed to validate configurations',
+        code: 'FAILED_TO_VALIDATE_CONFIGURATIONS',
+      },
     });
   }
 });

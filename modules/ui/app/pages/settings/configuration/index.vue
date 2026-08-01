@@ -327,38 +327,131 @@ const getStatusIcon = (status: string) => {
   }
 };
 
+type ConfigBundle = {
+  civicpress_config_export?: string;
+  exported_at?: string;
+  files: Record<string, string>;
+};
+
 const exportConfiguration = async () => {
   if (!canManageConfiguration.value) return;
 
   try {
-    // TODO: Implement configuration export API endpoint
-    // const response = await $api.get('/api/v1/config/export', { responseType: 'blob' })
-    // downloadBlob(response.data, 'civicpress-config.zip')
+    const response = (await useNuxtApp().$civicApi(
+      '/api/v1/config/export'
+    )) as ApiResponse<ConfigBundle>;
 
-    // Mock export for now
+    if (!response.success || !response.data) {
+      throw new Error(
+        extractErrorMessage(response) || 'Configuration export failed'
+      );
+    }
+
+    // Download the bundle as a JSON file client-side.
+    const blob = new Blob([JSON.stringify(response.data, null, 2)], {
+      type: 'application/json',
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'civicpress-config.json';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+
     useToast().add({
-      title: 'Configuration Export',
-      description: 'Configuration export feature coming soon.',
+      title: 'Configuration exported',
+      description: `Exported ${Object.keys(response.data.files).length} configuration files.`,
       color: 'primary',
     });
-  } catch (error) {
-    console.error('Configuration export failed:', error);
+  } catch (err: unknown) {
+    console.error('Configuration export failed:', err);
+    useToast().add({
+      title: 'Export failed',
+      description:
+        (err instanceof Error ? err.message : '') ||
+        'Could not export configuration.',
+      color: 'error',
+    });
+  }
+};
+
+// Apply a parsed bundle: POST it, summarize the per-file result, refresh the
+// list. Split out from the file-picker below so it is unit-testable.
+const applyConfigBundle = async (files: Record<string, string>) => {
+  try {
+    const response = (await useNuxtApp().$civicApi('/api/v1/config/import', {
+      method: 'POST',
+      body: { files },
+    })) as ApiResponse<{
+      applied: number;
+      skipped: number;
+      failed: number;
+      results: Array<{ type: string; status: string; message?: string }>;
+    }>;
+
+    if (!response.success || !response.data) {
+      throw new Error(
+        extractErrorMessage(response) || 'Configuration import failed'
+      );
+    }
+
+    const { applied, skipped, failed } = response.data;
+    useToast().add({
+      title: 'Configuration imported',
+      description: `Applied ${applied}, skipped ${skipped}, failed ${failed}.`,
+      color: failed > 0 ? 'warning' : 'primary',
+    });
+    await fetchConfigurations();
+  } catch (err: unknown) {
+    console.error('Configuration import failed:', err);
+    useToast().add({
+      title: 'Import failed',
+      description:
+        (err instanceof Error ? err.message : '') ||
+        'Could not import configuration.',
+      color: 'error',
+    });
   }
 };
 
 const importConfiguration = async () => {
   if (!canManageConfiguration.value) return;
 
-  try {
-    // TODO: Implement configuration import UI
-    useToast().add({
-      title: 'Configuration Import',
-      description: 'Configuration import feature coming soon.',
-      color: 'primary',
-    });
-  } catch (error) {
-    console.error('Configuration import failed:', error);
-  }
+  // Pick a bundle file, parse it, then hand off to applyConfigBundle.
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'application/json,.json';
+  input.onchange = async () => {
+    const file = input.files?.[0];
+    if (!file) return;
+
+    let files: Record<string, string> | undefined;
+    try {
+      const parsed = JSON.parse(await file.text()) as Partial<ConfigBundle> & {
+        data?: Partial<ConfigBundle>;
+      };
+      // Accept a raw { files } bundle or the export envelope's `data`.
+      files = parsed?.files ?? parsed?.data?.files;
+      if (!files || typeof files !== 'object') {
+        throw new Error('Not a CivicPress configuration bundle');
+      }
+    } catch (err: unknown) {
+      console.error('Configuration import failed:', err);
+      useToast().add({
+        title: 'Import failed',
+        description:
+          (err instanceof Error ? err.message : '') ||
+          'That file is not a CivicPress configuration bundle.',
+        color: 'error',
+      });
+      return;
+    }
+
+    await applyConfigBundle(files);
+  };
+  input.click();
 };
 
 // Redirect handled in initial onMounted

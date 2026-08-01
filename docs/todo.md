@@ -256,20 +256,21 @@ V2)
 
 #### Configuration Export/Import
 
-- [ ] **Implement configuration export API endpoint**
-  - **Current Status**: Not implemented - UI shows "coming soon" message
-  - **File**: `modules/ui/app/pages/settings/configuration/index.vue` (line 321)
-  - **Priority**: Low - nice to have feature
-  - **Action**: Create `POST /api/v1/config/export` endpoint to export all
-    configs as ZIP
-  - **Action**: Implement UI download functionality
+- [x] **Configuration export API endpoint — DONE 2026-08-01.**
+      `GET /api/v1/config/export` (admin / `config:manage`) returns a JSON
+      bundle of the instance's non-secret config as raw YAML keyed by type;
+      credential-bearing config (`notifications`, `storage`) is never included.
+      The UI's "Export All" button downloads it as `civicpress-config.json`
+      client-side.
 
-- [ ] **Implement configuration import UI**
-  - **Current Status**: Not implemented - UI shows "coming soon" message
-  - **File**: `modules/ui/app/pages/settings/configuration/index.vue` (line 340)
-  - **Priority**: Low - nice to have feature
-  - **Action**: Create file upload UI for configuration import
-  - **Action**: Validate and apply imported configurations
+- [x] **Configuration import UI — DONE 2026-08-01.**
+      `POST /api/v1/config/import` (admin) applies a
+      `{ files: { <type>: <yaml> } }` bundle: each entry is validated (bare type
+      name + parseable YAML) before it is written, secret config is skipped, and
+      a per-file `applied/skipped/failed` result set is returned. The UI's
+      "Import" button file-picks a bundle and summarizes the outcome. Covered by
+      `tests/api/config-import-export.test.ts` (10) +
+      `tests/ui/pages/config-index.test.ts` (6).
 
 #### Core Library Enhancements
 
