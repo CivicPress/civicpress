@@ -1114,8 +1114,10 @@ functions that can be tested in isolation and called by CLI, API, or UI.
 - Nuxt 4 (Vue.js framework)
 - Vue 3 with Composition API
 - Nuxt UI Pro component library
-- SPA mode with API integration
-- Server-side rendering for public pages
+- SPA mode with API integration (no live SSR — the server never renders per
+  request)
+- Public-read static prerender (SSG) planned for crawlable public record pages
+  (`ui-003`; deferred to the "easy deployment" epic)
 
 **Features**:
 

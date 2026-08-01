@@ -74,7 +74,10 @@ named gaps. **Stub/Planned**: advertised but not yet functional.
 
 ## In progress / next (Roadmap-tier — need scoping)
 
-- **`ui-003`** — server-side rendering for the UI.
+- **`ui-003`** — public-read static **prerender (SSG)** for public record pages
+  (crawlable, fast, no-JS). Explicitly **not live SSR** (decided against — the
+  server never renders per request); the admin UI stays SPA. Coupled to the
+  deployment model, so deferred to the "easy deployment" work.
 - **Signed appliance image** — a reproducible, clerk-installable deploy image
   (`docker/` is currently empty).
 - **Hardware / device-repo work** — capture decomposition + test coverage in the
