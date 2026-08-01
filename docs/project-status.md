@@ -45,12 +45,12 @@ named gaps. **Stub/Planned**: advertised but not yet functional.
 | Search                           | **Working** | Real SQLite **FTS5** + BM25 ranking, snippets, facets, autocomplete. Caveat: "typo tolerance" only re-ranks substring title suggestions, not the main query; no `field:value` syntax.                                                                                                                                                             |
 | Indexing                         | **Working** | `generateIndexes` (global + per-module `index.yml`, optional DB sync with conflict strategies), single-flight guarded.                                                                                                                                                                                                                            |
 | Geography                        | **Partial** | **GeoJSON** only — KML / GPX / Shapefile appear in the type enums but throw "not yet implemented". Leaflet map + CRUD + presets work; the DB mirror is write-only.                                                                                                                                                                                |
-| Storage                          | **Partial** | Local FS provider works and is tested. S3 / GCS / Azure are real SDK code but **untested**. Both the API and CLI apply `storage.yml` (provider selection + `global.*` tuning).                                                                                                                                                                    |
+| Storage                          | **Partial** | Local FS provider works and is tested. S3 / GCS / Azure provider ops + init are covered against a **mocked SDK boundary** (no live-cloud integration test). Both the API and CLI apply `storage.yml` (provider selection + `global.*` tuning).                                                                                                    |
 | Backup / restore                 | **Working** | Real `tar.gz` create + extract round-trip, SHA-256 verified. Backs up local-provider bytes only; the git-bundle path is untested.                                                                                                                                                                                                                 |
 | Notifications                    | **Partial** | One real email channel wired into the account-verification flow — but **off by default**. Channel failures are reported truthfully (a real SMTP error is recorded as a failed send). SMS/Slack are config-only. Mostly scaffold.                                                                                                                  |
 | REST API                         | **Working** | 25 routers, standardized response envelope, real supertest coverage; helmet + rate-limit + fail-closed CORS + CSRF wired. Exactly 4 honest `501` stubs: `workflows`, `hooks`, `import`, `export`.                                                                                                                                                 |
 | CLI                              | **Working** | 31 commands (~74 subcommands), `withCli`/`--json` migration complete, envelope mirrors the API; 28/31 substantive. Shipped stubs: `auto-index` (mostly), `cache:list`, `notify:retry`, `init` PostgreSQL, `export --format pdf`.                                                                                                                  |
-| Web UI                           | **Working** | ~80–90% on core surfaces: records CRUD + CodeMirror editor, geography + Leaflet, 14/15 admin pages, auth, genuine EN/FR translation. Stubs: forgot-password (no backend), config import/export, activity feed. No page/browser-e2e tests.                                                                                                         |
+| Web UI                           | **Working** | ~80–90% on core surfaces: records CRUD + CodeMirror editor, geography + Leaflet, 14/15 admin pages, auth (incl. self-service password reset), genuine EN/FR translation. Stubs: config import/export, activity feed. Component tests cover the auth flow + editor composables; no browser-e2e tests yet.                                          |
 | Realtime collaborative editing   | **Partial** | Yjs sync, Markdown writeback to draft, and snapshots work (CI-verified). Default-off. `onConnect` now enforces per-record **authorization** — it validates the session, confirms the record exists, and checks view permission, failing closed.                                                                                                   |
 | BroadcastBox (optional)          | **Working** | The strongest-verified module: ack-gated recording, a fail-closed redaction pipeline tested against **real ffmpeg** (published bytes proven black + silent in hidden windows), Ed25519 manifest verification, revocable enrollment. Transcription is delegated to `services/transcription`; the clerk-installable appliance image is out-of-repo. |
 | Auth & security                  | **Working** | Roles (admin/clerk/public) via `userCan`, signed sessions + API keys with mandatory signatures, HKDF-derived scoped secrets, CSRF, login lockout, bcrypt-12 password policy — all tested end-to-end.                                                                                                                                              |
@@ -67,10 +67,10 @@ named gaps. **Stub/Planned**: advertised but not yet functional.
   residual two are a brace-expansion DoS not reachable from the request
   surface); a `SECURITY.md` disclosure policy is published.
 - **Tests & CI:** ~265 test files (~2,500 cases) run green in parallel in CI.
-  Honest coverage gaps: six API routers (`cache`, `diagnose`, `diff`, `info`,
-  `notifications`, `templates`) plus `/validation` have no HTTP integration
-  tests; there are no UI page or browser-e2e tests; cloud storage providers are
-  untested.
+  Honest coverage gaps: the auth-flow pages and editor composables have
+  component tests, but there is no full editor-SFC mount and no browser-e2e
+  layer; cloud storage providers are exercised only against a mocked SDK
+  boundary (no live S3/GCS/Azure integration test).
 
 ## In progress / next (Roadmap-tier — need scoping)
 
@@ -91,16 +91,19 @@ Beyond the **Partial/Stub** areas above, the notable ones a reader should know:
 - **Notifications are email-only and off by default.** SMS/Slack are config-only
   scaffold. Channel failures are now reported truthfully — a real SMTP error is
   recorded as a failed send, not a success.
-- **Cloud storage providers are untested.** The API and CLI both honor
-  `storage.yml` (provider selection + `global.*` tuning), but S3/GCS/Azure are
-  real SDK code with no test coverage — every test runs the local provider.
+- **Cloud storage lacks a live-integration test.** The API and CLI both honor
+  `storage.yml` (provider selection + `global.*` tuning), and S3/GCS/Azure
+  provider ops + init are covered by 38 tests that mock the SDK boundary — but
+  there is no test against real S3/GCS/Azure (or the real SDKs).
 - **Workflow config over-advertises.** `hooks.yml` references `validate-record`
   and `notify-*` workflows that are not registered, so they are silently
   skipped.
 - **Geography accepts only GeoJSON** despite KML/GPX/Shapefile appearing in the
   type enums.
-- **The web UI has no automated page/browser tests**; the API-critical
-  composables (record editor/lock/detail, CSRF, auth) are also untested.
+- **The web UI has component tests for the auth flow + editor composables**
+  (record editor actions, lock, auth), but no browser-e2e tests and no full
+  editor-SFC mount; the CSRF and record-detail composables remain untested
+  (blocked on an `import.meta.client` test-harness gap).
 
 These are the current honest edges of an alpha, not blockers for a supported
 pilot — but they should be closed (or scoped as accepted) before any
