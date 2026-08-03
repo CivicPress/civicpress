@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { execSync } from 'child_process';
+import { execFileSync } from 'child_process';
 import {
   createCLITestContext,
   cleanupCLITestContext,
@@ -10,9 +10,13 @@ let context: Awaited<ReturnType<typeof createCLITestContext>>;
 
 function runCli(args: string): { code: number; out: string } {
   try {
-    const out = execSync(`cd ${context.testDir} && node ${context.cliPath} ${args}`, {
-      encoding: 'utf8',
-    });
+    // execFileSync (no shell) + cwd, so the test dir / cli path are argv, not
+    // interpolated into a shell string (js/shell-command-injection-from-env).
+    const out = execFileSync(
+      'node',
+      [context.cliPath, ...args.split(' ').filter(Boolean)],
+      { cwd: context.testDir, encoding: 'utf8' }
+    );
     return { code: 0, out };
   } catch (e: any) {
     return { code: e.status ?? 1, out: `${e.stdout ?? ''}${e.stderr ?? ''}` };

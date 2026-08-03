@@ -12,9 +12,14 @@ export function generateSecureToken(): string {
 }
 
 /**
- * SHA-256 hash of an opaque token, hex-encoded — used for at-rest storage of
- * API keys and session tokens. Extracted verbatim from `AuthService.hashToken`
- * (private).
+ * SHA-256 hash of an opaque, HIGH-ENTROPY token, hex-encoded — used for at-rest
+ * storage of API keys, session tokens, and password-reset tokens (all 32-byte
+ * `generateSecureToken` values). SHA-256 is appropriate here precisely because
+ * these are random tokens, not passwords: user passwords are verified with
+ * bcrypt (see `password-ops` `bcrypt.compare`) and never pass through this
+ * function. A static-analysis "insufficient password hash" flag on this line is
+ * a false positive for that reason. Extracted verbatim from
+ * `AuthService.hashToken`.
  */
 export function hashToken(token: string): string {
   return crypto.createHash('sha256').update(token).digest('hex');

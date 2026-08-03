@@ -53,7 +53,10 @@ export abstract class NotificationTemplate {
    * Extract variables from template
    */
   protected extractVariables(template: string): string[] {
-    const variableRegex = /\{\{([^}]+)\}\}/g;
+    // `[^{}]` (not `[^}]`) so a run of `{` cannot be consumed by the variable
+    // body — that overlap let the global scan degrade to O(n^2) on inputs like
+    // `{{{{{...` (js/polynomial-redos). Placeholders never contain braces.
+    const variableRegex = /\{\{([^{}]+)\}\}/g;
     const variables = new Set<string>();
     let match;
 
@@ -73,7 +76,7 @@ export abstract class NotificationTemplate {
    * Replace variables in template
    */
   protected replaceVariables(template: string, data: TemplateData): string {
-    return template.replace(/\{\{([^}]+)\}\}/g, (match, varName) => {
+    return template.replace(/\{\{([^{}]+)\}\}/g, (match, varName) => {
       const key = varName.trim();
       const value = data[key];
 
