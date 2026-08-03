@@ -4,11 +4,12 @@
 > implemented and tested (UUID files, attachments, `.meta.json` sidecars, a
 > path-containment guard). S3 / GCS / Azure provider ops + init exist but are
 > covered only against a **mocked SDK boundary** — there is no live-cloud
-> integration test. Several capabilities described below are design targets, not
-> shipped behavior: automatic **failover / circuit-breaker**, **lifecycle
-> archival** (no file is moved today), and **quota** enforcement. The
-> authoritative, code-verified status is `docs/project-status.md` (Storage =
-> Partial).
+> integration test. Some capabilities the original spec advertised are not
+> shipped: automatic **failover** (the never-wired failover / retry /
+> health-check subsystems were removed) and **lifecycle archival** (the archival
+> action moves no file today). The live circuit breaker, timeouts, quota, and
+> usage reporting are unaffected. The authoritative, code-verified status is
+> `docs/project-status.md` (Storage = Partial).
 
 ---
 

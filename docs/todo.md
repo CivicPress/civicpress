@@ -1,6 +1,13 @@
 # CivicPress TODO List
 
-## Current Priority: API Enhancement Phase (v1.3.0)
+> **Status note (2026-08-03).** This is a historical / aspirational scratch
+> list. The version numbers it used (v1.3–v1.6) are **superseded** and do NOT
+> reflect the project's release plan — the authoritative roadmap is
+> `docs/roadmap.md` (the v0.2.x → v1.0 ladder), with current, code-verified
+> status in `docs/project-status.md` and the active backlog in
+> `docs/backlog/2026-07-post-audit-hardening.md`. Kept for idea capture only.
+
+## Current Priority (historical): API Enhancement Phase
 
 ### Recent Achievements
 
@@ -327,7 +334,7 @@ work — both now closed.
       channel is configured, and that a channel-configured-but-no-address user
       falls through to the operator task.
 
-### Short Term Tasks (v1.4.0 - Next 1-2 months)
+### Short Term Tasks (Next 1-2 months)
 
 #### Plugin System Foundation
 
@@ -368,7 +375,7 @@ work — both now closed.
   - `GET /api/audit/user/:userId` - Get user audit trail
   - `POST /api/audit/export` - Export audit trail
 
-### Medium Term Tasks (v1.5.0 - Next 3-6 months)
+### Medium Term Tasks (Next 3-6 months)
 
 #### Civic Modules Implementation
 
@@ -412,7 +419,7 @@ work — both now closed.
   - Federation security
   - Node management
 
-### Long Term Tasks (v1.6.0 - Next 6-12 months)
+### Long Term Tasks (Next 6-12 months)
 
 #### Multi-tenant Support
 

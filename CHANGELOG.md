@@ -66,6 +66,21 @@ and this project adheres to
   - Allows frontend to fetch draft content when editing, published content when
     viewing
   - Public users always receive published version regardless of parameter
+- **Drag-and-drop attachment upload in the record editor.** The editor's
+  Attachments panel now embeds a real drop/click uploader (multipart
+  `POST /api/v1/storage/files`) alongside the existing link-a-file browser, so a
+  clerk can attach a new file without leaving the editor. Uploads target a
+  storage folder named after the record type (public fallback); the fake dashed
+  "dropzone" empty state is gone.
+- **Record activity feed backed by Git history.** The editor's Activity panel
+  reads `GET /api/v1/diff/:recordId/history` (summary + author + timestamp,
+  newest first) in place of a single hardcoded "Record created" row, with
+  loading / empty / error states — an unpublished draft with no committed
+  history reads as empty, not an error.
+- **Undo / redo toolbar buttons** in the record editor (the capability already
+  existed on both editing surfaces; only the buttons were missing).
+- **EN/FR locale-parity guard** — `pnpm i18n:check` (and a CI test) fails when
+  the two message catalogs drift out of key parity.
 
 ### Changed
 
@@ -100,6 +115,15 @@ and this project adheres to
   `health_check_timeout`) from the default `storage.yml` and the storage config
   type. The live circuit breaker, timeouts, quota, usage reporting, and
   lifecycle management are unaffected.
+- **Localized the interactive `aria-label`s** (clear-search, draft actions, and
+  editor chrome) so screen readers follow the UI locale (EN/FR).
+- **The editor upload dropzone (`FileUpload`) is theme-aware** — no more white
+  box in the dark editor; also improves Settings → Storage.
+- **Reconciled seven drifted specs with implementation reality.** `storage`,
+  `workflows`, `geography-data`, `notifications`, `accessibility`,
+  `testing-framework`, and `realtime-architecture` gained a top-of-file
+  implementation-status note (and `storage` was re-tagged `partial`), per the
+  v0.3.x "specs match reality" gate.
 
 ### Fixed
 
@@ -141,6 +165,16 @@ and this project adheres to
   CORS allowlist was `http://localhost:3000`, but the Nuxt UI dev server runs on
   `:3030`, so direct browser calls were blocked out of the box; `:3030` is now
   included (alongside `:3000`).
+- **The collaborative editor's toolbar is no longer inert.** In the TipTap/Yjs
+  editing surface, heading / bullet + numbered list / blockquote / horizontal
+  rule / link / image buttons were silent no-ops; they now apply via TipTap core
+  commands against the editor schema (bold/italic/code already worked).
+- **Removed the editor's underline decoy.** The underline button emitted
+  `underline`, which the host silently remapped to bold ("Markdown has no
+  underline"); the button, its handler, and its i18n key were dropped.
+- **Fixed the EN/FR sort-label key desync.** The code calls `records.sort.*`,
+  but French only carried the labels under an orphaned `records.sortBy.*`
+  scheme, so French users saw raw keys / English sort options.
 
 ### Security
 
@@ -643,6 +677,10 @@ All v0.2.x "Core Maturity and Stability" goals have been completed:
   using Vitest and Supertest
 
 ## [1.0.0] - 2025-07-02
+
+> **Note:** this `1.0.0` tag is the original monorepo scaffold. Versioning
+> restarted at `0.1.1` afterward, so this is **not** the roadmap's target v1.0
+> Stable Release (see `docs/roadmap.md`).
 
 ### Initial Release
 
