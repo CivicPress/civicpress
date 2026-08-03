@@ -207,6 +207,7 @@ defineExpose({
             <EditorAttachments
               v-else-if="item.value === 'attachments'"
               :attached-files="attachedFiles"
+              :record-type="recordType"
               :disabled="disabled"
               @update:attached-files="emit('update:attachedFiles', $event)"
             />
