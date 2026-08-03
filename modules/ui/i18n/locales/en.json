@@ -469,6 +469,8 @@
     "editor": {
       "details": "Details",
       "activity": "Activity",
+      "activityEmpty": "No activity yet",
+      "activityError": "Couldn't load activity",
       "rawYaml": "Raw YAML",
       "recordDetails": "Record Details",
       "relations": "Relations",

@@ -452,6 +452,8 @@
     "editor": {
       "details": "Détails",
       "activity": "Activité",
+      "activityEmpty": "Aucune activité pour le moment",
+      "activityError": "Impossible de charger l’activité",
       "rawYaml": "YAML brut",
       "recordDetails": "Détails du document",
       "relations": "Relations",
