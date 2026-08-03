@@ -1,5 +1,12 @@
 # CivicPress Spec: `notifications.md`
 
+> **Implementation status (2026-08-03).** One real channel is wired — **email**
+> — and it is **off by default**. The SMS / Slack / webhook channels and the
+> queue described below are config-only scaffold, not functional. Channel
+> failures are reported truthfully (a real send error is recorded as a failed
+> send). Authoritative status: `docs/project-status.md` (Notifications =
+> Partial).
+
 ---
 
 version: 0.2.x status: partial created: '2025-07-03' updated: '2025-07-15'

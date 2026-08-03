@@ -1,8 +1,18 @@
 # ️ CivicPress Spec: `storage.md`
 
+> **Implementation status (2026-08-03).** The local-filesystem provider is
+> implemented and tested (UUID files, attachments, `.meta.json` sidecars, a
+> path-containment guard). S3 / GCS / Azure provider ops + init exist but are
+> covered only against a **mocked SDK boundary** — there is no live-cloud
+> integration test. Several capabilities described below are design targets, not
+> shipped behavior: automatic **failover / circuit-breaker**, **lifecycle
+> archival** (no file is moved today), and **quota** enforcement. The
+> authoritative, code-verified status is `docs/project-status.md` (Storage =
+> Partial).
+
 ---
 
-version: 2.1.0 status: stable created: '2025-07-03' updated: '2025-12-03'
+version: 2.1.0 status: partial created: '2025-07-03' updated: '2026-08-03'
 deprecated: false sunset_date: null additions:
 
 - comprehensive storage documentation

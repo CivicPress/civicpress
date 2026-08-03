@@ -1,5 +1,12 @@
 # CivicPress Spec: `realtime-architecture.md`
 
+> **Implementation status (2026-08-03).** The realtime service is implemented
+> and CI-verified (Yjs sync, Markdown writeback to draft, snapshots), and
+> `onConnect` now enforces per-record **authorization** (fail-closed). It ships
+> **off by default**, and it is **single-node** — the multi-node Redis fan-out
+> described below is not built. Authoritative status: `docs/project-status.md`
+> (Realtime = Partial).
+
 ---
 
 version: 1.0.0 status: as-shipped (Phase 3, 2026-06) created: '2025-12-04' updated: '2026-06'

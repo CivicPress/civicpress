@@ -1,5 +1,11 @@
 # ️ CivicPress Spec: `geography-data.md`
 
+> **Implementation status (2026-08-03).** **GeoJSON is the only supported
+> format.** KML / GPX / Shapefile appear in the type enums but throw "not yet
+> implemented". The Leaflet map, CRUD, and presets work; the database mirror is
+> write-only. Authoritative status: `docs/project-status.md` (Geography =
+> Partial).
+
 ---
 
 version: 1.0.0 status: draft created: '2025-01-27' updated: '2025-01-27'

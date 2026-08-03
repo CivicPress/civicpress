@@ -1,5 +1,13 @@
 # CivicPress Workflows Specification
 
+> **Implementation status (2026-08-03).** Only one built-in workflow is
+> registered and runs today: `update-index` (on `record:updated`, via the hook
+> system). The programmable `.js` workflow engine, session-recorder triggers,
+> and manual UI actions described below are **design targets** — there is no
+> user-workflow loader or sandbox, and the REST `workflows` route is a `501`
+> stub. Authoritative status: `docs/project-status.md` (Workflow engine =
+> Partial).
+
 version: 0.2.x
 status: partial
 created: 2025-07-03
