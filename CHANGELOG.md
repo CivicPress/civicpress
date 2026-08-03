@@ -8,6 +8,8 @@ and this project adheres to
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-08-03
+
 <!-- markdownlint-disable MD024 -->
 
 ### Added
