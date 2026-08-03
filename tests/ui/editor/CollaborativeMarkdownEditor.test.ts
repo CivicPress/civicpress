@@ -187,4 +187,147 @@ describe('CollaborativeMarkdownEditor', () => {
 
     wrapper.unmount();
   });
+
+  // The toolbar command surface (heading / lists / blockquote / rule / link /
+  // image) used to be no-ops in the collaborative path. They must now mutate the
+  // shared document via TipTap CORE commands against editor-schema node/mark
+  // names (the editor is built from editor-schema's raw specs, so the bundled
+  // convenience commands are unavailable). We assert on the resulting document
+  // structure rather than serialized Markdown to stay serializer-agnostic.
+  const collectNodeNames = (
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    editor: any
+  ): Set<string> => {
+    const names = new Set<string>();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    editor.state.doc.descendants((n: any) => names.add(n.type.name));
+    return names;
+  };
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const seedAndGet = (wrapper: ReturnType<typeof mountEditor>): any => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const vm = wrapper.vm as any;
+    vm.getEditor().commands.insertContent('Content');
+    return vm;
+  };
+
+  it('executeHeading turns the block into a heading of the requested level', async () => {
+    const wrapper = mountEditor();
+    await nextTick();
+    const vm = seedAndGet(wrapper);
+
+    vm.executeHeading(2);
+
+    let level: number | null = null;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vm.getEditor().state.doc.descendants((n: any) => {
+      if (n.type.name === 'heading') level = n.attrs.level;
+    });
+    expect(level).toBe(2);
+
+    wrapper.unmount();
+  });
+
+  it('executeBulletList / executeNumberedList wrap the block in the matching list', async () => {
+    const bulletWrapper = mountEditor();
+    await nextTick();
+    const bulletVm = seedAndGet(bulletWrapper);
+    bulletVm.executeBulletList();
+    expect(collectNodeNames(bulletVm.getEditor()).has('bullet_list')).toBe(
+      true
+    );
+    bulletWrapper.unmount();
+
+    const orderedWrapper = mountEditor();
+    await nextTick();
+    const orderedVm = seedAndGet(orderedWrapper);
+    orderedVm.executeNumberedList();
+    expect(collectNodeNames(orderedVm.getEditor()).has('ordered_list')).toBe(
+      true
+    );
+    orderedWrapper.unmount();
+  });
+
+  it('executeBlockquote and executeHorizontalRule insert their nodes', async () => {
+    const quoteWrapper = mountEditor();
+    await nextTick();
+    const quoteVm = seedAndGet(quoteWrapper);
+    quoteVm.executeBlockquote();
+    expect(collectNodeNames(quoteVm.getEditor()).has('blockquote')).toBe(true);
+    quoteWrapper.unmount();
+
+    const ruleWrapper = mountEditor();
+    await nextTick();
+    const ruleVm = seedAndGet(ruleWrapper);
+    ruleVm.executeHorizontalRule();
+    expect(collectNodeNames(ruleVm.getEditor()).has('horizontal_rule')).toBe(
+      true
+    );
+    ruleWrapper.unmount();
+  });
+
+  it('executeLink applies a link mark using the prompted URL', async () => {
+    window.prompt = vi.fn(() => 'https://example.com');
+    const wrapper = mountEditor();
+    await nextTick();
+    const vm = seedAndGet(wrapper);
+
+    vm.executeLink();
+
+    let href: string | null = null;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vm.getEditor().state.doc.descendants((n: any) => {
+      if (n.isText) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const mark = n.marks.find((m: any) => m.type.name === 'link');
+        if (mark) href = mark.attrs.href;
+      }
+    });
+    expect(href).toBe('https://example.com');
+
+    wrapper.unmount();
+  });
+
+  it('executeImage inserts an image node with the prompted src', async () => {
+    window.prompt = vi.fn(() => 'https://example.com/photo.png');
+    const wrapper = mountEditor();
+    await nextTick();
+    const vm = seedAndGet(wrapper);
+
+    vm.executeImage();
+
+    let src: string | null = null;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vm.getEditor().state.doc.descendants((n: any) => {
+      if (n.type.name === 'image') src = n.attrs.src;
+    });
+    expect(src).toBe('https://example.com/photo.png');
+
+    wrapper.unmount();
+  });
+
+  it('link / image commands no-op when the prompt is cancelled', async () => {
+    window.prompt = vi.fn(() => null);
+    const wrapper = mountEditor();
+    await nextTick();
+    const vm = seedAndGet(wrapper);
+
+    vm.executeLink();
+    vm.executeImage();
+
+    const names = collectNodeNames(vm.getEditor());
+    expect(names.has('image')).toBe(false);
+    let hasLink = false;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vm.getEditor().state.doc.descendants((n: any) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      if (n.isText && n.marks.some((m: any) => m.type.name === 'link')) {
+        hasLink = true;
+      }
+    });
+    expect(hasLink).toBe(false);
+
+    wrapper.unmount();
+  });
 });

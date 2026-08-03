@@ -245,4 +245,47 @@ export const CORE_TABLE_STATEMENTS: string[] = [
     last_failed_at DATETIME,
     locked_until DATETIME
   )`,
+
+  // Password reset tokens (forgot-password flow). Distinct from
+  // email_verifications: different lifecycle (single-use credential reset,
+  // not address confirmation). Only the token HASH is stored — the plaintext
+  // exists exactly once, in the reset link handed to the user, and is never
+  // persisted or logged. Single-use is enforced by consumed_at; TTL by
+  // expires_at. ON DELETE CASCADE so deleting a user drops their tokens.
+  `CREATE TABLE IF NOT EXISTS password_reset_tokens (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    token_hash TEXT UNIQUE NOT NULL,
+    expires_at DATETIME NOT NULL,
+    consumed_at DATETIME,
+    created_ip TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+  )`,
+
+  // Operator notification center — the durable, admin-facing "inbox". This is
+  // the channel-free sink that works with zero comms config: password-reset
+  // requests that can't reach a user (no email channel), plus system signal
+  // (backup failed, security alerts, update available). NOT git-backed —
+  // these are operational read/unread state, not civic records, and some
+  // carry references that must never enter version control.
+  //
+  // severity: info | warning | critical | action ('action' = a task the
+  // operator must act on, e.g. a reset request). status drives the unread
+  // badge. dedupe_key lets a recurring signal ("update available") collapse
+  // instead of piling up while it stays unresolved (handled in the store).
+  `CREATE TABLE IF NOT EXISTS operator_notifications (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    type TEXT NOT NULL,
+    severity TEXT NOT NULL DEFAULT 'info' CHECK (severity IN ('info', 'warning', 'critical', 'action')),
+    title TEXT NOT NULL,
+    body TEXT,
+    data TEXT,
+    status TEXT NOT NULL DEFAULT 'unread' CHECK (status IN ('unread', 'read', 'dismissed')),
+    audience_role TEXT,
+    dedupe_key TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    read_at DATETIME,
+    dismissed_at DATETIME
+  )`,
 ];

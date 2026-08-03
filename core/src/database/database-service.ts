@@ -39,6 +39,7 @@ import { RecordStore } from './stores/record-store.js';
 import { UserStore } from './stores/user-store.js';
 import { StorageFileStore } from './stores/storage-file-store.js';
 import { GeographyStore } from './stores/geography-store.js';
+import { OperatorNotificationStore } from './stores/operator-notification-store.js';
 import type {
   RecordLockRow,
   AuditLogWithUserRow,
@@ -55,6 +56,7 @@ export class DatabaseService {
   private users: UserStore;
   private storageFiles: StorageFileStore;
   private geographyFiles: GeographyStore;
+  private operatorNotifications: OperatorNotificationStore;
 
   constructor(
     config: DatabaseConfig,
@@ -82,6 +84,7 @@ export class DatabaseService {
     this.users = new UserStore(this.adapter);
     this.storageFiles = new StorageFileStore(this.adapter, this.logger);
     this.geographyFiles = new GeographyStore(this.adapter, this.logger);
+    this.operatorNotifications = new OperatorNotificationStore(this.adapter);
   }
 
   /**
@@ -276,6 +279,77 @@ export class DatabaseService {
     ...args: Parameters<UserStore['pruneUserSessions']>
   ): ReturnType<UserStore['pruneUserSessions']> {
     return this.users.pruneUserSessions(...args);
+  }
+
+  // Password reset tokens — delegated to UserStore (auth surface)
+  async createPasswordResetToken(
+    ...args: Parameters<UserStore['createPasswordResetToken']>
+  ): ReturnType<UserStore['createPasswordResetToken']> {
+    return this.users.createPasswordResetToken(...args);
+  }
+
+  async getLivePasswordResetToken(
+    ...args: Parameters<UserStore['getLivePasswordResetToken']>
+  ): ReturnType<UserStore['getLivePasswordResetToken']> {
+    return this.users.getLivePasswordResetToken(...args);
+  }
+
+  async consumePasswordResetToken(
+    ...args: Parameters<UserStore['consumePasswordResetToken']>
+  ): ReturnType<UserStore['consumePasswordResetToken']> {
+    return this.users.consumePasswordResetToken(...args);
+  }
+
+  async deleteUserPasswordResetTokens(
+    ...args: Parameters<UserStore['deleteUserPasswordResetTokens']>
+  ): ReturnType<UserStore['deleteUserPasswordResetTokens']> {
+    return this.users.deleteUserPasswordResetTokens(...args);
+  }
+
+  async cleanupExpiredPasswordResetTokens(): Promise<void> {
+    return this.users.cleanupExpiredPasswordResetTokens();
+  }
+
+  // ---------------------------------------------------------------------------
+  // Operator notifications — delegated to OperatorNotificationStore
+  // ---------------------------------------------------------------------------
+
+  async createOperatorNotification(
+    ...args: Parameters<OperatorNotificationStore['create']>
+  ): ReturnType<OperatorNotificationStore['create']> {
+    return this.operatorNotifications.create(...args);
+  }
+
+  async listOperatorNotifications(
+    ...args: Parameters<OperatorNotificationStore['list']>
+  ): ReturnType<OperatorNotificationStore['list']> {
+    return this.operatorNotifications.list(...args);
+  }
+
+  async getOperatorNotificationById(
+    ...args: Parameters<OperatorNotificationStore['getById']>
+  ): ReturnType<OperatorNotificationStore['getById']> {
+    return this.operatorNotifications.getById(...args);
+  }
+
+  async countUnreadOperatorNotifications(): Promise<number> {
+    return this.operatorNotifications.countUnread();
+  }
+
+  async markOperatorNotificationRead(
+    ...args: Parameters<OperatorNotificationStore['markRead']>
+  ): ReturnType<OperatorNotificationStore['markRead']> {
+    return this.operatorNotifications.markRead(...args);
+  }
+
+  async markAllOperatorNotificationsRead(): Promise<number> {
+    return this.operatorNotifications.markAllRead();
+  }
+
+  async dismissOperatorNotification(
+    ...args: Parameters<OperatorNotificationStore['dismiss']>
+  ): ReturnType<OperatorNotificationStore['dismiss']> {
+    return this.operatorNotifications.dismiss(...args);
   }
 
   // ---------------------------------------------------------------------------

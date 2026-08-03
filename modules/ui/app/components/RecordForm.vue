@@ -52,10 +52,8 @@ const emit = defineEmits<{
 
 // Composables
 const { t } = useI18n();
-const { getRecordTypeOptions, fetchRecordTypes } =
-  useRecordTypes();
-const { fetchRecordStatuses } =
-  useRecordStatuses();
+const { getRecordTypeOptions, fetchRecordTypes } = useRecordTypes();
+const { fetchRecordStatuses } = useRecordStatuses();
 const toast = useToast();
 const $civicApi = useNuxtApp().$civicApi;
 const authStore = useAuthStore();
@@ -71,7 +69,12 @@ const form = reactive({
   tags: [] as string[],
   description: '',
   geography: undefined as
-    | { srid?: number; zone_ref?: string; bbox?: number[]; center?: { lon: number; lat: number } }
+    | {
+        srid?: number;
+        zone_ref?: string;
+        bbox?: number[];
+        center?: { lon: number; lat: number };
+      }
     | undefined,
   attachedFiles: [] as Array<{
     id: string;
@@ -645,7 +648,7 @@ defineExpose({
               variant="ghost"
               size="xs"
               @click="showSidebar = !showSidebar"
-              aria-label="Toggle sidebar"
+              :aria-label="t('records.editor.toggleSidebar')"
             />
           </div>
 
@@ -653,9 +656,10 @@ defineExpose({
           <EditorToolbar
             :disabled="saving || isLocked"
             :show-preview="showPreview"
+            @undo="handleToolbarAction('undo')"
+            @redo="handleToolbarAction('redo')"
             @bold="handleToolbarAction('bold')"
             @italic="handleToolbarAction('italic')"
-            @underline="handleToolbarAction('underline')"
             @code="handleToolbarAction('code')"
             @heading="handleToolbarAction('heading', $event)"
             @bullet-list="handleToolbarAction('bulletList')"
@@ -688,7 +692,7 @@ defineExpose({
           class="hidden lg:block w-1 bg-gray-200 dark:bg-gray-800 cursor-col-resize hover:bg-primary-500 dark:hover:bg-primary-600 transition-colors"
           @mousedown="startResize"
           role="separator"
-          aria-label="Resize editor and preview"
+          :aria-label="t('records.editor.resizeEditorPreview')"
         />
 
         <!-- Preview Section -->
@@ -713,7 +717,7 @@ defineExpose({
               variant="ghost"
               size="xs"
               @click="showPreview = false"
-              aria-label="Close preview"
+              :aria-label="t('records.editor.closePreview')"
             />
           </div>
           <PreviewPanel
@@ -767,7 +771,7 @@ defineExpose({
         v-if="isMobile && showSidebar"
         class="fixed inset-0 bg-black/50 z-20 lg:hidden"
         @click="showSidebar = false"
-        aria-label="Close sidebar"
+        :aria-label="t('records.editor.closeSidebar')"
       />
     </div>
   </div>

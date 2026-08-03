@@ -1,6 +1,6 @@
 {
   "name": "civicpress",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "CivicPress project",
   "type": "module",
   "packageManager": "pnpm@9.15.9",
@@ -54,6 +54,7 @@
     "test:all": "vitest run && vitest run --config vitest.config.ui.mjs",
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest --watch",
+    "i18n:check": "node scripts/i18n-parity.mjs",
     "gen": "plop",
     "gen:page": "plop nuxt:page",
     "gen:cli": "plop cli:command",

@@ -1,5 +1,12 @@
 # CivicPress Spec: `testing-framework.md`
 
+> **Implementation status (2026-08-03).** Unit and integration testing (Vitest,
+> supertest) are real and extensive. The **E2E / browser, performance, security,
+> and accessibility** layers described below are **not implemented** — there is
+> no Playwright/Cypress suite (the `@playwright/test` reference is aspirational),
+> no performance harness, and no a11y test suite. Authoritative status:
+> `docs/project-status.md`.
+
 ---
 
 version: 0.2.x status: partial created: '2025-07-15' updated: '2025-07-15'

@@ -31,6 +31,8 @@ import { registerGeographyCommand } from './commands/geography.js';
 import { CentralConfigManager } from '@civicpress/core';
 import { infoCommand } from './commands/info.js';
 import notifyCommand from './commands/notify.js';
+import { registerNotificationsCommand } from './commands/notifications.js';
+import { registerSystemCommand } from './commands/system.js';
 import { registerBackupCommand } from './commands/backup.js';
 import { registerRecordsCommand } from './commands/records.js';
 import { registerDiagnoseCommand } from './commands/diagnose.js';
@@ -104,6 +106,12 @@ registerGeographyCommand(cli);
 
 // Setup notification commands
 notifyCommand(cli);
+
+// Operator notification center (the "inbox") — list/read/dismiss + reset-requests
+registerNotificationsCommand(cli);
+
+// System maintenance (update checks, …)
+registerSystemCommand(cli);
 
 // Parse and run
 cli.parse();

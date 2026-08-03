@@ -1,7 +1,9 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
-  // SPA mode — historically chosen against Nuxt UI v3 + Pro v3; revisit for v4 + SSR
-  // when public-read prerender lands (ui-003).
+  // SPA mode — the deliberate long-term posture: NO live SSR (the server never
+  // renders per request). Public-read static prerender (SSG) — crawlable, fast,
+  // no-JS public record pages — is the eventual enhancement, deferred to the
+  // "easy deployment" epic (ui-003). The admin/editor UI stays SPA regardless.
   ssr: false,
 
   // Development server configuration

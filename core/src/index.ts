@@ -112,6 +112,10 @@ export type {
   AuditLogWithUserRow,
   SearchIndexRow,
   EmailVerificationRow,
+  PasswordResetTokenRow,
+  OperatorNotificationRow,
+  OperatorNotificationSeverity,
+  OperatorNotificationStatus,
   TableInfoRow,
   IndexInfoRow,
   TriggerInfoRow,
@@ -120,6 +124,10 @@ export type {
   CountRow,
   TotalRow,
 } from './database/types/row-types.js';
+export type {
+  CreateOperatorNotificationInput,
+  ListOperatorNotificationsOptions,
+} from './database/stores/operator-notification-store.js';
 
 // Export auth services
 export { AuthService, AuthUser, ApiKey, Session } from './auth/auth-service.js';
@@ -349,6 +357,11 @@ export {
   NotificationLogger,
   AuthTemplate,
   EmailChannel,
+  ConsoleChannel,
+  isConsoleChannelEnabled,
+  OperatorNotifier,
+  PasswordRecoveryService,
+  defaultOutboxDir,
 } from './notifications/index.js';
 export type {
   NotificationRequest,
@@ -369,7 +382,25 @@ export type {
   EmailSendResult,
   SmtpOptions,
   SendGridOptions,
+  OperatorNotificationType,
+  OperatorNotificationView,
+  ConsoleChannelOptions,
+  ResetTokenIssuer,
+  PasswordResetOutcome,
+  PasswordResetChannel,
+  PasswordRecoveryDeps,
 } from './notifications/index.js';
+
+// System / update checking
+export {
+  UpdateChecker,
+  isNewerVersion,
+  fetchLatestReleaseTag,
+} from './system/update-checker.js';
+export type {
+  UpdateCheckResult,
+  UpdateNotifierSink,
+} from './system/update-checker.js';
 
 // Configuration Management
 export {

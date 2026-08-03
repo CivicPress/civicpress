@@ -6,6 +6,7 @@ const toast = useToast();
 const appStore = useAppStore();
 const authStore = useAuthStore(); // ⬅️ add this
 const { t } = useI18n();
+const { unread, refreshUnread } = useOperatorNotifications();
 
 const links = computed<NavigationMenuItem[][]>(() => {
   const primary: NavigationMenuItem[] = [
@@ -42,6 +43,16 @@ const links = computed<NavigationMenuItem[][]>(() => {
 
   const secondary: NavigationMenuItem[] = [];
 
+  // Operator notification center — admins only, with a live unread badge.
+  if (authStore.isLoggedIn && authStore.hasPermission('system:admin')) {
+    secondary.push({
+      label: t('settings.alerts.title'),
+      to: '/settings/alerts',
+      icon: 'i-lucide-bell',
+      badge: unread.value > 0 ? String(unread.value) : undefined,
+    });
+  }
+
   if (authStore.isLoggedIn) {
     secondary.push({
       label: t('common.settings'),
@@ -51,6 +62,11 @@ const links = computed<NavigationMenuItem[][]>(() => {
   }
 
   return [primary, secondary];
+});
+
+// Prime the unread badge for admins (the composable no-ops for others).
+onMounted(() => {
+  refreshUnread();
 });
 
 onMounted(async () => {

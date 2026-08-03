@@ -1,5 +1,12 @@
 # CivicPress Spec: `accessibility.md`
 
+> **Implementation status (2026-08-03).** This spec describes a **target**
+> WCAG / a11y posture; it is largely aspirational. There is no dedicated
+> accessibility test suite, and only recent, incremental work has begun (e.g.
+> localizing interactive `aria-label`s so screen readers follow the UI locale).
+> Treat the compliance claims below as goals, not shipped guarantees.
+> Authoritative status: `docs/project-status.md`.
+
 ---
 
 version: 0.2.x status: partial created: '2025-07-03' updated: '2025-07-15'

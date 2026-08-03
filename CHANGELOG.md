@@ -8,10 +8,42 @@ and this project adheres to
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-08-03
+
 <!-- markdownlint-disable MD024 -->
 
 ### Added
 
+- **Self-service password reset that works with zero comms configuration.**
+  `POST /api/v1/auth/forgot-password` + `/auth/reset-password` back a real UI
+  (`/auth/forgot-password`, `/auth/reset-password`) in place of the previous
+  "coming soon" stub. Reset tokens are single-use, hashed at rest, 1-hour TTL,
+  and revoke every session on use. The request endpoint is anti-enumeration
+  (identical response for any input) and rate-limited by the existing `/auth`
+  window.
+  - **Channel-by-audience delivery:** a token is minted and a self-service link
+    delivered only when a user-facing channel can reach the account — email (if
+    configured), else the new **console** dev sink. With no channel (the default
+    production posture), no token is minted; instead an actionable task is filed
+    in the operator notification center for an admin to fulfill via
+    `civic users:set-password`. OAuth-only accounts are ineligible.
+- **Operator notification center (the "inbox").** A durable, admin-only,
+  channel-free feed for signal that needs an operator's attention: undeliverable
+  password-reset requests, backup failures, and account-lockout security alerts.
+  - API: `GET /api/v1/admin/notifications` (+ `/unread-count`, `/:id/read`,
+    `/:id/dismiss`, `/read-all`), gated by `system:admin`.
+  - CLI: `civic notifications:list|read|dismiss|read-all` and
+    `civic users:reset-requests`.
+  - UI: an admin notifications page (`/settings/alerts`) with a live unread
+    badge in the sidebar.
+- **Update check.** `civic system:check-updates` compares the running version
+  against the newest GitHub release and records a deduped `update_available`
+  entry in the operator notification center when a newer version exists. Local
+  and cron-friendly (no auth); `--latest` skips the network for offline use.
+- **Console notification channel.** A user-facing dev sink (default-on in
+  development/test, off in production unless `CIVIC_CONSOLE_NOTIFICATIONS=true`)
+  that prints rendered messages and writes a file outbox under the system-data
+  dir — so the email-shaped flows are exercisable out of the box without SMTP.
 - **Unpublished Changes Badge**: Added visual indicator for records with
   unpublished draft changes
   - Badge displays on record list page and single record view page
@@ -36,6 +68,21 @@ and this project adheres to
   - Allows frontend to fetch draft content when editing, published content when
     viewing
   - Public users always receive published version regardless of parameter
+- **Drag-and-drop attachment upload in the record editor.** The editor's
+  Attachments panel now embeds a real drop/click uploader (multipart
+  `POST /api/v1/storage/files`) alongside the existing link-a-file browser, so a
+  clerk can attach a new file without leaving the editor. Uploads target a
+  storage folder named after the record type (public fallback); the fake dashed
+  "dropzone" empty state is gone.
+- **Record activity feed backed by Git history.** The editor's Activity panel
+  reads `GET /api/v1/diff/:recordId/history` (summary + author + timestamp,
+  newest first) in place of a single hardcoded "Record created" row, with
+  loading / empty / error states — an unpublished draft with no committed
+  history reads as empty, not an error.
+- **Undo / redo toolbar buttons** in the record editor (the capability already
+  existed on both editing surfaces; only the buttons were missing).
+- **EN/FR locale-parity guard** — `pnpm i18n:check` (and a CI test) fails when
+  the two message catalogs drift out of key parity.
 
 ### Changed
 
@@ -70,6 +117,15 @@ and this project adheres to
   `health_check_timeout`) from the default `storage.yml` and the storage config
   type. The live circuit breaker, timeouts, quota, usage reporting, and
   lifecycle management are unaffected.
+- **Localized the interactive `aria-label`s** (clear-search, draft actions, and
+  editor chrome) so screen readers follow the UI locale (EN/FR).
+- **The editor upload dropzone (`FileUpload`) is theme-aware** — no more white
+  box in the dark editor; also improves Settings → Storage.
+- **Reconciled seven drifted specs with implementation reality.** `storage`,
+  `workflows`, `geography-data`, `notifications`, `accessibility`,
+  `testing-framework`, and `realtime-architecture` gained a top-of-file
+  implementation-status note (and `storage` was re-tagged `partial`), per the
+  v0.3.x "specs match reality" gate.
 
 ### Fixed
 
@@ -111,6 +167,16 @@ and this project adheres to
   CORS allowlist was `http://localhost:3000`, but the Nuxt UI dev server runs on
   `:3030`, so direct browser calls were blocked out of the box; `:3030` is now
   included (alongside `:3000`).
+- **The collaborative editor's toolbar is no longer inert.** In the TipTap/Yjs
+  editing surface, heading / bullet + numbered list / blockquote / horizontal
+  rule / link / image buttons were silent no-ops; they now apply via TipTap core
+  commands against the editor schema (bold/italic/code already worked).
+- **Removed the editor's underline decoy.** The underline button emitted
+  `underline`, which the host silently remapped to bold ("Markdown has no
+  underline"); the button, its handler, and its i18n key were dropped.
+- **Fixed the EN/FR sort-label key desync.** The code calls `records.sort.*`,
+  but French only carried the labels under an orphaned `records.sortBy.*`
+  scheme, so French users saw raw keys / English sort options.
 
 ### Security
 
@@ -613,6 +679,10 @@ All v0.2.x "Core Maturity and Stability" goals have been completed:
   using Vitest and Supertest
 
 ## [1.0.0] - 2025-07-02
+
+> **Note:** this `1.0.0` tag is the original monorepo scaffold. Versioning
+> restarted at `0.1.1` afterward, so this is **not** the roadmap's target v1.0
+> Stable Release (see `docs/roadmap.md`).
 
 ### Initial Release
 

@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import FileBrowserPopover from '~/components/storage/FileBrowserPopover.vue';
+import FileUpload from '~/components/storage/FileUpload.vue';
 import { useAttachmentTypes } from '~/composables/useAttachmentTypes';
 import { useTypedI18n } from '~/composables/useTypedI18n';
 
@@ -14,6 +15,8 @@ interface Props {
     description?: string;
     category?: string;
   }>;
+  /** Record type — used as the storage folder for newly uploaded attachments. */
+  recordType?: string;
   disabled?: boolean;
 }
 
@@ -54,6 +57,42 @@ const handleFilesSelected = (files: SelectedFile[]) => {
     title: t('records.filesAdded'),
     // vue-i18n's `t()` has overloads but TS picks the simplest; cast to access
     // the (key, count, named-params) pluralization overload.
+    description: tPlural('records.filesAttachedToRecord', files.length),
+    color: 'primary',
+  });
+};
+
+// Files uploaded directly from the editor land in a storage folder named after
+// the record type (falling back to the public folder), then attach to the
+// record just like browsed files. The upload API creates the folder if needed,
+// and files are later read by UUID, so the folder is only where the bytes live.
+const uploadFolder = computed(() => props.recordType || 'public');
+
+interface UploadedFile {
+  id: string;
+  name: string;
+  size: number;
+  type: string;
+  url: string;
+  path: string;
+  folder?: string;
+  description?: string;
+  created_at?: string;
+}
+
+const handleUploaded = (files: UploadedFile[]) => {
+  const newFiles = files.map((file) => ({
+    id: file.id,
+    path: file.path,
+    original_name: file.name,
+    description: file.description ?? '',
+    category: 'reference',
+  }));
+
+  emit('update:attachedFiles', [...props.attachedFiles, ...newFiles]);
+
+  toast.add({
+    title: t('records.filesAdded'),
     description: tPlural('records.filesAttachedToRecord', files.length),
     color: 'primary',
   });
@@ -228,8 +267,16 @@ const downloadFile = async (fileId: string, fileName: string) => {
       </div>
     </div>
 
+    <!-- Real drag-and-drop / click upload zone. Hidden while the record is
+         locked or saving (disabled); a plain note shows instead when empty. -->
+    <FileUpload
+      v-if="!disabled"
+      :folder="uploadFolder"
+      :multiple="true"
+      @upload-complete="handleUploaded"
+    />
     <div
-      v-else
+      v-else-if="attachedFiles.length === 0"
       class="text-center py-4 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg"
     >
       <p class="text-xs text-gray-500">

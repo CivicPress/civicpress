@@ -9,6 +9,14 @@ import {
   parseDurationMs,
 } from '../login-throttle.js';
 import { AuthConfigManager } from '../auth-config.js';
+import { generateSecureToken, hashToken } from './crypto.js';
+
+/**
+ * How long a password-reset link stays valid. Short by design — a reset token
+ * is an account-takeover credential; a narrow window limits exposure of a link
+ * that lingers in an inbox, a console outbox, or shell history.
+ */
+const RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hour
 
 export interface PasswordOpsDeps {
   db: DatabaseService;
@@ -32,6 +40,20 @@ export interface PasswordOpsDeps {
   /** Authentication-provider guards (live on the orchestrator). */
   canSetPassword: (user: AuthUser) => boolean;
   getUserAuthProvider: (user: AuthUser) => string;
+  /**
+   * Optional operator-notification sink. When present, a fresh account lockout
+   * files a security alert in the operator center. Optional so unit tests and
+   * lightweight constructions need not wire it.
+   */
+  operatorNotifier?: {
+    securityAlert(input: {
+      title: string;
+      body?: string;
+      data?: Record<string, unknown>;
+      dedupeKey?: string;
+      severity?: 'warning' | 'critical';
+    }): Promise<number | null>;
+  };
 }
 
 /**
@@ -45,6 +67,24 @@ export interface PasswordOpsDeps {
  */
 export class PasswordOps {
   constructor(private readonly deps: PasswordOpsDeps) {}
+
+  /**
+   * File a security alert when an account crosses into lockout. Best-effort:
+   * the notifier swallows its own errors, and the dedupe key collapses repeated
+   * locks of the same account within the window into one operator item.
+   */
+  private async notifyAccountLocked(username: string): Promise<void> {
+    await this.deps.operatorNotifier?.securityAlert({
+      title: `Account locked after repeated failed logins: ${username}`,
+      body:
+        `The account "${username}" was locked following too many failed ` +
+        `login attempts. If this was not the account owner, someone may be ` +
+        `attempting to guess the password.`,
+      data: { username },
+      dedupeKey: `account_locked:${username}`,
+      severity: 'warning',
+    });
+  }
 
   /** Build the throttle from the loaded auth config (defaults if unloaded). */
   private getThrottle(): LoginThrottle {
@@ -87,7 +127,8 @@ export class PasswordOps {
       // Get user with password hash
       const user = await this.deps.db.getUserWithPassword(username);
       if (!user || !user.password_hash) {
-        await throttle.recordFailure(username);
+        const locked = await throttle.recordFailure(username);
+        if (locked) await this.notifyAccountLocked(username);
         throw new Error('Invalid username or password');
       }
 
@@ -95,7 +136,8 @@ export class PasswordOps {
       const bcrypt = await import('bcrypt');
       const isValid = await bcrypt.compare(password, user.password_hash);
       if (!isValid) {
-        await throttle.recordFailure(username);
+        const locked = await throttle.recordFailure(username);
+        if (locked) await this.notifyAccountLocked(username);
         throw new Error('Invalid username or password');
       }
 
@@ -393,5 +435,203 @@ export class PasswordOps {
       this.deps.logger?.error('Failed to verify current email:', error);
       throw new Error('Failed to verify current email');
     }
+  }
+
+  // Password reset (forgot-password) --------------------------------------------
+
+  /** Build an AuthUser from a user row for the provider guards. */
+  private toAuthUser(user: {
+    id: number;
+    username: string;
+    role: string;
+    email?: string;
+    name?: string;
+    avatar_url?: string;
+    auth_provider?: string;
+    email_verified?: number;
+    pending_email?: string;
+  }): AuthUser {
+    return {
+      id: user.id,
+      username: user.username,
+      role: user.role,
+      email: user.email,
+      name: user.name,
+      avatar_url: user.avatar_url,
+      auth_provider: user.auth_provider,
+      email_verified: !!user.email_verified,
+      pending_email: user.pending_email,
+    };
+  }
+
+  /**
+   * Resolve a reset-eligible account from an identifier (username OR email)
+   * WITHOUT minting anything. Returns null when no such account exists or the
+   * account is external-auth (OAuth — no password to reset).
+   *
+   * Split out from token minting so the delivery layer can decide whether any
+   * user-facing channel can even reach this person BEFORE a token is created:
+   * when no channel can (the default operator-mediated path), no token is
+   * minted at all. Callers MUST respond identically whether this returns a
+   * user or null (anti-enumeration).
+   */
+  async findResetEligibleUser(identifier: string): Promise<{
+    userId: number;
+    username: string;
+    email?: string;
+    name?: string;
+  } | null> {
+    const id = identifier?.trim();
+    if (!id) return null;
+
+    // Match by username first, then email. Deliberately no error either way.
+    let user = await this.deps.db.getUserByUsername(id);
+    if (!user) {
+      user = await this.deps.db.getUserByEmail(id);
+    }
+    if (!user) return null;
+    if (!this.deps.canSetPassword(this.toAuthUser(user))) return null;
+
+    return {
+      userId: user.id,
+      username: user.username,
+      email: user.email,
+      name: user.name,
+    };
+  }
+
+  /**
+   * Mint a single-use reset token for a KNOWN eligible user id and return the
+   * plaintext (returned once, never stored — only the hash is persisted).
+   * Used once the delivery layer has confirmed a channel can reach the user.
+   */
+  async mintResetTokenForUser(
+    userId: number,
+    ipAddress?: string
+  ): Promise<string> {
+    const token = generateSecureToken();
+    const tokenHash = hashToken(token);
+    const expiresAt = new Date(Date.now() + RESET_TOKEN_TTL_MS);
+    await this.deps.db.createPasswordResetToken(
+      userId,
+      tokenHash,
+      expiresAt,
+      ipAddress
+    );
+    await this.deps.logAuthEvent(
+      userId,
+      'password_reset_requested',
+      'Password reset token issued',
+      ipAddress
+    );
+    return token;
+  }
+
+  /**
+   * Convenience: resolve + mint in one step. Returns the plaintext token plus
+   * contact info, or null if no eligible account matches. Prefer the split
+   * {@link findResetEligibleUser} / {@link mintResetTokenForUser} when the
+   * caller must avoid minting an undeliverable token.
+   */
+  async createPasswordResetToken(
+    identifier: string,
+    ipAddress?: string
+  ): Promise<{
+    userId: number;
+    username: string;
+    email?: string;
+    name?: string;
+    token: string;
+  } | null> {
+    const user = await this.findResetEligibleUser(identifier);
+    if (!user) return null;
+    const token = await this.mintResetTokenForUser(user.userId, ipAddress);
+    return { ...user, token };
+  }
+
+  /**
+   * Consume a reset token and set the new password. Same fail-safe posture as
+   * an admin set-password: enforce policy, then single-use-consume the token,
+   * then revoke every session BEFORE writing the new credential.
+   *
+   * A weak-password rejection happens BEFORE consuming, so the same link can be
+   * retried with a compliant password. Any other outstanding tokens for the
+   * user are invalidated on success.
+   */
+  async resetPasswordWithToken(
+    token: string,
+    newPassword: string
+  ): Promise<{
+    success: boolean;
+    message: string;
+    sessionsRevoked?: boolean;
+  }> {
+    const t = token?.trim();
+    // Uniform failure text: never distinguish unknown / expired / consumed.
+    const invalid = {
+      success: false as const,
+      message: 'This password reset link is invalid or has expired.',
+    };
+    if (!t) return invalid;
+
+    const row = await this.deps.db.getLivePasswordResetToken(hashToken(t));
+    if (!row) return invalid;
+
+    const user = await this.deps.db.getUserById(row.user_id);
+    if (!user) return invalid;
+
+    if (!this.deps.canSetPassword(this.toAuthUser(user))) {
+      return {
+        success: false,
+        message: `Password management is handled by ${this.deps.getUserAuthProvider(
+          this.toAuthUser(user)
+        )} for this account.`,
+      };
+    }
+
+    // Enforce policy BEFORE consuming so a rejected weak password leaves the
+    // link usable for another try.
+    const policy = this.validatePasswordPolicy(newPassword);
+    if (!policy.valid) {
+      return {
+        success: false,
+        message: `Password does not meet requirements: ${policy.errors.join('; ')}`,
+      };
+    }
+
+    // Single-use: flip consumed_at atomically. If a concurrent redemption won
+    // the race, this returns false and we stop — the other request is setting
+    // the password.
+    const consumed = await this.deps.db.consumePasswordResetToken(row.id);
+    if (!consumed) return invalid;
+
+    const bcrypt = await import('bcrypt');
+    const passwordHash = await bcrypt.hash(newPassword, 12);
+
+    // Revoke-first (see setUserPassword): a reset is the standard compromise
+    // response, so live tokens must die with the old password.
+    await this.deps.deleteUserSessions(user.id);
+
+    const updated = await this.deps.db.updateUser(user.id, { passwordHash });
+    if (!updated) {
+      return { success: false, message: 'Failed to reset password.' };
+    }
+
+    // Drop any other outstanding reset tokens for this user.
+    await this.deps.db.deleteUserPasswordResetTokens(user.id);
+
+    await this.deps.logAuthEvent(
+      user.id,
+      'password_reset',
+      `Password reset via token for user ${user.username}; all sessions revoked`
+    );
+
+    return {
+      success: true,
+      sessionsRevoked: true,
+      message:
+        'Your password has been reset. For your security, any existing ' +
+        'sessions have been signed out — please sign in with your new password.',
+    };
   }
 }

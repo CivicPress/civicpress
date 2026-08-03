@@ -15,6 +15,7 @@ import { ApiKeyOps } from './auth-service/api-key-ops.js';
 import { SessionOps } from './auth-service/session-ops.js';
 import { OAuthOps } from './auth-service/oauth-ops.js';
 import { PasswordOps } from './auth-service/password-ops.js';
+import { OperatorNotifier } from '../notifications/operator-notifier.js';
 
 const logger = new Logger();
 
@@ -161,6 +162,10 @@ export class AuthService {
         this.sessionOps.deleteUserSessions(userId),
       canSetPassword,
       getUserAuthProvider,
+      // Operator-center sink for security alerts (fresh account lockouts).
+      // Stateless writer over the same DB store as the DI singleton, so a
+      // locally-constructed instance is fine and avoids a constructor change.
+      operatorNotifier: new OperatorNotifier(db, logger),
     });
   }
 
@@ -685,6 +690,42 @@ export class AuthService {
     ...args: Parameters<PasswordOps['setUserPassword']>
   ): ReturnType<PasswordOps['setUserPassword']> {
     return this.passwordOps.setUserPassword(...args);
+  }
+
+  /**
+   * Resolve a reset-eligible account (username/email) without minting a token,
+   * or null. Callers MUST respond identically either way (anti-enumeration).
+   */
+  async findResetEligibleUser(
+    ...args: Parameters<PasswordOps['findResetEligibleUser']>
+  ): ReturnType<PasswordOps['findResetEligibleUser']> {
+    return this.passwordOps.findResetEligibleUser(...args);
+  }
+
+  /** Mint a single-use reset token for a known eligible user id. */
+  async mintResetTokenForUser(
+    ...args: Parameters<PasswordOps['mintResetTokenForUser']>
+  ): ReturnType<PasswordOps['mintResetTokenForUser']> {
+    return this.passwordOps.mintResetTokenForUser(...args);
+  }
+
+  /**
+   * Mint a single-use password-reset token for a username/email, or null if
+   * no eligible account matches. Callers MUST respond identically either way.
+   */
+  async createPasswordResetToken(
+    ...args: Parameters<PasswordOps['createPasswordResetToken']>
+  ): ReturnType<PasswordOps['createPasswordResetToken']> {
+    return this.passwordOps.createPasswordResetToken(...args);
+  }
+
+  /**
+   * Consume a reset token and set the new password (revokes all sessions).
+   */
+  async resetPasswordWithToken(
+    ...args: Parameters<PasswordOps['resetPasswordWithToken']>
+  ): ReturnType<PasswordOps['resetPasswordWithToken']> {
+    return this.passwordOps.resetPasswordWithToken(...args);
   }
 
   /**

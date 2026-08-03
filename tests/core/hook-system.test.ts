@@ -44,6 +44,22 @@ describe('Hook System', () => {
 
       rmSync(newTestDir, { recursive: true, force: true });
     });
+
+    it('default config references only implemented workflows (no phantom advertising)', () => {
+      // `update-index` is the only workflow the WorkflowEngine registers today.
+      // The default hooks must not list workflow names that are silently skipped
+      // (validate-record / notify-*), or the config over-advertises what runs.
+      // If a genuinely new built-in workflow is added + registered, update this.
+      const config = hookSystem.getConfiguration();
+      const referenced = new Set<string>();
+      for (const hook of Object.values(config?.hooks ?? {})) {
+        const wf = Array.isArray(hook.workflows)
+          ? hook.workflows
+          : ((hook.workflows as { value?: string[] })?.value ?? []);
+        for (const name of wf) referenced.add(name);
+      }
+      expect([...referenced].sort()).toEqual(['update-index']);
+    });
   });
 
   describe('Hook Registration and Emission', () => {

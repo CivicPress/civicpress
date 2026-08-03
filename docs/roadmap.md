@@ -20,7 +20,9 @@ alpha toward a stable, production-grade civic infrastructure platform._
 > the audit's deferred carry-forward surfaces audited (no live vulnerabilities),
 > plus Low defense-in-depth hardening and dead-code cleanup — pending the next
 > develop→main PR. **Genuinely open (Roadmap-tier, need scoping):** `ui-003`
-> SSR; signed appliance image; HW/device-repo work; equity/i18n; device-repo
+> public-read prerender (SSG — static public record pages; **not** live SSR,
+> which is decided against — deferred to the "easy deployment" epic); signed
+> appliance image; HW/device-repo work; equity/i18n; device-repo
 > required-status-checks branch protection. The phase-tracking and status
 > snapshots below are historical; the forward-looking milestone sections stand.
 

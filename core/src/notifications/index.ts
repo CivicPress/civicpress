@@ -7,6 +7,17 @@ export { AuthTemplate } from './templates/auth-template.js';
 
 // Channels (canonical implementations)
 export { EmailChannel } from './channels/email-channel.js';
+export {
+  ConsoleChannel,
+  isConsoleChannelEnabled,
+} from './channels/console-channel.js';
+
+// Operator notification center (the "inbox") + password recovery orchestration
+export { OperatorNotifier } from './operator-notifier.js';
+export {
+  PasswordRecoveryService,
+  defaultOutboxDir,
+} from './password-recovery-service.js';
 
 // Supporting classes
 export { NotificationAudit } from './notification-audit.js';
@@ -44,6 +55,22 @@ export type {
 export type { SecurityValidationResult } from './notification-security.js';
 
 export type { LogEntry } from './notification-logger.js';
+
+export type {
+  OperatorNotificationType,
+  OperatorNotificationView,
+} from './operator-notifier.js';
+
+export type {
+  ConsoleChannelOptions,
+} from './channels/console-channel.js';
+
+export type {
+  ResetTokenIssuer,
+  PasswordResetOutcome,
+  PasswordResetChannel,
+  PasswordRecoveryDeps,
+} from './password-recovery-service.js';
 
 export type {
   EmailMessage,

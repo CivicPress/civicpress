@@ -455,7 +455,7 @@ onUnmounted(() => {
                 variant="link"
                 size="sm"
                 icon="i-lucide-circle-x"
-                aria-label="Clear search"
+                :aria-label="t('common.clearSearch')"
                 data-test="clear-search"
                 @click="searchQuery = ''"
               />

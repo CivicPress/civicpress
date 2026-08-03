@@ -11,6 +11,8 @@ import { Logger } from './utils/logger.js';
 import {
   NotificationService,
   NotificationConfig,
+  OperatorNotifier,
+  PasswordRecoveryService,
 } from './notifications/index.js';
 import { UnifiedCacheManager } from './cache/unified-cache-manager.js';
 import { Geography } from './types/geography.js';
@@ -180,6 +182,8 @@ export class CivicPress {
   private _indexingService?: IndexingService;
   private _notificationService?: NotificationService;
   private _notificationConfig?: NotificationConfig;
+  private _operatorNotifier?: OperatorNotifier;
+  private _passwordRecovery?: PasswordRecoveryService;
   private _cacheManager?: UnifiedCacheManager;
 
   constructor(config: CivicPressConfig) {
@@ -413,6 +417,22 @@ export class CivicPress {
         this.container.resolve<NotificationConfig>('notificationConfig');
     }
     return this._notificationConfig;
+  }
+
+  getOperatorNotifier(): OperatorNotifier {
+    if (!this._operatorNotifier) {
+      this._operatorNotifier =
+        this.container.resolve<OperatorNotifier>('operatorNotifier');
+    }
+    return this._operatorNotifier;
+  }
+
+  getPasswordRecoveryService(): PasswordRecoveryService {
+    if (!this._passwordRecovery) {
+      this._passwordRecovery =
+        this.container.resolve<PasswordRecoveryService>('passwordRecovery');
+    }
+    return this._passwordRecovery;
   }
 
   getCacheManager(): UnifiedCacheManager {

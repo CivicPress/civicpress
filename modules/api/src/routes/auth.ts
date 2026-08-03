@@ -9,6 +9,7 @@ import {
   sendSuccess,
   handleApiError,
   logApiRequest,
+  logApiError,
 } from '../utils/api-logger.js';
 
 const router = Router();
@@ -133,6 +134,108 @@ router.post('/password', async (req, res) => {
       res,
       'Password authentication failed'
     );
+  }
+});
+
+/**
+ * POST /api/auth/forgot-password
+ * Begin a password reset for a username or email. ALWAYS responds 200 with the
+ * same generic message whether or not an account matched (anti-enumeration).
+ * Delivery is handled by the recovery service: a reset link over a user-facing
+ * channel when one is configured (email, or the console dev sink), otherwise an
+ * actionable task in the operator notification center. Rate-limited by the
+ * strict window on the /auth mount.
+ */
+router.post('/forgot-password', async (req, res) => {
+  logApiRequest(req, { operation: 'forgot_password' });
+
+  // Uniform response — identical for a hit, a miss, or an OAuth-only account.
+  const uniform = {
+    message:
+      'If an account matches, a password reset has been started. If you do ' +
+      'not receive a reset link, contact your administrator.',
+  };
+
+  try {
+    const { identifier, email, username } = req.body ?? {};
+    const who =
+      typeof identifier === 'string'
+        ? identifier
+        : typeof email === 'string'
+          ? email
+          : typeof username === 'string'
+            ? username
+            : '';
+
+    // A blank request is still answered uniformly (no 400 that would let a
+    // caller distinguish "missing field" from "no such user").
+    if (who.trim()) {
+      const civicPress = req.civicPress as CivicPress;
+      const recovery = civicPress.getPasswordRecoveryService();
+      const base = process.env.BASE_URL || 'http://localhost:3030';
+      const resetUrlBase = `${base.replace(/\/$/, '')}/auth/reset-password`;
+
+      // Do not await failures into the response — the outcome is server-side
+      // telemetry only and must never change what the caller sees.
+      const outcome = await recovery.requestReset(who.trim(), {
+        resetUrlBase,
+        ipAddress: req.ip,
+      });
+      logApiRequest(req, {
+        operation: 'forgot_password',
+        outcome: outcome.outcome,
+        channel: outcome.channel,
+      });
+    }
+
+    sendSuccess(uniform, req, res, { operation: 'forgot_password' });
+  } catch (error) {
+    // Even on an internal error, do not leak specifics — log server-side and
+    // respond uniformly so a failure is indistinguishable from a no-match.
+    logApiError('forgot_password', error, req);
+    sendSuccess(uniform, req, res, { operation: 'forgot_password' });
+  }
+});
+
+/**
+ * POST /api/auth/reset-password
+ * Consume a reset token and set a new password. Invalid/expired/consumed
+ * tokens all return the same 400 (no oracle). On success every session is
+ * revoked, so the user must sign in again with the new password.
+ */
+router.post('/reset-password', async (req, res) => {
+  logApiRequest(req, { operation: 'reset_password' });
+
+  try {
+    const { token, newPassword, password } = req.body ?? {};
+    const newPass = typeof newPassword === 'string' ? newPassword : password;
+
+    if (!token || typeof token !== 'string' || !newPass) {
+      const error = new HttpError(
+        400,
+        'A reset token and a new password are required',
+        'MISSING_FIELDS'
+      );
+      return handleApiError('reset_password', error, req, res);
+    }
+
+    const civicPress = req.civicPress as CivicPress;
+    const authService = civicPress.getAuthService();
+    const result = await authService.resetPasswordWithToken(token, newPass);
+
+    if (!result.success) {
+      const error = new HttpError(400, result.message, 'RESET_FAILED');
+      return handleApiError('reset_password', error, req, res, result.message);
+    }
+
+    sendSuccess(
+      { message: result.message, sessionsRevoked: result.sessionsRevoked },
+      req,
+      res,
+      { operation: 'reset_password' }
+    );
+  } catch (error) {
+    handleApiError('reset_password', error, req, res, 'Failed to reset password');
   }
 });
 

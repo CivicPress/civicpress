@@ -127,14 +127,15 @@ const collaborativeRef = ref<InstanceType<
 > | null>(null);
 
 const active = () =>
-  (useCollaborative.value ? collaborativeRef.value : codeMirrorRef.value) as
-    | Record<string, unknown>
-    | null;
+  (useCollaborative.value
+    ? collaborativeRef.value
+    : codeMirrorRef.value) as Record<string, unknown> | null;
 
 const callActive = (method: string, ...args: unknown[]): unknown => {
   const target = active();
   const fn = target?.[method];
-  if (typeof fn === 'function') return (fn as (...a: unknown[]) => unknown)(...args);
+  if (typeof fn === 'function')
+    return (fn as (...a: unknown[]) => unknown)(...args);
   return undefined;
 };
 
@@ -149,6 +150,8 @@ defineExpose({
   getValue: () => (callActive('getValue') as string) ?? props.modelValue,
   setValue: (value: string) => callActive('setValue', value),
   getEditor: () => callActive('getEditor'),
+  executeUndo: () => callActive('executeUndo'),
+  executeRedo: () => callActive('executeRedo'),
   executeBold: () => callActive('executeBold'),
   executeItalic: () => callActive('executeItalic'),
   executeCode: () => callActive('executeCode'),

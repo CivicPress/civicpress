@@ -5,9 +5,37 @@ import { createRequire } from 'module';
 import {
   BackupService,
   CentralConfigManager,
+  DatabaseService,
+  OperatorNotifier,
   type BackupCreateResult,
   type BackupRestoreResult,
 } from '@civicpress/core';
+
+/**
+ * Best-effort: record a failed backup in the operator notification center so
+ * an unattended (scheduled/scripted) failure is not invisible. Constructed
+ * only on the failure path; never allowed to mask the original backup error.
+ */
+async function notifyBackupFailure(
+  dbConfig: ReturnType<typeof CentralConfigManager.getDatabaseConfig>,
+  error: unknown
+): Promise<void> {
+  if (!dbConfig) return;
+  let db: DatabaseService | undefined;
+  try {
+    db = new DatabaseService(dbConfig);
+    await db.initialize();
+    await new OperatorNotifier(db).systemError({
+      title: 'Backup failed',
+      body: error instanceof Error ? error.message : String(error),
+      dedupeKey: 'backup_failed',
+    });
+  } catch {
+    // Swallow — a notification failure must never eclipse the backup error.
+  } finally {
+    await db?.close().catch(() => {});
+  }
+}
 import { cliSuccess, cliInfo, cliWarn } from '../utils/cli-output.js';
 import { withCli } from '../utils/with-cli.js';
 import { initializeLogger } from '../utils/global-options.js';
@@ -110,19 +138,27 @@ async function handleCreate(
   const compress = options.compress !== false;
 
   const dbConfig = CentralConfigManager.getDatabaseConfig();
-  const result = await BackupService.createBackup({
-    dataDir,
-    outputDir,
-    systemDataDir,
-    includeStorage,
-    includeGitBundle,
-    compress,
-    version: civicpressVersion,
-    databaseConfig: dbConfig,
-    extraMetadata: {
-      createdBy: 'civic-cli',
-    },
-  });
+  let result: BackupCreateResult;
+  try {
+    result = await BackupService.createBackup({
+      dataDir,
+      outputDir,
+      systemDataDir,
+      includeStorage,
+      includeGitBundle,
+      compress,
+      version: civicpressVersion,
+      databaseConfig: dbConfig,
+      extraMetadata: {
+        createdBy: 'civic-cli',
+      },
+    });
+  } catch (error) {
+    // Surface unattended failures in the operator center, then re-throw so the
+    // CLI reports the error as before.
+    await notifyBackupFailure(dbConfig, error);
+    throw error;
+  }
 
   outputCreateResult(
     result,

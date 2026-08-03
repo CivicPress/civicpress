@@ -1067,24 +1067,70 @@ they are pre-existing gaps the audit made visible.
     (drives `RecordsService` directly, real DB) — **relocated** to
     `tests/integration/` (alongside `draft-publish-workflow.test.ts`) so
     `tests/api/` honestly means HTTP; content unchanged.
-- [ ] **No UI page-component or browser-e2e tests** (no Playwright/Cypress); the
-      API-critical composables (`useRecordEditorActions`, `useRecordLock`,
-      `useRecordDetail`, `useCsrf`, `useAuth`) are untested.
+- [ ] **UI page-component / e2e coverage — IN PROGRESS 2026-08-01.** Using the
+      established `@vue/test-utils` `mount` + `#imports`-shim harness (not
+      `@nuxt/test-utils` `mountSuspended`, which would need a divergent
+      `environment: 'nuxt'` config fighting the root-based setup). - **Done:**
+      auth-flow pages (`login`, `forgot-password`, `reset-password` — 12 tests);
+      editor composables `useRecordEditorActions` (save/publish/ delete),
+      `useRecordLock` (acquire/409/release/lost-lock/refresh), and `useAuth` (13
+      tests). Also fixed the test config's `#app` alias (was a dir with no index
+      → any `from '#app'` import failed to resolve; now points at the
+      nuxt-imports shim like `#imports`). Also ported an `enforce:'pre'` Vite
+      plugin (from the HW frontend harness) that rewrites
+      `import.meta.client`→`true` (space-padded) so client-guarded composables
+      run under test — `useCsrf` (7) and `useRecordDetail` (fetch, link
+      navigation, status-history normalization — 6) are now covered. Then the
+      **records-editor page SFCs were mounted end-to-end (2026-08-01, cont.):**
+      `records/[type]/[id]/edit.vue` (11 tests — mount-time fetch, published-vs-
+      draft breadcrumbs, loading skeleton, access-denied gating, fetch-failure
+      toast, the `@saved`/`@delete` wiring driven through real child emits,
+      delete→navigate, and the `realtimeEnabled`→`collaborativeMode`
+      passthrough) and `records/[type]/new.vue` (6 tests — role-gated create,
+      POST→navigate on success, and both create-failure paths). ⚠️ Harness
+      gotcha worth remembering: `edit.vue` _imports_ RecordForm so it stubs via
+      `vi.mock('~/components/RecordForm.vue')`, but `new.vue` _auto-imports_ it
+      (no import statement in the SFC) — `vi.mock` can't intercept an
+      auto-import, so there RecordForm must be a global stub component or the
+      mount fails to resolve it. UI suite 239→256. Then the **page tail was
+      covered (2026-08-01, cont.), UI suite 256→331 (+75 across 13 files):** the
+      record **detail cluster** — `records/[type]/[id]/index.vue` (6, mocking
+      the already-tested `useRecordDetail`) plus its seven `_components/*`
+      panels (RecordHeaderInfo, RecordContentBody, LinkedRecordsPanel,
+      AdditionalInfoPanel, AttachmentsPanel, TranscriptViewer,
+      RecordDetailAccordion = 33 tests); the **list/create pages**
+      `records/drafts.vue` (11 — mount-fetch+sort, `confirm()`-gated delete,
+      perm-gated actions) and the generic `records/new.vue` (4); and the **edit
+      pages** `settings/users/[username]/edit.vue` (7 — the self-or-manager
+      onMounted guard + PUT/DELETE), `geography/[id]/edit.vue` (5), and
+      `settings/configuration/[configFile]/edit.vue` (9 — load, field
+      getters/updaters, save + post-save validate, reset, perm gate). ⚠️ Two
+      more harness notes: (a) a component importing `useRoute`/`useRouter`
+      straight from `vue-router` needs a `vue-router` alias in
+      `vitest.config.ui.mjs` (added — same transitive-dep resolution gap as
+      `vue-i18n`) or `vi.mock('vue-router')` silently fails to intercept and the
+      real one throws "injection Symbol(router) not found"; (b) a
+      `<UButton @click="$emit('click')">` stub must declare `emits: ['click']`
+      or `@click` also falls through as a native DOM listener and the handler
+      fires twice. - **Still open:** only the browser-e2e layer
+      (Playwright/Cypress) for a few journeys — independent of the `ui-003` SSR
+      decision.
 - [x] **Cloud storage providers now covered — DONE 2026-07-31 (PR #23).** The
       S3/Azure/GCS SDK code (reachable via the API since `42ab1f0` applied
       `storage.yml`) had zero coverage — every prior suite drove
       `active_provider:'local'`. Added two hermetic suites (38 tests) that mock
-      the `sdk-loader` seam so they never import the real, often-absent cloud SDKs
-      (Azure/GCS are `optionalDependencies` and were not installed on the VM):
+      the `sdk-loader` seam so they never import the real, often-absent cloud
+      SDKs (Azure/GCS are `optionalDependencies` and were not installed on the
+      VM):
   - `cloud-provider-ops.test.ts` (21) — upload/download/delete/stream across all
-    three providers: provider_path formatting, prefix handling, not-found → null,
-    S3 `transformToByteArray` vs async-iterable Body, Range headers, streamed
-    byte-count sizing, and the GCS-stream-download-unsupported → null limitation
-    (pinned explicitly rather than left silent).
+    three providers: provider_path formatting, prefix handling, not-found →
+    null, S3 `transformToByteArray` vs async-iterable Body, Range headers,
+    streamed byte-count sizing, and the GCS-stream-download-unsupported → null
+    limitation (pinned explicitly rather than left silent).
   - `provider-init.test.ts` (17) — client bootstrap: S3
     creds/endpoint/sessionToken/forcePathStyle, Azure connection-string vs
-    shared-key, GCS bucket exists/create/keyFilename, and every missing-credential
-    error path.
+    shared-key, GCS bucket exists/create/keyFilename, and every
+    missing-credential error path.
   - Storage suite now 204 green (was 166); `tsc --noEmit` + eslint clean. The UI
     page-component/composable gap above remains open.
 
@@ -1116,8 +1162,12 @@ they are pre-existing gaps the audit made visible.
       `GeographySelector` v-model type (added `value-key="value"` + typed the
       ref `GeographyCategory | null`), and the API dev-default CORS origin now
       includes the UI dev port `:3030` (was `:3000`-only, blocking `pnpm dev`).
-- [ ] `forgot-password.vue` is a `mailto:` stub and **has no backend route** at
-      all (confirmed absent).
+- [x] **DONE 2026-07-31.** `forgot-password.vue` was a `mailto:` stub with no
+      backend route. Now a real self-service reset flow (channel-by-audience:
+      email/console deliver a token link, else an operator task) + a reset page,
+      backing API (`/auth/forgot-password`, `/auth/reset-password`), the
+      operator notification center, and CLI. On `origin/develop`
+      (`7f7ef4d`→`8795802`).
 
 **Advertised-but-stub (honesty — either implement or stop advertising)**
 

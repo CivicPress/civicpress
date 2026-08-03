@@ -16,6 +16,8 @@ export default defineNuxtPlugin(async (_nuxtApp) => {
       const isPublicEndpoint =
         url.includes('/api/v1/auth/login') ||
         url.includes('/api/v1/auth/password') ||
+        url.includes('/api/v1/auth/forgot-password') ||
+        url.includes('/api/v1/auth/reset-password') ||
         url.includes('/api/v1/health') ||
         url.includes('/api/v1/info') ||
         url.includes('/api/v1/docs') ||

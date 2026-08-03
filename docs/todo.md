@@ -1,6 +1,13 @@
 # CivicPress TODO List
 
-## Current Priority: API Enhancement Phase (v1.3.0)
+> **Status note (2026-08-03).** This is a historical / aspirational scratch
+> list. The version numbers it used (v1.3–v1.6) are **superseded** and do NOT
+> reflect the project's release plan — the authoritative roadmap is
+> `docs/roadmap.md` (the v0.2.x → v1.0 ladder), with current, code-verified
+> status in `docs/project-status.md` and the active backlog in
+> `docs/backlog/2026-07-post-audit-hardening.md`. Kept for idea capture only.
+
+## Current Priority (historical): API Enhancement Phase
 
 ### Recent Achievements
 
@@ -256,20 +263,21 @@ V2)
 
 #### Configuration Export/Import
 
-- [ ] **Implement configuration export API endpoint**
-  - **Current Status**: Not implemented - UI shows "coming soon" message
-  - **File**: `modules/ui/app/pages/settings/configuration/index.vue` (line 321)
-  - **Priority**: Low - nice to have feature
-  - **Action**: Create `POST /api/v1/config/export` endpoint to export all
-    configs as ZIP
-  - **Action**: Implement UI download functionality
+- [x] **Configuration export API endpoint — DONE 2026-08-01.**
+      `GET /api/v1/config/export` (admin / `config:manage`) returns a JSON
+      bundle of the instance's non-secret config as raw YAML keyed by type;
+      credential-bearing config (`notifications`, `storage`) is never included.
+      The UI's "Export All" button downloads it as `civicpress-config.json`
+      client-side.
 
-- [ ] **Implement configuration import UI**
-  - **Current Status**: Not implemented - UI shows "coming soon" message
-  - **File**: `modules/ui/app/pages/settings/configuration/index.vue` (line 340)
-  - **Priority**: Low - nice to have feature
-  - **Action**: Create file upload UI for configuration import
-  - **Action**: Validate and apply imported configurations
+- [x] **Configuration import UI — DONE 2026-08-01.**
+      `POST /api/v1/config/import` (admin) applies a
+      `{ files: { <type>: <yaml> } }` bundle: each entry is validated (bare type
+      name + parseable YAML) before it is written, secret config is skipped, and
+      a per-file `applied/skipped/failed` result set is returned. The UI's
+      "Import" button file-picks a bundle and summarizes the outcome. Covered by
+      `tests/api/config-import-export.test.ts` (10) +
+      `tests/ui/pages/config-index.test.ts` (6).
 
 #### Core Library Enhancements
 
@@ -306,7 +314,27 @@ V2)
   - **Action**: Replace `t('records.currentUser')` with
     `useAuth().user.value?.name` or similar
 
-### Short Term Tasks (v1.4.0 - Next 1-2 months)
+#### Notifications & Password Recovery Follow-ups
+
+Deliberate deferrals from the forgot-password / operator notification center
+work — both now closed.
+
+- [x] **Wire an "update available" producer — DONE.** Added
+      `core/src/system/update-checker.ts` (`UpdateChecker` + minimal semver
+      `isNewerVersion` + `fetchLatestReleaseTag`) and the
+      `civic system:check-updates` CLI command (local/cron-friendly, no auth;
+      `--latest` for offline). It emits the deduped `updateAvailable` operator
+      notification when a newer GitHub release exists. 9 core tests + 2 CLI
+      tests.
+
+- [x] **Cover the email password-reset delivery path with an SMTP mock — DONE.**
+      `PasswordRecoveryService` gained an injectable `notificationService` /
+      `notificationConfig` seam; two `PasswordRecoveryService` tests now assert
+      the reset link is delivered via email (fake transport) when the email
+      channel is configured, and that a channel-configured-but-no-address user
+      falls through to the operator task.
+
+### Short Term Tasks (Next 1-2 months)
 
 #### Plugin System Foundation
 
@@ -347,7 +375,7 @@ V2)
   - `GET /api/audit/user/:userId` - Get user audit trail
   - `POST /api/audit/export` - Export audit trail
 
-### Medium Term Tasks (v1.5.0 - Next 3-6 months)
+### Medium Term Tasks (Next 3-6 months)
 
 #### Civic Modules Implementation
 
@@ -391,7 +419,7 @@ V2)
   - Federation security
   - Node management
 
-### Long Term Tasks (v1.6.0 - Next 6-12 months)
+### Long Term Tasks (Next 6-12 months)
 
 #### Multi-tenant Support
 

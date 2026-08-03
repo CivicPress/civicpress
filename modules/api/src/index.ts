@@ -30,6 +30,7 @@ import { workflowsRouter } from './routes/workflows.js';
 import { createIndexingRouter } from './routes/indexing.js';
 import { createHistoryRouter } from './routes/history.js';
 import { createStatusRouter } from './routes/status.js';
+import { createAdminNotificationsRouter } from './routes/admin-notifications.js';
 import { createDiagnoseRouter } from './routes/diagnose.js';
 import docsRouter from './routes/docs.js';
 import { createValidationRouter } from './routes/validation.js';
@@ -462,6 +463,19 @@ export class CivicPressAPI {
         next();
       },
       createCacheRouter(this.civicPress.getCacheManager())
+    );
+
+    // Operator notification center (the "inbox") — admin only. The read/ack
+    // surface over OperatorNotifier; producers write to it from core.
+    this.app.use(
+      apiPath('admin/notifications'),
+      authMiddleware(this.civicPress),
+      requirePermission('system:admin'),
+      (req, _res, next) => {
+        req.civicPress = this.civicPress;
+        next();
+      },
+      createAdminNotificationsRouter()
     );
 
     this.app.use(

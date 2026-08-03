@@ -15,7 +15,13 @@ import {
 import { EditorState, Compartment } from '@codemirror/state';
 import { markdown } from '@codemirror/lang-markdown';
 import { oneDark } from '@codemirror/theme-one-dark';
-import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
+import {
+  defaultKeymap,
+  history,
+  historyKeymap,
+  undo,
+  redo,
+} from '@codemirror/commands';
 import { searchKeymap, highlightSelectionMatches } from '@codemirror/search';
 import {
   autocompletion,
@@ -354,6 +360,14 @@ const executeImage = () => {
   });
 };
 
+const executeUndo = () => {
+  if (view) undo(view);
+};
+
+const executeRedo = () => {
+  if (view) redo(view);
+};
+
 // Expose methods
 defineExpose({
   focus: () => view?.focus(),
@@ -372,6 +386,8 @@ defineExpose({
   },
   getEditor: () => view,
   // Toolbar actions
+  executeUndo,
+  executeRedo,
   executeBold,
   executeItalic,
   executeCode,

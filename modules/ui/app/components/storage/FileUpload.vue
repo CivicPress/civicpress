@@ -4,8 +4,9 @@
     <div
       class="file-upload-area"
       :class="{
-        'border-primary-500 bg-primary-50': isDragOver,
-        'border-gray-300 bg-white': !isDragOver,
+        'border-primary-500 bg-primary-50 dark:bg-primary-950': isDragOver,
+        'border-gray-300 bg-white dark:border-gray-600 dark:bg-gray-900':
+          !isDragOver,
         'border-dashed': true,
         'border-2': true,
         'rounded-lg': true,
@@ -31,10 +32,10 @@
 
       <!-- Upload Label -->
       <div class="space-y-2">
-        <h3 class="text-lg font-medium text-gray-900">
+        <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">
           {{ uploadLabel }}
         </h3>
-        <p class="text-sm text-gray-600">
+        <p class="text-sm text-gray-600 dark:text-gray-400">
           {{ uploadDescription }}
         </p>
       </div>
@@ -58,7 +59,11 @@
           :disabled="isUploading"
         >
           <UIcon name="i-lucide-upload" class="w-4 h-4 mr-2" />
-          {{ t('settings.storage.uploadFilesCount', { count: selectedFiles.length }) }}
+          {{
+            t('settings.storage.uploadFilesCount', {
+              count: selectedFiles.length,
+            })
+          }}
         </UButton>
 
         <UButton
@@ -74,15 +79,20 @@
 
     <!-- Upload Progress -->
     <div v-if="uploads.length > 0" class="upload-progress mt-4">
-      <h4 class="text-sm font-medium text-gray-700 mb-3">
-        {{ t('settings.storage.uploadProgress', { completed: completedCount, total: uploads.length }) }}
+      <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+        {{
+          t('settings.storage.uploadProgress', {
+            completed: completedCount,
+            total: uploads.length,
+          })
+        }}
       </h4>
 
       <div class="space-y-3">
         <div
           v-for="upload in uploads"
           :key="upload.id"
-          class="upload-item bg-white border border-gray-200 rounded-lg p-3"
+          class="upload-item bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3"
         >
           <div class="flex items-center space-x-3">
             <UIcon
@@ -90,7 +100,9 @@
               class="w-5 h-5 text-gray-500 flex-shrink-0"
             />
             <div class="flex-1 min-w-0">
-              <p class="text-sm font-medium text-gray-900 truncate">
+              <p
+                class="text-sm font-medium text-gray-900 dark:text-gray-100 truncate"
+              >
                 {{ upload.file.name }}
               </p>
               <p class="text-xs text-gray-500">
@@ -105,7 +117,9 @@
                 "
               >
                 {{
-                  upload.status === 'error' ? t('common.failed') : `${upload.progress}%`
+                  upload.status === 'error'
+                    ? t('common.failed')
+                    : `${upload.progress}%`
                 }}
               </span>
               <UButton
@@ -232,7 +246,10 @@ const uploadLabel = computed(() => {
 });
 
 const uploadDescription = computed(() => {
-  return t('settings.storage.uploadDescription', { types: props.allowedTypes.join(', '), maxSize: props.maxSize });
+  return t('settings.storage.uploadDescription', {
+    types: props.allowedTypes.join(', '),
+    maxSize: props.maxSize,
+  });
 });
 
 const completedCount = computed(() => {
@@ -321,7 +338,9 @@ const validateFile = (file: File): boolean => {
   if (!extension || !props.allowedTypes.includes(extension)) {
     toast.add({
       title: t('settings.storage.invalidFileType'),
-      description: t('settings.storage.fileTypeNotAllowed', { type: extension }),
+      description: t('settings.storage.fileTypeNotAllowed', {
+        type: extension,
+      }),
       color: 'error',
     });
     return false;
@@ -332,7 +351,9 @@ const validateFile = (file: File): boolean => {
   if (file.size > maxSizeBytes) {
     toast.add({
       title: t('settings.storage.fileTooLarge'),
-      description: t('settings.storage.fileSizeExceedsLimit', { maxSize: props.maxSize }),
+      description: t('settings.storage.fileSizeExceedsLimit', {
+        maxSize: props.maxSize,
+      }),
       color: 'error',
     });
     return false;
@@ -388,7 +409,11 @@ const uploadFiles = async () => {
 
   for (const item of newUploads) {
     try {
-      item.status = 'uploading' as 'pending' | 'uploading' | 'completed' | 'error';
+      item.status = 'uploading' as
+        | 'pending'
+        | 'uploading'
+        | 'completed'
+        | 'error';
       item.progress = 0;
 
       // Simulate progress (in real implementation, use XMLHttpRequest or fetch with progress)
@@ -416,9 +441,15 @@ const uploadFiles = async () => {
       clearInterval(progressInterval);
 
       if (response.success) {
-        item.status = 'completed' as 'pending' | 'uploading' | 'completed' | 'error';
+        item.status = 'completed' as
+          | 'pending'
+          | 'uploading'
+          | 'completed'
+          | 'error';
         item.progress = 100;
-        item.message = t('settings.storage.uploadSuccessful') as string | undefined;
+        item.message = t('settings.storage.uploadSuccessful') as
+          | string
+          | undefined;
 
         // Emit success
         emit('upload-complete', [
@@ -435,12 +466,18 @@ const uploadFiles = async () => {
           },
         ]);
       } else {
-        throw new Error(extractErrorMessage(response) || t('settings.storage.uploadFailed'));
+        throw new Error(
+          extractErrorMessage(response) || t('settings.storage.uploadFailed')
+        );
       }
     } catch (error) {
       item.status = 'error' as 'pending' | 'uploading' | 'completed' | 'error';
       item.progress = 0;
-      item.message = (error instanceof Error ? error.message : t('settings.storage.uploadFailed')) as string | undefined;
+      item.message = (
+        error instanceof Error
+          ? error.message
+          : t('settings.storage.uploadFailed')
+      ) as string | undefined;
 
       emit('upload-error', item.message || t('settings.storage.uploadFailed'));
     }

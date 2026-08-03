@@ -5,8 +5,16 @@ import {
 } from '../notification-template.js';
 
 export class AuthTemplate extends NotificationTemplate {
-  constructor(name: string, template: string) {
+  private subjectTemplate?: string;
+
+  /**
+   * @param subject Optional subject line (may contain {{variables}}). When
+   * omitted, ProcessedTemplate carries no subject and the channel applies its
+   * own fallback — preserving the pre-existing behaviour of the 2-arg callers.
+   */
+  constructor(name: string, template: string, subject?: string) {
     super(name, template);
+    this.subjectTemplate = subject;
   }
 
   /**
@@ -30,6 +38,9 @@ export class AuthTemplate extends NotificationTemplate {
     const htmlBody = this.createHtmlVersion(processedBody, data);
 
     return {
+      subject: this.subjectTemplate
+        ? this.replaceVariables(this.subjectTemplate, data)
+        : undefined,
       body: processedBody,
       html: htmlBody,
       text: this.htmlToText(htmlBody),
