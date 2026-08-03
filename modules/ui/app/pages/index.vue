@@ -182,7 +182,8 @@ const loadDashboardData = async () => {
     await fetchOrganizationInfo();
     await fetchRecentRecords();
   } catch (err: unknown) {
-    error.value = (err instanceof Error ? err.message : '') || t('home.failedToLoad');
+    error.value =
+      (err instanceof Error ? err.message : '') || t('home.failedToLoad');
     console.error('Error loading dashboard data:', err);
   } finally {
     loading.value = false;
@@ -305,7 +306,7 @@ watch(isAuthenticated, (newValue) => {
                     variant="link"
                     size="sm"
                     icon="i-lucide-circle-x"
-                    aria-label="Clear search"
+                    :aria-label="t('common.clearSearch')"
                     @click="homeSearchQuery = ''"
                   />
                 </template>

@@ -14,12 +14,8 @@ const authStore = useAuthStore();
 const $civicApi = useNuxtApp().$civicApi;
 
 // Record utilities
-const {
-  formatDate,
-  formatRelativeTime,
-  getTypeLabel,
-  getTypeIcon,
-} = useRecordUtils();
+const { formatDate, formatRelativeTime, getTypeLabel, getTypeIcon } =
+  useRecordUtils();
 
 // Reactive state
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -52,7 +48,8 @@ const fetchDrafts = async () => {
       throw new Error('Failed to load drafts');
     }
   } catch (err: unknown) {
-    error.value = (err instanceof Error ? err.message : '') || 'Failed to load drafts';
+    error.value =
+      (err instanceof Error ? err.message : '') || 'Failed to load drafts';
     console.error('Error fetching drafts:', err);
   } finally {
     loading.value = false;
@@ -85,7 +82,8 @@ const deleteDraft = async (draft: { id: string; title?: string }) => {
     const toast = useToast();
     toast.add({
       title: 'Delete failed',
-      description: (err instanceof Error ? err.message : '') || 'Failed to delete draft',
+      description:
+        (err instanceof Error ? err.message : '') || 'Failed to delete draft',
       color: 'error',
     });
   }
@@ -295,7 +293,7 @@ const breadcrumbItems = computed(() => [
                   variant="ghost"
                   size="sm"
                   @click.stop="editDraft(draft)"
-                  aria-label="Edit draft"
+                  :aria-label="t('records.drafts.editDraft')"
                 >
                   Edit
                 </UButton>
@@ -316,7 +314,7 @@ const breadcrumbItems = computed(() => [
                     variant="ghost"
                     size="sm"
                     @click.stop
-                    aria-label="More options"
+                    :aria-label="t('common.moreOptions')"
                   />
                 </UDropdownMenu>
               </div>

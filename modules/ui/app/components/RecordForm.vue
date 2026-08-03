@@ -648,7 +648,7 @@ defineExpose({
               variant="ghost"
               size="xs"
               @click="showSidebar = !showSidebar"
-              aria-label="Toggle sidebar"
+              :aria-label="t('records.editor.toggleSidebar')"
             />
           </div>
 
@@ -692,7 +692,7 @@ defineExpose({
           class="hidden lg:block w-1 bg-gray-200 dark:bg-gray-800 cursor-col-resize hover:bg-primary-500 dark:hover:bg-primary-600 transition-colors"
           @mousedown="startResize"
           role="separator"
-          aria-label="Resize editor and preview"
+          :aria-label="t('records.editor.resizeEditorPreview')"
         />
 
         <!-- Preview Section -->
@@ -717,7 +717,7 @@ defineExpose({
               variant="ghost"
               size="xs"
               @click="showPreview = false"
-              aria-label="Close preview"
+              :aria-label="t('records.editor.closePreview')"
             />
           </div>
           <PreviewPanel
@@ -771,7 +771,7 @@ defineExpose({
         v-if="isMobile && showSidebar"
         class="fixed inset-0 bg-black/50 z-20 lg:hidden"
         @click="showSidebar = false"
-        aria-label="Close sidebar"
+        :aria-label="t('records.editor.closeSidebar')"
       />
     </div>
   </div>

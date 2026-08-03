@@ -77,7 +77,9 @@
     "only": "seulement",
     "retry": "Réessayer",
     "refresh": "Actualiser",
-    "download": "Télécharger"
+    "download": "Télécharger",
+    "clearSearch": "Effacer la recherche",
+    "moreOptions": "Plus d'options"
   },
   "home": {
     "title": "CivicPress",
@@ -516,7 +518,11 @@
         "insertImage": "Insérer une image",
         "showPreview": "Afficher l'aperçu",
         "hidePreview": "Masquer l'aperçu"
-      }
+      },
+      "toggleSidebar": "Basculer la barre latérale",
+      "resizeEditorPreview": "Redimensionner l'éditeur et l'aperçu",
+      "closePreview": "Fermer l'aperçu",
+      "closeSidebar": "Fermer la barre latérale"
     },
     "updateRecord": "Mettre à jour le document",
     "drafts": {
@@ -533,7 +539,8 @@
       "empty": {
         "title": "Aucun brouillon pour le moment",
         "description": "Lorsque vous enregistrez un document en tant que brouillon ou qu'il a un état de workflow non publié, il apparaîtra ici. Vous pouvez continuer à modifier les brouillons avant de les publier."
-      }
+      },
+      "editDraft": "Modifier le brouillon"
     },
     "sort": {
       "relevance": "Pertinence",
