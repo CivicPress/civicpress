@@ -16,6 +16,8 @@ import {
 // type so the composable doesn't have to import the component (which would
 // create a cycle for tests).
 interface EditorCommands {
+  executeUndo: () => void;
+  executeRedo: () => void;
   executeBold: () => void;
   executeItalic: () => void;
   executeCode: () => void;
@@ -277,7 +279,8 @@ export function useRecordEditorActions(deps: UseRecordEditorActionsDeps) {
     } catch (err: unknown) {
       toast.add({
         title: 'Save failed',
-        description: (err instanceof Error ? err.message : '') || 'Failed to save draft',
+        description:
+          (err instanceof Error ? err.message : '') || 'Failed to save draft',
         color: 'error',
       });
       autosaveStatus.value = 'error';
@@ -323,7 +326,9 @@ export function useRecordEditorActions(deps: UseRecordEditorActionsDeps) {
     } catch (err: unknown) {
       toast.add({
         title: 'Publish failed',
-        description: (err instanceof Error ? err.message : '') || 'Failed to publish record',
+        description:
+          (err instanceof Error ? err.message : '') ||
+          'Failed to publish record',
         color: 'error',
       });
     }
@@ -358,7 +363,8 @@ export function useRecordEditorActions(deps: UseRecordEditorActionsDeps) {
       }
     } catch (err: unknown) {
       const errorMessage =
-        (err instanceof Error ? err.message : '') || t('records.editor.failedToDeleteUnpublishedChanges');
+        (err instanceof Error ? err.message : '') ||
+        t('records.editor.failedToDeleteUnpublishedChanges');
       toast.add({
         title: t('common.error'),
         description: errorMessage,
@@ -413,7 +419,9 @@ export function useRecordEditorActions(deps: UseRecordEditorActionsDeps) {
     } catch (err: unknown) {
       toast.add({
         title: 'Unpublish failed',
-        description: (err instanceof Error ? err.message : '') || 'Failed to unpublish record',
+        description:
+          (err instanceof Error ? err.message : '') ||
+          'Failed to unpublish record',
         color: 'error',
       });
     }
@@ -459,7 +467,9 @@ export function useRecordEditorActions(deps: UseRecordEditorActionsDeps) {
     } catch (err: unknown) {
       toast.add({
         title: 'Archive failed',
-        description: (err instanceof Error ? err.message : '') || 'Failed to archive record',
+        description:
+          (err instanceof Error ? err.message : '') ||
+          'Failed to archive record',
         color: 'error',
       });
     }
@@ -478,7 +488,9 @@ export function useRecordEditorActions(deps: UseRecordEditorActionsDeps) {
 
     try {
       // Fetch the current record
-      const response = (await $civicApi(`/api/v1/records/${form.id}`)) as ApiResponse<RecordResponse>;
+      const response = (await $civicApi(
+        `/api/v1/records/${form.id}`
+      )) as ApiResponse<RecordResponse>;
 
       if (response?.success && response?.data) {
         const record = response.data;
@@ -526,7 +538,9 @@ export function useRecordEditorActions(deps: UseRecordEditorActionsDeps) {
     } catch (err: unknown) {
       toast.add({
         title: 'Duplicate failed',
-        description: (err instanceof Error ? err.message : '') || 'Failed to duplicate record',
+        description:
+          (err instanceof Error ? err.message : '') ||
+          'Failed to duplicate record',
         color: 'error',
       });
     }
@@ -602,15 +616,17 @@ export function useRecordEditorActions(deps: UseRecordEditorActionsDeps) {
     if (!editorRef.value) return;
 
     switch (action) {
+      case 'undo':
+        editorRef.value.executeUndo();
+        break;
+      case 'redo':
+        editorRef.value.executeRedo();
+        break;
       case 'bold':
         editorRef.value.executeBold();
         break;
       case 'italic':
         editorRef.value.executeItalic();
-        break;
-      case 'underline':
-        // Markdown doesn't support underline, use bold instead
-        editorRef.value.executeBold();
         break;
       case 'code':
         editorRef.value.executeCode();

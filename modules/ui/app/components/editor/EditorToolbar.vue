@@ -1,5 +1,4 @@
 <script setup lang="ts">
-
 const { t } = useI18n();
 
 interface Props {
@@ -13,9 +12,10 @@ const props = withDefaults(defineProps<Props>(), {
 });
 
 const emit = defineEmits<{
+  undo: [];
+  redo: [];
   bold: [];
   italic: [];
-  underline: [];
   code: [];
   heading: [level: 1 | 2 | 3];
   bulletList: [];
@@ -31,9 +31,10 @@ const emit = defineEmits<{
 const handleAction = (action: string, ...args: any[]) => {
   if (props.disabled) return;
   // Type-safe emit based on action
-  if (action === 'bold') emit('bold');
+  if (action === 'undo') emit('undo');
+  else if (action === 'redo') emit('redo');
+  else if (action === 'bold') emit('bold');
   else if (action === 'italic') emit('italic');
-  else if (action === 'underline') emit('underline');
   else if (action === 'code') emit('code');
   else if (action === 'heading' && args[0])
     emit('heading', args[0] as 1 | 2 | 3);
@@ -51,6 +52,30 @@ const handleAction = (action: string, ...args: any[]) => {
     class="editor-toolbar flex items-center justify-between gap-0.5 sm:gap-1 p-2 sm:p-3 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 overflow-x-auto"
   >
     <div class="flex items-center gap-0.5 sm:gap-1 flex-shrink-0">
+      <!-- History -->
+      <div
+        class="flex items-center gap-0.5 sm:gap-1 border-r border-gray-300 dark:border-gray-700 pr-1.5 sm:pr-2 flex-shrink-0"
+      >
+        <UButton
+          icon="i-lucide-undo-2"
+          variant="ghost"
+          size="xs"
+          :disabled="disabled"
+          @click="handleAction('undo')"
+          :title="t('records.editor.toolbar.undo')"
+          :aria-label="t('records.editor.toolbar.undo')"
+        />
+        <UButton
+          icon="i-lucide-redo-2"
+          variant="ghost"
+          size="xs"
+          :disabled="disabled"
+          @click="handleAction('redo')"
+          :title="t('records.editor.toolbar.redo')"
+          :aria-label="t('records.editor.toolbar.redo')"
+        />
+      </div>
+
       <!-- Formatting -->
       <div
         class="flex items-center gap-0.5 sm:gap-1 border-r border-gray-300 dark:border-gray-700 pr-1.5 sm:pr-2 flex-shrink-0"
@@ -72,15 +97,6 @@ const handleAction = (action: string, ...args: any[]) => {
           @click="handleAction('italic')"
           :title="t('records.editor.toolbar.italic')"
           :aria-label="t('records.editor.toolbar.italic')"
-        />
-        <UButton
-          icon="i-lucide-underline"
-          variant="ghost"
-          size="xs"
-          :disabled="disabled"
-          @click="handleAction('underline')"
-          :title="t('records.editor.toolbar.underline')"
-          :aria-label="t('records.editor.toolbar.underline')"
         />
         <UButton
           icon="i-lucide-code"

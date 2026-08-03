@@ -52,10 +52,8 @@ const emit = defineEmits<{
 
 // Composables
 const { t } = useI18n();
-const { getRecordTypeOptions, fetchRecordTypes } =
-  useRecordTypes();
-const { fetchRecordStatuses } =
-  useRecordStatuses();
+const { getRecordTypeOptions, fetchRecordTypes } = useRecordTypes();
+const { fetchRecordStatuses } = useRecordStatuses();
 const toast = useToast();
 const $civicApi = useNuxtApp().$civicApi;
 const authStore = useAuthStore();
@@ -71,7 +69,12 @@ const form = reactive({
   tags: [] as string[],
   description: '',
   geography: undefined as
-    | { srid?: number; zone_ref?: string; bbox?: number[]; center?: { lon: number; lat: number } }
+    | {
+        srid?: number;
+        zone_ref?: string;
+        bbox?: number[];
+        center?: { lon: number; lat: number };
+      }
     | undefined,
   attachedFiles: [] as Array<{
     id: string;
@@ -653,9 +656,10 @@ defineExpose({
           <EditorToolbar
             :disabled="saving || isLocked"
             :show-preview="showPreview"
+            @undo="handleToolbarAction('undo')"
+            @redo="handleToolbarAction('redo')"
             @bold="handleToolbarAction('bold')"
             @italic="handleToolbarAction('italic')"
-            @underline="handleToolbarAction('underline')"
             @code="handleToolbarAction('code')"
             @heading="handleToolbarAction('heading', $event)"
             @bullet-list="handleToolbarAction('bulletList')"

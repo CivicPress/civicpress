@@ -51,6 +51,7 @@ const emit = defineEmits<{
 
 const authStore = useAuthStore();
 const runtimeConfig = useRuntimeConfig();
+const { t } = useI18n();
 
 const realtime = useRealtimeEditor({
   recordId: props.recordId,
@@ -107,27 +108,90 @@ onBeforeUnmount(() => {
 });
 
 // Expose a command surface compatible with the CodeMirror editor so the host's
-// editorRef forwarding works. Toolbar formatting commands are intentionally
-// minimal in the collaborative path for this iteration (see W5-T9 notes); they
-// no-op rather than mutate, leaving rich-toolbar wiring as deferred polish.
+// editorRef forwarding (RecordForm's toolbar → useRecordEditorActions) drives
+// the SAME buttons in both editing modes.
+//
+// The editor is built from @civicpress/editor-schema's raw ProseMirror specs
+// (buildTiptapExtensionsFromSchema), NOT from TipTap's bundled node extensions —
+// so the convenience commands those extensions add (toggleHeading,
+// toggleBulletList, setLink, …) are not registered. We use TipTap's
+// schema-agnostic CORE commands (toggleNode / toggleList / toggleWrap /
+// insertContent / setMark), which resolve node & mark TYPES by name at run time,
+// against editor-schema's node/mark names (heading, bullet_list, ordered_list,
+// list_item, blockquote, horizontal_rule, image node; link mark).
 const focus = () => editor.commands.focus();
-const noop = () => {};
+
+/**
+ * Ask the user for a URL (link href / image src). Uses the platform prompt — a
+ * deliberately minimal input for the collaborative path — and returns null when
+ * unavailable (SSR / no DOM) or cancelled / blank, so callers no-op cleanly.
+ */
+const promptForUrl = (message: string): string | null => {
+  if (typeof window === 'undefined' || typeof window.prompt !== 'function') {
+    return null;
+  }
+  const value = window.prompt(message);
+  if (value == null) return null;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+};
+
+const insertLink = () => {
+  const href = promptForUrl(t('records.editor.linkUrlPrompt'));
+  if (!href) return;
+  if (editor.state.selection.empty) {
+    // No selection — insert the URL itself as linked text.
+    editor
+      .chain()
+      .focus()
+      .insertContent({
+        type: 'text',
+        text: href,
+        marks: [{ type: 'link', attrs: { href } }],
+      })
+      .run();
+  } else {
+    // Wrap the selection (widen to any existing link first).
+    editor
+      .chain()
+      .focus()
+      .extendMarkRange('link')
+      .setMark('link', { href })
+      .run();
+  }
+};
+
+const insertImage = () => {
+  const src = promptForUrl(t('records.editor.imageUrlPrompt'));
+  if (!src) return;
+  editor.chain().focus().insertContent({ type: 'image', attrs: { src } }).run();
+};
 
 defineExpose({
   focus,
   blur: () => editor.commands.blur(),
   getValue: () => serializeDocToMarkdown(editor.state.doc),
   getEditor: () => editor,
+  // Undo/redo come from the Collaboration extension's Yjs UndoManager (document
+  // history is intentionally omitted from the schema extensions — see
+  // tiptap-from-schema.ts).
+  executeUndo: () => editor.chain().focus().undo().run(),
+  executeRedo: () => editor.chain().focus().redo().run(),
   executeBold: () => editor.chain().focus().toggleMark('strong').run(),
   executeItalic: () => editor.chain().focus().toggleMark('em').run(),
   executeCode: () => editor.chain().focus().toggleMark('code').run(),
-  executeHeading: noop,
-  executeBulletList: noop,
-  executeNumberedList: noop,
-  executeBlockquote: noop,
-  executeHorizontalRule: noop,
-  executeLink: noop,
-  executeImage: noop,
+  executeHeading: (level: 1 | 2 | 3) =>
+    editor.chain().focus().toggleNode('heading', 'paragraph', { level }).run(),
+  executeBulletList: () =>
+    editor.chain().focus().toggleList('bullet_list', 'list_item').run(),
+  executeNumberedList: () =>
+    editor.chain().focus().toggleList('ordered_list', 'list_item').run(),
+  executeBlockquote: () =>
+    editor.chain().focus().toggleWrap('blockquote').run(),
+  executeHorizontalRule: () =>
+    editor.chain().focus().insertContent({ type: 'horizontal_rule' }).run(),
+  executeLink: insertLink,
+  executeImage: insertImage,
 });
 </script>
 
