@@ -89,3 +89,7 @@ Icon?
 /playwright-report/
 /blob-report/
 /playwright/.cache/
+
+# Deployment secrets / TLS certs — never commit (see deploy/README.md)
+/deploy/secrets/
+/deploy/certs/
