@@ -55,10 +55,39 @@ the fastest tunnel-to-live if we ever want one.) Then build the operator UI.
       `deployment.md` from `planned` + fix its inverted port table; backlog note
       for the missing published-only gate.
 
+- [ ] **D8 — `civic doctor`** (env preflight): checks ffmpeg/ffprobe, whisper
+      binary+model, `CIVICPRESS_SECRET`, free ports, node version; reports what's
+      missing with fix hints. Extends `civic diagnose`. Serves both a new dev
+      ("why isn't transcription working?") and a deployer ("safe to expose?").
+
+## Design goal (2026-08-04)
+
+**"Deploy a public instance" and "a new dev boots a local instance" are the same
+`zero → running, loginable` path** — the environment flips the posture. One
+command must "just work" on localhost with zero config (dev), and fail safe +
+loud under production `NODE_ENV` (deploy).
+
+### Refinements folded into the deliverables
+
+- **D3 becomes a true one-shot:** `civic init --yes` is complete and takes
+  `--admin-user/--admin-password[-stdin]` + `--profile demo` (enables
+  broadcast-box+transcription and seeds curated data). Init is **idempotent**
+  (safe re-run). Module enablement via `civic config:enable <module>` (no YAML
+  hand-edits).
+- **D2 secret is 12-factor:** accept `CIVICPRESS_SECRET` **or**
+  `CIVICPRESS_SECRET_FILE` (Docker/K8s secrets); on-disk `secrets.yml` for dev.
+- **D4 `civic serve` prints a ready-banner** showing each subsystem's real state
+  (`transcription: OFF (whisper not found …)`) — makes the crash-safe silent
+  gates visible — plus `--with-ui` / `--open`.
+- **D5 Docker image also backs a `.devcontainer.json`** (clone → reopen in
+  container → `civic init --yes --profile demo` → `civic serve`, zero local
+  ffmpeg/whisper). Wire if the image lands cleanly.
+
 ## Sequence
 
-1. bootstrap + secrets (D1 + D2) → 2. complete `--yes` (D3) → 3. `civic serve`
-   (D4) → 4. packaging + seed (D5 + D6) → 5. runbook + security (D7).
+1. bootstrap + secrets (D1 + D2) → 2. complete `--yes` one-shot (D3) →
+   3. `civic serve` + `civic doctor` (D4 + D8) → 4. packaging + seed (D5 + D6) →
+   5. runbook + security (D7).
 
 Each deliverable ships tested + committed on the branch.
 

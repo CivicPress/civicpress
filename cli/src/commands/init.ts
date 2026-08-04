@@ -499,6 +499,39 @@ export const initCommand = (cli: CAC) => {
               }
             }
 
+            // Ensure a signing secret exists BEFORE core initialization. Under
+            // a production NODE_ENV, SecretsManager.initialize() refuses to
+            // auto-generate one (FA-CORE-002), which would abort init on a fresh
+            // box. `civic init` is the explicit opt-in moment, so mint + persist
+            // one here and tell the operator how to pin it for a deploy.
+            const { SecretsManager } = await import('@civicpress/core');
+            const secretInfo = await SecretsManager.getInstance(
+              fullDataDir,
+              systemDataDir
+            ).ensureSecretPersisted();
+            if (!shouldOutputJson) {
+              if (secretInfo.generated) {
+                logger.success(
+                  `🔑 Generated a signing secret → ${secretInfo.path} (mode 0600)`
+                );
+                logger.warn(
+                  '⚠️  For a container / multi-host deploy, pin this value as an ' +
+                    'env var so sessions survive restarts:'
+                );
+                logger.info(`   export CIVICPRESS_SECRET=${secretInfo.secret}`);
+              } else if (secretInfo.source === 'env') {
+                logger.info('🔑 Using CIVICPRESS_SECRET from the environment');
+              } else if (secretInfo.source === 'env-file') {
+                logger.info(
+                  `🔑 Using the secret from CIVICPRESS_SECRET_FILE (${secretInfo.path})`
+                );
+              } else {
+                logger.info(
+                  `🔑 Using the existing secret at ${secretInfo.path}`
+                );
+              }
+            }
+
             // Initialize CivicPress core with data directory
             const civic = new CivicPress({ dataDir: fullDataDir });
             await civic.initialize();

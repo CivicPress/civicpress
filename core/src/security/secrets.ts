@@ -69,6 +69,23 @@ export class SecretsManager {
       return;
     }
 
+    // Then a mounted secret file (Docker / Kubernetes secrets) via
+    // CIVICPRESS_SECRET_FILE — 12-factor friendly, keeps the value out of the
+    // process environment / the process list.
+    if (process.env.CIVICPRESS_SECRET_FILE) {
+      const fileSecret = (
+        await fs.readFile(process.env.CIVICPRESS_SECRET_FILE, 'utf-8')
+      ).trim();
+      if (!this.validateSecret(fileSecret)) {
+        throw new Error(
+          'CIVICPRESS_SECRET_FILE must contain at least 64 hex characters (32 bytes)'
+        );
+      }
+      this.rootSecret = fileSecret;
+      logger.info('Loaded secret from CIVICPRESS_SECRET_FILE');
+      return;
+    }
+
     // Try loading from file
     try {
       const secretData = await this.loadSecretFromFile();
@@ -93,6 +110,76 @@ export class SecretsManager {
       );
     }
     await this.generateAndSaveSecret();
+  }
+
+  /**
+   * Ensure a root secret exists, generating and persisting one to
+   * `.system-data/secrets.yml` if none is configured.
+   *
+   * Unlike `initialize()`, this deliberately bypasses the production
+   * auto-generation gate (FA-CORE-002): it is meant to be called from an
+   * explicit operator action — `civic init` — where minting a secret is the
+   * intent, not a silent server-boot fallback. The returned `source` lets the
+   * caller tell the operator whether they still need to pin `CIVICPRESS_SECRET`
+   * for a container deploy.
+   */
+  async ensureSecretPersisted(): Promise<{
+    secret: string;
+    generated: boolean;
+    source: 'env' | 'env-file' | 'file' | 'generated';
+    path: string;
+  }> {
+    if (process.env.CIVICPRESS_SECRET) {
+      if (!this.validateSecret(process.env.CIVICPRESS_SECRET)) {
+        throw new Error(
+          'CIVICPRESS_SECRET must be at least 64 hex characters (32 bytes)'
+        );
+      }
+      this.rootSecret = process.env.CIVICPRESS_SECRET;
+      return {
+        secret: this.rootSecret,
+        generated: false,
+        source: 'env',
+        path: 'CIVICPRESS_SECRET',
+      };
+    }
+
+    if (process.env.CIVICPRESS_SECRET_FILE) {
+      const fileSecret = (
+        await fs.readFile(process.env.CIVICPRESS_SECRET_FILE, 'utf-8')
+      ).trim();
+      if (!this.validateSecret(fileSecret)) {
+        throw new Error(
+          'CIVICPRESS_SECRET_FILE must contain at least 64 hex characters (32 bytes)'
+        );
+      }
+      this.rootSecret = fileSecret;
+      return {
+        secret: fileSecret,
+        generated: false,
+        source: 'env-file',
+        path: process.env.CIVICPRESS_SECRET_FILE,
+      };
+    }
+
+    const existing = await this.loadSecretFromFile();
+    if (existing) {
+      this.rootSecret = existing.secret;
+      return {
+        secret: existing.secret,
+        generated: false,
+        source: 'file',
+        path: this.secretsFilePath,
+      };
+    }
+
+    await this.generateAndSaveSecret();
+    return {
+      secret: this.rootSecret!,
+      generated: true,
+      source: 'generated',
+      path: this.secretsFilePath,
+    };
   }
 
   /**
