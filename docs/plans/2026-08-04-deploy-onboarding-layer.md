@@ -58,8 +58,10 @@ the fastest tunnel-to-live if we ever want one.) Then build the operator UI.
       left opt-in (lean, network-independent build). ⚠️ **build-verify on a
       Docker host** — authored without a local daemon; bash/YAML/UI-output-path
       checked.
-- [ ] **D6 — Curated demo seed:** only the records we want public (incl. one
-      broadcast session), respecting "public = indexed".
+- [x] **D6 — Curated demo seed** (`deploy/seed-demo.sh`): copies a hand-picked
+      subset of the bundled demo records into the instance + `civic index
+      --sync-db`, so ONLY curated records are public. Verified (6 records synced
+      to the DB). Broadcast session deferred to a live capture (needs real A/V).
 - [ ] **D7 — Runbook + pre-public security checklist;** promote
       `deployment.md` from `planned` + fix its inverted port table; backlog note
       for the missing published-only gate.
