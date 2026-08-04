@@ -8,6 +8,39 @@ and this project adheres to
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-08-04
+
+<!-- markdownlint-disable MD024 -->
+
+Completes the **v0.3.x — Editor, Attachments & Civic UX** milestone. The feature
+work (rich editor, drag-and-drop attachments, i18n/equity, spec-reality gate)
+shipped in 0.2.1; this release adds the remaining test and documentation
+completion, so the milestone's exit criteria are genuinely met.
+
+### Added
+
+- **Browser end-to-end tests (Playwright + Chromium).** A real-browser layer
+  that drives the actual Nuxt UI SPA with the API stubbed at the network
+  boundary — smoke journeys (the app boots + hydrates, the records browser
+  renders a record from the API, the login form renders), plus a SHA-pinned
+  `browser-e2e` CI workflow. Run with `pnpm e2e`. Fills the gap the vitest
+  component tests and the API-level journey tests couldn't reach.
+- **Live cloud-storage integration test.** Exercises the real S3 upload →
+  download → delete round-trip against a live S3-compatible server (minio),
+  closing the "no live-cloud test" gap behind the mocked SDK boundary. Opt-in
+  via `CIVIC_TEST_LIVE_S3=1`; skips otherwise so normal CI stays hermetic.
+- **Spec-frontmatter CI guard.** `pnpm specs:check` (and a vitest gate) asserts
+  every spec's frontmatter parses and declares a known status.
+
+### Changed
+
+- **Normalized spec metadata into real top-of-file YAML frontmatter** across 68
+  specs. They carried a malformed, jammed single-line block after the title (an
+  artifact of prettier prose-wrapping metadata that was never real frontmatter);
+  they now use proper frontmatter (version / status / created / updated) with
+  the AI-authored boilerplate dropped. `spec:validate` is now frontmatter-aware.
+  This completes the "every spec matches implementation reality" gate.
+
 ## [0.2.1] - 2026-08-03
 
 <!-- markdownlint-disable MD024 -->
