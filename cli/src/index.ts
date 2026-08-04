@@ -2,6 +2,8 @@
 
 import { cac } from 'cac';
 import { initCommand } from './commands/init.js';
+import { registerServeCommand } from './commands/serve.js';
+import { registerDoctorCommand } from './commands/doctor.js';
 import { createCommand } from './commands/create.js';
 import { commitCommand } from './commands/commit.js';
 import { historyCommand } from './commands/history.js';
@@ -112,6 +114,10 @@ registerNotificationsCommand(cli);
 
 // System maintenance (update checks, …)
 registerSystemCommand(cli);
+
+// Run the server + environment preflight
+registerServeCommand(cli);
+registerDoctorCommand(cli);
 
 // Parse and run
 cli.parse();

@@ -46,8 +46,9 @@ the fastest tunnel-to-live if we ever want one.) Then build the operator UI.
       `--profile demo` module enablement — one command → a loginable,
       demo-configured instance. **Fixes Blocker 4.** _(standalone `civic
       config:enable` + idempotency hardening deferred.)_
-- [ ] **D4 — `civic serve`:** one entrypoint that boots the API (+ in-process
-      realtime/transcription/broadcast-box), reads env, prints URLs.
+- [x] **D4 — `civic serve`:** boots the API (+ in-process realtime /
+      transcription / broadcast-box) as a child process, forwarding signals,
+      with a ready-banner showing each subsystem's live/idle state.
       **Fixes Blocker 1 (FA-CLI-006).**
 - [ ] **D5 — Packaging:** Dockerfile + docker-compose bundling Node + ffmpeg +
       whisper.cpp + model; enables broadcast-box + transcription; injects the
@@ -58,10 +59,11 @@ the fastest tunnel-to-live if we ever want one.) Then build the operator UI.
       `deployment.md` from `planned` + fix its inverted port table; backlog note
       for the missing published-only gate.
 
-- [ ] **D8 — `civic doctor`** (env preflight): checks ffmpeg/ffprobe, whisper
-      binary+model, `CIVICPRESS_SECRET`, free ports, node version; reports what's
-      missing with fix hints. Extends `civic diagnose`. Serves both a new dev
-      ("why isn't transcription working?") and a deployer ("safe to expose?").
+- [x] **D8 — `civic doctor`** (env preflight): checks node, signing secret,
+      auth posture (fails on the simulated-auth backdoor), ffmpeg/ffprobe,
+      whisper, and modules — each with a fix hint; exits non-zero on a hard
+      failure so it can gate a deploy. Standalone command sharing the status
+      inspector (`env-status.ts`) with `civic serve`.
 
 ## Design goal (2026-08-04)
 
