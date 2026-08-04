@@ -56,6 +56,8 @@
     "test:watch": "vitest --watch",
     "i18n:check": "node scripts/i18n-parity.mjs",
     "specs:check": "node scripts/check-spec-frontmatter.mjs",
+    "e2e": "playwright test",
+    "e2e:ui": "playwright test --ui",
     "gen": "plop",
     "gen:page": "plop nuxt:page",
     "gen:cli": "plop cli:command",
@@ -67,6 +69,7 @@
   },
   "license": "MIT",
   "devDependencies": {
+    "@playwright/test": "1.48.0",
     "@types/bcrypt": "5.0.2",
     "@types/nodemailer": "6.4.17",
     "@vitejs/plugin-vue": "6.0.3",
