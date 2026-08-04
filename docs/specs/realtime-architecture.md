@@ -1,3 +1,10 @@
+---
+version: '1.0.0'
+status: as-shipped
+created: '2025-12-04'
+updated: '2026-06'
+---
+
 # CivicPress Spec: `realtime-architecture.md`
 
 > **Implementation status (2026-08-03).** The realtime service is implemented
@@ -6,24 +13,6 @@
 > **off by default**, and it is **single-node** — the multi-node Redis fan-out
 > described below is not built. Authoritative status: `docs/project-status.md`
 > (Realtime = Partial).
-
----
-
-version: 1.0.0 status: as-shipped (Phase 3, 2026-06) created: '2025-12-04' updated: '2026-06'
-deprecated: false sunset_date: null breaking_changes: [] additions:
-
-- WebSocket-based realtime service architecture
-- yjs document collaboration system
-- Presence tracking and room management
-- Snapshot persistence strategy fixes: [] migration_guide: null compatibility:
-  min_civicpress: '1.0.0' max_civicpress: null dependencies:
-- 'editor-spec-v3.md: >=1.0.0'
-- 'api.md: >=1.0.0'
-- 'auth.md: >=1.0.0'
-- 'permissions.md: >=1.0.0' authors:
-- 'Core Team <team@civicpress.io>' reviewers: []
-
----
 
 ## As-shipped status (Phase 3, 2026-06)
 

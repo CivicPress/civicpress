@@ -1,21 +1,11 @@
+---
+version: '0.3.x-scope'
+status: planned
+created: '2025-07-03'
+updated: '2025-07-15'
+---
+
 # CivicPress Spec: `metrics.md`
-
----
-
-version: 0.3.x-scope status: planned created: '2025-07-03' updated: '2025-07-15'
-deprecated: false sunset_date: null additions:
-
-- comprehensive metrics documentation
-- performance tracking
-- security considerations compatibility: min_civicpress: 1.0.0 max_civicpress:
- 'null' dependencies:
- - 'observability.md: >=1.0.0'
- - 'api.md: >=1.0.0' authors:
-- Sophie Germain <sophie@civicpress.io> reviewers:
-- Ada Lovelace
-- Irène Joliot-Curie
-
----
 
 ## Name
 

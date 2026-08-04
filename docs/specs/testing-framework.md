@@ -1,3 +1,10 @@
+---
+version: '0.2.x'
+status: partial
+created: '2025-07-15'
+updated: '2025-07-15'
+---
+
 # CivicPress Spec: `testing-framework.md`
 
 > **Implementation status (2026-08-03).** Unit and integration testing (Vitest,
@@ -6,30 +13,6 @@
 > no Playwright/Cypress suite (the `@playwright/test` reference is aspirational),
 > no performance harness, and no a11y test suite. Authoritative status:
 > `docs/project-status.md`.
-
----
-
-version: 0.2.x status: partial created: '2025-07-15' updated: '2025-07-15'
-deprecated: false sunset_date: null additions:
-
-- comprehensive testing standards
-- tools
-- patterns
-- utilities covering unit
-- integration
-- E2E
-- security
-- performance
-- and accessibility testing compatibility: min_civicpress: 1.0.0 max_civicpress:
-  'null' dependencies:
-- 'plugins.md: >=1.5.0'
-- 'auth.md: >=1.2.0'
-- 'permissions.md: >=1.1.0' authors:
-- Sophie Germain <sophie@civicpress.io> reviewers:
-- Ada Lovelace
-- Irène Joliot-Curie
-
----
 
 ## Name
 

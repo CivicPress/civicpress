@@ -1,19 +1,11 @@
+---
+version: '1.0.0'
+status: stable
+created: '2025-07-04'
+updated: '2025-07-04'
+---
+
 # CivicPress Spec: `spec-guidelines.md`
-
----
-
-version: 1.0.0 status: stable created: '2025-07-04' updated: '2025-07-04'
-deprecated: false sunset_date: null breaking_changes: [] additions:
-
-- standardized spec format
-- metadata fields
-- authorship tracking fixes: [] migration_guide: null compatibility:
- min_civicpress: 1.0.0 max_civicpress: null dependencies: [] authors:
-- Sophie Germain <sophie@civicpress.io> reviewers:
-- Ada Lovelace
-- Tim Berners-Lee
-
----
 
 ## Name
 

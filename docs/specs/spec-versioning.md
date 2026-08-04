@@ -1,15 +1,11 @@
+---
+version: '1.0.0'
+status: stable
+created: '2025-07-04'
+updated: '2025-07-15'
+---
+
 # CivicPress Spec: `spec-versioning.md`
-
----
-
-version: 1.0.0 status: stable created: '2025-07-04' updated: '2025-07-15'
-deprecated: false sunset_date: null authors:
-
-- 'Sophie Germain <sophie@civicpress.io>' reviewers:
-- 'Ada Lovelace'
-- 'Irène Joliot-Curie'
-
----
 
 ## Name
 

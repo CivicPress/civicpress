@@ -1,33 +1,11 @@
-# CivicPress Spec: `editor-spec-v3.md`
-
 ---
-version: 1.0.0
+version: '1.0.0'
 status: draft
 created: '2025-12-04'
 updated: '2026-06-15'
-deprecated: false
-sunset_date: null
-breaking_changes: []
-additions:
-  - Real-time collaborative editing using yjs
-  - WebSocket-based document synchronization
-  - Presence indicators and cursor tracking
-  - Snapshot persistence for reconnection
-fixes: []
-migration_guide: null
-compatibility:
-  min_civicpress: '1.0.0'
-  max_civicpress: null
-dependencies:
-  - 'editor-spec-v2.md: >=1.0.0'
-  - 'realtime-architecture.md: >=1.0.0'
-  - 'records.md: >=1.0.0'
-  - 'api.md: >=1.0.0'
-  - 'frontend.md: >=1.0.0'
-authors:
-  - 'Core Team <team@civicpress.io>'
-reviewers: []
 ---
+
+# CivicPress Spec: `editor-spec-v3.md`
 
 ## ✅ As-Shipped Status (reconciled 2026-06-15)
 

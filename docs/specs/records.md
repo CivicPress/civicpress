@@ -1,14 +1,11 @@
+---
+version: '1.0.0'
+status: stable
+created: '2025-01-15'
+updated: '2025-01-15'
+---
+
 # CivicPress Spec: `records.md`
-
----
-
-version: 1.0.0 
-status: stable 
-created: '2025-01-15' 
-updated: '2025-01-15' 
-deprecated: false
-
----
 
 ## Name
 

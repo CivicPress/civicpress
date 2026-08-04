@@ -1,22 +1,11 @@
+---
+version: '0.3.x-scope'
+status: planned
+created: '2025-07-03'
+updated: '2025-07-15'
+---
+
 # CivicPress Spec: `feedback.md`
-
----
-
-version: 0.3.x-scope status: planned created: '2025-07-03' updated: '2025-07-15'
-deprecated: false sunset_date: null breaking_changes: [] additions:
-
-- comprehensive feedback documentation
-- feedback workflows
-- security considerations fixes: [] migration_guide: null compatibility:
- min_civicpress: 1.0.0 max_civicpress: 'null' dependencies:
- - 'ui.md: >=1.0.0'
- - 'auth.md: >=1.0.0'
- - 'permissions.md: >=1.0.0' authors:
-- Sophie Germain <sophie@civicpress.io> reviewers:
-- Ada Lovelace
-- Irène Joliot-Curie
-
----
 
 ## Name
 

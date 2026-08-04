@@ -1,20 +1,11 @@
+---
+version: '0.3.x-scope'
+status: planned
+created: '2025-07-15'
+updated: '2025-07-15'
+---
+
 # CivicPress Spec: `version-tracker.md`
-
----
-
-version: 0.3.x-scope status: planned created: '2025-07-15' updated: '2025-07-15'
-deprecated: false sunset_date: null breaking_changes: [] additions:
-
-- comprehensive version tracking documentation
-- dependency management
-- compatibility matrices fixes: [] migration_guide: null compatibility:
-  min_civicpress: 1.0.0 max_civicpress: 'null' dependencies:
-- 'spec-versioning.md: >=1.0.0' authors:
-- Sophie Germain <sophie@civicpress.io> reviewers:
-- Ada Lovelace
-- Irène Joliot-Curie
-
----
 
 ## Name
 

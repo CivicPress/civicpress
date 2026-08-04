@@ -1,3 +1,10 @@
+---
+version: '0.2.x'
+status: partial
+created: '2025-07-03'
+updated: '2025-07-15'
+---
+
 # CivicPress Spec: `accessibility.md`
 
 > **Implementation status (2026-08-03).** This spec describes a **target**
@@ -6,26 +13,6 @@
 > localizing interactive `aria-label`s so screen readers follow the UI locale).
 > Treat the compliance claims below as goals, not shipped guarantees.
 > Authoritative status: `docs/project-status.md`.
-
----
-
-version: 0.2.x status: partial created: '2025-07-03' updated: '2025-07-15'
-deprecated: false sunset_date: null additions:
-
-- comprehensive accessibility documentation
-- WCAG compliance
-- testing patterns
-- security considerations
-- automated testing frameworks compatibility: min_civicpress: 1.0.0
- max_civicpress: 'null' dependencies:
- - 'ui.md: >=1.0.0'
- - 'themes.md: >=1.0.0'
- - 'translations.md: >=1.0.0' authors:
-- 'Sophie Germain <sophie@civicpress.io>' reviewers:
-- 'Ada Lovelace'
-- 'Irène Joliot-Curie'
-
----
 
 ## Name
 

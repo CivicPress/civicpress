@@ -1,31 +1,11 @@
-# CivicPress Spec: `editor-spec-v1.md`
-
 ---
-version: 1.0.0
+version: '1.0.0'
 status: draft
 created: '2025-12-04'
 updated: '2026-06-15'
-deprecated: false
-sunset_date: null
-breaking_changes: []
-additions:
-  - Markdown editor with preview mode
-  - Autosave draft functionality
-  - Metadata sidebar management
-  - Publish/draft workflow
-fixes: []
-migration_guide: null
-compatibility:
-  min_civicpress: '1.0.0'
-  max_civicpress: null
-dependencies:
-  - 'records.md: >=1.0.0'
-  - 'api.md: >=1.0.0'
-  - 'frontend.md: >=1.0.0'
-authors:
-  - 'Core Team <team@civicpress.io>'
-reviewers: []
 ---
+
+# CivicPress Spec: `editor-spec-v1.md`
 
 ## ✅ As-Shipped Status (reconciled 2026-06-15)
 

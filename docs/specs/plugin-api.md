@@ -1,27 +1,11 @@
+---
+version: '0.3.x-scope'
+status: planned
+created: '2025-07-15'
+updated: '2025-07-15'
+---
+
 # CivicPress Spec: `plugin-api.md`
-
----
-
-version: 0.3.x-scope status: planned created: '2025-07-15' updated: '2025-07-15'
-deprecated: false sunset_date: null additions:
-
-- comprehensive API interfaces
-- lifecycle hooks
-- UI widget API
-- hook system
-- route API
-- CLI API
-- testing frameworks
-- security considerations compatibility: min_civicpress: 1.0.0 max_civicpress:
- 'null' dependencies:
- - 'plugins.md: >=1.5.0'
- - 'hooks.md: >=1.2.0'
- - 'testing-framework.md: >=1.0.0' authors:
-- Sophie Germain <sophie@civicpress.io> reviewers:
-- Ada Lovelace
-- Irène Joliot-Curie
-
----
 
 ## Name
 

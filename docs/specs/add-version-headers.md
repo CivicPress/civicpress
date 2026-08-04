@@ -1,20 +1,11 @@
+---
+version: '1.0.0'
+status: stable
+created: '2025-07-03'
+updated: '2025-07-15'
+---
+
 # CivicPress Spec: `add-version-headers.md`
-
----
-
-version: 1.0.0 status: stable created: '2025-07-03' updated: '2025-07-15'
-deprecated: false sunset_date: null additions:
-
-- comprehensive version header documentation
-- maintenance guidelines
-- validation standards compatibility: min_civicpress: 1.0.0 max_civicpress:
- 'null' dependencies:
- - 'spec-versioning.md: >=1.0.0' authors:
-- Sophie Germain <sophie@civicpress.io> reviewers:
-- Ada Lovelace
-- Irène Joliot-Curie
-
----
 
 ## Name
 

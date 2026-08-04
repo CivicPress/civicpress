@@ -1,21 +1,11 @@
+---
+version: '0.3.x-scope'
+status: planned
+created: '2025-07-03'
+updated: '2025-07-15'
+---
+
 # ️ CivicPress Spec: `signatures.md`
-
----
-
-version: 0.3.x-scope status: planned created: '2025-07-03' updated: '2025-07-15'
-deprecated: false sunset_date: null additions:
-
-- comprehensive signature documentation
-- digital signatures
-- security considerations compatibility: min_civicpress: 1.0.0 max_civicpress:
- 'null' dependencies:
- - 'auth.md: >=1.2.0'
- - 'permissions.md: >=1.1.0' authors:
-- Sophie Germain <sophie@civicpress.io> reviewers:
-- Ada Lovelace
-- Irène Joliot-Curie
-
----
 
 ## Name
 

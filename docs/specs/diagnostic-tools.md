@@ -1,11 +1,11 @@
+---
+version: '1.0.0'
+status: draft
+created: '2025-01-27'
+updated: '2025-01-27'
+---
+
 # CivicPress Spec: `diagnostic-tools.md`
-
----
-
-version: 1.0.0 status: draft created: '2025-01-27' updated: '2025-01-27'
-deprecated: false
-
----
 
 ## Name
 

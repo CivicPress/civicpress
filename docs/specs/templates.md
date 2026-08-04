@@ -1,29 +1,11 @@
+---
+version: '2.0.0'
+status: stable
+created: '2025-01-15'
+updated: '2025-12-17'
+---
+
 # CivicPress Spec: `templates.md`
-
----
-
-version: 2.0.0 status: stable created: '2025-01-15' updated: '2025-12-17'
-implementation_status: completed deprecated: false sunset_date: null
-breaking_changes: [] additions:
-
-- Comprehensive API endpoint specifications
-- Template service layer architecture
-- Security and permission model
-- Error handling and validation
-- Caching strategy
-- Template ID format standardization fixes:
-- API endpoint structure inconsistencies
-- Missing error handling specifications
-- Incomplete permission model migration_guide: null compatibility:
-  min_civicpress: '0.2.0' max_civicpress: null dependencies:
-- 'auth.md: >=1.2.0'
-- 'permissions.md: >=1.1.0'
-- 'records.md: >=1.0.0' authors:
-- 'Sophie Germain <sophie@civicpress.io>' reviewers:
-- 'Ada Lovelace'
-- 'Irène Joliot-Curie'
-
----
 
 ## Name
 
