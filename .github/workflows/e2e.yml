@@ -43,14 +43,17 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build the UI's workspace dependencies
-        # `^...` = only the dependencies of @civicpress/ui (editor-schema, …),
-        # not the UI itself — the dev server builds the UI on the fly.
-        run: pnpm --filter "@civicpress/ui^..." run build
+      - name: Build the UI (and its workspace deps)
+        # `...` = @civicpress/ui plus its deps (editor-schema, …). CI serves the
+        # built preview below rather than the dev server, which cold-starts too
+        # slowly on a runner (the dev server is the local default).
+        run: pnpm --filter "@civicpress/ui..." run build
 
       - name: Install Playwright Chromium
         run: pnpm exec playwright install --with-deps chromium
 
       - name: Run browser e2e
-        # Playwright's webServer auto-starts the Nuxt dev server and waits for it.
+        # Playwright's webServer serves the built UI preview and waits for it.
         run: pnpm e2e
+        env:
+          CIVIC_E2E_WEBSERVER: pnpm --filter @civicpress/ui run preview

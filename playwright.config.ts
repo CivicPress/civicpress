@@ -38,7 +38,9 @@ export default defineConfig({
     command: WEBSERVER,
     url: `http://127.0.0.1:${PORT}/`,
     reuseExistingServer: true,
-    timeout: 150_000,
+    timeout: 180_000,
+    stdout: 'pipe',
+    stderr: 'pipe',
     env: { PORT, NUXT_PORT: PORT },
   },
 });

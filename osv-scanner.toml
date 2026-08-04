@@ -1,0 +1,21 @@
+# osv-scanner ignore list — accepted, documented residual advisories.
+#
+# Read automatically from the repo root by both scans in
+# .github/workflows/osv-scanner.yml (the scheduled report-only full scan and the
+# fail-on-vuln PR scan). Every entry must record WHY the advisory is accepted.
+
+[[IgnoredVulns]]
+id = "GHSA-mh99-v99m-4gvg"
+reason = """
+brace-expansion flat-range ReDoS/DoS (alias CVE-2026-14257). Accepted residual:
+the fix lands only in brace-expansion 5.x, which is ESM-only and cannot be forced
+under the CJS minimatch/glob consumers in this dependency tree — brace-expansion
+is pinned via pnpm.overrides (1.1.16 / 2.1.2) accordingly. Not reachable from the
+request surface (build/test tooling only). Already an accepted residual on main;
+it re-surfaced on the v0.3.0 branch solely because @playwright/test's dependency
+tree adds more instances of the same already-pinned versions.
+"""
+
+[[IgnoredVulns]]
+id = "CVE-2026-14257"
+reason = "Alias of GHSA-mh99-v99m-4gvg (brace-expansion flat-range DoS) — see above."

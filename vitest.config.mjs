@@ -80,6 +80,7 @@ export default defineConfig({
       '**/cli/node_modules/**',    // Skip CLI dependencies
       '**/core/node_modules/**',   // Skip core dependencies
       'tests/ui/**',               // Exclude UI tests (use vitest.config.ui.mjs with happy-dom)
+      'tests/e2e-browser/**',      // Playwright browser specs — run via `pnpm e2e`, not vitest
       // QUARANTINE — BURNED DOWN 2026-07-17 (phase-7e test-health). The 5 files
       // that formerly failed deterministically from a clean checkout are fixed
       // and now pass individually AND together from clean; they run in CI again.
