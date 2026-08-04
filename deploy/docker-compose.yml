@@ -1,0 +1,68 @@
+# CivicPress demo / pilot — one `docker compose up` brings up API + UI + nginx.
+#
+# Before first run, create the two secret files:
+#   mkdir -p deploy/secrets
+#   openssl rand -hex 32 > deploy/secrets/civicpress_secret
+#   printf 'ChangeMe!Str0ng' > deploy/secrets/civic_admin_password
+# and (for real TLS) drop fullchain.pem + privkey.pem in deploy/certs/.
+#
+# NOTE: authored without a local Docker daemon — verify on a Docker host.
+name: civicpress
+
+services:
+  api:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    image: civicpress:local
+    command: ['serve']
+    environment:
+      NODE_ENV: production
+      TRUST_PROXY: 'true'
+      CIVIC_PROFILE: ${CIVIC_PROFILE:-demo}
+      CIVIC_ADMIN_USER: ${CIVIC_ADMIN_USER:-admin}
+      CIVIC_ADMIN_EMAIL: ${CIVIC_ADMIN_EMAIL:-admin@example.org}
+      CIVIC_ADMIN_PASSWORD_FILE: /run/secrets/civic_admin_password
+      CIVICPRESS_SECRET_FILE: /run/secrets/civicpress_secret
+    secrets:
+      - civicpress_secret
+      - civic_admin_password
+    volumes:
+      - civic-instance:/instance
+    expose:
+      - '3000'
+      - '3001'
+    restart: unless-stopped
+
+  ui:
+    image: civicpress:local
+    command: ['ui']
+    environment:
+      UI_PORT: '3030'
+    depends_on:
+      - api
+    expose:
+      - '3030'
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:1.27-alpine
+    depends_on:
+      - api
+      - ui
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - ./nginx/civicpress.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./certs:/etc/nginx/certs:ro
+    restart: unless-stopped
+
+secrets:
+  civicpress_secret:
+    file: ./secrets/civicpress_secret
+  civic_admin_password:
+    file: ./secrets/civic_admin_password
+
+volumes:
+  civic-instance:

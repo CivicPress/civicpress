@@ -50,9 +50,14 @@ the fastest tunnel-to-live if we ever want one.) Then build the operator UI.
       transcription / broadcast-box) as a child process, forwarding signals,
       with a ready-banner showing each subsystem's live/idle state.
       **Fixes Blocker 1 (FA-CLI-006).**
-- [ ] **D5 — Packaging:** Dockerfile + docker-compose bundling Node + ffmpeg +
-      whisper.cpp + model; enables broadcast-box + transcription; injects the
-      secret; bootstraps the admin; runs API + UI + nginx. Reference nginx config.
+- [x] **D5 — Packaging:** multi-stage `Dockerfile` (node 22 + ffmpeg) +
+      `deploy/docker-compose.yml` (api / ui / nginx, Docker secrets) + nginx
+      reverse-proxy config + a thin `deploy/docker-entrypoint.sh` over
+      `civic init --profile demo` / `civic doctor` / `civic serve`. Secret via
+      `CIVICPRESS_SECRET_FILE`; admin via `CIVIC_ADMIN_PASSWORD_FILE`. whisper
+      left opt-in (lean, network-independent build). ⚠️ **build-verify on a
+      Docker host** — authored without a local daemon; bash/YAML/UI-output-path
+      checked.
 - [ ] **D6 — Curated demo seed:** only the records we want public (incl. one
       broadcast session), respecting "public = indexed".
 - [ ] **D7 — Runbook + pre-public security checklist;** promote
