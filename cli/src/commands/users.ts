@@ -39,6 +39,43 @@ function confirmUserDeletion(target: {
   });
 }
 
+/**
+ * Read a single line from stdin — used by `--password-stdin` so an admin
+ * password never lands in argv, the shell history, or the process list.
+ */
+function readStdinLine(): Promise<string> {
+  return new Promise((resolve, reject) => {
+    let data = '';
+    const onData = (chunk: string) => {
+      data += chunk;
+      const nl = data.indexOf('\n');
+      if (nl !== -1) {
+        cleanup();
+        resolve(data.slice(0, nl));
+      }
+    };
+    const onEnd = () => {
+      cleanup();
+      resolve(data);
+    };
+    const onErr = (err: Error) => {
+      cleanup();
+      reject(err);
+    };
+    const cleanup = () => {
+      process.stdin.off('data', onData);
+      process.stdin.off('end', onEnd);
+      process.stdin.off('error', onErr);
+      process.stdin.pause();
+    };
+    process.stdin.setEncoding('utf8');
+    process.stdin.resume();
+    process.stdin.on('data', onData);
+    process.stdin.on('end', onEnd);
+    process.stdin.on('error', onErr);
+  });
+}
+
 export default function setupUsersCommand(cli: CAC) {
   cli
     .command('users:create', 'Create a new user account')
@@ -222,6 +259,183 @@ export default function setupUsersCommand(cli: CAC) {
             `User created successfully: ${newUser.username}`,
             {
               operation: 'users:create',
+              userId: newUser.id,
+              username: newUser.username,
+              role: newUser.role,
+            }
+          );
+
+          await civic.shutdown();
+        }
+      )
+    );
+
+  cli
+    .command(
+      'users:bootstrap-admin',
+      'Create the first admin on a fresh instance (only when no users exist)'
+    )
+    .option('--username <username>', 'Admin username')
+    .option('--email <email>', 'Admin email address')
+    .option('--name <name>', 'Full name')
+    .option('--password <password>', 'Admin password (prefer --password-stdin)')
+    .option('--password-stdin', 'Read the password from stdin (one line)')
+    .option('--json', 'Output as JSON')
+    .option('--silent', 'Suppress output')
+    .action(
+      withCli<[any]>(
+        {
+          operation: 'users:bootstrap-admin',
+          errorMessage: 'Failed to bootstrap admin user',
+          errorCode: 'BOOTSTRAP_ADMIN_FAILED',
+          details: (error) => ({
+            error: error instanceof Error ? error.message : 'Unknown error',
+          }),
+        },
+        async (_ctx, options) => {
+          // Resolve the password. --password-stdin keeps the secret out of argv
+          // (and the shell history / process list), which matters because this
+          // command mints an admin. Fall back to --password, then an interactive
+          // prompt when a TTY is available.
+          let password = options.password;
+          if (options.passwordStdin) {
+            password = (await readStdinLine()).replace(/[\r\n]+$/, '');
+          }
+          let { username, email, name } = options;
+
+          if (
+            (!username || !password) &&
+            !options.passwordStdin &&
+            process.stdin.isTTY === true &&
+            !options.json &&
+            !options.silent
+          ) {
+            const inquirer = await import('inquirer');
+            const prompts: any[] = [];
+            if (!username) {
+              prompts.push({
+                type: 'input',
+                name: 'username',
+                message: 'Admin username:',
+                validate: (i: string) =>
+                  i.trim() ? true : 'Username is required',
+              });
+            }
+            if (!password) {
+              prompts.push({
+                type: 'password',
+                name: 'password',
+                message: 'Admin password:',
+                validate: (i: string) =>
+                  i.trim() ? true : 'Password is required',
+              });
+            }
+            if (!email) {
+              prompts.push({
+                type: 'input',
+                name: 'email',
+                message: 'Admin email (optional):',
+              });
+            }
+            if (!name) {
+              prompts.push({
+                type: 'input',
+                name: 'name',
+                message: 'Full name (optional):',
+              });
+            }
+            const answers = await inquirer.default.prompt(prompts);
+            username = username || answers.username;
+            password = password || answers.password;
+            email = email || answers.email;
+            name = name || answers.name;
+          }
+
+          if (!username || !password) {
+            cliError(
+              '--username and --password (or --password-stdin) are required',
+              'VALIDATION_ERROR',
+              undefined,
+              'users:bootstrap-admin'
+            );
+            process.exit(1);
+          }
+
+          // Get configuration from central config
+          const { CentralConfigManager } = await import('@civicpress/core');
+          const dataDir = CentralConfigManager.getDataDir();
+          const dbConfig = CentralConfigManager.getDatabaseConfig();
+
+          const civic = new CivicPress({
+            dataDir,
+            database: dbConfig,
+            logger: { json: options.json, silent: options.silent },
+          });
+          await civic.initialize();
+
+          const authService = civic.getAuthService();
+          const dbService = civic.getDatabaseService();
+
+          // SECURITY GUARD: bootstrap is permitted ONLY on an empty instance.
+          // Once any user exists this path is closed — an operator must instead
+          // use `civic users:create` (which requires an authenticated admin).
+          // This closes the first-admin chicken-and-egg without ever touching
+          // the dev-only simulated-auth backdoor, so it is safe to leave
+          // available on a production/public instance.
+          const existing = await dbService.listUsers({ limit: 1, offset: 0 });
+          if (existing.total > 0) {
+            cliError(
+              'Refusing to bootstrap: this instance already has users. ' +
+                'Use `civic users:create` as an authenticated admin instead.',
+              'INSTANCE_NOT_EMPTY',
+              { existingUsers: existing.total },
+              'users:bootstrap-admin'
+            );
+            await civic.shutdown();
+            process.exit(1);
+          }
+
+          // Enforce the configured password policy (same gate as users:create).
+          const policy = authService.validatePasswordPolicy(password);
+          if (!policy.valid) {
+            cliError(
+              `Password does not meet requirements: ${policy.errors.join('; ')}`,
+              'WEAK_PASSWORD',
+              { errors: policy.errors },
+              'users:bootstrap-admin'
+            );
+            await civic.shutdown();
+            process.exit(1);
+          }
+
+          const bcrypt = await import('bcrypt');
+          const passwordHash = await bcrypt.hash(password, 12);
+
+          const newUser = await authService.createUserWithPassword({
+            username,
+            email,
+            name,
+            role: 'admin',
+            passwordHash,
+            auth_provider: 'password',
+            email_verified: false,
+          });
+
+          cliSuccess(
+            {
+              user: {
+                id: newUser.id,
+                username: newUser.username,
+                role: newUser.role,
+                email: newUser.email,
+                name: newUser.name,
+                created_at: newUser.created_at,
+              },
+              loginCommand: `civic auth:password --username ${newUser.username}`,
+            },
+            `Admin user created: ${newUser.username}`,
+            {
+              operation: 'users:bootstrap-admin',
               userId: newUser.id,
               username: newUser.username,
               role: newUser.role,
