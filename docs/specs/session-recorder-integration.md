@@ -1,5 +1,7 @@
 # CivicPress – Session Recorder Integration
 
+**Status**: Implemented
+
 ## Purpose
 
 This document describes how a session recorder box integrates with CivicPress to

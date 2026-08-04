@@ -15,8 +15,14 @@ const specs = fs.readdirSync(dir).filter(f => f.endsWith('.md'));
 for (const f of specs) {
   const p = path.join(dir, f);
   const txt = fs.readFileSync(p, 'utf8');
-  const hasHeader = /^#\s+/.test(txt);
-  const hasStatus = /\bStatus\s*:/i.test(txt);
+  // Specs now carry their metadata as standard top-of-file YAML frontmatter, so
+  // strip a leading `---...---` block before checking for the H1 title. (The
+  // status also lives in that frontmatter as `status:`.)
+  const afterFrontmatter = txt.replace(/^---\n[\s\S]*?\n---\n/, '');
+  const hasHeader = /^\s*#\s+/.test(afterFrontmatter);
+  // Accept the status in frontmatter (`status:`) or as a bold-prose header
+  // (`**Status**:`) — both conventions are in use across the specs.
+  const hasStatus = /\bStatus[\s*]*:/i.test(txt);
   if (!hasHeader || !hasStatus) {
     failures++;
     console.log(`Spec issue: ${f} -> missing ${!hasHeader ? 'header' : ''}${!hasHeader && !hasStatus ? ' and ' : ''}${!hasStatus ? 'status' : ''}`);
