@@ -1,3 +1,10 @@
+---
+version: '2.1.0'
+status: partial
+created: '2025-07-03'
+updated: '2026-08-03'
+---
+
 # ️ CivicPress Spec: `storage.md`
 
 > **Implementation status (2026-08-03).** The local-filesystem provider is
@@ -10,31 +17,6 @@
 > action moves no file today). The live circuit breaker, timeouts, quota, and
 > usage reporting are unaffected. The authoritative, code-verified status is
 > `docs/project-status.md` (Storage = Partial).
-
----
-
-version: 2.1.0 status: partial created: '2025-07-03' updated: '2026-08-03'
-deprecated: false sunset_date: null additions:
-
-- comprehensive storage documentation
-- UUID-based file management system
-- multi-provider backend support
-- file attachment system integration
-- data management
-- security considerations
-- performance optimizations (caching, batch, streaming)
-- reliability improvements (retry, failover, circuit breaker)
-- observability & management (metrics, quota, lifecycle)
-- enhanced error handling
-
-compatibility: min_civicpress: 2.0.0 max_civicpress: 'null' dependencies: []
-authors:
-
-- Sophie Germain <sophie@civicpress.io> reviewers:
-- Ada Lovelace
-- Irène Joliot-Curie
-
----
 
 ## Name
 

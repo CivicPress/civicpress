@@ -1,23 +1,11 @@
+---
+version: '0.3.x-scope'
+status: planned
+created: '2025-07-04'
+updated: '2025-07-15'
+---
+
 # ️ CivicPress Spec: `plugin-development.md`
-
----
-
-version: 0.3.x-scope status: planned created: '2025-07-04' updated: '2025-07-15'
-deprecated: false sunset_date: null additions:
-
-- comprehensive plugin development documentation
-- security testing patterns
-- testing frameworks
-- development workflows compatibility: min_civicpress: 1.0.0 max_civicpress:
- 'null' dependencies:
- - 'plugins.md: >=1.5.0'
- - 'plugin-api.md: >=1.0.0'
- - 'testing-framework.md: >=1.0.0' authors:
-- 'Sophie Germain <sophie@civicpress.io>' reviewers:
-- 'Ada Lovelace'
-- 'Irène Joliot-Curie'
-
----
 
 ## Name
 

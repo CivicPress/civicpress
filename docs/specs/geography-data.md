@@ -1,3 +1,10 @@
+---
+version: '1.0.0'
+status: draft
+created: '2025-01-27'
+updated: '2025-01-27'
+---
+
 # ️ CivicPress Spec: `geography-data.md`
 
 > **Implementation status (2026-08-03).** **GeoJSON is the only supported
@@ -5,24 +12,6 @@
 > implemented". The Leaflet map, CRUD, and presets work; the database mirror is
 > write-only. Authoritative status: `docs/project-status.md` (Geography =
 > Partial).
-
----
-
-version: 1.0.0 status: draft created: '2025-01-27' updated: '2025-01-27'
-deprecated: false sunset_date: null breaking_changes: [] additions:
-
-- centralized geography data management system
-- text box input with API validation and file generation
-- live preview with Leaflet maps
-- public geography file access
-- geography data relationships
-- standardized geography file structure fixes: [] migration_guide: null
- compatibility: min_civicpress: 1.0.0 max_civicpress: null dependencies: []
- authors:
-- 'AI Assistant <ai@civicpress.io>' reviewers:
-- 'Development Team'
-
----
 
 ## Name
 

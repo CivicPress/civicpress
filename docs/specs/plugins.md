@@ -1,25 +1,11 @@
+---
+version: '0.3.x-scope'
+status: planned
+created: '2025-07-04'
+updated: '2025-07-15'
+---
+
 # CivicPress Spec: `plugins.md`
-
----
-
-version: 0.3.x-scope status: planned created: '2025-07-04' updated: '2025-07-15'
-deprecated: false sunset_date: null breaking_changes: [] additions:
-
-- comprehensive development examples
-- security testing patterns
-- CLI documentation
-- performance testing frameworks fixes: [] migration_guide: null compatibility:
- min_civicpress: 1.0.0 max_civicpress: 'null' dependencies:
- - 'auth.md: >=1.0.0'
- - 'permissions.md: >=1.0.0'
- - 'plugin-api.md: >=1.0.0'
- - 'plugin-development.md: >=1.0.0'
- - 'testing-framework.md: >=1.0.0' authors:
-- Sophie Germain <sophie@civicpress.io> reviewers:
-- Ada Lovelace
-- Irène Joliot-Curie
-
----
 
 ## Name
 

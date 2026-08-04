@@ -1,3 +1,10 @@
+---
+version: '0.2.x'
+status: partial
+created: '2025-07-03'
+updated: '2026-05-17'
+---
+
 # CivicPress Workflows Specification
 
 > **Implementation status (2026-08-03).** Only one built-in workflow is
@@ -7,31 +14,6 @@
 > user-workflow loader or sandbox, and the REST `workflows` route is a `501`
 > stub. Authoritative status: `docs/project-status.md` (Workflow engine =
 > Partial).
-
-version: 0.2.x
-status: partial
-created: 2025-07-03
-updated: 2026-05-17
-deprecated: false
-sunset_date: null
-breaking_changes: []
-
-additions:
-
-- Session recorder integration workflow triggers
-- YAML-based workflow configuration
-- Manual workflow actions (UI triggers)
-- Enhanced security considerations fixes: []  
-  migration_guide: null  
-  compatibility: min_civicpress: 1.0.0 max_civicpress: null dependencies:
-- 'auth.md: >=1.0.0'
-- 'permissions.md: >=1.0.0'
-- 'hooks.md: >=1.0.0' authors:
-- Sophie Germain <sophie@civicpress.io> reviewers:
-- Ada Lovelace
-- Irène Joliot-Curie
-
----
 
 ## Name
 

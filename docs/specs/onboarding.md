@@ -1,21 +1,11 @@
+---
+version: '0.2.x'
+status: partial
+created: '2025-07-03'
+updated: '2025-07-15'
+---
+
 # CivicPress Spec: `onboarding.md`
-
----
-
-version: 0.2.x status: partial created: '2025-07-03' updated: '2025-07-15'
-deprecated: false sunset_date: null additions:
-
-- comprehensive onboarding documentation
-- user experience patterns
-- security considerations compatibility: min_civicpress: 1.0.0 max_civicpress:
- 'null' dependencies:
- - 'ui.md: >=1.0.0'
- - 'auth.md: >=1.2.0' authors:
-- Sophie Germain <sophie@civicpress.io> reviewers:
-- Ada Lovelace
-- Irène Joliot-Curie
-
----
 
 ## Name
 

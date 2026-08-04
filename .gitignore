@@ -83,3 +83,9 @@ Icon?
 
 # BroadcastBox live-e2e harness throwaway data
 /.e2e-live/
+
+# Playwright browser-e2e artifacts
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/

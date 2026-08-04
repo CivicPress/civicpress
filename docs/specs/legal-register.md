@@ -1,21 +1,11 @@
+---
+version: '0.3.x-scope'
+status: planned
+created: '2025-07-03'
+updated: '2026-05-17'
+---
+
 # ️ CivicPress Spec: `legal-register.md`
-
----
-
-version: 0.3.x-scope status: planned created: '2025-07-03' updated: '2026-05-17'
-deprecated: false sunset_date: null breaking_changes: [] additions:
-
-- comprehensive legal register documentation
-- document integrity
-- security considerations fixes: [] migration_guide: null compatibility:
- min_civicpress: 0.3.0 max_civicpress: 'null' dependencies:
- - 'public-data-structure.md: >=1.0.0'
- - 'records-validation.md: >=1.0.0' authors:
-- Sophie Germain <sophie@civicpress.io> reviewers:
-- Ada Lovelace
-- Irène Joliot-Curie
-
----
 
 > **Status note (Phase 2b Truth Restoration, 2026-05-17):** This spec is `status: planned`. The described module is absent from v0.2.0 — see "Current implementation" below for what exists today. Closes audit findings `legal-register-001` and `legal-register-006`. Module build sequenced post-Phase-2d per refactor master plan §9.4. Triage rationale: `docs/audits/spec-stability-triage.md`.
 

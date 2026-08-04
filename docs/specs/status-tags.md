@@ -1,21 +1,11 @@
+---
+version: '1.0.0'
+status: stable
+created: '2025-07-03'
+updated: '2025-07-15'
+---
+
 # ️ CivicPress Spec: `status-tags.md`
-
----
-
-version: 1.0.0 status: stable created: '2025-07-03' updated: '2025-07-15'
-deprecated: false sunset_date: null additions:
-
-- comprehensive status tag documentation
-- transition security
-- abuse prevention compatibility: min_civicpress: 1.0.0 max_civicpress: 'null'
- dependencies:
- - 'workflows.md: >=1.3.0'
- - 'permissions.md: >=1.1.0' authors:
-- Sophie Germain <sophie@civicpress.io> reviewers:
-- Ada Lovelace
-- Irène Joliot-Curie
-
----
 
 ## Name
 

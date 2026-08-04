@@ -1,21 +1,11 @@
+---
+version: '0.2.x'
+status: partial
+created: '2025-07-03'
+updated: '2025-07-15'
+---
+
 # CivicPress Spec: `lifecycle.md`
-
----
-
-version: 0.2.x status: partial created: '2025-07-03' updated: '2025-07-15'
-deprecated: false sunset_date: null additions:
-
-- comprehensive lifecycle documentation
-- state management
-- security considerations compatibility: min_civicpress: 1.0.0 max_civicpress:
- 'null' dependencies:
- - 'workflows.md: >=1.3.0'
- - 'status-tags.md: >=1.0.0' authors:
-- Sophie Germain <sophie@civicpress.io> reviewers:
-- Ada Lovelace
-- Irène Joliot-Curie
-
----
 
 ## Name
 

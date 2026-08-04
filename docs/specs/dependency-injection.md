@@ -1,19 +1,11 @@
+---
+version: '1.0.0'
+status: implemented
+created: '2025-01-27'
+updated: '2025-12-18'
+---
+
 # CivicPress Spec: `dependency-injection.md`
-
----
-
-version: 1.0.0 status: implemented created: '2025-01-27' updated: '2025-12-18'
-deprecated: false sunset_date: null breaking_changes: [] additions:
-
-- Dependency injection container system
-- Service registration and resolution
-- Lazy initialization support
-- Service lifecycle management fixes: [] migration_guide: null compatibility:
-  min_civicpress: '0.2.0' max_civicpress: null dependencies:
-- 'core.md: >=1.0.0' authors:
-- 'AI Assistant <assistant@civicpress.io>' reviewers: []
-
----
 
 ## Name
 

@@ -1,0 +1,59 @@
+# Browser end-to-end tests (Playwright + Chromium) against the real UI SPA.
+#
+# Separate from the `ci` job because it needs a browser and a running UI server.
+# The API is stubbed at the network boundary inside the specs (page.route), so no
+# database/API boot is required — this layer verifies real-browser routing,
+# hydration, and rendering that the vitest component tests and the API-level
+# journey tests (tests/e2e/) can't reach.
+#
+# The UI's workspace deps (e.g. @civicpress/editor-schema) are consumed as dist,
+# so they must be built before the Nuxt dev server (which Playwright auto-starts
+# via webServer) can resolve them. Action refs are SHA-pinned to match ci.yml.
+name: browser-e2e
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - develop
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  browser-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
+
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build the UI (and its workspace deps)
+        # `...` = @civicpress/ui plus its deps (editor-schema, …). CI serves the
+        # built preview below rather than the dev server, which cold-starts too
+        # slowly on a runner (the dev server is the local default).
+        run: pnpm --filter "@civicpress/ui..." run build
+
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Run browser e2e
+        # Playwright's webServer serves the built UI preview and waits for it.
+        run: pnpm e2e
+        env:
+          CIVIC_E2E_WEBSERVER: pnpm --filter @civicpress/ui run preview

@@ -1,14 +1,11 @@
-# CivicPress Spec: `health.md`
-
 ---
-
-version: 0.2.x
+version: '0.2.x'
 status: partial
 created: '2025-01-15'
 updated: '2026-05-17'
-deprecated: false
-
 ---
+
+# CivicPress Spec: `health.md`
 
 ## Name
 

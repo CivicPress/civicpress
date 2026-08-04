@@ -1,21 +1,11 @@
+---
+version: '0.3.x-scope'
+status: planned
+created: '2025-07-03'
+updated: '2025-07-15'
+---
+
 # CivicPress Spec: `static-export.md`
-
----
-
-version: 0.3.x-scope status: planned created: '2025-07-03' updated: '2025-07-15'
-deprecated: false sunset_date: null additions:
-
-- comprehensive static export documentation
-- asset validation
-- security considerations compatibility: min_civicpress: 1.0.0 max_civicpress:
- 'null' dependencies:
- - 'ui.md: >=1.0.0'
- - 'public-data-structure.md: >=1.0.0' authors:
-- Sophie Germain <sophie@civicpress.io> reviewers:
-- Ada Lovelace
-- Irène Joliot-Curie
-
----
 
 ## Name
 

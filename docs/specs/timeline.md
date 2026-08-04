@@ -1,21 +1,11 @@
+---
+version: '0.3.x-scope'
+status: planned
+created: '2025-07-03'
+updated: '2025-07-15'
+---
+
 # CivicPress Spec: `timeline.md`
-
----
-
-version: 0.3.x-scope status: planned created: '2025-07-03' updated: '2025-07-15'
-deprecated: false sunset_date: null additions:
-
-- comprehensive timeline documentation
-- chronological tracking
-- security considerations compatibility: min_civicpress: 1.0.0 max_civicpress:
- 'null' dependencies:
- - 'public-data-structure.md: >=1.0.0'
- - 'workflows.md: >=1.3.0' authors:
-- Sophie Germain <sophie@civicpress.io> reviewers:
-- Ada Lovelace
-- Irène Joliot-Curie
-
----
 
 ## Name
 
