@@ -62,9 +62,10 @@ the fastest tunnel-to-live if we ever want one.) Then build the operator UI.
       subset of the bundled demo records into the instance + `civic index
       --sync-db`, so ONLY curated records are public. Verified (6 records synced
       to the DB). Broadcast session deferred to a live capture (needs real A/V).
-- [ ] **D7 — Runbook + pre-public security checklist;** promote
-      `deployment.md` from `planned` + fix its inverted port table; backlog note
-      for the missing published-only gate.
+- [x] **D7 — Runbook** (`deploy/README.md`: Docker + manual paths, seeding,
+      recording a broadcast session, pre-public security checklist) + promoted
+      `deployment.md` (status → partial, inverted port table corrected) + backlog
+      note for the missing published-only gate.
 
 - [x] **D8 — `civic doctor`** (env preflight): checks node, signing secret,
       auth posture (fails on the simulated-auth backdoor), ffmpeg/ffprobe,

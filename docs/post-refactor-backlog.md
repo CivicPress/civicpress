@@ -87,6 +87,23 @@ forgotten if priorities change.
 
 ---
 
+## Security: public reads have no "published-only" gate
+
+**Disposition:** backlog (real product gap; surfaced 2026-08-04 during the
+deployment-layer work).
+
+Public read endpoints are ungated (`optionalAuth`) and filter only
+`workflow_state != 'internal_only'` (`core/src/database/stores/record-store.ts`
+list/search; get-by-id filters nothing). Legal `status` is **not** checked, and
+`civic index` loads every on-disk record into the public `records` table
+(default `workflow_state='draft'`). So "public" == "indexed", **not**
+"status=published". A public demo works around this by curating what is indexed
+(`deploy/seed-demo.sh`), but a real deployment wants an actual published-only
+gate on the public read paths (or a clearly documented `internal_only`
+workflow). Ties to the manifesto's "make truth true" / least-surprise spine.
+
+---
+
 ## Triaged + closed (no longer carry-forward)
 
 - **Dead legacy `SnapshotManager` API removed** — 2026-06-15. The W4 row-based
