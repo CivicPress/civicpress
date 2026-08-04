@@ -12,6 +12,7 @@ import inquirer from 'inquirer';
 import * as yaml from 'yaml';
 import { cliSuccess } from '../utils/cli-output.js';
 import { withCli } from '../utils/with-cli.js';
+import { readStdinLine } from '../utils/stdin.js';
 import { fileURLToPath } from 'url';
 
 // FA-CLI-005: the default record-type / status config blocks were inlined
@@ -104,6 +105,53 @@ const INIT_RECORD_STATUSES_CONFIG = {
   },
 } as const;
 
+/**
+ * Resolve which modules to enable from --modules / --profile, or null if
+ * neither was given (leaving the default module set from config.yml).
+ */
+function resolveRequestedModules(options: any): string[] | null {
+  if (options.modules) {
+    return String(options.modules)
+      .split(',')
+      .map((m: string) => m.trim())
+      .filter(Boolean);
+  }
+  if (options.profile === 'demo') {
+    // The demo profile turns on the broadcast-box appliance feature alongside
+    // the default legal-register module.
+    return ['legal-register', 'broadcast-box'];
+  }
+  return null;
+}
+
+/**
+ * Patch the `modules:` list in data/.civic/config.yml — the file the running
+ * instance reads to decide which modules to mount — preserving all other keys.
+ */
+async function applyModulesToConfigYml(
+  configYmlPath: string,
+  modules: string[],
+  logger: any,
+  shouldOutputJson: boolean
+): Promise<void> {
+  try {
+    const fsp = await import('fs/promises');
+    let doc: any = {};
+    try {
+      doc = yaml.parse(await fsp.readFile(configYmlPath, 'utf8')) || {};
+    } catch {
+      // config.yml not present yet — start from an empty document.
+    }
+    doc.modules = modules;
+    await fsp.writeFile(configYmlPath, yaml.stringify(doc), 'utf8');
+    if (!shouldOutputJson) {
+      logger.success(`🧩 Enabled modules: ${modules.join(', ')}`);
+    }
+  } catch (err: any) {
+    logger.warn(`⚠️  Failed to apply module selection: ${err?.message || err}`);
+  }
+}
+
 export const initCommand = (cli: CAC) => {
   cli
     .command('init', 'Initialize a new CivicPress project')
@@ -117,6 +165,28 @@ export const initCommand = (cli: CAC) => {
     .option(
       '--demo-data [city]',
       'Load demo data (optional: specify city name)'
+    )
+    .option(
+      '--admin-user <username>',
+      'Create an admin with this username (non-interactive)'
+    )
+    .option('--admin-email <email>', 'Admin email address')
+    .option('--admin-name <name>', 'Admin full name')
+    .option(
+      '--admin-password <password>',
+      'Admin password (prefer --admin-password-stdin)'
+    )
+    .option(
+      '--admin-password-stdin',
+      'Read the admin password from stdin (one line)'
+    )
+    .option(
+      '--modules <list>',
+      'Comma-separated modules to enable (e.g. legal-register,broadcast-box)'
+    )
+    .option(
+      '--profile <name>',
+      'Config profile to apply ("demo" enables the broadcast-box module)'
     )
     .action(
       withCli<[any]>(
@@ -148,53 +218,13 @@ export const initCommand = (cli: CAC) => {
             let config: any;
             let dataDir = 'data';
 
-            if (skipPrompts) {
-              // Use all defaults for prompts
-              config = {
-                version: '1.0.0',
-                name: 'Civic Records',
-                city: 'Richmond',
-                state: 'Quebec',
-                country: 'Canada',
-                timezone: 'America/Montreal',
-                repo_url: null,
-                modules: ['legal-register'],
-                record_types: ['bylaw', 'policy'],
-                record_types_config: INIT_RECORD_TYPES_CONFIG,
-                record_statuses_config: INIT_RECORD_STATUSES_CONFIG,
-                default_role: 'clerk',
-                hooks: { enabled: true },
-                workflows: { enabled: true },
-                audit: { enabled: true },
-                created: new Date().toISOString(),
-              };
-              // Write config to .civicrc
-              const fs = await import('fs/promises');
-              await fs.writeFile('.civicrc', JSON.stringify(config, null, 2));
-              // Create data directory if it doesn't exist
-              const { existsSync, mkdirSync } = await import('fs');
-              if (!existsSync(dataDir)) {
-                mkdirSync(dataDir, { recursive: true });
-              }
-
-              // Handle demo data loading for skipPrompts mode
-              if (options.demoData) {
-                const demoCity =
-                  typeof options.demoData === 'string'
-                    ? options.demoData
-                    : 'richmond-quebec';
-                await loadDemoData(dataDir, demoCity, logger);
-              }
-
-              cliSuccess(
-                {
-                  initialized: true,
-                  message: 'CivicPress project initialized with defaults.',
-                },
-                'CivicPress project initialized with defaults.',
-                { operation: 'init' }
-              );
-              return;
+            // `--yes` / `--no-prompt` = non-interactive with defaults. Default
+            // the data dir so the FULL pipeline below runs exactly as it does
+            // for `--data-dir` (DB, storage, secret, git, index — plus, with the
+            // --admin-* flags, a login). The old thin early-return here left an
+            // instance you could not log into.
+            if (skipPrompts && !options.dataDir && !options.config) {
+              options.dataDir = dataDir; // default 'data'
             }
 
             if (options.dataDir) {
@@ -554,6 +584,18 @@ export const initCommand = (cli: CAC) => {
               config?.storage_path
             );
 
+            // Apply --modules / --profile to data/.civic/config.yml — the file
+            // the running instance reads to decide which modules to mount.
+            const requestedModules = resolveRequestedModules(options);
+            if (requestedModules) {
+              await applyModulesToConfigYml(
+                path.join(fullDataDir, '.civic', 'config.yml'),
+                requestedModules,
+                logger,
+                shouldOutputJson || false
+              );
+            }
+
             // Create admin user if not already specified
             if (!skipPrompts && !options.config && !options.dataDir) {
               const { createAdmin } = await inquirer.prompt([
@@ -654,6 +696,51 @@ export const initCommand = (cli: CAC) => {
                     '💡 You can create an admin user later with: civic users create'
                   );
                 }
+              }
+            }
+
+            // Non-interactive admin bootstrap via --admin-* flags. Runs for
+            // --yes / --data-dir / scripted setups where the interactive block
+            // above was skipped. Uses the same real password path + policy.
+            {
+              const adminPassword = options.adminPasswordStdin
+                ? (await readStdinLine()).replace(/[\r\n]+$/, '')
+                : options.adminPassword;
+              if (options.adminUser && adminPassword) {
+                try {
+                  const authService = civic.getAuthService();
+                  const policy =
+                    authService.validatePasswordPolicy(adminPassword);
+                  if (!policy.valid) {
+                    logger.error(
+                      `Admin password does not meet requirements: ${policy.errors.join('; ')}`
+                    );
+                    process.exit(1);
+                  }
+                  const bcrypt = await import('bcrypt');
+                  const passwordHash = await bcrypt.hash(adminPassword, 12);
+                  await authService.createUserWithPassword({
+                    username: options.adminUser,
+                    email: options.adminEmail,
+                    name: options.adminName,
+                    passwordHash,
+                    role: 'admin',
+                    auth_provider: 'password',
+                    email_verified: false,
+                  });
+                  if (!shouldOutputJson) {
+                    logger.success(`👤 Created admin user: ${options.adminUser}`);
+                  }
+                } catch (error: any) {
+                  logger.warn(
+                    `⚠️  Failed to create admin user: ${error.message}`
+                  );
+                }
+              } else if (options.adminUser && !adminPassword) {
+                logger.warn(
+                  '⚠️  --admin-user was given without a password; skipping admin ' +
+                    'creation. Provide --admin-password or --admin-password-stdin.'
+                );
               }
             }
 

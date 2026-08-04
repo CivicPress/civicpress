@@ -5,6 +5,7 @@ import { CivicPress } from '@civicpress/core';
 import { AuthUtils } from '../utils/auth-utils.js';
 import { withCli } from '../utils/with-cli.js';
 import { cliSuccess, cliError, cliInfo, cliWarn } from '../utils/cli-output.js';
+import { readStdinLine } from '../utils/stdin.js';
 
 /**
  * Interactive "are you sure" for an irreversible user deletion.
@@ -36,43 +37,6 @@ function confirmUserDeletion(target: {
       const normalized = answer.trim().toLowerCase();
       resolve(normalized === 'yes' || normalized === 'y');
     });
-  });
-}
-
-/**
- * Read a single line from stdin — used by `--password-stdin` so an admin
- * password never lands in argv, the shell history, or the process list.
- */
-function readStdinLine(): Promise<string> {
-  return new Promise((resolve, reject) => {
-    let data = '';
-    const onData = (chunk: string) => {
-      data += chunk;
-      const nl = data.indexOf('\n');
-      if (nl !== -1) {
-        cleanup();
-        resolve(data.slice(0, nl));
-      }
-    };
-    const onEnd = () => {
-      cleanup();
-      resolve(data);
-    };
-    const onErr = (err: Error) => {
-      cleanup();
-      reject(err);
-    };
-    const cleanup = () => {
-      process.stdin.off('data', onData);
-      process.stdin.off('end', onEnd);
-      process.stdin.off('error', onErr);
-      process.stdin.pause();
-    };
-    process.stdin.setEncoding('utf8');
-    process.stdin.resume();
-    process.stdin.on('data', onData);
-    process.stdin.on('end', onEnd);
-    process.stdin.on('error', onErr);
   });
 }
 

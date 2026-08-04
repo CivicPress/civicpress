@@ -37,12 +37,15 @@ the fastest tunnel-to-live if we ever want one.) Then build the operator UI.
       `--password-stdin`): a scriptable first admin over the real password path,
       without the simulated-auth backdoor. **Fixes Blocker 2.**
       _`cli/src/commands/users.ts`; verified E2E: create → guard-refuse → login._
-- [ ] **D2 — Secret + env UX:** `civic init` generates/persists
-      `CIVICPRESS_SECRET`; a clear boot error if it is missing; `.env.example` +
-      dotenv loading. **Fixes Blocker 3.**
-- [ ] **D3 — Complete `--yes` init:** full on-disk instance (`.system-data`,
-      storage/notifications yml, git, index, YAML `.civicrc`) + `--admin-*`
-      flags so `--yes` yields a loginable instance. **Fixes Blocker 4.**
+- [x] **D2 — Secret + env UX:** `civic init` ensures/persists/prints a secret
+      (`SecretsManager.ensureSecretPersisted`); `CIVICPRESS_SECRET_FILE` (Docker
+      secrets); `.env.example`. **Fixes Blocker 3.** _(dotenv loading + secrets
+      unit tests deferred.)_
+- [x] **D3 — Complete `--yes` init:** routes `--yes` through the full pipeline
+      (DB, storage, secret, git, index) + `--admin-*` flags + `--modules` /
+      `--profile demo` module enablement — one command → a loginable,
+      demo-configured instance. **Fixes Blocker 4.** _(standalone `civic
+      config:enable` + idempotency hardening deferred.)_
 - [ ] **D4 — `civic serve`:** one entrypoint that boots the API (+ in-process
       realtime/transcription/broadcast-box), reads env, prints URLs.
       **Fixes Blocker 1 (FA-CLI-006).**
