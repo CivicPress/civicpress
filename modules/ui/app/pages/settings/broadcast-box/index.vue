@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import SystemFooter from '~/components/SystemFooter.vue';
-import type {
-  BroadcastDevice,
-  BroadcastSession,
+// Import the composable explicitly (not via auto-import): pulling `type`s from
+// this file below would otherwise suppress the auto-import of useBroadcastBox.
+import {
+  useBroadcastBox,
+  type BroadcastDevice,
+  type BroadcastSession,
 } from '~/composables/useBroadcastBox';
 
 const { t } = useI18n();
@@ -35,10 +38,12 @@ const refresh = async () => {
     devices.value = d;
     sessions.value = s;
     const statuses = await Promise.all(
-      s.map((sess) => bb.getRedactionStatus(sess.civicpressSessionId))
+      s.map((sess: BroadcastSession) =>
+        bb.getRedactionStatus(sess.civicpressSessionId)
+      )
     );
     const next: Record<string, string> = {};
-    s.forEach((sess, i) => {
+    s.forEach((sess: BroadcastSession, i: number) => {
       const st = statuses[i];
       if (st) next[sess.civicpressSessionId] = st;
     });

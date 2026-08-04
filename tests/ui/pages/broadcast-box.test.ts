@@ -19,9 +19,6 @@ let hasPerm: (p: string) => boolean = () => true;
 const toastAdd = vi.fn();
 (global as any).useToast = vi.fn(() => ({ add: toastAdd }));
 (global as any).definePageMeta = vi.fn();
-// The SFC calls useBroadcastBox() as a Nuxt auto-import (a global); wire the
-// real composable, which uses the mocked $civicApi above.
-(global as any).useBroadcastBox = useBroadcastBox;
 
 const devices = [
   {
