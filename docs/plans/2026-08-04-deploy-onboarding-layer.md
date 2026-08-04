@@ -55,9 +55,10 @@ the fastest tunnel-to-live if we ever want one.) Then build the operator UI.
       reverse-proxy config + a thin `deploy/docker-entrypoint.sh` over
       `civic init --profile demo` / `civic doctor` / `civic serve`. Secret via
       `CIVICPRESS_SECRET_FILE`; admin via `CIVIC_ADMIN_PASSWORD_FILE`. whisper
-      left opt-in (lean, network-independent build). ⚠️ **build-verify on a
-      Docker host** — authored without a local daemon; bash/YAML/UI-output-path
-      checked.
+      left opt-in (lean, network-independent build). ✅ **build-verified**
+      2026-08-04 (aarch64): full `docker compose up` stack, API self-init, and
+      admin login through nginx — the build caught a missing `git` in the
+      runtime image (now fixed).
 - [x] **D6 — Curated demo seed** (`deploy/seed-demo.sh`): copies a hand-picked
       subset of the bundled demo records into the instance + `civic index
       --sync-db`, so ONLY curated records are public. Verified (6 records synced

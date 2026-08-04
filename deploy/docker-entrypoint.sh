@@ -24,6 +24,11 @@ case "$mode" in
   serve)
     cd "$INSTANCE_DIR"
 
+    # CivicPress commits records to Git; a fresh container has no git identity,
+    # so the initial commit would fail. Set a default (override via env).
+    git config --global user.email "${CIVIC_GIT_EMAIL:-civicpress@localhost}" >/dev/null 2>&1 || true
+    git config --global user.name "${CIVIC_GIT_NAME:-CivicPress}" >/dev/null 2>&1 || true
+
     if [ ! -f "$INSTANCE_DIR/.civicrc" ]; then
       echo "civic: no instance at $INSTANCE_DIR — initializing…"
       profile="${CIVIC_PROFILE:-demo}"

@@ -6,7 +6,7 @@
 #   printf 'ChangeMe!Str0ng' > deploy/secrets/civic_admin_password
 # and (for real TLS) drop fullchain.pem + privkey.pem in deploy/certs/.
 #
-# NOTE: authored without a local Docker daemon — verify on a Docker host.
+# Build-verified 2026-08-04 (aarch64): full stack up; login works through nginx.
 name: civicpress
 
 services:

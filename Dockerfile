@@ -4,8 +4,8 @@
 # container is a thin wrapper over the verified CLI (`civic init` / `doctor` /
 # `serve`); see deploy/docker-entrypoint.sh.
 #
-# NOTE: authored without a local Docker daemon — build-verify on a Docker host
-# (`docker build -t civicpress:local .`).
+# Build-verified 2026-08-04 on an aarch64 host: `docker compose up` brings up
+# api + ui + nginx, the API self-initializes, and admin login works through nginx.
 
 # ---------- builder ----------
 FROM node:22-bookworm AS builder
@@ -31,13 +31,16 @@ RUN pnpm -r run build
 # ---------- runtime ----------
 FROM node:22-bookworm-slim AS runtime
 
-# ffmpeg + ffprobe are required by broadcast-box redaction and (optionally)
-# transcription. tini gives correct signal handling / zombie reaping.
+# Runtime deps:
+#  - git: CivicPress commits records to a Git repo (`civic init` runs git init +
+#    an initial commit); required, not optional.
+#  - ffmpeg/ffprobe: broadcast-box redaction and (optionally) transcription.
+#  - tini: correct signal handling / zombie reaping.
 # Transcription (whisper.cpp) is intentionally NOT bundled to keep the image
 # lean and the build network-independent; enable it by mounting a whisper-cli
 # binary + ggml model and setting transcription.* in data/.civic/config.yml.
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends ffmpeg ca-certificates tini \
+  && apt-get install -y --no-install-recommends git ffmpeg ca-certificates tini \
   && rm -rf /var/lib/apt/lists/*
 
 ENV NODE_ENV=production

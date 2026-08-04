@@ -8,9 +8,10 @@ Two paths: **Docker** (recommended) or **manual**. Both stand the instance up
 through the same verified CLI commands (`civic init` → `civic doctor` →
 `civic serve`).
 
-> **Status:** the Docker image is authored but was **not build-verified** on the
-> authoring machine (no Docker daemon). Build it once on your host and expect to
-> iterate. The manual path uses only commands that are E2E-verified.
+> **Status:** **build-verified 2026-08-04** (aarch64) — `docker compose up`
+> brings up api + ui + nginx, the API self-initializes (secret + modules +
+> admin), `civic doctor` passes, and admin login works through nginx. (Building
+> it caught + fixed a missing `git` in the runtime image.)
 
 ---
 
