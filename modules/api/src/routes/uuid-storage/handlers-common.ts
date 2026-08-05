@@ -9,6 +9,7 @@ import path from 'path';
 import os from 'os';
 import fs from 'fs';
 import { AuthenticatedRequest } from '../../middleware/auth.js';
+import { logApiError } from '../../utils/api-logger.js';
 
 /**
  * Decision returned by {@link checkFileAccess}. `ok:true` means serve; otherwise
@@ -73,6 +74,49 @@ export async function checkFileAccess(
     };
   }
   return { ok: true };
+}
+
+/**
+ * The read gate for a SINGLE file (download + `/info`), layered on top of
+ * {@link checkFileAccess}: a file the folder tier would refuse is still served
+ * when a PUBLISHED record references it.
+ *
+ * This is what lets an editor attachment be staff-only while its record is a
+ * draft and public once the record goes live, without the bytes moving between
+ * folders (which would mean provider-specific copy/delete and a window where a
+ * half-moved attachment 404s).
+ *
+ * Deliberately narrow, since it is the one path that can turn a deny into a
+ * serve:
+ *   - ONLY the `authenticated` tier is overridable. `private` (and any
+ *     unrecognized level, which falls through to private) is never opened by
+ *     publishing a record — `recordings_raw` holds unredacted closed-session
+ *     A/V and attaching it to a published record must not expose it (FA-BB-002).
+ *   - NEVER used for folder listing: enumeration stays authenticated
+ *     (FA-STOR-001), so this cannot become a way to walk a folder.
+ *   - Fails CLOSED: if the lookup throws, the original deny stands.
+ */
+export async function checkFileReadAccess(
+  folderAccess: string | undefined,
+  fileId: string,
+  req: AuthenticatedRequest
+): Promise<StorageAccessDecision> {
+  const decision = await checkFileAccess(folderAccess, req.user);
+  if (decision.ok) return decision;
+  if (folderAccess !== 'authenticated') return decision;
+
+  const civicPress = req.context?.civicPress || req.civicPress;
+  try {
+    const db = civicPress?.getDatabaseService?.();
+    if (await db?.isFileReferencedByPublishedRecord(fileId)) {
+      return { ok: true };
+    }
+  } catch (error: unknown) {
+    // Fail closed — an unreachable index must not open a file up.
+    logApiError('published_attachment_check', error, req, { file_id: fileId });
+  }
+
+  return decision;
 }
 
 // FA-API-016: buffer uploads in a temp DIR, not in the heap. memoryStorage held
@@ -206,8 +250,7 @@ export async function getStorageService(
     const errorName = error instanceof Error ? error.name : undefined;
     const errorCtorName =
       error instanceof Error ? error.constructor?.name : undefined;
-    const errorMessage =
-      error instanceof Error ? error.message : String(error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
     if (
       errorName === 'ServiceNotFoundError' ||
       errorCtorName === 'ServiceNotFoundError'

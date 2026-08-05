@@ -13,7 +13,7 @@ import {
   upload,
   getStorageService,
   getStorageConfigManager,
-  checkFileAccess,
+  checkFileReadAccess,
 } from './handlers-common.js';
 
 export function registerSingleFileRoutes(router: Router): void {
@@ -24,7 +24,12 @@ export function registerSingleFileRoutes(router: Router): void {
     upload.single('file'),
     body('folder').isString().notEmpty(),
     body('description').optional().isString(),
-    (error: Error, req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    (
+      error: Error,
+      req: AuthenticatedRequest,
+      res: Response,
+      next: NextFunction
+    ) => {
       if (error) {
         return handleStorageError(
           'upload_file',
@@ -191,8 +196,14 @@ export function registerSingleFileRoutes(router: Router): void {
         }
         const folderConfig = config.folders?.[fileInfo.folder];
         // FA-STOR-002: same three-tier gate as download — /info leaks file
-        // metadata (name, size, path) so it must honor the private tier too.
-        const access = await checkFileAccess(folderConfig?.access, req.user);
+        // metadata (name, size, path) so it must honor the private tier too —
+        // plus the published-record override, so a citizen reading a published
+        // record can resolve its attachments' names/sizes.
+        const access = await checkFileReadAccess(
+          folderConfig?.access,
+          fileId,
+          req
+        );
         if (!access.ok) {
           res.status(access.status ?? 403).json({
             success: false,
@@ -283,8 +294,14 @@ export function registerSingleFileRoutes(router: Router): void {
           }
         }
         const folderConfig = config.folders?.[fileInfo.folder];
-        // FA-STOR-002: three-tier gate (public / authenticated / private).
-        const access = await checkFileAccess(folderConfig?.access, req.user);
+        // FA-STOR-002: three-tier gate (public / authenticated / private),
+        // widened only by the published-record override so that publishing a
+        // record makes its attachments citizen-readable.
+        const access = await checkFileReadAccess(
+          folderConfig?.access,
+          fileId,
+          req
+        );
         if (!access.ok) {
           res.status(access.status ?? 403).json({
             success: false,
@@ -326,7 +343,10 @@ export function registerSingleFileRoutes(router: Router): void {
             end = totalSize - 1;
           } else {
             start = Number(rawStart);
-            end = rawEnd === '' ? totalSize - 1 : Math.min(Number(rawEnd), totalSize - 1);
+            end =
+              rawEnd === ''
+                ? totalSize - 1
+                : Math.min(Number(rawEnd), totalSize - 1);
           }
           if (start > end || start >= totalSize) {
             res

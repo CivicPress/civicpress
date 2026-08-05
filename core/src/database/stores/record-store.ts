@@ -366,6 +366,42 @@ export class RecordStore {
     return rows.length > 0 ? rows[0] : null;
   }
 
+  /**
+   * Is this storage file referenced by at least one PUBLISHED record?
+   *
+   * The storage read gate uses this to let an attachment become publicly
+   * readable exactly when the record carrying it is published — so a draft's
+   * attachments stay staff-only without the bytes having to move folders when
+   * the record goes live. Callers must NOT apply it to confidential
+   * (`access: private`) folders; see checkFileAccess in the API.
+   *
+   * Both reference sites count: `attached_files` (the sidebar attachment list)
+   * and `content` (an image dragged into the body is stored as a bare UUID in
+   * the Markdown — see useMarkdown's normalizeInternalImageUrls).
+   *
+   * The id is matched as a LIKE substring, so it MUST be a UUID: anything else
+   * is rejected rather than concatenated into a pattern, which keeps `%`/`_`
+   * (and a bare `''`, which would match every row) out of the query.
+   */
+  async isFileReferencedByPublishedRecord(fileId: string): Promise<boolean> {
+    if (
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        fileId
+      )
+    ) {
+      return false;
+    }
+
+    const needle = `%${fileId}%`;
+    const rows = await this.adapter.query<CountRow>(
+      `SELECT COUNT(*) as count FROM records
+       WHERE status = 'published'
+         AND (attached_files LIKE ? OR content LIKE ?)`,
+      [needle, needle]
+    );
+    return (rows[0]?.count ?? 0) > 0;
+  }
+
   async updateRecord(
     id: string,
     updates: {
@@ -476,10 +512,9 @@ export class RecordStore {
   async deleteRecord(id: string): Promise<void> {
     // record_locks intentionally has no FK/cascade (locks are taken on
     // drafts too, which have no records row) — clean up explicitly.
-    await this.adapter.execute(
-      'DELETE FROM record_locks WHERE record_id = ?',
-      [id]
-    );
+    await this.adapter.execute('DELETE FROM record_locks WHERE record_id = ?', [
+      id,
+    ]);
     await this.adapter.execute('DELETE FROM records WHERE id = ?', [id]);
     await this.removeRecordFromIndex(id, '');
   }

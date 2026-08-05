@@ -60,16 +60,20 @@ const handleFilesSelected = (files: SelectedFile[]) => {
   });
 };
 
-// Files uploaded directly from the editor land in the general-purpose `public`
-// storage folder, then attach to the record just like browsed files. Files are
-// read back by UUID, so the folder is only where the bytes live.
+// Files uploaded from the editor land in the `attachments` storage folder,
+// then attach to the record just like browsed files. Files are read back by
+// UUID, so the folder is only where the bytes live.
+//
+// `attachments` is configured `access: authenticated` on purpose: a DRAFT
+// record's attachments must not be readable anonymously. The API opens them to
+// citizens the moment a record referencing the file is published, so the bytes
+// never have to move (see checkFileReadAccess).
 //
 // This used to be `props.recordType`, on the assumption that the upload API
 // creates folders on demand. It does not: storage folders are a fixed,
-// configured set (public / sessions / permits / private / icons / ...) and an
-// unconfigured name is rejected with FOLDER_NOT_FOUND, so uploading from the
-// editor 404'd for every record type ('session', 'bylaw', 'policy', ...).
-const uploadFolder = 'public';
+// configured set and an unconfigured name is rejected with FOLDER_NOT_FOUND,
+// so uploading from the editor 404'd for every record type.
+const uploadFolder = 'attachments';
 
 interface UploadedFile {
   id: string;

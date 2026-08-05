@@ -101,6 +101,32 @@ folders:
       - md
     max_size: 100MB
     description: Meeting recordings and session materials
+  attachments:
+    path: attachments
+    access: authenticated
+    allowed_types:
+      - jpg
+      - jpeg
+      - png
+      - gif
+      - webp
+      - svg
+      - pdf
+      - txt
+      - md
+      - doc
+      - docx
+      - xls
+      - xlsx
+      - ppt
+      - pptx
+      - csv
+    max_size: 25MB
+    # `authenticated`, not `public`: a DRAFT record's attachments must not be
+    # readable anonymously. They become publicly readable the moment a record
+    # referencing them is published — the storage read gate consults the
+    # records index rather than moving the bytes to another folder.
+    description: Files uploaded from the record editor
   permits:
     path: permits
     access: authenticated

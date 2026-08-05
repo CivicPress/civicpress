@@ -156,10 +156,7 @@ export class DatabaseService {
     return await this.adapter.query<T>(sql, params);
   }
 
-  async execute(
-    sql: string,
-    params: SqlParam[] = []
-  ): Promise<ExecuteResult> {
+  async execute(sql: string, params: SqlParam[] = []): Promise<ExecuteResult> {
     return await this.adapter.execute(sql, params);
   }
 
@@ -388,6 +385,12 @@ export class DatabaseService {
     ...args: Parameters<RecordStore['getRecord']>
   ): ReturnType<RecordStore['getRecord']> {
     return this.records.getRecord(...args);
+  }
+
+  async isFileReferencedByPublishedRecord(
+    ...args: Parameters<RecordStore['isFileReferencedByPublishedRecord']>
+  ): ReturnType<RecordStore['isFileReferencedByPublishedRecord']> {
+    return this.records.isFileReferencedByPublishedRecord(...args);
   }
 
   async updateRecord(
@@ -641,10 +644,7 @@ export class DatabaseService {
     }
   }
 
-  async getAuditLogs(
-    limit = 100,
-    offset = 0
-  ): Promise<AuditLogWithUserRow[]> {
+  async getAuditLogs(limit = 100, offset = 0): Promise<AuditLogWithUserRow[]> {
     return await this.adapter.query<AuditLogWithUserRow>(
       'SELECT al.*, u.username FROM audit_logs al LEFT JOIN users u ON al.user_id = u.id ORDER BY al.created_at DESC LIMIT ? OFFSET ?',
       [limit, offset]

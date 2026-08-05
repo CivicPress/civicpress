@@ -149,6 +149,12 @@ Run `civic doctor` — it fails (exit 1) on the hard ones. Before exposing:
 - [ ] **Index only public records** — "public = indexed"; curate the seed.
 - [ ] **Raw recordings stay private** — `recordings_raw` is fail-closed
       (admin-only); only redacted variants are ever published.
+- [ ] **Editor attachments follow their record** — uploads from the record
+      editor land in the `attachments` folder (`access: authenticated`), so a
+      DRAFT's attachments are staff-only. They open to citizens automatically
+      once a record referencing the file is `published`. Files a user picks
+      from the `public` folder are public immediately, as before — check the
+      folder before attaching something that should wait for publication.
 - [ ] **UI security headers at nginx** — the API ships helmet; the UI (Nitro)
       does not. `civicpress.conf` adds them for the UI origin.
 - [ ] **No stray cloud keys** in `.system-data/` (e.g. a GCS service-account

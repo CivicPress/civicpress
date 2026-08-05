@@ -276,6 +276,7 @@
       "selected": "selected",
       "addFiles": "Add Files",
       "folders": {
+        "attachments": "Attachments",
         "public": "Public",
         "sessions": "Sessions",
         "permits": "Permits",

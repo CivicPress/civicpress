@@ -1,9 +1,13 @@
 <template>
   <div class="file-browser-popover w-96 max-h-96 overflow-hidden flex flex-col">
     <!-- Header with Folder Selection -->
-    <div class="border-b border-gray-200 dark:border-gray-800 p-4 flex-shrink-0">
+    <div
+      class="border-b border-gray-200 dark:border-gray-800 p-4 flex-shrink-0"
+    >
       <div class="space-y-3">
-        <h3 class="font-medium text-gray-900 dark:text-white">{{ t('records.attachments.selectFiles') }}</h3>
+        <h3 class="font-medium text-gray-900 dark:text-white">
+          {{ t('records.attachments.selectFiles') }}
+        </h3>
 
         <!-- Folder Selection -->
         <USelectMenu
@@ -25,7 +29,9 @@
           name="i-lucide-loader-2"
           class="w-6 h-6 animate-spin mx-auto mb-2"
         />
-        <p class="text-sm text-gray-500">{{ t('records.attachments.loadingFiles') }}</p>
+        <p class="text-sm text-gray-500">
+          {{ t('records.attachments.loadingFiles') }}
+        </p>
       </div>
 
       <!-- Empty State -->
@@ -34,7 +40,9 @@
           name="i-lucide-folder-open"
           class="w-8 h-8 text-gray-400 mx-auto mb-2"
         />
-        <p class="text-sm text-gray-500">{{ t('records.attachments.noFilesInFolder') }}</p>
+        <p class="text-sm text-gray-500">
+          {{ t('records.attachments.noFilesInFolder') }}
+        </p>
       </div>
 
       <!-- File List -->
@@ -88,7 +96,9 @@
     </div>
 
     <!-- Footer with Actions -->
-    <div class="border-t border-gray-200 dark:border-gray-800 p-4 flex-shrink-0">
+    <div
+      class="border-t border-gray-200 dark:border-gray-800 p-4 flex-shrink-0"
+    >
       <div class="flex items-center justify-between">
         <p class="text-sm text-gray-500">
           {{ tPlural('common.selected', selectedFiles.length) }}
@@ -153,16 +163,38 @@ const { t, tPlural } = useTypedI18n();
 
 // Folder options
 const folderOptions = computed(() => [
-  { label: t('records.attachments.folders.public'), value: 'public', icon: 'i-lucide-globe' },
-  { label: t('records.attachments.folders.sessions'), value: 'sessions', icon: 'i-lucide-calendar' },
-  { label: t('records.attachments.folders.permits'), value: 'permits', icon: 'i-lucide-file-text' },
-  { label: t('records.attachments.folders.private'), value: 'private', icon: 'i-lucide-lock' },
+  {
+    label: t('records.attachments.folders.attachments'),
+    value: 'attachments',
+    icon: 'i-lucide-paperclip',
+  },
+  {
+    label: t('records.attachments.folders.public'),
+    value: 'public',
+    icon: 'i-lucide-globe',
+  },
+  {
+    label: t('records.attachments.folders.sessions'),
+    value: 'sessions',
+    icon: 'i-lucide-calendar',
+  },
+  {
+    label: t('records.attachments.folders.permits'),
+    value: 'permits',
+    icon: 'i-lucide-file-text',
+  },
+  {
+    label: t('records.attachments.folders.private'),
+    value: 'private',
+    icon: 'i-lucide-lock',
+  },
 ]);
 
 // Initialize with default folder
 onMounted(() => {
   selectedFolder.value =
-    folderOptions.value.find((f) => f.value === props.folder) || folderOptions.value[0];
+    folderOptions.value.find((f) => f.value === props.folder) ||
+    folderOptions.value[0];
   loadFiles();
 });
 
@@ -172,10 +204,10 @@ const loadFiles = async () => {
 
   loading.value = true;
   try {
-    const response = await useNuxtApp().$civicApi(
+    const response = (await useNuxtApp().$civicApi(
       `/api/v1/storage/folders/${selectedFolder.value.value}/files`
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ) as any;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    )) as any;
 
     if (response.success) {
       files.value = response.data.files || [];
