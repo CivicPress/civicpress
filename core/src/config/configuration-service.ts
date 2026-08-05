@@ -1,6 +1,12 @@
 import { readFile, writeFile, access, mkdir } from 'fs/promises';
-import { errorMessage, errorStack, errorCode, errorName } from '../utils/error-narrow.js';
+import {
+  errorMessage,
+  errorStack,
+  errorCode,
+  errorName,
+} from '../utils/error-narrow.js';
 import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
 import { existsSync } from 'fs';
 import { parse, stringify } from 'yaml';
 import { coreWarn } from '../utils/core-output.js';
@@ -34,6 +40,37 @@ export interface ConfigurationFile {
   lastModified: Date;
 }
 
+/**
+ * Locate the bundled default config templates.
+ *
+ * These ship WITH the core package, so they must be resolved relative to this
+ * module — never relative to the process cwd. The old cwd-relative default
+ * ('core/src/defaults') only ever resolved when the process happened to run
+ * from the monorepo root: in the Docker image the API runs from /instance, so
+ * every config type without a user file (attachment-types, link-categories)
+ * fell through to "Configuration file not found" and the endpoint 500'd.
+ *
+ * `dist/defaults` is checked first because that is what a built/published
+ * package carries (see core's build:copy-defaults); `src/defaults` covers
+ * vitest/tsx runs straight from source. Each candidate is probed for an actual
+ * template rather than just the directory: `tsc` creates `dist/defaults/` for
+ * its index.js regardless, so a dist built before build:copy-defaults existed
+ * would otherwise shadow the source templates.
+ */
+function resolveBundledDefaultsPath(): string {
+  const here = dirname(fileURLToPath(import.meta.url));
+  // .../core/{src,dist}/config -> .../core
+  const coreRoot = join(here, '..', '..');
+  for (const candidate of [
+    join(coreRoot, 'dist', 'defaults'),
+    join(coreRoot, 'src', 'defaults'),
+  ]) {
+    if (existsSync(join(candidate, 'config.yml'))) return candidate;
+  }
+  // Last resort: the historical cwd-relative path.
+  return join('core', 'src', 'defaults');
+}
+
 export class ConfigurationService {
   private dataPath: string;
   private defaultsPath: string;
@@ -41,7 +78,7 @@ export class ConfigurationService {
 
   constructor(options: ConfigurationServiceOptions = {}) {
     this.dataPath = options.dataPath || 'data/.civic';
-    this.defaultsPath = options.defaultsPath || 'core/src/defaults';
+    this.defaultsPath = options.defaultsPath || resolveBundledDefaultsPath();
     this.systemDataPath = options.systemDataPath || '.system-data';
   }
 
@@ -188,7 +225,10 @@ export class ConfigurationService {
       await writeFile(userPath, yamlContent, 'utf-8');
     } catch (error: unknown) {
       const errorMsg =
-        errorMessage(error) || error?.toString() || String(error) || 'Unknown error';
+        errorMessage(error) ||
+        error?.toString() ||
+        String(error) ||
+        'Unknown error';
       throw new Error(
         `Failed to save configuration ${configType}: ${errorMsg}`
       );
@@ -498,9 +538,7 @@ export class ConfigurationService {
         ? (metadata as ConfigurationContent)[key]
         : undefined;
       const normalizedValue =
-        fieldValue &&
-        typeof fieldValue === 'object' &&
-        'value' in fieldValue
+        fieldValue && typeof fieldValue === 'object' && 'value' in fieldValue
           ? (fieldValue as { value: unknown }).value
           : fieldValue;
 
