@@ -28,6 +28,15 @@ RUN pnpm --filter @civicpress/core run build
 ENV CIVIC_API_CLIENT_BASE=""
 RUN pnpm -r run build
 
+# The build is done — shrink the runtime copy:
+#  - drop devDependencies (nuxt/vitest/eslint/typescript/playwright are large
+#    and runtime-unused);
+#  - remove the project-local pnpm content store — node_modules entries are
+#    hardlinks into it, so the file DATA survives its removal; it's just a
+#    redundant second copy of every package (incl. the pruned devDeps).
+RUN pnpm prune --prod || true
+RUN rm -rf .pnpm-store
+
 # ---------- runtime ----------
 FROM node:22-bookworm-slim AS runtime
 
