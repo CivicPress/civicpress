@@ -8,6 +8,57 @@ and this project adheres to
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-08-06
+
+<!-- markdownlint-disable MD024 -->
+
+A **deployment & onboarding layer** that stands a CivicPress instance up with
+one command, a thin **BroadcastBox operator UI**, and correctness fixes to the
+record round-trip and CLI output surfaced while building them. This makes the
+BroadcastBox feature demonstrable on a shareable instance.
+
+### Added
+
+- **One-command deployment.** A multi-stage `Dockerfile` and a `deploy/` stack —
+  `docker-compose` (api + ui + nginx, Docker secrets), reverse-proxy config, and
+  an entrypoint that is a thin wrapper over the CLI — plus a curated demo seed
+  (`deploy/seed-demo.sh`) and an operator runbook (`deploy/README.md`) with a
+  pre-public security checklist. `.env.example` documents the knobs.
+- **First-run CLI.** `civic init --yes` now runs the full pipeline (`--admin-*`
+  flags, `--modules` / `--profile demo`) to produce a running-ready, loginable,
+  demo-configured instance in a single command; `civic serve` runs the server
+  with a subsystem ready-banner (closes FA-CLI-006); `civic doctor` is an
+  environment preflight that exits non-zero so it can gate a deploy;
+  `civic users:bootstrap-admin` mints a scriptable first admin. The
+  signing-secret UX ensures a persisted root secret under production `NODE_ENV`
+  and supports `CIVICPRESS_SECRET_FILE` (Docker secrets).
+- **BroadcastBox operator UI.** `/settings/broadcast-box` — device enrollment
+  (one-time codes), session start/stop, a per-session redaction-status chip, and
+  a link to the published record; permission-gated, EN/FR.
+- **Post-1.0 concept note** capturing in-session council voting as a future
+  direction (docs only).
+
+### Fixed
+
+- **Record metadata round-trips idempotently.** `RecordParser` no longer
+  re-nests a top-level `metadata:` frontmatter block on every parse→serialize
+  cycle. The old behavior split the BroadcastBox `capture` block across nesting
+  levels, so the redaction worker never saw `redaction_status: pending` and
+  sessions stalled without publishing the verified redacted variant.
+- **CLI `--json` output stays a single parseable document.** Notification
+  channel/template registration no longer logs at `info` to stdout during core
+  initialization, which had prepended a log line to every command's stdout and
+  broken the `--json` machine contract.
+- **Configuration editor** edits object-valued fields (e.g. a notifications
+  channel's `credentials` block) as JSON instead of rendering `[object Object]`.
+
+### Changed
+
+- `docs/specs/deployment.md` promoted `planned` → `partial` with the corrected
+  port table (API 3000 / UI 3030). The security note that **public reads are
+  _indexed_, not `status=published`** is documented in the runbook and backlog
+  so a public instance curates what it indexes.
+
 ## [0.3.0] - 2026-08-04
 
 <!-- markdownlint-disable MD024 -->
