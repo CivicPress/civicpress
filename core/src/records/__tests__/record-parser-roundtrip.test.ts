@@ -63,7 +63,10 @@ describe('RecordParser round-trip idempotency', () => {
 
   it('serialize -> parse -> serialize is stable (no growing metadata nesting)', () => {
     const record = baseRecord({
-      capture: { av_file: 'x', redaction_status: 'pending' },
+      // `device` is required by the session schema extension when the
+      // broadcast-box module is discoverable (root test config); include it so
+      // the round-trip parse validates in both module-loaded and bare contexts.
+      capture: { device: 'device-uuid', av_file: 'x', redaction_status: 'pending' },
     });
 
     const md1 = RecordParser.serializeToMarkdown(record);

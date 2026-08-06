@@ -131,7 +131,9 @@ export function registerEmailChannelOn(
       >[1]
     );
 
-    logger.info('Email channel registered successfully');
+    // Bootstrap detail — `debug`, not `info`: fires during core init for every
+    // command; at `info` it prints to stdout and corrupts `--json` output.
+    logger.debug('Email channel registered successfully');
   } catch (error) {
     logger.error('Error registering email channel:', error);
   }
