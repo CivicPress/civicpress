@@ -1,11 +1,19 @@
 ---
 version: '0.3.x-scope'
-status: planned
+status: partial
 created: '2025-07-03'
-updated: '2025-07-15'
+updated: '2026-08-04'
 ---
 
 # CivicPress Spec: `deployment.md`
+
+> **2026-08-04 — a concrete, working deployment now exists.** See `deploy/`
+> (`Dockerfile`, `deploy/docker-compose.yml`, `deploy/nginx/civicpress.conf`,
+> `deploy/seed-demo.sh`) and the `civic serve` / `civic doctor` CLI commands; an
+> instance stands up via `civic init --yes --profile demo`. **`deploy/README.md`
+> is the operator runbook.** Much of the aspirational detail below (systemd
+> units, IaC/Terraform, blue-green, multi-region) remains future work, and the
+> port table in "Local & Demo Setup" was **inverted** — it is corrected there.
 
 ## Name
 
@@ -107,10 +115,13 @@ deployment/
 For local or lightweight demos:
 
 | Service | URL/Port | Description |
-| ----------- | ----------------------- | ------------------------- |
-| Public UI | `http://localhost:3000` | Nuxt civic portal |
-| API Backend | `http://localhost:3030` | Express or Hono server |
-| Admin UI | `http://localhost:3100` | Optional management layer |
+| --------------------- | ----------------------- | ------------------------------------ |
+| API (+ broadcast-box) | `http://localhost:3000` | REST API; realtime WS on `3001` |
+| UI | `http://localhost:3030` | Nuxt SPA (`nuxt preview`) |
+
+> Corrected 2026-08-04: the API is on **3000** and the UI on **3030** (the
+> original table had these reversed). There is no separate admin service — the
+> admin experience is part of the one UI.
 
 Simple to run and debug 
 No Docker or domain config required 

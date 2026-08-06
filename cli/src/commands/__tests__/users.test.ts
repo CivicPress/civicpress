@@ -72,6 +72,11 @@ describe('Users CLI Command', () => {
       expect(names).toContain('users:delete-all-test');
     });
 
+    it('should register users:bootstrap-admin (first-admin bootstrap)', () => {
+      const names = cli.commands.map((c: any) => c.name);
+      expect(names).toContain('users:bootstrap-admin');
+    });
+
     it('should register the security sub-commands (change-password, set-password, etc.)', () => {
       const names = cli.commands.map((c: any) => c.name);
       expect(names).toContain('users:change-password');
@@ -106,6 +111,37 @@ describe('Users CLI Command', () => {
       expect(optNames).toContain('token');
       expect(optNames).toContain('json');
       expect(optNames).toContain('silent');
+    });
+  });
+
+  describe('users:bootstrap-admin options', () => {
+    it('should accept --username, --email, --name, --password', () => {
+      const cmd = cli.commands.find(
+        (c: any) => c.name === 'users:bootstrap-admin'
+      );
+      const optNames = (cmd?.options ?? []).map((o: any) => o.name);
+      expect(optNames).toContain('username');
+      expect(optNames).toContain('email');
+      expect(optNames).toContain('name');
+      expect(optNames).toContain('password');
+    });
+
+    it('should offer --password-stdin (keeps the secret out of argv)', () => {
+      const cmd = cli.commands.find(
+        (c: any) => c.name === 'users:bootstrap-admin'
+      );
+      const raws = (cmd?.options ?? []).map((o: any) => o.rawName);
+      expect(raws.some((r: string) => r.includes('--password-stdin'))).toBe(
+        true
+      );
+    });
+
+    it('should NOT require a --token (bootstrap runs unauthenticated on an empty instance)', () => {
+      const cmd = cli.commands.find(
+        (c: any) => c.name === 'users:bootstrap-admin'
+      );
+      const optNames = (cmd?.options ?? []).map((o: any) => o.name);
+      expect(optNames).not.toContain('token');
     });
   });
 

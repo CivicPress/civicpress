@@ -87,6 +87,46 @@ forgotten if priorities change.
 
 ---
 
+## Security: public reads have no "published-only" gate
+
+**Disposition:** backlog (real product gap; surfaced 2026-08-04 during the
+deployment-layer work).
+
+Public read endpoints are ungated (`optionalAuth`) and filter only
+`workflow_state != 'internal_only'` (`core/src/database/stores/record-store.ts`
+list/search; get-by-id filters nothing). Legal `status` is **not** checked, and
+`civic index` loads every on-disk record into the public `records` table
+(default `workflow_state='draft'`). So "public" == "indexed", **not**
+"status=published". A public demo works around this by curating what is indexed
+(`deploy/seed-demo.sh`), but a real deployment wants an actual published-only
+gate on the public read paths (or a clearly documented `internal_only`
+workflow). Ties to the manifesto's "make truth true" / least-surprise spine.
+
+---
+
+## `security-commands.test.ts`: happy-path cases need real email + auth infra
+
+**Disposition:** backlog (test infrastructure; surfaced 2026-08-06 during the
+deployment-layer work).
+
+Five happy-path cases in `tests/cli/security-commands.test.ts`
+(`users:set-password`, `users:request-email-change`, `users:cancel-email-change`,
+`users:security-info` ×2) are `it.skip`. They exercise sensitive commands that,
+in the hermetic `civic init --yes` test instance, cannot complete: there is no
+email channel configured, and the simulated-auth token the fixture mints (fine
+for `view`/`list`) is not accepted for these operations — the command exits 1
+with no diagnostic output (only the `🔄 Starting:` banner + the `--token`
+warning). They were effectively dormant on develop (the fixture produced no
+admin token, so each early-returned), and only appeared to pass once the token
+existed because a bootstrap `info` log (`Email channel registered successfully`)
+leaked onto stdout and matched their lenient `/email channel/i` tolerance — a
+leak correctly removed by the `--json` stdout-purity fix. To un-skip: give the
+CLI test instance a real (mock SMTP / console) email channel and an auth token
+these commands accept, then assert the actual success output. Separately, the
+silent status-1 exit with no error message is a CLI UX gap worth its own fix.
+
+---
+
 ## Triaged + closed (no longer carry-forward)
 
 - **Dead legacy `SnapshotManager` API removed** — 2026-06-15. The W4 row-based
