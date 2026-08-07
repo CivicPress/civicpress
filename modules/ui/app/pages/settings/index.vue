@@ -44,6 +44,15 @@ const settingsItems = computed<NavigationMenuItem[]>(() => {
     });
   }
 
+  if (authStore.hasPermission('broadcast-box:sessions:view')) {
+    items.push({
+      label: t('settings.broadcastBox.title'),
+      icon: 'i-lucide-radio',
+      to: '/settings/broadcast-box',
+      description: t('settings.broadcastBox.navDescription'),
+    });
+  }
+
   if (authStore.hasPermission('storage:manage')) {
     items.push({
       label: t('settings.storageNav'),

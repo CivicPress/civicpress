@@ -56,7 +56,10 @@ export class NotificationService {
    */
   registerChannel(name: string, channel: NotificationChannel): void {
     this.channels.set(name, channel);
-    this.logger.info(`Registered notification channel: ${name}`);
+    // Bootstrap detail — `debug`, not `info`: this fires during core
+    // initialization for every command, and at `info` it prints to stdout,
+    // corrupting the `--json` machine contract (and any "stdout clean" path).
+    this.logger.debug(`Registered notification channel: ${name}`);
   }
 
   /**
@@ -64,7 +67,8 @@ export class NotificationService {
    */
   registerTemplate(name: string, template: NotificationTemplate): void {
     this.templates.set(name, template);
-    this.logger.info(`Registered notification template: ${name}`);
+    // Bootstrap detail — `debug`, not `info` (see registerChannel).
+    this.logger.debug(`Registered notification template: ${name}`);
   }
 
   /**

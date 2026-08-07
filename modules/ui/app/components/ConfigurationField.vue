@@ -18,9 +18,27 @@
     </div>
     <!-- Dynamic form field based on type -->
     <div class="space-y-4">
+      <!-- Object / array value (e.g. a credentials block): edit as JSON so it
+           doesn't render as "[object Object]" in a text input. -->
+      <UFormField
+        v-if="isObjectValue"
+        :label="fieldLabel"
+        :description="meta.description"
+      >
+        <UTextarea
+          :model-value="jsonText"
+          :rows="6"
+          class="font-mono text-sm"
+          @update:model-value="updateJson"
+        />
+        <p v-if="jsonError" class="mt-1 text-xs text-red-600 dark:text-red-400">
+          {{ jsonError }}
+        </p>
+      </UFormField>
+
       <!-- String input -->
       <UFormField
-        v-if="fieldType === 'string'"
+        v-else-if="fieldType === 'string'"
         :label="fieldLabel"
         :description="meta.description"
       >
@@ -205,6 +223,36 @@ const fieldType = computed(() => {
 
   return type;
 });
+
+// An object/array value has no scalar input; edit it as JSON instead of
+// rendering "[object Object]" (e.g. a notifications channel `credentials` block
+// nested deeper than the form's flat fields reach).
+const isObjectValue = computed(
+  () => props.value !== null && typeof props.value === 'object'
+);
+const jsonText = ref('');
+const jsonError = ref('');
+watch(
+  () => props.value,
+  (v) => {
+    if (v !== null && typeof v === 'object') {
+      jsonText.value = JSON.stringify(v, null, 2);
+      jsonError.value = '';
+    }
+  },
+  { immediate: true }
+);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- UTextarea payload
+const updateJson = (text: any) => {
+  jsonText.value = text;
+  try {
+    const parsed = text.trim() === '' ? null : JSON.parse(text);
+    jsonError.value = '';
+    emit('update', props.fieldKey, parsed);
+  } catch {
+    jsonError.value = 'Invalid JSON — changes not saved until fixed';
+  }
+};
 
 // Helper functions
 const getPlaceholder = (field: ConfigField) => {

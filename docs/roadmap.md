@@ -323,6 +323,12 @@ CivicPress toward full digital governance infrastructure.
 - Decision workflows (e.g., resolutions, motions)
 - Multi-step inter-town and MRC-level approvals
 
+> The first two bullets have an early, unvalidated concept sketch — in-session
+> council voting captured against the BroadcastBox recording, so motions link to
+> a video timecode and minutes largely generate themselves. See
+> `docs/backlog/2026-08-03-in-session-council-voting-concept.md`. **Concept
+> only: not scheduled, not market-tested, and explicitly not v1.0 scope.**
+
 ### Transparency & Public Access
 
 - Public API key registry

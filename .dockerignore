@@ -1,0 +1,21 @@
+# Keep the build context source-only — deps, build output, and instance state
+# are rebuilt/created inside the image.
+**/node_modules
+**/dist
+**/.output
+**/.nuxt
+.git
+.github
+# Instance runtime state (must never leak into an image):
+.system-data
+data
+deploy/secrets
+deploy/certs
+# Misc
+**/*.log
+.env
+# Local temp verification scripts (never in the image)
+/_verify-ui.cjs
+**/coverage
+**/playwright-report
+**/test-results

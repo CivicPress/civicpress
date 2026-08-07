@@ -247,6 +247,19 @@ export class RecordParser {
           ...(normalized.attendees && { attendees: normalized.attendees }),
           ...(normalized.topics && { topics: normalized.topics }),
           ...(normalized.media ? { media: normalized.media } : {}),
+          // Inverse of `buildFrontmatter`, which nests non-top-level metadata
+          // fields under a `metadata:` block: spread that block's CONTENTS back
+          // in so the round-trip is idempotent. Carrying `metadata` through as a
+          // literal key (the passthrough below) instead produced
+          // `record.metadata.metadata` and, on repeated writes,
+          // `metadata.metadata.metadata...` — which split BroadcastBox `capture`
+          // across nesting levels and stalled redaction at `pending`. Top-level
+          // custom fields (the passthrough) still take precedence.
+          ...(normalized.metadata &&
+          typeof normalized.metadata === 'object' &&
+          !Array.isArray(normalized.metadata)
+            ? (normalized.metadata as Record<string, unknown>)
+            : {}),
           // Include any other custom metadata fields
           ...Object.entries(normalized)
             .filter(
@@ -284,6 +297,10 @@ export class RecordParser {
                   'attendees',
                   'topics',
                   'media',
+                  // The nested `metadata:` block is spread in above, not
+                  // carried through as a literal `metadata` key (which would
+                  // re-nest into record.metadata.metadata on every round-trip).
+                  'metadata',
                 ].includes(key)
             )
             .reduce((acc, [key, value]) => ({ ...acc, [key]: value }), {}),
