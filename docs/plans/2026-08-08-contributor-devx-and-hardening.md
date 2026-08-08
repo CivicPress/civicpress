@@ -100,6 +100,25 @@ function resolveInstanceContext(explicitRoot?: string): InstanceContext {
 Payoff: deterministic (same answer regardless of cwd), and the redaction-bug
 class becomes structurally impossible.
 
+**Progress (2026-08-08):** first increment landed — `getModuleResolver`'s
+fallback now resolves from `resolveProjectRoot(config)/modules` (matching the
+injected resolver) instead of raw `process.cwd()/modules` (`4cbc036`). Two
+design refinements surfaced while grounding, and they change the full migration:
+
+1. **The cwd-dependence is pervasive.** `central-config`'s
+   `resolveSystemDataDir` / `resolveProjectRoot` themselves fall back to
+   `path.resolve(process.cwd(), dirname(dataDir))` when `systemDataDir` is
+   unset. So `resolveInstanceContext` must resolve `root` **once** (from the
+   explicit `dataDir`, or a single `.civicrc` walk-up) and every other field
+   derives from that one root — you can't fix the leaks piecemeal without a
+   captured root.
+2. **Modules are CODE, not data.** In a split deployment (code at `/app`,
+   instance data at `/instance`) the modules dir is colocated with the app, so
+   `modulesDir` should key off the installed-code location (`__dirname` /
+   package), **not** the instance data root. `resolveProjectRoot/modules` works
+   today only because dev and the Docker image colocate code + data. The
+   `InstanceContext` likely needs `root` (data) AND a separate `codeRoot`.
+
 ### 2b. Hermetic test instance
 
 - One `createTestInstance()` — an `InstanceContext` over a fresh temp dir (own
