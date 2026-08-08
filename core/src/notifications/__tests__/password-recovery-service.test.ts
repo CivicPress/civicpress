@@ -10,6 +10,9 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { mkdtempSync } from 'fs';
+import { tmpdir } from 'os';
+import { join } from 'path';
 import {
   PasswordRecoveryService,
   type ResetTokenIssuer,
@@ -21,11 +24,13 @@ import type {
   NotificationChannel,
 } from '../notification-channel.js';
 
-function fakeIssuer(user: {
-  userId: number;
-  username: string;
-  email?: string;
-} | null) {
+function fakeIssuer(
+  user: {
+    userId: number;
+    username: string;
+    email?: string;
+  } | null
+) {
   return {
     findResetEligibleUser: vi.fn(async () => user),
     mintResetTokenForUser: vi.fn(async () => 'plaintext-token-xyz'),
@@ -50,12 +55,28 @@ function fakeEmailChannel(sink: ChannelRequest[]): NotificationChannel {
   } as unknown as NotificationChannel;
 }
 
+/**
+ * A NotificationConfig rooted in an EMPTY directory, so it is exactly the code
+ * defaults — no `notifications.yml` from any real instance.
+ *
+ * These tests assert what happens with email off / on, so the starting state
+ * has to be owned by the test. Constructed bare, NotificationConfig now reads
+ * the resolved instance's `.system-data/notifications.yml`; on a dev machine
+ * that is a real configured instance, which silently flipped both the
+ * "no user-facing channel" and "email configured" cases.
+ */
+function isolatedConfig(): NotificationConfig {
+  return new NotificationConfig(
+    mkdtempSync(join(tmpdir(), 'civic-notif-cfg-'))
+  );
+}
+
 /** A NotificationService whose email channel is the recording fake + enabled. */
 function serviceWithFakeEmail(sink: ChannelRequest[]): {
   service: NotificationService;
   config: NotificationConfig;
 } {
-  const config = new NotificationConfig();
+  const config = isolatedConfig();
   config.updateChannelConfig('email', {
     enabled: true,
     provider: 'smtp',
@@ -83,7 +104,8 @@ describe('PasswordRecoveryService', () => {
   });
 
   afterEach(() => {
-    if (savedConsole === undefined) delete process.env.CIVIC_CONSOLE_NOTIFICATIONS;
+    if (savedConsole === undefined)
+      delete process.env.CIVIC_CONSOLE_NOTIFICATIONS;
     else process.env.CIVIC_CONSOLE_NOTIFICATIONS = savedConsole;
     vi.restoreAllMocks();
   });
@@ -94,6 +116,7 @@ describe('PasswordRecoveryService', () => {
     const svc = new PasswordRecoveryService({
       issuer,
       operatorNotifier: op as never,
+      notificationConfig: isolatedConfig(),
     });
 
     const outcome = await svc.requestReset('ghost', OPTS);
@@ -110,6 +133,7 @@ describe('PasswordRecoveryService', () => {
     const svc = new PasswordRecoveryService({
       issuer,
       operatorNotifier: op as never,
+      notificationConfig: isolatedConfig(),
     });
 
     const outcome = await svc.requestReset('jo', OPTS);
@@ -125,11 +149,16 @@ describe('PasswordRecoveryService', () => {
 
   it('console sink available → mint token + deliver, no operator task', async () => {
     process.env.CIVIC_CONSOLE_NOTIFICATIONS = 'true';
-    const issuer = fakeIssuer({ userId: 9, username: 'sam', email: 'sam@x.org' });
+    const issuer = fakeIssuer({
+      userId: 9,
+      username: 'sam',
+      email: 'sam@x.org',
+    });
     const op = fakeOperatorNotifier();
     const svc = new PasswordRecoveryService({
       issuer,
       operatorNotifier: op as never,
+      notificationConfig: isolatedConfig(),
       // echo path prints; no outboxDir keeps the test filesystem clean
     });
 
@@ -145,7 +174,11 @@ describe('PasswordRecoveryService', () => {
     process.env.CIVIC_CONSOLE_NOTIFICATIONS = 'false';
     const sink: ChannelRequest[] = [];
     const { service, config } = serviceWithFakeEmail(sink);
-    const issuer = fakeIssuer({ userId: 3, username: 'sam', email: 'sam@x.org' });
+    const issuer = fakeIssuer({
+      userId: 3,
+      username: 'sam',
+      email: 'sam@x.org',
+    });
     const op = fakeOperatorNotifier();
 
     const svc = new PasswordRecoveryService({
@@ -198,6 +231,7 @@ describe('PasswordRecoveryService', () => {
     const svc = new PasswordRecoveryService({
       issuer,
       operatorNotifier: op as never,
+      notificationConfig: isolatedConfig(),
     });
 
     await svc.requestReset('some@email.org', OPTS);

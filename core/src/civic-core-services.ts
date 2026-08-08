@@ -160,7 +160,12 @@ export function registerCivicPressServices(
   // Step 7: Register notification config and service
   container.singleton('notificationConfig', (c) => {
     const config = c.resolve<CivicPressConfig>('config');
-    return new NotificationConfig(config.dataDir);
+    // `notifications.yml` lives in `.system-data` — the configuration service
+    // MIGRATES it out of `dataDir` and leaves a "# Moved to …" pointer behind
+    // (see migrateNotificationsIfNeeded). Passing `config.dataDir` here read
+    // that stub, so the DI-provided notification config silently fell back to
+    // defaults on any instance that had been migrated.
+    return new NotificationConfig(resolveSystemDataDir(config));
   });
   container.singleton('notification', (c) => {
     const notificationConfig =
