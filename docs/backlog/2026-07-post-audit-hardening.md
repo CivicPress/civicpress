@@ -1252,3 +1252,46 @@ they are pre-existing gaps the audit made visible.
       coverage before. Verified: a real relocated-`dataDir` project wipes +
       recreates the right locations; CLI suite green (12 files / 89),
       characterization test green (17).
+
+## Discovered during the 2026-08-08 InstanceContext / DevX pass
+
+Carried over from `docs/plans/2026-08-08-contributor-devx-and-hardening.md` (now
+closed) so they stay discoverable. All are **pre-existing** — surfaced by that
+work, not caused by it.
+
+- [ ] **Legal numbering does not reach the primary editor path.**
+      `DocumentNumberGenerator` has exactly TWO production call sites
+      (`RecordManager.createRecord`, `create-record-saga`). The draft → publish
+      flow goes through `RecordManager.createRecordWithId`, which has **no
+      numbering block at all**, so those records land with **no
+      `document_number`** — permanently unnumbered and invisible to
+      `getDocumentNumbers()`. Numbering itself is now correct wherever it
+      happens (fixed 2026-08-08); this is the gap in _where_ it happens.
+- [ ] **A caller-supplied `metadata.document_number` bypasses numbering** and is
+      stored with no uniqueness check. `DocumentNumberGenerator.validate()`
+      exists but has **zero call sites**, and the base record schema declares
+      `document_number` with no pattern.
+- [ ] **Document-number assignment is a read-then-write race.** Two concurrent
+      creates of the same type/year can be issued the same number — there is no
+      lock and no uniqueness constraint on the column (it lives in the metadata
+      JSON, so there is no column to constrain).
+- [ ] **Make the pre-commit hook a fast, reliable subset.** The full-suite hook
+      is flaky on the dev VM (parallel DB/auth races), so the standing advice is
+      `--no-verify` — which means the hook gates nothing. This was Phase 2b's
+      third bullet and is the one part not done.
+- [ ] **`ci.yml` (`build-test`) does not run on pushes to `develop`** — only on
+      PRs, pushes to `main`, and `renovate/**`. So a branch can land on
+      `develop` without the heavy suite ever running in a clean environment.
+      That is exactly where the 2026-08-08 pass's one CI-only failure would have
+      hidden (a test asserting on the gitignored `.civicrc`, green locally).
+      Either add `develop` to the push triggers or make the develop→main PR the
+      explicit gate. Workaround for now: `gh workflow run ci.yml --ref develop`.
+- [ ] **`resolveModulesDir` precedence is exclusive** — a `modules/` directory
+      beside the data root hides every installed-code module rather than
+      merging. Intended (it preserves the dev/Docker layout) but sharp; revisit
+      if instance-local modules become a real use case.
+
+Still open from the plan's own list, unchanged: the **published-only gate**
+(public reads return anything _indexed_, not `status=published`), the device
+`--enroll` signing-key registration, the three metadata representations, and the
+core↔storage circular build dep.

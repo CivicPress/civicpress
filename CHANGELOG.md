@@ -8,6 +8,83 @@ and this project adheres to
 
 ## [Unreleased]
 
+<!-- markdownlint-disable MD024 -->
+
+A **contributor DevX + resolution-hardening** pass ahead of v0.4.x. Its keystone
+is a single-root instance resolver: "where is this instance?" is now answered
+once, instead of independently in a dozen places that each fell back to
+`process.cwd()`. Several live bugs fell out of that migration.
+
+### Added
+
+- **`resolveInstanceContext()`** (`@civicpress/core`) — resolves the instance
+  root ONCE (an explicit argument, or a single `.civicrc` walk-up) and derives
+  `dataDir` / `systemDataDir` / `modulesDir` / `storageRoot` from it. It
+  distinguishes the DATA root from `codeRoot`, the installed-code location, so a
+  split deployment (the Docker image ships code at `/app` and runs with WORKDIR
+  `/instance`) discovers modules correctly — modules are code, not data. A root
+  can also be **installed** via `setInstanceContext()` rather than discovered.
+- **Real document-number sequencing.** `RecordStore.getDocumentNumbers()` plus a
+  format-aware matcher, so legal numbering continues from what has actually been
+  issued.
+
+### Fixed
+
+- **Legal document numbers were always `1`.** `getNextSequence` was a stub that
+  returned 1, and both call sites fed it straight into the generator, so every
+  legal-type record they created came out as `<PREFIX>-<YEAR>-001` — silent
+  duplicates of the record's own citable identity. Numbering now continues from
+  the highest issued number, scoped by prefix AND year, and honours custom
+  `document_number_formats` (a prefix containing a digit, or a `.` / `_`
+  separator, previously matched nothing and restarted the sequence).
+- **The orphaned-file cleaner could delete the wrong tree.** It resolved a
+  relative local provider path against the literal `.system-data` — i.e.
+  `process.cwd()` — so when run from anywhere but the instance root it scanned a
+  different tree than the database it compared against, and every file it found
+  there looked like an orphan. `cleanupOrphanedFiles` deletes those, so this was
+  a live data-loss path rather than a harmless empty scan.
+- **Cloud storage credentials were read from the working directory.**
+  `CredentialManager` was constructed with no path and fell back to
+  `<cwd>/.system-data/storage.yml`, making file-configured credentials invisible
+  outside the instance root. A relative GCS `keyFilename` now resolves against
+  the instance root too.
+- **The storage CLI read a different `storage.yml` than core and the API.** It
+  computed its own systemDataDir from cwd behind a test heuristic that sniffed
+  the data path (`dataDir.includes('/tmp/') || dataDir.includes('test')`), so a
+  production instance whose dataDir merely contained "test" took the test
+  branch.
+- **`civic init` produced an instance that nagged about its own config.** All
+  three `.civicrc` writers seeded top-level `modules` and `record_types`, both
+  deprecated there, so every freshly-initialised instance warned "Deprecated: …
+  Prefer data/.civic/config.yml" on every command. `modules` now lives only in
+  `data/.civic/config.yml`; `record_types` had no reader at all.
+- **Notification config and audit log followed the working directory.** Both
+  defaulted to a relative `.system-data`, and the DI container read
+  `notifications.yml` from `dataDir` — the location the configuration service
+  migrates the file OUT of, leaving a pointer stub — so the notification config
+  silently fell back to defaults on any migrated instance.
+- **Template base paths, the diagnostics config checker and `civic diagnose`**
+  all resolved `.system-data` from the working directory.
+
+### Changed
+
+- **Module discovery follows one rule.** Three independent answers to "where are
+  the modules?" (the schema builder's fallback, the DI resolver, and the
+  storage-module import) are now a single `resolveModulesDir()`. When they
+  disagreed, schema-extension lookup validated against a different module set
+  than it discovered — the shape of the BroadcastBox redaction bug.
+- **The API no longer calls `process.chdir()` during `initialize()`** — a
+  process-wide side effect from a library init, previously needed so
+  cwd-relative database paths resolved. Paths now come from the instance
+  context.
+- **Two duplicate `.civicrc` walk-ups removed** (the diagnostics one silently
+  gave up after 10 levels, so it could report on a different config file than
+  the one actually loaded); one implementation remains.
+- **Hermetic test harness.** `createTestInstance()` builds an isolated instance
+  and installs it, replacing fixtures that had to `process.chdir()` into their
+  own directory to be discovered. Test runs no longer write a stray
+  `.system-data` into the repository checkout.
+
 ## [0.3.1] - 2026-08-06
 
 <!-- markdownlint-disable MD024 -->
