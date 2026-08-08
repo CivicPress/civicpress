@@ -16,6 +16,9 @@ export default defineConfig({
 
     globals: true,
     environment: 'node',
+    // Rebuild core/cli dist iff their source is newer (see the file) — keeps
+    // CLI-subprocess tests from silently running stale compiled code.
+    globalSetup: ['./tests/global-setup.mjs'],
     // Limit how many worker processes Vitest uses
     // Use forks instead of threads for API tests that use process.chdir()
     // Limited to prevent CPU overload when debugging tests
@@ -32,6 +35,13 @@ export default defineConfig({
     // produced a "Duplicate key" warning every test run.)
     fileParallelism: 2,
     alias: {
+      // Resolve @civicpress/core to the built dist — the SAME single copy the
+      // broadcast-box / transcription / realtime modules resolve (they require
+      // it from their node_modules). Aliasing to src instead would give the test
+      // a second core instance while those modules keep the dist one, so
+      // singletons like CentralConfigManager diverge and cross-module e2e tests
+      // break. The "ran stale dist" trap is handled instead by the globalSetup
+      // above, which rebuilds core/dist whenever core/src is newer.
       '@civicpress/core': join(__dirname, 'core', 'dist/'),
       // Realtime integration tests under tests/realtime/ import the realtime
       // source directly (which pulls in ws + the Yjs stack) and the shared
