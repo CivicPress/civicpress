@@ -103,7 +103,8 @@ class becomes structurally impossible.
 **Progress (2026-08-08):** first increment landed — `getModuleResolver`'s
 fallback now resolves from `resolveProjectRoot(config)/modules` (matching the
 injected resolver) instead of raw `process.cwd()/modules` (`4cbc036`). Two
-design refinements surfaced while grounding, and they change the full migration:
+design refinements surfaced while grounding, and they changed the full migration
+(both are now implemented — see "2a landed" below):
 
 1. **The cwd-dependence is pervasive.** `central-config`'s
    `resolveSystemDataDir` / `resolveProjectRoot` themselves fall back to
@@ -119,6 +120,44 @@ design refinements surfaced while grounding, and they change the full migration:
    today only because dev and the Docker image colocate code + data. The
    `InstanceContext` likely needs `root` (data) AND a separate `codeRoot`.
 
+**2a landed (2026-08-08).** `core/src/config/instance-context.ts` resolves the
+root ONCE and derives everything from it; both refinements above are in the
+shipped shape — `root` (data) vs `codeRoot` (installed code), and `modulesDir`
+prefers a `modules/` beside the data root, else `<codeRoot>/modules`. Migrated
+one verified commit at a time:
+
+| Consumer                                      | Now                                     |
+| --------------------------------------------- | --------------------------------------- |
+| `central-config.ts` ×7 cwd fallbacks          | one `getInstanceContext()` root         |
+| duplicate `.civicrc` walk-up                  | deleted — one implementation            |
+| `getSystemDataDir()` / `getProjectRoot()`     | `ctx.systemDataDir` / `ctx.root`        |
+| `record-schema-builder` `getModuleResolver()` | `ctx.modulesDir` (no cwd fallback left) |
+| DI `moduleResolver` + storage-module import   | `resolveModulesDir(...)`                |
+
+`getConfig()` reads through `getInstanceContext()` rather than resolving afresh
+— that is what lets a caller **install** a root instead of being found by a
+walk-up, and it is the hinge 2b turns on.
+
+**Three live bugs surfaced while migrating**, each fixed with a regression test:
+
+- `OrphanedFileCleaner` resolved a relative local provider path against the
+  literal `.system-data` (i.e. cwd), so it scanned a different tree than the DB
+  it compared against and everything it found there looked like an `in_storage`
+  orphan — which `cleanupOrphanedFiles` deletes via `fs.remove`. A **data-loss
+  path**, not a harmless empty scan.
+- `CloudUuidStorageService` constructed `CredentialManager` with no argument,
+  reading cloud credentials from `<cwd>/.system-data/storage.yml`.
+- `cli/commands/storage.ts` computed its own systemDataDir from cwd behind a
+  test heuristic (`dataDir.includes('/tmp/') || dataDir.includes('test')`), so
+  the storage CLI read a **different `storage.yml`** than core and the API — and
+  a production dataDir merely containing "test" took the test branch.
+
+_Still cwd-dependent, not yet migrated_ — a follow-up sweep, same pattern:
+`templates/template-service.ts`, `templates/template-validator.ts`,
+`utils/template/loader.ts`, `diagnostics/checkers/config-checker.ts` (a THIRD
+`.civicrc` walk-up), `modules/api/src/index.ts` (a fourth), the broadcast-box
+migrations-dir fallback, and `cli/commands/{diagnose,config}.ts`.
+
 ### 2b. Hermetic test instance
 
 - One `createTestInstance()` — an `InstanceContext` over a fresh temp dir (own
@@ -130,6 +169,28 @@ design refinements surfaced while grounding, and they change the full migration:
 
 `createTestInstance()` and `resolveInstanceContext()` are the **same
 abstraction** — one for tests, one for prod startup.
+
+**2b landed (2026-08-08).** `tests/fixtures/test-instance.ts` builds an isolated
+instance (temp root, own `.civicrc` / `config.yml` / storage / roles / workflows
+/ org, own git repos, own DB) and **installs** it via `setInstanceContext`.
+
+The property that matters: a test instance is now found because it was
+_declared_, not because the process is sitting in its directory. The API fixture
+previously had to `process.chdir()` into its own temp dir so the `.civicrc`
+walk-up would see it, then `chdir` back in a `finally` — shared global state,
+order-dependent, and a throw mid-test stranded the rest of the run in the wrong
+directory. That whole dance is gone; `createTestInstance()` touches neither
+`process.cwd()` nor `NODE_ENV`.
+
+`createCoreTestContext`, `createAPITestContext` and `createCLITestContext` all
+build on it (−85 lines of hand-assembled fixture);
+`createExtendedAPITestContext` writes its own extended `.civicrc` but installs
+the root the same way. `tests/core/test-instance-harness.test.ts` pins the
+no-chdir property, the `.system-data` anchoring, and per-instance DB isolation.
+
+_Not yet done in 2b:_ the remaining `create*` helpers are still exported and
+used directly by some suites, and the pre-commit hook is untouched — so
+`--no-verify` is still the standing advice.
 
 ---
 

@@ -25,6 +25,8 @@ import {
   RecordParser,
   RecordData,
   CentralConfigManager,
+  setInstanceContext,
+  resolveInstanceContext,
 } from '@civicpress/core';
 
 // Test configuration
@@ -1395,23 +1397,16 @@ export function createExtendedSampleRecords(config: TestConfig) {
 
 // CLI test helpers
 export async function createCLITestContext(): Promise<CLITestContext> {
-  const config = createTestDirectory('cli-test');
-
-  // Create configuration files first
-  createCivicConfig(config);
-  createWorkflowConfig(config);
-  createRolesConfig(config);
-  createStorageConfig(config);
-  createOrgConfig(config);
-  createSampleRecords(config);
+  // One hermetic instance instead of directory + six config writers + git init.
+  // CLI tests still run the binary as a subprocess with `cd <testDir>`, so the
+  // child discovers the instance by walk-up the normal way; the installed
+  // context keeps THIS process pointed at it too.
+  const { createTestInstance } = await import('./test-instance.js');
+  const instance = createTestInstance({ prefix: 'cli-test', records: true });
+  const config = instance.config;
 
   // Ensure CLI is built before executing commands
   ensureCliBuilt();
-
-  // Initialize Git repository for the test directory
-  const { simpleGit } = await import('simple-git');
-  const git = simpleGit(config.testDir);
-  await git.init();
 
   // Initialize CivicPress
   execSync(`cd ${config.testDir} && node ${TEST_CONFIG.CLI_PATH} init --yes`, {
@@ -1455,25 +1450,15 @@ export function cleanupCLITestContext(context: CLITestContext) {
 
 // API test helpers
 export async function createAPITestContext(): Promise<APITestContext> {
-  const config = createTestDirectory('api-test');
+  // One hermetic instance (directory + every config file + both git repos),
+  // installed as the process's current instance.
+  const { createTestInstance } = await import('./test-instance.js');
+  const instance = createTestInstance({ prefix: 'api-test', records: true });
+  const config = instance.config;
   const port = getRandomPort();
 
-  // Create configuration files
-  createCivicConfig(config);
-  createWorkflowConfig(config);
-  createRolesConfig(config);
-  createStorageConfig(config);
-  createOrgConfig(config);
-  createSampleRecords(config);
-
-  // Initialize Git repository for the test directory
   const { simpleGit } = await import('simple-git');
-  const git = simpleGit(config.testDir);
-  await git.init();
-
-  // Also initialize Git repository in the data directory where CivicPress expects it
   const dataGit = simpleGit(config.dataDir);
-  await dataGit.init();
 
   // Add sample record files and commit them
   const bylawDir = join(config.dataDir, 'records', 'bylaw');
@@ -1551,37 +1536,34 @@ export async function createAPITestContext(): Promise<APITestContext> {
   const { CivicPressAPI } = await import('../../modules/api/src/index.js');
   const api = new CivicPressAPI(port);
 
-  // Change to test directory so CentralConfigManager finds the .civicrc file
-  const originalCwd = process.cwd();
-  process.chdir(config.testDir);
-
-  // Drop any cached central config (e.g. one the CivicPressAPI constructor or a
-  // prior test resolved while cwd was the repo root — which pins the sqlite DB to
-  // the shared repo-root .system-data/civic.db). Resetting here forces the next
-  // getConfig() to re-resolve from THIS test's .civicrc, so the DB is the isolated
-  // testDir/test.db and users no longer accumulate across files/runs (the 409s).
+  // No chdir. This used to change into the test directory so the `.civicrc`
+  // walk-up would find it, then reset the cached config and chdir back in a
+  // `finally` — global mutable state, and the reason a test that threw could
+  // strand the whole run in the wrong directory. createTestInstance() already
+  // INSTALLED this root, so resolution lands here regardless of cwd. The
+  // CivicPressAPI constructor may have resolved a config before that (pinning
+  // the DB to the shared repo-root .system-data/civic.db), so re-install the
+  // instance's context to be sure this API uses the isolated testDir/test.db.
+  // reset() first (it drops the cached config AND the memoized context), then
+  // re-install — the same order createTestInstance uses.
   CentralConfigManager.reset();
+  setInstanceContext(instance.context);
 
-  try {
-    // Initialize CivicPress core first, then force reload role config before setting up routes
-    await api.initialize(config.dataDir);
+  // Initialize CivicPress core first, then force reload role config before setting up routes
+  await api.initialize(config.dataDir);
 
-    // Force reload role configuration after CivicPress initialization but before routes are fully set up
-    const civicPress = api.getCivicPress();
-    if (civicPress && typeof civicPress.getAuthService === 'function') {
-      await civicPress.getAuthService().reloadRoleConfig();
-    }
+  // Force reload role configuration after CivicPress initialization but before routes are fully set up
+  const civicPress = api.getCivicPress();
+  if (civicPress && typeof civicPress.getAuthService === 'function') {
+    await civicPress.getAuthService().reloadRoleConfig();
+  }
 
-    // Generate the index after creating sample records and initializing the API
-    if (civicPress && typeof civicPress.getIndexingService === 'function') {
-      await civicPress.getIndexingService().generateIndexes({
-        syncDatabase: true,
-        conflictResolution: 'file-wins',
-      });
-    }
-  } finally {
-    // Restore original working directory
-    process.chdir(originalCwd);
+  // Generate the index after creating sample records and initializing the API
+  if (civicPress && typeof civicPress.getIndexingService === 'function') {
+    await civicPress.getIndexingService().generateIndexes({
+      syncDatabase: true,
+      conflictResolution: 'file-wins',
+    });
   }
 
   // Create admin user and get token for authenticated API tests
@@ -1646,15 +1628,13 @@ export async function createExtendedAPITestContext(): Promise<APITestContext> {
 
   // Resolve config against THIS test's .civicrc (isolated testDir/test.db), the
   // same way createAPITestContext does — this helper previously never chdir'd, so
-  // it always hit the shared repo-root DB.
-  const originalCwd = process.cwd();
-  process.chdir(config.testDir);
+  // it always hit the shared repo-root DB. Installing the root replaces the
+  // chdir/restore pair entirely. (This context builds an EXTENDED .civicrc of
+  // its own, so it writes the config files itself rather than going through
+  // createTestInstance.)
   CentralConfigManager.reset();
-  try {
-    await api.initialize(config.dataDir);
-  } finally {
-    process.chdir(originalCwd);
-  }
+  setInstanceContext(resolveInstanceContext({ root: config.testDir }));
+  await api.initialize(config.dataDir);
 
   return {
     api,
@@ -1665,30 +1645,23 @@ export async function createExtendedAPITestContext(): Promise<APITestContext> {
 
 // Core test helpers
 export async function createCoreTestContext(): Promise<CoreTestContext> {
-  const config = createTestDirectory('core-test');
+  // One hermetic instance instead of directory + four config writers + two git
+  // inits assembled by hand. The instance is INSTALLED, so nothing here has to
+  // chdir for CentralConfigManager to find it.
+  const { createTestInstance } = await import('./test-instance.js');
+  const instance = createTestInstance({
+    prefix: 'core-test',
+    storage: false,
+    org: false,
+  });
 
-  // Create configuration files
-  createCivicConfig(config);
-  createWorkflowConfig(config);
-  createRolesConfig(config);
-
-  // Initialize Git repository for the test directory
-  const { simpleGit } = await import('simple-git');
-  const git = simpleGit(config.testDir);
-  await git.init();
-
-  // Also initialize Git repository in the data directory where CivicPress expects it
-  const dataGit = simpleGit(config.dataDir);
-  await dataGit.init();
-
-  // Initialize CivicPress core
   const { CivicPress } = await import('../../core/src/civic-core.js');
   const civic = new CivicPress({
-    dataDir: config.dataDir,
+    dataDir: instance.dataDir,
     database: {
       type: 'sqlite' as const,
       sqlite: {
-        file: join(config.testDir, 'test.db'),
+        file: instance.dbFile,
       },
     },
   });
@@ -1696,8 +1669,8 @@ export async function createCoreTestContext(): Promise<CoreTestContext> {
 
   return {
     civic,
-    testDir: config.testDir,
-    dbPath: join(config.testDir, 'test.db'),
+    testDir: instance.root,
+    dbPath: instance.dbFile,
   };
 }
 

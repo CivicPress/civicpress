@@ -221,7 +221,12 @@ export class CentralConfigManager {
     // this, five separate `configPath ? dirname(configPath) : process.cwd()`
     // expressions each re-derived it, so a process launched from a
     // subdirectory could land on a different root per path.
-    const instance = resolveInstanceContext();
+    //
+    // Reading through getInstanceContext() (rather than resolving afresh) is
+    // what lets a caller INSTALL a root instead of being found by a walk-up —
+    // the hermetic test harness sets one explicitly, so tests no longer have to
+    // chdir into a fixture directory to be discovered.
+    const instance = getInstanceContext();
     const configPath = instance.configPath;
     const projectRoot = instance.root;
     const fallbackPath = configPath
