@@ -8,11 +8,18 @@ import * as path from 'path';
 import * as os from 'os';
 import { TemplateService } from '../template-service.js';
 import { Logger } from '../../utils/logger.js';
+import {
+  resolveInstanceContext,
+  setInstanceContext,
+  resetInstanceContext,
+} from '../../config/instance-context.js';
 
 // Run tests sequentially to avoid memory issues
 describe('TemplateService', () => {
   let service: TemplateService;
   let testDataDir: string;
+  let instanceRoot: string;
+  let systemTemplateDir: string;
   let mockLogger: Logger;
 
   beforeEach(() => {
@@ -21,14 +28,27 @@ describe('TemplateService', () => {
       path.join(os.tmpdir(), 'civicpress-template-test-')
     );
 
+    // Base templates now live in the INSTANCE's `.system-data`, so stand up an
+    // instance for this test and install it. This used to mkdir into
+    // `<cwd>/.system-data/templates` — matching the old cwd-based production
+    // code, which meant the suite created a stray `.system-data` inside the
+    // repository checkout on every run.
+    instanceRoot = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'civicpress-template-instance-')
+    );
+    setInstanceContext(resolveInstanceContext({ root: instanceRoot }));
+    systemTemplateDir = path.join(
+      instanceRoot,
+      '.system-data',
+      'templates',
+      'bylaw'
+    );
+
     // Create directory structure
     fs.mkdirSync(path.join(testDataDir, '.civic', 'templates'), {
       recursive: true,
     });
-    fs.mkdirSync(
-      path.join(process.cwd(), '.system-data', 'templates', 'bylaw'),
-      { recursive: true }
-    );
+    fs.mkdirSync(systemTemplateDir, { recursive: true });
 
     mockLogger = {
       debug: vi.fn(),
@@ -61,25 +81,12 @@ describe('TemplateService', () => {
       }
     }
 
-    // Cleanup system templates (only if they exist)
-    const systemTemplatePath = path.join(
-      process.cwd(),
-      '.system-data',
-      'templates',
-      'bylaw'
-    );
-    if (fs.existsSync(systemTemplatePath)) {
+    // The whole instance is disposable now, so drop it wholesale instead of
+    // hand-picking `test-*.md` files back out of the repository checkout.
+    resetInstanceContext();
+    if (instanceRoot && fs.existsSync(instanceRoot)) {
       try {
-        const files = fs.readdirSync(systemTemplatePath);
-        for (const file of files) {
-          if (file.endsWith('.md') && file.startsWith('test-')) {
-            try {
-              fs.unlinkSync(path.join(systemTemplatePath, file));
-            } catch {
-              // Ignore individual file errors
-            }
-          }
-        }
+        fs.rmSync(instanceRoot, { recursive: true, force: true });
       } catch {
         // Ignore cleanup errors
       }
