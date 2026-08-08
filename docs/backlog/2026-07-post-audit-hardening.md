@@ -1255,9 +1255,32 @@ they are pre-existing gaps the audit made visible.
 
 ## Discovered during the 2026-08-08 InstanceContext / DevX pass
 
-Carried over from `docs/plans/2026-08-08-contributor-devx-and-hardening.md` (now
-closed) so they stay discoverable. All are **pre-existing** — surfaced by that
-work, not caused by it.
+- [ ] **🔴 BLOCKING — `develop` CI is red: vitest exits 1 on an unhandled worker
+      error.** `[vitest-worker]: Timeout calling "onTaskUpdate"`, raised inside
+      vitest's own worker↔main RPC layer (no CivicPress frame in the stack).
+      **All 201 test files and 1845 tests PASS** — vitest counts the unhandled
+      error as a run failure, so the process exits 1 and `build-test` goes red.
+      Reproduced on two consecutive CI runs of `efe7559`
+      (`gh run     31283421555`) and in ~3 of 4 local full-suite runs.
+      **Regression, not pre-existing:** the last full CI before this work (PR
+      #31, 2026-08-07) had zero unhandled errors. Not yet attributed to a
+      specific commit or test file — with `fileParallelism: 2` the stalled
+      worker is not necessarily the file that last reported, so this needs a
+      bisect across the 14 commits. ⚠️ **Watch out when measuring:**
+      `npx vitest … | tail` reports _tail's_ exit code, which is how this stayed
+      hidden — always capture vitest's own `$?`. Do NOT paper over it with
+      `dangerouslyIgnoreUnhandledErrors`; that would mask real unhandled errors
+      too.
+- [ ] **Stale rationale in `vitest.config.mjs`.** `pool: 'forks'` is justified
+      by a comment saying it is needed "for API tests that use
+      `process.chdir()`". That chdir was removed on 2026-08-08 (from both the
+      API and the fixtures), so the stated reason no longer holds. Re-evaluate
+      the pool choice — plausibly relevant to the RPC-timeout item above.
+
+The rest of this section is carried over from
+`docs/plans/2026-08-08-contributor-devx-and-hardening.md` (now closed) so it
+stays discoverable. Those items are **pre-existing** — surfaced by that work,
+not caused by it.
 
 - [ ] **Legal numbering does not reach the primary editor path.**
       `DocumentNumberGenerator` has exactly TWO production call sites
