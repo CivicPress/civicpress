@@ -45,9 +45,17 @@ resolved from several places at once.
       pruned the `dev:all`/`dev:all:watch` duplicate aliases; documented in
       CONTRIBUTING (also fixed the stale Node-20/pnpm-8 prerequisites → 22/9).
       _Done — commit to follow._
-- [ ] **Loud failures.** No command exits non-zero without printing what failed
-      and the fix — the silent `status 1` papercut (a security command exited 1
-      with no message this session). `withCli` error path.
+- [ ] **Clear failures** _(investigated 2026-08-08 → reframed)._ The CLI is
+      already broadly **loud**: `withCli`→`cliError`, the user commands, and
+      `auth-utils` all print `❌ <error>` to stderr, verified even under
+      `NODE_ENV=test` / `--silent` / `--quiet`. The real papercut is the inverse
+      — the actual error is **buried under ~14 lines of init-log noise** that
+      print on _every_ command (`.civicrc` deprecation nags ×4, "Initializing
+      CivicPress", "Database initialized", "Loaded secret", a non-fatal "Error
+      registering email templates", cache + hook init). Reframed goal: **quiet
+      the CLI init/log noise** so the result/error is the clear last word — not
+      the originally-assumed silent-exit fix. (Ties to the notification-log
+      cleanup already done in `ebe327a`.)
 
 ---
 
