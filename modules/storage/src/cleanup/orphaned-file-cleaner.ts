@@ -45,19 +45,28 @@ export class OrphanedFileCleaner {
   private s3Client: S3Client | null = null;
   private azureContainerClient: ContainerClient | null = null;
   private config: StorageConfig;
+  /**
+   * The instance's `.system-data` directory — the base a relative local
+   * provider path resolves against. Supplied by the owning storage service
+   * (which already holds the resolved, absolute value), because the cleaner
+   * cannot derive it safely on its own — see `listLocalFiles`.
+   */
+  private basePath: string | null;
 
   constructor(
     databaseService: StorageDatabaseService,
     config: StorageConfig,
     s3Client?: S3Client | null,
     azureContainerClient?: ContainerClient | null,
-    logger?: Logger
+    logger?: Logger,
+    basePath?: string
   ) {
     this.logger = logger || new Logger();
     this.databaseService = databaseService;
     this.config = config;
     this.s3Client = s3Client || null;
     this.azureContainerClient = azureContainerClient || null;
+    this.basePath = basePath ?? null;
   }
 
   /**
@@ -215,15 +224,35 @@ export class OrphanedFileCleaner {
   }
 
   /**
-   * List files in local storage
+   * List files in local storage.
+   *
+   * A relative provider path used to resolve against the LITERAL `.system-data`
+   * — i.e. against process.cwd() — so this scanned `<cwd>/.system-data/storage`
+   * rather than the instance's storage root. Whenever the process ran from
+   * anywhere but the instance root, the scan listed a different tree than the
+   * database it was being compared against, and every file it found there
+   * looked like an `in_storage` orphan. `cleanupOrphanedFiles` deletes those
+   * (`fs.remove`), so this was a live data-loss path, not just a no-op scan.
+   *
+   * The base now comes from the owning storage service, which holds the
+   * instance's absolute systemDataDir — the same value every other
+   * local-storage read resolves against.
    */
   private async listLocalFiles(
     provider: StorageProvider
   ): Promise<Array<{ path: string; size?: number }>> {
     const storagePath = provider.path || 'storage';
+    if (!path.isAbsolute(storagePath) && !this.basePath) {
+      // Refuse to guess: scanning the wrong tree and calling its contents
+      // orphans is worse than reporting nothing.
+      throw new Error(
+        'OrphanedFileCleaner: a relative local provider path needs a basePath; ' +
+          'construct it via CloudUuidStorageService.getOrphanedFileCleaner().'
+      );
+    }
     const resolvedPath = path.isAbsolute(storagePath)
       ? storagePath
-      : path.resolve('.system-data', storagePath);
+      : path.resolve(this.basePath as string, storagePath);
 
     const files: Array<{ path: string; size?: number }> = [];
 
@@ -347,7 +376,10 @@ export class OrphanedFileCleaner {
   /**
    * Delete file from S3
    */
-  private async deleteFromS3(filePath: string, provider: StorageProvider): Promise<void> {
+  private async deleteFromS3(
+    filePath: string,
+    provider: StorageProvider
+  ): Promise<void> {
     if (!this.s3Client) {
       throw new Error('S3 client not initialized');
     }
