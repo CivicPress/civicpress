@@ -540,7 +540,7 @@ export class HookSystem {
 
   // Default hook handlers
   private onInitialized(_data: HookData, _context: HookContext): void {
-    coreInfo('CivicPress initialized', { operation: 'hook handling' });
+    coreDebug('CivicPress initialized', { operation: 'hook handling' });
   }
 
   private onRecordCreated(_data: HookData, _context: HookContext): void {

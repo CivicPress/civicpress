@@ -91,7 +91,7 @@ export class SecretsManager {
       const secretData = await this.loadSecretFromFile();
       if (secretData) {
         this.rootSecret = secretData.secret;
-        logger.info('Loaded secret from file');
+        logger.debug('Loaded secret from file');
         return;
       }
     } catch {

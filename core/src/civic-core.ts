@@ -245,12 +245,12 @@ export class CivicPress {
 
   async initialize(): Promise<void> {
     try {
-      this.logger.info('Initializing CivicPress...');
+      this.logger.debug('Initializing CivicPress...');
 
       // Initialize database first
       const db = this.container.resolve<DatabaseService>('database');
       await db.initialize();
-      this.logger.info('Database initialized');
+      this.logger.debug('Database initialized');
 
       // FA-CORE-001: recover sagas orphaned by a prior crash BEFORE any new
       // work starts — release their held resource locks and surface any
@@ -287,7 +287,7 @@ export class CivicPress {
       const hooks = this.container.resolve<HookSystem>('hooks');
       await hooks.initialize();
 
-      this.logger.info('CivicPress initialized');
+      this.logger.debug('CivicPress initialized');
     } catch (error) {
       this.logger.error('Failed to initialize CivicPress:', error);
       throw error;

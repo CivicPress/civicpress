@@ -150,13 +150,13 @@ export class CoreOutput {
   startOperation(operation: string): () => void {
     const startTime = Date.now();
 
-    this.logger.info(`Starting: ${operation}`, {
+    this.logger.debug(`Starting: ${operation}`, {
       operation,
     });
 
     return () => {
       const duration = Date.now() - startTime;
-      this.logger.info(`Finished: ${operation}`, {
+      this.logger.debug(`Finished: ${operation}`, {
         operation,
         duration,
       });
