@@ -125,6 +125,38 @@ function resolveRequestedModules(options: any): string[] | null {
 }
 
 /**
+ * Guarantee config.yml names a module set, WITHOUT overriding one already
+ * present.
+ *
+ * `.civicrc` no longer carries `modules` (deprecated there, and nagged on every
+ * command), which makes config.yml the only source. The defaults copy normally
+ * supplies it; this is the backstop for when it did not, so dropping the
+ * `.civicrc` copy can never leave an instance with no modules at all.
+ */
+async function ensureModulesInConfigYml(
+  configYmlPath: string,
+  fallbackModules: string[],
+  logger: any
+): Promise<void> {
+  try {
+    const fsp = await import('fs/promises');
+    let doc: any = {};
+    try {
+      doc = yaml.parse(await fsp.readFile(configYmlPath, 'utf8')) || {};
+    } catch {
+      // config.yml absent or unreadable — write a minimal one below.
+    }
+    if (Array.isArray(doc.modules) && doc.modules.length > 0) {
+      return;
+    }
+    doc.modules = fallbackModules;
+    await fsp.writeFile(configYmlPath, yaml.stringify(doc), 'utf8');
+  } catch (err: any) {
+    logger.warn(`⚠️  Could not ensure module list: ${err?.message || err}`);
+  }
+}
+
+/**
  * Patch the `modules:` list in data/.civic/config.yml — the file the running
  * instance reads to decide which modules to mount — preserving all other keys.
  */
@@ -511,7 +543,8 @@ export const initCommand = (cli: CAC) => {
                   civicrcPath,
                   config,
                   dataDir,
-                  logger
+                  logger,
+                  shouldOutputJson
                 );
               } else if (options.dataDir) {
                 // Use non-interactive setup when --data-dir is provided
@@ -587,12 +620,26 @@ export const initCommand = (cli: CAC) => {
             // Apply --modules / --profile to data/.civic/config.yml — the file
             // the running instance reads to decide which modules to mount.
             const requestedModules = resolveRequestedModules(options);
+            const configYmlPath = path.join(
+              fullDataDir,
+              '.civic',
+              'config.yml'
+            );
             if (requestedModules) {
               await applyModulesToConfigYml(
-                path.join(fullDataDir, '.civic', 'config.yml'),
+                configYmlPath,
                 requestedModules,
                 logger,
                 shouldOutputJson || false
+              );
+            } else {
+              // No explicit selection: config.yml keeps whatever the defaults
+              // supplied, and this fills in the default set if it has none —
+              // `.civicrc` is no longer a fallback source for it.
+              await ensureModulesInConfigYml(
+                configYmlPath,
+                ['legal-register'],
+                logger
               );
             }
 
@@ -729,7 +776,9 @@ export const initCommand = (cli: CAC) => {
                     email_verified: false,
                   });
                   if (!shouldOutputJson) {
-                    logger.success(`👤 Created admin user: ${options.adminUser}`);
+                    logger.success(
+                      `👤 Created admin user: ${options.adminUser}`
+                    );
                   }
                 } catch (error: any) {
                   logger.warn(
@@ -918,7 +967,8 @@ async function setupCivicrcFromFile(
   civicrcPath: string,
   config: any,
   dataDir: string,
-  logger: any
+  logger: any,
+  shouldOutputJson = false
 ): Promise<void> {
   logger.info('⚙️  Setting up configuration from file...');
 
@@ -946,12 +996,18 @@ async function setupCivicrcFromFile(
     delete config.database.postgres;
   }
 
-  // Create .civicrc object (system config - only system settings)
+  // Create .civicrc object (system config - only system settings).
+  //
+  // `modules` and `record_types` are deliberately NOT written here: both are
+  // deprecated in `.civicrc` (CentralConfigManager warns about them on EVERY
+  // command), and their real home is `data/.civic/config.yml`. Writing them
+  // meant every freshly-initialized instance nagged about its own config from
+  // the first command onwards. `modules` is routed to config.yml below;
+  // `record_types` has no reader at all — the live setting is
+  // `record_types_config`, which config.yml already carries.
   const civicrc = {
     version: '1.0.0',
     dataDir: dataDir,
-    modules: config.modules || ['legal-register'],
-    record_types: config.record_types || ['bylaw', 'policy'],
     default_role: config.default_role || 'clerk',
     hooks: {
       enabled: config.hooks?.enabled ?? true,
@@ -988,6 +1044,17 @@ async function setupCivicrcFromFile(
   const civicrcYaml = yaml.stringify(civicrc);
   fs.writeFileSync(civicrcPath, civicrcYaml);
   logger.success('⚙️  .civicrc saved (system configuration)');
+
+  // A module list from the supplied config file belongs in config.yml, which is
+  // where the running instance reads it from.
+  if (Array.isArray(config.modules) && config.modules.length > 0) {
+    await applyModulesToConfigYml(
+      path.join(dataDir, '.civic', 'config.yml'),
+      config.modules,
+      logger,
+      shouldOutputJson
+    );
+  }
 
   // Create org-config.yml object (organization config - branding and org details)
   const orgConfig = {
@@ -1049,12 +1116,13 @@ async function setupCivicrcNonInteractive(
 ): Promise<void> {
   logger.info('⚙️  Setting up configuration (non-interactive)...');
 
-  // Create .civicrc object with default values (system config)
+  // Create .civicrc object with default values (system config).
+  // `modules` / `record_types` omitted on purpose — see setupCivicrcFromFile:
+  // both are deprecated here and live in data/.civic/config.yml, which is
+  // seeded from the defaults during init.
   const civicrc = {
     version: '1.0.0',
     dataDir: dataDir,
-    modules: ['legal-register'],
-    record_types: ['bylaw', 'policy'],
     default_role: 'clerk',
     hooks: {
       enabled: true,
@@ -1369,12 +1437,12 @@ async function setupCivicrc(
     }
   }
 
-  // Create .civicrc object (system config - only system settings)
+  // Create .civicrc object (system config - only system settings).
+  // `modules` / `record_types` omitted on purpose — see setupCivicrcFromFile:
+  // both are deprecated here and live in data/.civic/config.yml.
   const civicrc = {
     version: '1.0.0',
     dataDir: dataDir,
-    modules: ['legal-register'],
-    record_types: ['bylaw', 'policy'],
     default_role: 'clerk',
     hooks: {
       enabled: true,
