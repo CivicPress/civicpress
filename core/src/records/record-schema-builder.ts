@@ -14,7 +14,10 @@
 import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { CentralConfigManager } from '../config/central-config.js';
+import {
+  CentralConfigManager,
+  resolveProjectRoot,
+} from '../config/central-config.js';
 import { Logger } from '../utils/logger.js';
 import { ModuleResolver } from '../modules/module-resolver.js';
 
@@ -77,9 +80,28 @@ function getModuleResolver(): ModuleResolver {
   if (injectedModuleResolver) {
     return injectedModuleResolver;
   }
-  // Fallback for direct test invocations / pre-init contexts. Same shape as
-  // the pre-W1-T2 behavior (look under cwd/modules) but routed through the
-  // resolver abstraction.
+  // Deterministic fallback for pre-init / direct-invocation contexts: resolve
+  // modules from the config's PROJECT ROOT (the `.civicrc` directory) — the
+  // SAME anchor the injected resolver uses (civic-core-services builds it from
+  // `resolveProjectRoot(config)/modules`). Raw `process.cwd()/modules` silently
+  // returned the wrong/empty module set when the process ran from a directory
+  // other than the instance root (a BroadcastBox redaction-pipeline failure
+  // mode: `getSchemaExtensionFieldNames('session')` came back empty, so
+  // `capture` was mis-nested). Falls back to cwd only if no config resolves at
+  // all. (Full cwd-independence — the root itself — is the InstanceContext work
+  // in docs/plans/2026-08-08-contributor-devx-and-hardening.md.)
+  try {
+    const config = CentralConfigManager.getConfig();
+    if (config.dataDir) {
+      const root = resolveProjectRoot({
+        dataDir: config.dataDir,
+        systemDataDir: config.systemDataDir,
+      });
+      return new ModuleResolver(join(root, 'modules'));
+    }
+  } catch {
+    // no resolvable config — fall through to cwd
+  }
   return new ModuleResolver(join(process.cwd(), 'modules'));
 }
 
