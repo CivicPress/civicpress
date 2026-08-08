@@ -289,9 +289,7 @@ export class SecretsManager {
   } | null> {
     try {
       const content = await fs.readFile(this.secretsFilePath, 'utf-8');
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const yaml = await import('js-yaml');
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
       const data = yaml.load(content) as
         | { secret?: string; created?: string }
         | null
@@ -322,7 +320,6 @@ export class SecretsManager {
       const secretsDir = path.dirname(this.secretsFilePath);
       await fs.mkdir(secretsDir, { recursive: true });
 
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const yaml = await import('js-yaml');
       const secretData = {
         secret: this.rootSecret,
@@ -330,7 +327,6 @@ export class SecretsManager {
         warning: 'DO NOT COMMIT THIS FILE - It contains sensitive secrets',
       };
 
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
       await fs.writeFile(
         this.secretsFilePath,
         yaml.dump(secretData),

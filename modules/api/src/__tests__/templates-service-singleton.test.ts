@@ -51,18 +51,14 @@ function fakeCivicPress(dataDir: string) {
 }
 
 /** Drive the router's GET / handler with a fake request. */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function callList(router: any, civicPress: unknown) {
   // express Router stores handlers on `router.stack[].route.stack[].handle`.
   const layer = router.stack.find(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (l: any) => l.route?.path === '/' && l.route?.methods?.get
   );
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handlers = layer.route.stack.map((s: any) => s.handle);
   const handler = handlers[handlers.length - 1];
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const req: any = {
     civicPress,
     query: {},
@@ -81,7 +77,6 @@ async function callList(router: any, civicPress: unknown) {
     requestId: 'test-request',
     user: { id: 1, username: 'tester', role: 'admin' },
   };
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const res: any = {
     statusCode: 200,
     status(code: number) {
