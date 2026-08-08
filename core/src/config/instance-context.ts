@@ -189,6 +189,23 @@ export function resolveCodeRoot(fromDir: string = __dirname): string {
 }
 
 /**
+ * Where `module.json` manifests live for an instance rooted at `root`.
+ *
+ * Modules are CODE, so the authoritative location is `<codeRoot>/modules`. A
+ * `modules/` tree beside the data root still wins when one exists: that is the
+ * dev / single-tree / Docker-image layout, and honoring it keeps an instance
+ * able to ship its own modules. Split deployments — where the data root holds
+ * no modules/ — fall through to the installed code.
+ *
+ * Exported so the DI container can apply the identical rule to a
+ * config-supplied root (which may be a test instance, not the process's own).
+ */
+export function resolveModulesDir(root: string): string {
+  const beside = path.join(path.resolve(root), 'modules');
+  return isDirectory(beside) ? beside : path.join(resolveCodeRoot(), 'modules');
+}
+
+/**
  * Read the layout-relevant fields out of a `.civicrc`. Parse failures are
  * non-fatal — a malformed config degrades to defaults here and is reported by
  * CentralConfigManager, which owns validation and warnings.
@@ -282,9 +299,7 @@ export function resolveInstanceContext(
   const codeRoot = resolveCodeRoot();
   const modulesDir = config.modulesDir
     ? path.resolve(root, config.modulesDir)
-    : isDirectory(path.join(root, 'modules'))
-      ? path.join(root, 'modules')
-      : path.join(codeRoot, 'modules');
+    : resolveModulesDir(root);
 
   return Object.freeze({
     root,

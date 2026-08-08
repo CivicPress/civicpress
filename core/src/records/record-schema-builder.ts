@@ -14,10 +14,8 @@
 import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import {
-  CentralConfigManager,
-  resolveProjectRoot,
-} from '../config/central-config.js';
+import { CentralConfigManager } from '../config/central-config.js';
+import { getInstanceContext } from '../config/instance-context.js';
 import { Logger } from '../utils/logger.js';
 import { ModuleResolver } from '../modules/module-resolver.js';
 
@@ -64,9 +62,9 @@ const pluginSchemas = new Map<
 /**
  * Injected ModuleResolver for filesystem-based module discovery.
  * Set by civic-core-services.ts at startup (Phase 2d W1-T2). When unset,
- * mergeModuleExtensions falls back to a process.cwd()-based default for
- * backward compatibility during the migration; production code paths
- * always set this.
+ * mergeModuleExtensions falls back to the instance context's modulesDir —
+ * the same rule the injected resolver is built from, so the two can no longer
+ * disagree. Production code paths always set this.
  */
 let injectedModuleResolver: ModuleResolver | null = null;
 
@@ -80,29 +78,16 @@ function getModuleResolver(): ModuleResolver {
   if (injectedModuleResolver) {
     return injectedModuleResolver;
   }
-  // Deterministic fallback for pre-init / direct-invocation contexts: resolve
-  // modules from the config's PROJECT ROOT (the `.civicrc` directory) — the
-  // SAME anchor the injected resolver uses (civic-core-services builds it from
-  // `resolveProjectRoot(config)/modules`). Raw `process.cwd()/modules` silently
-  // returned the wrong/empty module set when the process ran from a directory
-  // other than the instance root (a BroadcastBox redaction-pipeline failure
-  // mode: `getSchemaExtensionFieldNames('session')` came back empty, so
-  // `capture` was mis-nested). Falls back to cwd only if no config resolves at
-  // all. (Full cwd-independence — the root itself — is the InstanceContext work
-  // in docs/plans/2026-08-08-contributor-devx-and-hardening.md.)
-  try {
-    const config = CentralConfigManager.getConfig();
-    if (config.dataDir) {
-      const root = resolveProjectRoot({
-        dataDir: config.dataDir,
-        systemDataDir: config.systemDataDir,
-      });
-      return new ModuleResolver(join(root, 'modules'));
-    }
-  } catch {
-    // no resolvable config — fall through to cwd
-  }
-  return new ModuleResolver(join(process.cwd(), 'modules'));
+  // Deterministic fallback for pre-init / direct-invocation contexts: the
+  // instance context's modulesDir — the SAME rule the injected resolver uses
+  // (civic-core-services builds it from `resolveModulesDir(...)`). Raw
+  // `process.cwd()/modules` silently returned the wrong/empty module set when
+  // the process ran from a directory other than the instance root (the
+  // BroadcastBox redaction-pipeline failure mode:
+  // `getSchemaExtensionFieldNames('session')` came back empty, so `capture` was
+  // mis-nested). There is no cwd fallback left here — the context always
+  // resolves, and for a split deployment it points at the installed code.
+  return new ModuleResolver(getInstanceContext().modulesDir);
 }
 
 /**
@@ -241,7 +226,10 @@ export class RecordSchemaBuilder {
   /**
    * Merge type-specific schema extension (geography, session)
    */
-  private static mergeTypeExtension(schema: JsonSchemaObject, recordType: string): void {
+  private static mergeTypeExtension(
+    schema: JsonSchemaObject,
+    recordType: string
+  ): void {
     const typeSchemaPath = join(
       __dirname,
       '../schemas/record-type-schemas',
@@ -278,7 +266,10 @@ export class RecordSchemaBuilder {
    * `session` for broadcast-box) needs no core change. Phase 2d W1-T3
    * removed the former hardcoded `moduleName === 'legal-register'` check.
    */
-  private static mergeModuleExtensions(schema: JsonSchemaObject, recordType?: string): void {
+  private static mergeModuleExtensions(
+    schema: JsonSchemaObject,
+    recordType?: string
+  ): void {
     try {
       const modules = CentralConfigManager.getModules();
       const resolver = getModuleResolver();
@@ -347,7 +338,10 @@ export class RecordSchemaBuilder {
   /**
    * Merge plugin schema extensions (registered at runtime)
    */
-  private static mergePluginExtensions(schema: JsonSchemaObject, recordType?: string): void {
+  private static mergePluginExtensions(
+    schema: JsonSchemaObject,
+    recordType?: string
+  ): void {
     for (const [pluginName, pluginSchema] of pluginSchemas.entries()) {
       // Check if this plugin schema applies to this record type
       if (recordType && !pluginSchema.appliesTo(recordType)) {

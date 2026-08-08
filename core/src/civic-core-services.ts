@@ -10,6 +10,7 @@ import {
   resolveSystemDataDir,
   resolveProjectRoot,
 } from './config/central-config.js';
+import { resolveModulesDir } from './config/instance-context.js';
 import { errorMessage, errorStack, errorCode } from './utils/error-narrow.js';
 import { ServiceContainer } from './di/container.js';
 import { CivicPressConfig } from './civic-core.js';
@@ -101,13 +102,14 @@ export function registerCivicPressServices(
 
   // Step 2.5: Register ModuleResolver (Phase 2d W1-T2) — replaces the
   // prior process.cwd()-based filesystem discovery in record-schema-builder
-  // and the storage-module fallback below. ModulesRoot resolves relative
-  // to the project root (parent of dataDir) so production and test runs
-  // both find the modules/ directory deterministically.
+  // and the storage-module fallback below. resolveModulesDir applies the one
+  // rule: a modules/ tree beside this config's project root when it exists,
+  // otherwise the installed-code location — so a split deployment (Docker:
+  // code /app, data /instance) still discovers modules.
   container.singleton('moduleResolver', (c) => {
     const config = c.resolve<CivicPressConfig>('config');
     const resolver = new ModuleResolver(
-      path.join(resolveProjectRoot(config), 'modules')
+      resolveModulesDir(resolveProjectRoot(config))
     );
     // Wire into RecordSchemaBuilder so schema-extension lookup uses the
     // same resolver instance (singleton across the request lifecycle).
@@ -345,11 +347,16 @@ export async function completeServiceInitialization(
         const path = await import('path');
         const { pathToFileURL } = await import('url');
 
-        // Use process.cwd() to find storage module
-        // This works reliably in both test and production environments
-        const storagePath = path.resolve(
-          process.cwd(),
-          'modules/storage/dist/index.js'
+        // Locate the storage module through the SAME resolver everything else
+        // uses, rather than guessing from process.cwd(). cwd only found it when
+        // the process happened to be launched from the instance root; the
+        // resolver's root is derived from the config (and falls back to the
+        // installed-code location for split deployments).
+        const storagePath = path.join(
+          container.resolve<ModuleResolver>('moduleResolver').getModulesRoot(),
+          'storage',
+          'dist',
+          'index.js'
         );
 
         // Convert to file:// URL for ES module import

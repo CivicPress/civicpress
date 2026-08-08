@@ -6,6 +6,7 @@ import { join, dirname } from 'path';
 import {
   resolveInstanceContext,
   resolveCodeRoot,
+  resolveModulesDir,
   findConfigFile,
   getInstanceContext,
   setInstanceContext,
@@ -184,6 +185,37 @@ describe('resolveInstanceContext', () => {
       expect(resolveInstanceContext({ root: dir }).modulesDir).toBe(
         join(dir, 'custom-modules')
       );
+    });
+
+    // resolveModulesDir is the shared rule: the DI container applies it to a
+    // CONFIG-supplied root (possibly a test instance), while the
+    // record-schema-builder fallback applies it to the process's own context.
+    // Both must agree, or a schema-extension lookup silently sees a different
+    // module set than the one that was validated against.
+    describe('resolveModulesDir (the shared rule)', () => {
+      it('returns the data-root modules/ when it exists', () => {
+        mkdirSync(join(dir, 'modules'), { recursive: true });
+        expect(resolveModulesDir(dir)).toBe(join(dir, 'modules'));
+      });
+
+      it('falls back to the code root when the data root has no modules/', () => {
+        expect(resolveModulesDir(dir)).toBe(join(resolveCodeRoot(), 'modules'));
+      });
+
+      it('agrees with the context that resolveInstanceContext computes', () => {
+        writeConfig(dir, 'dataDir: data\n');
+        expect(resolveInstanceContext({ root: dir }).modulesDir).toBe(
+          resolveModulesDir(dir)
+        );
+      });
+
+      it('is independent of cwd', () => {
+        const nested = join(dir, 'n', 'e', 's', 't');
+        mkdirSync(nested, { recursive: true });
+        const before = resolveModulesDir(dir);
+        process.chdir(nested);
+        expect(resolveModulesDir(dir)).toBe(before);
+      });
     });
   });
 
