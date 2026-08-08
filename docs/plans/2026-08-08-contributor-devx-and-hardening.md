@@ -152,11 +152,29 @@ walk-up, and it is the hinge 2b turns on.
   the storage CLI read a **different `storage.yml`** than core and the API — and
   a production dataDir merely containing "test" took the test branch.
 
-_Still cwd-dependent, not yet migrated_ — a follow-up sweep, same pattern:
-`templates/template-service.ts`, `templates/template-validator.ts`,
-`utils/template/loader.ts`, `diagnostics/checkers/config-checker.ts` (a THIRD
-`.civicrc` walk-up), `modules/api/src/index.ts` (a fourth), the broadcast-box
-migrations-dir fallback, and `cli/commands/{diagnose,config}.ts`.
+**The cwd sweep is now COMPLETE** (was listed here as a follow-up; done in the
+same session):
+
+- the three template base paths (`template-service`, `template-validator`,
+  `utils/template/loader`) → instance `systemDataDir`. Their two test files had
+  been written against the old behavior and were creating a stray `.system-data`
+  **inside the repo checkout** on every run; they now stand up a disposable
+  instance. A full `core` run leaves the checkout untouched.
+- `diagnostics/checkers/config-checker.ts` (a THIRD `.civicrc` walk-up — and one
+  that gave up after 10 levels, so it could report on a _different_ config file
+  than the one actually loaded) and `modules/api/src/index.ts` (a fourth) → the
+  resolved context.
+- **the API's `process.chdir()`** during `initialize()` — a process-wide side
+  effect from a library init, justified by "so database paths resolve
+  correctly". Paths no longer depend on cwd, so it is gone.
+- `cli/commands/diagnose.ts` (passed cwd as the filesystem checker's project
+  root) and `cli/commands/config.ts` (`systemDataPath` from cwd while taking
+  `dataDir` from the config authority — the two halves of one service could
+  point at different instances; plus a defaults path for CODE resolved from cwd
+  → `resolveCodeRoot()`).
+
+Only the broadcast-box migrations-dir fallback remains, and it is already
+guarded by an `existsSync` chain that tries the code-relative path first.
 
 ### 2b. Hermetic test instance
 
@@ -200,18 +218,32 @@ Pull from this list when a task already has us in the relevant code.
 
 **Correctness**
 
-- **Document numbers always `1`**
-  (`core/src/utils/document-number-generator.ts:186` — never queries the DB for
-  the highest sequence). → fold in when touching legal-register / record
-  creation.
-- **`storage.yml` `backend.path` ignored** by broadcast-box (writes to a default
-  root). → absorbed by `InstanceContext.storageRoot` (2a).
-- **`civic init` writes a deprecated `.civicrc`** — top-level `modules` /
-  `record_types` / `record_types_config` / `record_statuses_config` (belongs in
-  `data/.civic/config.yml`) and omits `dataDir`, so _every fresh instance_ nags
-  "Deprecated: … Prefer data/.civic/config.yml" + "Missing required fields:
-  dataDir" on every command. → fold in when touching `civic init` / config (this
-  is the residual noise from quick-win #3).
+- [x] **Document numbers always `1`** — `getNextSequence` was a stub that logged
+      a warning and returned 1, and BOTH call sites (RecordManager + the
+      create-record saga) fed it straight into `generate()`. So every bylaw /
+      ordinance / policy / proclamation / resolution was created as
+      `<PREFIX>-<YEAR>-001` — silent duplicates of the record's own citable
+      identity. Now reads what has been issued (`RecordStore.getDocumentNumbers`
+      via `json_extract`, since `document_number` has no column) and takes
+      highest-matching +1, scoped by prefix AND year. 17 tests, 5 of them
+      against real SQLite.
+- [x] **`storage.yml` `backend.path` ignored** — absorbed by
+      `InstanceContext.storageRoot`, and two live cwd bugs fixed alongside it
+      (see 2a).
+- [x] **`civic init` writes a deprecated `.civicrc`** — all three writers seeded
+      top-level `modules` + `record_types`; both dropped. `modules` already
+      lives in `data/.civic/config.yml` (which `getModules()` reads first) and
+      `record_types` has no reader at all. Verified against a real
+      `civic init --yes`: no deprecation or missing-field warnings afterwards.
+      (`dataDir` was in fact always written — the "omits dataDir" note here was
+      wrong.)
+- [x] **Notification state resolved from cwd** — found while verifying the
+      harness. `NotificationAudit` and `NotificationConfig` both defaulted to
+      the RELATIVE `'.system-data'`, and the DI container passed
+      `config.dataDir` for `notifications.yml` — which the configuration service
+      MIGRATES out of `dataDir`, leaving a `# Moved to …` stub, so the container
+      was reading the stub and silently falling back to defaults on any migrated
+      instance.
 
 **Security**
 
