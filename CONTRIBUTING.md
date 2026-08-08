@@ -89,14 +89,35 @@ This section covers the technical workflow for developers.
 
 Before contributing code, ensure you have:
 
-- **Node.js** 20.11.1 or higher (LTS recommended)
-- **pnpm** 8.15.0 or higher (package manager)
+- **Node.js** 22 or higher (see `.nvmrc`; matches the repo's `engines`)
+- **pnpm** 9 or higher — `corepack enable` picks up the pinned `pnpm@9.15.9`
 - **Git** installed and configured
+- **ffmpeg / ffprobe** on your `PATH` (broadcast-box redaction + parts of the
+  test suite)
 
 ## Development Setup
 
-Follow the installation instructions in
-[docs/bootstrap-guide.md](docs/bootstrap-guide.md) to set up your environment.
+```bash
+pnpm install
+pnpm dev:setup   # one-time: build core+cli, create a local instance, seed demo records
+pnpm dev         # run the whole stack with hot reload
+```
+
+`pnpm dev` runs **core (watch) + API + UI** together with prefixed, colour-coded
+logs:
+
+- **API** → <http://localhost:3000>
+- **UI** → <http://localhost:3030>
+- Log in as **`admin` / `Dev-Admin-123!`** — a local-only dev credential.
+
+Editing `core/`, `modules/api/`, or `modules/ui/` source hot-reloads
+automatically. Tests also rebuild stale `core`/`cli` output for you, so you
+never run against stale compiled code.
+
+`pnpm dev` fails fast with a hint if you haven't run `pnpm dev:setup` yet. The
+per-workspace scripts (`pnpm dev:api`, `pnpm dev:ui`, `pnpm dev:core`, …) remain
+for running a single piece. For a deeper setup guide see
+[docs/bootstrap-guide.md](docs/bootstrap-guide.md).
 
 ## Proposal Before Big PRs
 

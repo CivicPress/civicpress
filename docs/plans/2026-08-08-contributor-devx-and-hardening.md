@@ -38,9 +38,13 @@ resolved from several places at once.
       transcription / realtime modules — aliasing to src forks
       `CentralConfigManager` and breaks cross-module e2e). _Done — commit
       `3d2e582`._
-- [ ] **One blessed `dev`.** Collapse the ~10 `dev:*` variants into a single
-      `pnpm dev` (core-watch + api-tsx + ui + seeded sample data); document it
-      in CONTRIBUTING; keep the rest as advanced.
+- [x] **One blessed `dev`.** `pnpm dev` = a preflight guard + `concurrently`
+      core-watch + api (tsx) + ui (nuxt) with prefixed/colour-coded logs;
+      `pnpm dev:setup` bootstraps a local instance (build core+cli →
+      `civic init` → seed demo records; login `admin` / `Dev-Admin-123!`);
+      pruned the `dev:all`/`dev:all:watch` duplicate aliases; documented in
+      CONTRIBUTING (also fixed the stale Node-20/pnpm-8 prerequisites → 22/9).
+      _Done — commit to follow._
 - [ ] **Loud failures.** No command exits non-zero without printing what failed
       and the fix — the silent `status 1` papercut (a security command exited 1
       with no message this session). `withCli` error path.

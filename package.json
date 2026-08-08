@@ -9,7 +9,8 @@
     "pnpm": ">=9"
   },
   "scripts": {
-    "dev": "concurrently \"pnpm run dev:api\" \"pnpm run dev:ui\"",
+    "dev": "node scripts/dev-guard.mjs && concurrently -k -n core,api,ui -c blue,green,magenta \"pnpm run dev:core\" \"pnpm run dev:api\" \"pnpm run dev:ui\"",
+    "dev:setup": "node scripts/dev-setup.mjs",
     "dev:api": "cd modules/api && pnpm run dev",
     "dev:api:watch": "cd modules/api && pnpm run dev:watch",
     "dev:core": "cd core && pnpm run dev",
@@ -17,8 +18,6 @@
     "dev:ui": "cd modules/ui && pnpm run dev",
     "dev:storage": "cd modules/storage && pnpm run dev",
     "dev:serve": "cd modules/serve && pnpm run dev",
-    "dev:all": "concurrently \"pnpm run dev:api\" \"pnpm run dev:ui\"",
-    "dev:all:watch": "concurrently \"pnpm run dev:api\" \"pnpm run dev:ui\"",
     "dev:parallel": "pnpm -r --parallel run dev",
     "build": "pnpm -r run build",
     "build:cli": "cd cli && pnpm run build",
