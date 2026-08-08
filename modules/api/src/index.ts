@@ -12,6 +12,7 @@ import {
   CentralConfigManager,
   GeographyManager,
   AuthMaintenanceScheduler,
+  getInstanceContext,
 } from '@civicpress/core';
 
 const logger = new Logger();
@@ -262,11 +263,15 @@ export class CivicPressAPI {
       // Store dataDir for use in routes
       this.dataDir = dataDir;
 
-      // Change to project root directory to ensure database paths are resolved correctly
+      // No chdir. This used to `process.chdir(projectRoot)` so that the
+      // cwd-relative database path would resolve correctly — a process-wide
+      // side effect from a library's initialize(), which also silently moved
+      // every OTHER relative path in the host process. Paths now derive from
+      // the resolved instance context rather than the working directory, so
+      // the reason for it is gone.
       const projectRoot = this.findProjectRoot();
-      if (projectRoot && process.cwd() !== projectRoot) {
-        logger.info(`Changing to project root: ${projectRoot}`);
-        process.chdir(projectRoot);
+      if (projectRoot) {
+        logger.debug(`Serving instance at: ${projectRoot}`);
       }
 
       // Load database config from central config
@@ -331,23 +336,17 @@ export class CivicPressAPI {
     }
   }
 
+  /**
+   * The instance root the API is serving.
+   *
+   * This was a fourth hand-rolled upward search for `.civicrc`. It now reads
+   * the resolved instance context, so the API can never disagree with core
+   * about which instance it is running — and returns null (as before) when
+   * there is no `.civicrc` at all, which is what the caller branches on.
+   */
   private findProjectRoot(): string | null {
-    let currentPath = process.cwd();
-    const rootPath = path.parse(currentPath).root;
-
-    while (currentPath !== rootPath) {
-      const civicrcPath = path.join(currentPath, '.civicrc');
-      if (fs.existsSync(civicrcPath)) {
-        return currentPath;
-      }
-      const parentPath = path.dirname(currentPath);
-      if (parentPath === currentPath) {
-        break;
-      }
-      currentPath = parentPath;
-    }
-
-    return null;
+    const { configPath, root } = getInstanceContext();
+    return configPath ? root : null;
   }
 
   private setupRoutes(): void {
