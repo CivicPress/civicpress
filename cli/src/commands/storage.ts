@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- CLI command handlers pass CAC's untyped options through withCli. */
 import { CAC } from 'cac';
-import { CivicPress } from '@civicpress/core';
+import { CivicPress, CentralConfigManager } from '@civicpress/core';
 import { AuthUtils } from '../utils/auth-utils.js';
 import fs from 'fs-extra';
 import path from 'path';
@@ -14,37 +14,19 @@ import { withCli } from '../utils/with-cli.js';
 import { cliSuccess, cliError } from '../utils/cli-output.js';
 
 // Helper function to initialize storage services
-async function initializeStorageServices(
-  civic: CivicPress,
-  dataDir: string
-): Promise<{
+async function initializeStorageServices(civic: CivicPress): Promise<{
   storageService: CloudUuidStorageService;
   configManager: StorageConfigManager;
 }> {
-  // Determine system data directory (same logic as API routes)
-  const projectRootSystemData = path.join(process.cwd(), '.system-data');
-  const isTestEnvironment =
-    dataDir.includes('/tmp/') ||
-    dataDir.includes('test') ||
-    process.env.NODE_ENV === 'test';
-
-  let systemDataDir: string;
-
-  // In test environments, always use test directory to ensure isolation
-  if (isTestEnvironment) {
-    // Test environment: use dataDir/.system-data (isolated per test)
-    systemDataDir = path.join(dataDir, '.system-data');
-  } else {
-    // Production: check if .system-data exists at project root
-    try {
-      await fs.access(projectRootSystemData);
-      // .system-data exists at project root, use it (production)
-      systemDataDir = projectRootSystemData;
-    } catch {
-      // Production but .system-data missing at root - use project root anyway
-      systemDataDir = projectRootSystemData;
-    }
-  }
+  // Ask the config authority where `.system-data` is, exactly like every other
+  // consumer. This replaced a cwd-based guess wrapped in a test heuristic
+  // (`dataDir.includes('/tmp/') || dataDir.includes('test')`) that picked
+  // `<dataDir>/.system-data` under test and `<cwd>/.system-data` otherwise —
+  // so these commands read a DIFFERENT storage.yml than core and the API,
+  // whose systemDataDir is anchored to the project root either way. A
+  // production instance whose dataDir merely contained the substring "test"
+  // silently took the test branch too.
+  const systemDataDir = CentralConfigManager.getSystemDataDir();
 
   const configManager = new StorageConfigManager(systemDataDir);
   const config = await configManager.loadConfig();
@@ -124,7 +106,7 @@ export default function setupStorageCommand(cli: CAC) {
 
             // Initialize storage services
             const { storageService: _storageService, configManager } =
-              await initializeStorageServices(civic, dataDir);
+              await initializeStorageServices(civic);
 
             if (options.update) {
               // Update configuration
@@ -286,10 +268,7 @@ export default function setupStorageCommand(cli: CAC) {
             );
 
             // Initialize storage services
-            const { storageService } = await initializeStorageServices(
-              civic,
-              dataDir
-            );
+            const { storageService } = await initializeStorageServices(civic);
 
             // Read file and create MulterFile-like object
             const fileBuffer = await fs.readFile(options.file);
@@ -429,10 +408,7 @@ export default function setupStorageCommand(cli: CAC) {
             );
 
             // Initialize storage services
-            const { storageService } = await initializeStorageServices(
-              civic,
-              dataDir
-            );
+            const { storageService } = await initializeStorageServices(civic);
 
             // List files
             const files = await storageService.listFiles(options.folder);
@@ -581,10 +557,7 @@ export default function setupStorageCommand(cli: CAC) {
             );
 
             // Initialize storage services
-            const { storageService } = await initializeStorageServices(
-              civic,
-              dataDir
-            );
+            const { storageService } = await initializeStorageServices(civic);
 
             // Find file by name in folder
             const files = await storageService.listFiles(options.folder);
@@ -715,10 +688,7 @@ export default function setupStorageCommand(cli: CAC) {
             );
 
             // Initialize storage services
-            const { storageService } = await initializeStorageServices(
-              civic,
-              dataDir
-            );
+            const { storageService } = await initializeStorageServices(civic);
 
             // Find file by name in folder
             const files = await storageService.listFiles(options.folder);
@@ -852,10 +822,7 @@ export default function setupStorageCommand(cli: CAC) {
             );
 
             // Initialize storage services
-            const { configManager } = await initializeStorageServices(
-              civic,
-              dataDir
-            );
+            const { configManager } = await initializeStorageServices(civic);
 
             // Load current config
             const config = await configManager.loadConfig();
@@ -987,10 +954,7 @@ export default function setupStorageCommand(cli: CAC) {
             );
 
             // Initialize storage services
-            const { configManager } = await initializeStorageServices(
-              civic,
-              dataDir
-            );
+            const { configManager } = await initializeStorageServices(civic);
 
             // Load current config
             const config = await configManager.loadConfig();
@@ -1116,10 +1080,7 @@ export default function setupStorageCommand(cli: CAC) {
             );
 
             // Initialize storage services
-            const { configManager } = await initializeStorageServices(
-              civic,
-              dataDir
-            );
+            const { configManager } = await initializeStorageServices(civic);
 
             // Load current config
             const config = await configManager.loadConfig();
@@ -1231,10 +1192,7 @@ export default function setupStorageCommand(cli: CAC) {
             );
 
             // Initialize storage services
-            const { storageService } = await initializeStorageServices(
-              civic,
-              dataDir
-            );
+            const { storageService } = await initializeStorageServices(civic);
 
             // Find file by name in folder
             const files = await storageService.listFiles(options.folder);
