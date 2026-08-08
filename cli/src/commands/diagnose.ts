@@ -125,7 +125,7 @@ export function registerDiagnoseCommand(cli: CAC) {
           const filesystemChecker = new FilesystemDiagnosticChecker(
             dataDir,
             civic['logger'] as Logger,
-            process.cwd() // Project root for .system-data
+            CentralConfigManager.getProjectRoot() // where .system-data lives
           );
           diagnosticService.registerChecker(filesystemChecker);
 
@@ -309,7 +309,7 @@ function registerComponentCommands(cli: CAC) {
               const filesystemChecker = new FilesystemDiagnosticChecker(
                 config.dataDir,
                 civic['logger'] as Logger,
-                process.cwd() // Project root for .system-data
+                CentralConfigManager.getProjectRoot() // where .system-data lives
               );
               diagnosticService.registerChecker(filesystemChecker);
             } else if (component === 'system') {
