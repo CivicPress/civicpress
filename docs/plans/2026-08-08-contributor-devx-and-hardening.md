@@ -45,17 +45,20 @@ resolved from several places at once.
       pruned the `dev:all`/`dev:all:watch` duplicate aliases; documented in
       CONTRIBUTING (also fixed the stale Node-20/pnpm-8 prerequisites → 22/9).
       _Done — commit to follow._
-- [ ] **Clear failures** _(investigated 2026-08-08 → reframed)._ The CLI is
-      already broadly **loud**: `withCli`→`cliError`, the user commands, and
-      `auth-utils` all print `❌ <error>` to stderr, verified even under
-      `NODE_ENV=test` / `--silent` / `--quiet`. The real papercut is the inverse
-      — the actual error is **buried under ~14 lines of init-log noise** that
-      print on _every_ command (`.civicrc` deprecation nags ×4, "Initializing
-      CivicPress", "Database initialized", "Loaded secret", a non-fatal "Error
-      registering email templates", cache + hook init). Reframed goal: **quiet
-      the CLI init/log noise** so the result/error is the clear last word — not
-      the originally-assumed silent-exit fix. (Ties to the notification-log
-      cleanup already done in `ebe327a`.)
+- [x] **Clear failures → quieted the init noise.** _(investigated → reframed →
+      done, 2026-08-08.)_ The CLI was already broadly **loud** (verified under
+      `NODE_ENV=test` / `--silent` / `--quiet`); the papercut was the inverse —
+      the actual result was buried under ~14 lines of per-command init
+      narration. Fixed the real bug behind one of those lines: **email templates
+      never registered** — a CommonJS `require(...)` threw `ReferenceError` in
+      ESM on every init (`"Error registering email templates"`), leaving
+      `email_verification` / `email_change_verification` unregistered (the
+      downstream `Template not found`). Swapped to a static import (`3bd2a6c`;
+      same bug also fixed in `generator.ts` `detectAuthor`). Then downgraded the
+      pure init narration to `debug` (`34457a1`) — a failing command went **17 →
+      9 lines**, error prominent. **Residual:** 5 `.civicrc`
+      deprecation/missing-field warnings, which trace to `civic init` itself
+      (see the opportunistic list) — legitimate signals, not narration.
 
 ---
 
@@ -123,6 +126,12 @@ Pull from this list when a task already has us in the relevant code.
   creation.
 - **`storage.yml` `backend.path` ignored** by broadcast-box (writes to a default
   root). → absorbed by `InstanceContext.storageRoot` (2a).
+- **`civic init` writes a deprecated `.civicrc`** — top-level `modules` /
+  `record_types` / `record_types_config` / `record_statuses_config` (belongs in
+  `data/.civic/config.yml`) and omits `dataDir`, so _every fresh instance_ nags
+  "Deprecated: … Prefer data/.civic/config.yml" + "Missing required fields:
+  dataDir" on every command. → fold in when touching `civic init` / config (this
+  is the residual noise from quick-win #3).
 
 **Security**
 
