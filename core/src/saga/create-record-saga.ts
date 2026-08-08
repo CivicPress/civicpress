@@ -119,7 +119,8 @@ class CreateInRecordsStep extends BaseSagaStep<
           : documentDate.getFullYear();
         const sequence = await DocumentNumberGenerator.getNextSequence(
           request.type,
-          year
+          year,
+          this.db
         );
         documentNumber = DocumentNumberGenerator.generate(
           request.type,

@@ -156,10 +156,7 @@ export class DatabaseService {
     return await this.adapter.query<T>(sql, params);
   }
 
-  async execute(
-    sql: string,
-    params: SqlParam[] = []
-  ): Promise<ExecuteResult> {
+  async execute(sql: string, params: SqlParam[] = []): Promise<ExecuteResult> {
     return await this.adapter.execute(sql, params);
   }
 
@@ -408,6 +405,12 @@ export class DatabaseService {
     return this.records.listRecords(...args);
   }
 
+  async getDocumentNumbers(
+    ...args: Parameters<RecordStore['getDocumentNumbers']>
+  ): ReturnType<RecordStore['getDocumentNumbers']> {
+    return this.records.getDocumentNumbers(...args);
+  }
+
   // ---------------------------------------------------------------------------
   // Draft management — delegated to DraftStore
   // ---------------------------------------------------------------------------
@@ -641,10 +644,7 @@ export class DatabaseService {
     }
   }
 
-  async getAuditLogs(
-    limit = 100,
-    offset = 0
-  ): Promise<AuditLogWithUserRow[]> {
+  async getAuditLogs(limit = 100, offset = 0): Promise<AuditLogWithUserRow[]> {
     return await this.adapter.query<AuditLogWithUserRow>(
       'SELECT al.*, u.username FROM audit_logs al LEFT JOIN users u ON al.user_id = u.id ORDER BY al.created_at DESC LIMIT ? OFFSET ?',
       [limit, offset]

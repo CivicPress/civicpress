@@ -263,7 +263,8 @@ export class RecordManager {
         : documentDate.getFullYear();
       const sequence = await DocumentNumberGenerator.getNextSequence(
         request.type,
-        year
+        year,
+        this.db
       );
       documentNumber = DocumentNumberGenerator.generate(
         request.type,
@@ -969,7 +970,6 @@ export class RecordManager {
   ): Promise<string[]> {
     return this.search.getSearchSuggestions(...args);
   }
-
 
   /**
    * Publish a draft record using the saga pattern

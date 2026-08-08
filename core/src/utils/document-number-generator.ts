@@ -33,7 +33,7 @@ export class DocumentNumberGenerator {
   private static getFormat(recordType: string): DocumentNumberFormat {
     try {
       const formats = CentralConfigManager.getDocumentNumberFormats();
-      
+
       if (formats[recordType]) {
         // Map config format (snake_case) to internal format (camelCase)
         const configFormat = formats[recordType];
@@ -45,7 +45,10 @@ export class DocumentNumberGenerator {
         };
       }
     } catch (error) {
-      logger.warn('Failed to load document number format from config, using default', error);
+      logger.warn(
+        'Failed to load document number format from config, using default',
+        error
+      );
     }
 
     // Default format
@@ -89,10 +92,11 @@ export class DocumentNumberGenerator {
   ): string {
     const format = this.getFormat(recordType);
     const yearValue = year || new Date().getFullYear();
-    const yearStr = format.yearFormat === 'short' 
-      ? String(yearValue).slice(-2) 
-      : String(yearValue);
-    
+    const yearStr =
+      format.yearFormat === 'short'
+        ? String(yearValue).slice(-2)
+        : String(yearValue);
+
     const sequenceStr = String(sequence).padStart(format.sequencePadding, '0');
 
     return `${format.prefix}${format.separator}${yearStr}${format.separator}${sequenceStr}`;
@@ -168,22 +172,66 @@ export class DocumentNumberGenerator {
   }
 
   /**
-   * Get the next sequence number for a record type and year
-   * This would typically query the database to find the highest sequence
-   * For now, returns a placeholder that should be implemented with actual DB query
+   * The next sequence number given the numbers already issued.
    *
-   * @param recordType - The record type
-   * @param year - The year
-   * @returns Next sequence number
+   * Pure: the caller supplies the existing document numbers, so the parsing
+   * rule is testable without a database. Only numbers whose prefix matches
+   * this type's configured prefix AND whose year matches are considered —
+   * sequences restart each year, and two types can share a year without
+   * colliding.
+   */
+  static nextSequenceFrom(
+    existingNumbers: readonly string[],
+    recordType: string,
+    year?: number
+  ): number {
+    const targetYear = year || new Date().getFullYear();
+    const { prefix } = this.getFormat(recordType);
+
+    let highest = 0;
+    for (const documentNumber of existingNumbers) {
+      const parsed = this.parse(documentNumber);
+      if (!parsed) continue;
+      if (parsed.prefix !== prefix) continue;
+      if (parsed.year !== targetYear) continue;
+      if (parsed.sequence > highest) highest = parsed.sequence;
+    }
+
+    return highest + 1;
+  }
+
+  /**
+   * Next sequence number for a record type and year, from what the database
+   * has already issued.
+   *
+   * This used to be a stub that logged a warning and returned `1` — so EVERY
+   * bylaw/ordinance/policy/proclamation/resolution was created as
+   * `<PREFIX>-<YEAR>-001`. For legal registers, where the document number is
+   * the citable identity of the record, that meant silent duplicates.
+   *
+   * `db` is optional so existing direct callers keep working; without it there
+   * is nothing to count against and the answer is the first sequence.
    */
   static async getNextSequence(
-    _recordType: string,
-    _year?: number
+    recordType: string,
+    year?: number,
+    db?: { getDocumentNumbers(recordType: string): Promise<string[]> }
   ): Promise<number> {
-    // TODO: Implement database query to find highest sequence for this type/year
-    // For now, return 1 as placeholder
-    logger.warn('getNextSequence not yet implemented, returning 1');
-    return 1;
+    if (!db) {
+      return 1;
+    }
+
+    try {
+      const existing = await db.getDocumentNumbers(recordType);
+      return this.nextSequenceFrom(existing, recordType, year);
+    } catch (error) {
+      // A numbering lookup must not block record creation; fall back to the
+      // first sequence and make the reason visible rather than silent.
+      logger.warn(
+        `Could not read existing document numbers for '${recordType}'; defaulting to sequence 1`,
+        error
+      );
+      return 1;
+    }
   }
 }
-

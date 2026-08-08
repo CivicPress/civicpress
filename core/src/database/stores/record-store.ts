@@ -366,6 +366,28 @@ export class RecordStore {
     return rows.length > 0 ? rows[0] : null;
   }
 
+  /**
+   * Every `document_number` already assigned to records of a type.
+   *
+   * Legal numbering has to be unique and gapless-ish per year, so the
+   * generator needs to know what has already been issued. `document_number`
+   * lives inside the metadata JSON rather than its own column, so this reads
+   * it with json_extract and returns only the non-null values — parsing the
+   * prefix/year/sequence is the generator's job, since the format is
+   * per-type configuration.
+   */
+  async getDocumentNumbers(recordType: string): Promise<string[]> {
+    const rows = await this.adapter.query<{ document_number: string | null }>(
+      `SELECT json_extract(metadata, '$.document_number') AS document_number
+       FROM records
+       WHERE type = ? AND json_extract(metadata, '$.document_number') IS NOT NULL`,
+      [recordType]
+    );
+    return rows
+      .map((row) => row.document_number)
+      .filter((value): value is string => typeof value === 'string');
+  }
+
   async updateRecord(
     id: string,
     updates: {
@@ -476,10 +498,9 @@ export class RecordStore {
   async deleteRecord(id: string): Promise<void> {
     // record_locks intentionally has no FK/cascade (locks are taken on
     // drafts too, which have no records row) — clean up explicitly.
-    await this.adapter.execute(
-      'DELETE FROM record_locks WHERE record_id = ?',
-      [id]
-    );
+    await this.adapter.execute('DELETE FROM record_locks WHERE record_id = ?', [
+      id,
+    ]);
     await this.adapter.execute('DELETE FROM records WHERE id = ?', [id]);
     await this.removeRecordFromIndex(id, '');
   }
