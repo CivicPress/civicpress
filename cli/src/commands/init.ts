@@ -140,12 +140,30 @@ async function ensureModulesInConfigYml(
 ): Promise<void> {
   try {
     const fsp = await import('fs/promises');
-    let doc: any = {};
+
+    let raw: string | null = null;
     try {
-      doc = yaml.parse(await fsp.readFile(configYmlPath, 'utf8')) || {};
+      raw = await fsp.readFile(configYmlPath, 'utf8');
     } catch {
-      // config.yml absent or unreadable — write a minimal one below.
+      raw = null; // absent — we may create it below
     }
+
+    let doc: any = {};
+    if (raw !== null) {
+      try {
+        doc = yaml.parse(raw) || {};
+      } catch (err: any) {
+        // The file EXISTS but does not parse. Bail out rather than replace it:
+        // treating a parse failure the same as "absent" would rewrite the file
+        // as a single `modules:` key and destroy record_types_config,
+        // record_statuses_config and document_number_formats along with it.
+        logger.warn(
+          `⚠️  Could not parse ${configYmlPath} (${err?.message || err}); leaving it untouched. Add a 'modules:' list manually if modules do not load.`
+        );
+        return;
+      }
+    }
+
     if (Array.isArray(doc.modules) && doc.modules.length > 0) {
       return;
     }
@@ -334,6 +352,23 @@ export const initCommand = (cli: CAC) => {
             // Check if .civicrc already exists (will be handled later)
             const civicrcPath = path.join(process.cwd(), '.civicrc');
             const civicrcExists = fs.existsSync(civicrcPath);
+
+            // Capture a module list from an EXISTING .civicrc before we rewrite
+            // it. We no longer write `modules` there, so re-running init on an
+            // instance whose modules lived only in .civicrc would otherwise
+            // strand that list: config.yml takes precedence in getModules(), so
+            // a hardcoded default would silently shadow the operator's choice.
+            // Carrying it forward migrates the setting instead of dropping it.
+            const priorCivicrcModules: string[] | null = (() => {
+              if (!civicrcExists) return null;
+              try {
+                const prior = yaml.parse(fs.readFileSync(civicrcPath, 'utf8'));
+                const mods = prior?.modules;
+                return Array.isArray(mods) && mods.length > 0 ? mods : null;
+              } catch {
+                return null;
+              }
+            })();
 
             const fullDataDir = path.resolve(dataDir);
             if (!shouldOutputJson) {
@@ -634,11 +669,13 @@ export const initCommand = (cli: CAC) => {
               );
             } else {
               // No explicit selection: config.yml keeps whatever the defaults
-              // supplied, and this fills in the default set if it has none —
-              // `.civicrc` is no longer a fallback source for it.
+              // supplied, and this fills in the gap if it has none — `.civicrc`
+              // is no longer a source for it. A module list carried over from a
+              // pre-existing `.civicrc` wins over the built-in default so
+              // re-running init never silently drops an operator's selection.
               await ensureModulesInConfigYml(
                 configYmlPath,
-                ['legal-register'],
+                priorCivicrcModules ?? ['legal-register'],
                 logger
               );
             }

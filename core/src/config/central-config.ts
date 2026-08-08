@@ -102,6 +102,12 @@ export interface CentralConfig {
    * `resolveSystemDataDir()`.
    */
   systemDataDir?: string;
+  /**
+   * Optional override for where `module.json` manifests are discovered.
+   * Relative paths resolve against the project root. Unset means the standard
+   * rule (a `modules/` beside the data root, else the installed-code location).
+   */
+  modulesDir?: string;
   // System configuration (from .civicrc)
   modules?: string[];
   record_types?: string[];
@@ -375,6 +381,11 @@ export class CentralConfigManager {
         config: {
           dataDir: mergedConfig.dataDir,
           systemDataDir: mergedConfig.systemDataDir,
+          // Forward the `modulesDir` override too. Omitting it meant a
+          // `modulesDir:` in `.civicrc` was accepted by resolveInstanceContext
+          // in isolation but silently dropped for the real, process-wide
+          // context — so the documented override did nothing in practice.
+          modulesDir: mergedConfig.modulesDir,
         },
       })
     );

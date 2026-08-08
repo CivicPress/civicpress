@@ -186,18 +186,58 @@ export class DocumentNumberGenerator {
     year?: number
   ): number {
     const targetYear = year || new Date().getFullYear();
-    const { prefix } = this.getFormat(recordType);
+    const format = this.getFormat(recordType);
 
     let highest = 0;
     for (const documentNumber of existingNumbers) {
-      const parsed = this.parse(documentNumber);
-      if (!parsed) continue;
-      if (parsed.prefix !== prefix) continue;
-      if (parsed.year !== targetYear) continue;
-      if (parsed.sequence > highest) highest = parsed.sequence;
+      const sequence = this.matchSequence(documentNumber, format, targetYear);
+      if (sequence !== null && sequence > highest) highest = sequence;
     }
 
     return highest + 1;
+  }
+
+  /**
+   * The sequence in `documentNumber` if it is one THIS format would have
+   * produced for `targetYear`, else null.
+   *
+   * Matching is built from the record type's own configured format rather than
+   * the loose `parse()` regex. `parse()` only recognises `[A-Z]+` prefixes and
+   * `-` or `/` separators, so any other configured `document_number_formats`
+   * entry — a prefix containing a digit (`BY2`), a lowercase prefix, or a
+   * separator like `.` or `_` — matched nothing, every lookup came back empty,
+   * and the sequence silently restarted at 1 for every record: exactly the
+   * duplicate-numbering bug this was meant to fix, just narrowed to
+   * non-default configs.
+   *
+   * Comparing the year in the SAME representation `generate()` emits also makes
+   * the `short` format round-trip for any century — `parse()` hard-codes a
+   * 2-digit year to `2000 + n`, so a backfilled `BYL-98-001` was read as 2098
+   * and never matched a 1998 target.
+   */
+  private static matchSequence(
+    documentNumber: string,
+    format: DocumentNumberFormat,
+    targetYear: number
+  ): number | null {
+    const escape = (value: string) =>
+      value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+    const separator = format.separator || '-';
+    const yearStr =
+      format.yearFormat === 'short'
+        ? String(targetYear).slice(-2)
+        : String(targetYear);
+
+    const pattern = new RegExp(
+      `^${escape(format.prefix)}${escape(separator)}${escape(yearStr)}${escape(separator)}(\\d+)$`
+    );
+
+    const match = documentNumber.match(pattern);
+    if (!match) return null;
+
+    const sequence = parseInt(match[1], 10);
+    return Number.isFinite(sequence) ? sequence : null;
   }
 
   /**

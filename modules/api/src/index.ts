@@ -5,7 +5,6 @@ import helmet from 'helmet';
 import compression from 'compression';
 import { rateLimit } from 'express-rate-limit';
 import path from 'path';
-import fs from 'fs';
 import {
   CivicPress,
   Logger,

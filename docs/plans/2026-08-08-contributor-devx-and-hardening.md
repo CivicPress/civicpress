@@ -219,14 +219,26 @@ Pull from this list when a task already has us in the relevant code.
 **Correctness**
 
 - [x] **Document numbers always `1`** — `getNextSequence` was a stub that logged
-      a warning and returned 1, and BOTH call sites (RecordManager + the
-      create-record saga) fed it straight into `generate()`. So every bylaw /
-      ordinance / policy / proclamation / resolution was created as
-      `<PREFIX>-<YEAR>-001` — silent duplicates of the record's own citable
-      identity. Now reads what has been issued (`RecordStore.getDocumentNumbers`
-      via `json_extract`, since `document_number` has no column) and takes
-      highest-matching +1, scoped by prefix AND year. 17 tests, 5 of them
-      against real SQLite.
+      a warning and returned 1, and BOTH call sites (`RecordManager.createRecord`
+      + the create-record saga) fed it straight into `generate()`, so every
+      legal-type record they created came out as `<PREFIX>-<YEAR>-001` — silent
+      duplicates of the record's own citable identity. Now reads what has been
+      issued (`RecordStore.getDocumentNumbers` via `json_extract`, since
+      `document_number` has no column) and takes highest-matching +1, scoped by
+      prefix AND year. 17 tests, 5 of them against real SQLite.
+
+      ⚠️ **Scope correction** (found in the pre-merge review; the commit message
+      for `88b66b9` overstates this as "every" record). `DocumentNumberGenerator`
+      has exactly TWO production call sites. The primary editor path —
+      create draft → publish — goes through `RecordManager.createRecordWithId`,
+      which has **no numbering block at all**, so those records land with **no
+      `document_number`**. That is pre-existing and untouched by this work, but
+      it bounds the fix: numbering is correct now wherever it happens, and the
+      draft→publish path still needs numbering wired in. Related gaps, all
+      pre-existing: a caller-supplied `metadata.document_number` bypasses
+      generation with no uniqueness check (`DocumentNumberGenerator.validate()`
+      exists but has zero call sites), and concurrent creates can race for the
+      same number. → **follow-up work item.**
 - [x] **`storage.yml` `backend.path` ignored** — absorbed by
       `InstanceContext.storageRoot`, and two live cwd bugs fixed alongside it
       (see 2a).

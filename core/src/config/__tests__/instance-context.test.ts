@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'fs';
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync, existsSync } from 'fs';
 import { realpathSync } from 'fs';
 import { tmpdir } from 'os';
 import { join, dirname } from 'path';
@@ -81,6 +81,17 @@ describe('resolveInstanceContext', () => {
 
     it('reports configPath: null when an explicit root holds no .civicrc', () => {
       expect(resolveInstanceContext({ root: dir }).configPath).toBeNull();
+    });
+
+    it('findConfigFile walks up and returns null when nothing is found', () => {
+      const nested = join(dir, 'p', 'q');
+      mkdirSync(nested, { recursive: true });
+
+      // Nothing yet — a tmpdir has no .civicrc above it.
+      expect(findConfigFile(nested)).toBeNull();
+
+      writeConfig(dir, 'dataDir: data\n');
+      expect(findConfigFile(nested)).toBe(join(dir, '.civicrc'));
     });
 
     it('resolves identically from any cwd — the property the cwd fallbacks broke', () => {
@@ -280,8 +291,16 @@ describe('resolveCodeRoot', () => {
     // core's build emits core/dist/modules/ for the manifest schema. Anchoring
     // on "first ancestor with a modules/ dir" would stop there; the real code
     // root is the workspace above core/.
+    //
+    // Assert against TRACKED marker files only. An earlier version of this test
+    // checked for a `.civicrc` above the code root — but `.civicrc` is
+    // gitignored, so it exists only on a machine where someone has run
+    // `civic init`. That passed locally and would have failed on every clean
+    // clone and in CI.
     const codeRoot = resolveCodeRoot();
-    expect(findConfigFile(codeRoot)).not.toBeNull();
+    expect(existsSync(join(codeRoot, 'modules'))).toBe(true);
+    expect(existsSync(join(codeRoot, 'package.json'))).toBe(true);
+    expect(existsSync(join(codeRoot, 'pnpm-workspace.yaml'))).toBe(true);
     expect(codeRoot.endsWith(join('core', 'dist'))).toBe(false);
     expect(codeRoot.endsWith('core')).toBe(false);
   });

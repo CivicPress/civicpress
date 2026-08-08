@@ -242,12 +242,18 @@ export class OrphanedFileCleaner {
     provider: StorageProvider
   ): Promise<Array<{ path: string; size?: number }>> {
     const storagePath = provider.path || 'storage';
-    if (!path.isAbsolute(storagePath) && !this.basePath) {
+    if (
+      !path.isAbsolute(storagePath) &&
+      !path.isAbsolute(this.basePath ?? '')
+    ) {
       // Refuse to guess: scanning the wrong tree and calling its contents
-      // orphans is worse than reporting nothing.
+      // orphans is worse than reporting nothing. The base must be ABSOLUTE, not
+      // merely present — a relative basePath would re-introduce exactly the
+      // cwd-anchored resolution this guard exists to prevent.
       throw new Error(
-        'OrphanedFileCleaner: a relative local provider path needs a basePath; ' +
-          'construct it via CloudUuidStorageService.getOrphanedFileCleaner().'
+        'OrphanedFileCleaner: a relative local provider path needs an absolute ' +
+          'basePath; construct it via ' +
+          'CloudUuidStorageService.getOrphanedFileCleaner().'
       );
     }
     const resolvedPath = path.isAbsolute(storagePath)

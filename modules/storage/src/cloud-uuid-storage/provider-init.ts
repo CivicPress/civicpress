@@ -15,6 +15,7 @@
 
 import fs from 'fs-extra';
 import path from 'path';
+import { getInstanceContext } from '@civicpress/core';
 import {
   loadAwsS3Sdk,
   loadAzureBlobSdk,
@@ -211,10 +212,15 @@ export class ProviderInit {
 
     // Use service account key file if provided
     if (gcsCredentials.keyFilename) {
-      // Resolve path if relative
-      const keyPath = gcsCredentials.keyFilename.startsWith('/')
+      // Resolve a relative key path against the INSTANCE root, not the
+      // directory the process was launched from. This used to work only by
+      // accident: the API chdir'd to the project root during initialize(), so
+      // cwd happened to be the instance. That chdir is gone (it was a
+      // process-wide side effect), which would have left a relative
+      // `keyFilename` resolving against the launch directory.
+      const keyPath = path.isAbsolute(gcsCredentials.keyFilename)
         ? gcsCredentials.keyFilename
-        : path.resolve(process.cwd(), gcsCredentials.keyFilename);
+        : path.resolve(getInstanceContext().root, gcsCredentials.keyFilename);
 
       // Verify file exists
       if (!(await fs.pathExists(keyPath))) {

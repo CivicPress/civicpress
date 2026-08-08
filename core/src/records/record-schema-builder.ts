@@ -74,6 +74,17 @@ export function setModuleResolver(resolver: ModuleResolver): void {
   schemaCache.clear();
 }
 
+/**
+ * Memoized fallback resolver, keyed by the directory it scans.
+ *
+ * A ModuleResolver caches its scan internally, so building a NEW one per call
+ * re-walked the module tree every time. That was nearly free while the fallback
+ * pointed at a `cwd/modules` that usually did not exist; now that it resolves to
+ * a real tree, an uninjected caller (e.g. `getSchemaExtensionFieldNames`, hit
+ * once per record serialization) would rescan the filesystem on every call.
+ */
+let fallbackResolver: { dir: string; resolver: ModuleResolver } | null = null;
+
 function getModuleResolver(): ModuleResolver {
   if (injectedModuleResolver) {
     return injectedModuleResolver;
@@ -87,7 +98,14 @@ function getModuleResolver(): ModuleResolver {
   // `getSchemaExtensionFieldNames('session')` came back empty, so `capture` was
   // mis-nested). There is no cwd fallback left here — the context always
   // resolves, and for a split deployment it points at the installed code.
-  return new ModuleResolver(getInstanceContext().modulesDir);
+  const modulesDir = getInstanceContext().modulesDir;
+  if (!fallbackResolver || fallbackResolver.dir !== modulesDir) {
+    fallbackResolver = {
+      dir: modulesDir,
+      resolver: new ModuleResolver(modulesDir),
+    };
+  }
+  return fallbackResolver.resolver;
 }
 
 /**

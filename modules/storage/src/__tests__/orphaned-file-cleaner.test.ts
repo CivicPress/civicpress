@@ -385,7 +385,24 @@ describe('OrphanedFileCleaner', () => {
       );
 
       await expect(baseless.findOrphanedFiles('local')).rejects.toThrow(
-        /needs a basePath/
+        /needs an absolute basePath/
+      );
+    });
+
+    it('rejects a RELATIVE basePath too, not just a missing one', async () => {
+      // A relative base would re-introduce the cwd-anchored resolution this
+      // guard exists to prevent — `.system-data` was exactly such a value.
+      const relativeBase = new OrphanedFileCleaner(
+        databaseService as unknown as StorageDatabaseService,
+        { providers: { local: { type: 'local', path: 'storage' } } } as any,
+        null,
+        null,
+        mockLogger,
+        '.system-data'
+      );
+
+      await expect(relativeBase.findOrphanedFiles('local')).rejects.toThrow(
+        /needs an absolute basePath/
       );
     });
 
