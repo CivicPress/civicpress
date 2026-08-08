@@ -3,28 +3,35 @@
 _A unified, authoritative roadmap for CivicPress, guiding the project from early
 alpha toward a stable, production-grade civic infrastructure platform._
 
-**Current Version:** v0.2.0 (Alpha)
+**Current Version:** v0.3.1 (Alpha)
 
-> **Current status (2026-07-30) — supersedes every snapshot below.** The
-> 2026-07-02 two-repo audit (`docs/audits/2026-07-02-full-audit.md`, `FA-*`
-> registry) is the authoritative findings tracker and is **fully remediated** —
-> every finding closed or an explicit accepted-deferral. Since the 2026-07-15
-> snapshot, an entire post-audit-hardening arc landed on `main` (PRs #19–#22,
-> `main` at `e4f64bd`): audit Tiers A–D and test-health phases 7e–7j (#19);
-> tech-debt refactors (withCli, API-envelope standardization, config/dataDir
-> anchoring) (#20); two production-bug fixes (published records leaking into
-> drafts; record locks expiring mid-edit), the core-002 hook→WorkflowEngine
-> wiring, supply-chain scanning (osv-scanner, CodeQL, `SECURITY.md`), and a 94→2
-> osv-advisory dependency remediation (#21); and CodeQL SAST with a Node/pnpm
-> `engines` reconcile (#22). `develop` carries a further security-tail batch —
-> the audit's deferred carry-forward surfaces audited (no live vulnerabilities),
-> plus Low defense-in-depth hardening and dead-code cleanup — pending the next
-> develop→main PR. **Genuinely open (Roadmap-tier, need scoping):** `ui-003`
-> public-read prerender (SSG — static public record pages; **not** live SSR,
-> which is decided against — deferred to the "easy deployment" epic); signed
-> appliance image; HW/device-repo work; equity/i18n; device-repo
-> required-status-checks branch protection. The phase-tracking and status
-> snapshots below are historical; the forward-looking milestone sections stand.
+> **Current status (2026-08-07) — supersedes every snapshot below.** `main` is
+> at **v0.3.1** (tagged). The 2026-07-02 two-repo audit
+> (`docs/audits/2026-07-02-full-audit.md`, `FA-*` registry) is fully remediated,
+> and the entire post-audit-hardening arc has landed on `main` (PRs #19–#23):
+> audit Tiers A–D and test-health phases 7e–7j; tech-debt refactors (withCli,
+> API-envelope standardization, config/dataDir anchoring); two production-bug
+> fixes (published records leaking into drafts; record locks expiring mid-edit);
+> the core-002 hook→WorkflowEngine wiring; supply-chain scanning (osv-scanner,
+> CodeQL, `SECURITY.md`) with a 94→2 dependency remediation; CodeQL SAST; and
+> the deferred security-tail carry-forward (surfaces audited — no live
+> vulnerabilities — plus Low defense-in-depth hardening).
+>
+> Two release milestones have shipped since: **v0.3.x — Editor, Attachments &
+> Civic UX is complete** (rich editor, drag-and-drop attachments, EN/FR parity,
+> spec-reality gate — released across 0.2.1 → 0.3.0), and **v0.3.1** added a
+> **deployment & onboarding layer** (one-command `civic init` / `serve` /
+> `doctor` + a Docker/compose/nginx stack + a curated demo seed) and a thin
+> **BroadcastBox operator UI**, plus record round-trip and CLI `--json`
+> correctness fixes. **The active milestone is now v0.4.x — Workflow Engine +
+> Permissions** (§5).
+>
+> **Still open / needs scoping:** public-read prerender (SSG — static public
+> record pages; live SSR is decided against); signed appliance image; broader
+> equity/i18n; device-repo required-status-checks branch protection; and
+> developer-experience polish (hermetic tests, a single blessed `dev` command, a
+> reproducible dev environment). The phase-tracking and status snapshots below
+> are historical; the forward-looking milestone sections stand.
 
 **Status (2026-06-03 snapshot — historical; superseded by the 2026-07-30 banner
 above).** The post-audit base refactor (Phases 2a–2d + the lint-rule rollout,
@@ -120,10 +127,12 @@ sustainability.
 
 The development path is organized into the following major phases:
 
-- **v0.2.x — Core Maturity and Stability**
-- **v0.3.x — Editor, Attachments, and Civic UX**
-- **v0.4.x — Workflow Engine + Permissions**
-- **v0.5–0.8 — Municipal Pilot Readiness**
+- **v0.2.x — Core Maturity and Stability** — ✅ shipped
+- **v0.3.x — Editor, Attachments, and Civic UX** — ✅ complete (released 0.2.1 →
+  0.3.0)
+- **v0.4.x — Workflow Engine + Permissions** — ⏭️ active milestone
+- **v0.5–0.8 — Municipal Pilot Readiness** — deployment/onboarding groundwork
+  pulled forward in v0.3.1 (one-command deploy + operator UI)
 - **v0.9 — Production Candidate**
 - **v1.0 — Stable Release**
 
@@ -131,7 +140,7 @@ Each phase includes objectives and expected deliverables.
 
 ---
 
-# 3. v0.2.x — Core Maturity and Stability 🟡 SHIPPED — refactor in progress
+# 3. v0.2.x — Core Maturity and Stability ✅ SHIPPED (refactor complete)
 
 **Focus:** Indexing, search, architecture cleanup, reliability improvements.
 
@@ -188,7 +197,15 @@ registry.
 
 ---
 
-# 4. v0.3.x — Editor, Attachments, Civic UX, and Refactor Completion
+# 4. v0.3.x — Editor, Attachments, Civic UX, and Refactor Completion ✅ COMPLETE
+
+**Status:** Complete — released across **0.2.1 → 0.3.0**. The feature work (rich
+Markdown editor, drag-and-drop attachments, EN/FR i18n parity, record activity
+feed) shipped in 0.2.1; 0.3.0 closed the milestone's test and documentation exit
+criteria (browser e2e, live cloud-storage test, the spec-reality frontmatter
+gate), so every spec under `docs/specs/` now matches implementation reality. A
+follow-on **0.3.1** then added a deployment & onboarding layer and a
+BroadcastBox operator UI (pilot-readiness groundwork pulled forward — see §6).
 
 **Focus:** Improve clerk-facing daily usability and make the platform visually
 compelling for demonstrations and municipal outreach. **Couples with the
@@ -220,7 +237,9 @@ focuses on UX enhancements.
 
 ---
 
-# 5. v0.4.x — Workflow Engine + Permissions
+# 5. v0.4.x — Workflow Engine + Permissions ⏭️ ACTIVE MILESTONE
+
+**Status:** Next up — not yet started. This is the current development frontier.
 
 **Focus:** Enhance workflows and permissions with advanced features and UI
 integration.
