@@ -1327,8 +1327,29 @@ Both found by inspecting what a full test run leaves behind on disk. Neither is
 caused by the CI fix; both are the same cwd-resolution class the InstanceContext
 pass closed elsewhere, in two places it did not reach.
 
-- [ ] **🔴 The API writes its audit trail to `process.cwd()`, not to the
-      instance.** `AuditLogger`'s constructor defaults to the **relative**
+- [x] **🔴 The API writes its audit trail to `process.cwd()`, not to the
+      instance.** **FIXED 2026-08-09.** `AuditLogger` now resolves its path
+      **lazily, per use**, from `getInstanceContext().systemDataDir`; the
+      constructor option is renamed `dataDir` → `dir` (that name is precisely
+      what invited core to pass `config.dataDir` and split the trail), and every
+      caller that was passing a directory — core's DI singleton, three API
+      diagnose sites, two CLI diagnose sites — now passes nothing and lets the
+      context decide. Lazy matters: the five route modules construct at import
+      time, before any context is installed, so an eagerly-computed path could
+      never be right for them.
+
+      All three locations now agree on `<systemDataDir>/activity.log`, which is
+      where the bulk of the trail already lived — the API's cwd default landed
+      there whenever the process started from the instance root, the normal case
+      and the one the Docker image arranges. So this converges on the existing
+      history rather than moving it. Pinned by
+      `tests/core/audit/audit-logger-location.test.ts` (4 tests), which was
+      negative-controlled: reverting the resolver to the old relative default
+      fails 2 of the 4. ⚠️ Leftover: an orphaned `data/activity.log` (core's old
+      `<dataDir>` location) may exist on instances created before this — nothing
+      reads it now; delete or merge it by hand.
+
+      Original report: `AuditLogger`'s constructor defaulted to the **relative**
       `dataDir = '.system-data'` (`core/src/audit/audit-logger.ts:54`), so
       `path.join` resolves it against the working directory at write time. Five
       API route modules construct it with **no argument at module scope** —
@@ -1349,10 +1370,7 @@ pass closed elsewhere, in two places it did not reach.
       the checkout.** A full suite run appended 2204 entries to this repo's own
       `.system-data/activity.log` — including one whose payload points at
       `/tmp/api-test-…/data/.civic/org-config.yml`, i.e. the audited object was
-      in a temp instance while the audit record went to the repo. Fix: resolve
-      from `getInstanceContext().systemDataDir` and stop defaulting to a
-      relative path; then decide which of the three locations is canonical and
-      migrate.
+      in a temp instance while the audit record went to the repo.
 
 - [ ] **The signing-secret writer runs after teardown and can strand a
       `secrets.yml` anywhere.** `cleanupAPITestContext` deletes its temp root

@@ -1,5 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import { getInstanceContext } from '../config/instance-context.js';
 import { coreError } from '../utils/core-output.js';
 
 export type ActivityOutcome = 'success' | 'failure';
@@ -33,10 +34,33 @@ export interface ActivityLogEntry {
 
 /**
  * Minimal append-only JSONL audit logger for high-level actions.
- * Writes to .system-data/activity.log by default.
+ *
+ * Writes to `<systemDataDir>/activity.log` — the instance's system-state
+ * directory, alongside the database and secrets.
+ *
+ * ## Why the path is resolved lazily
+ *
+ * This used to default to the RELATIVE string `'.system-data'`, joined in the
+ * constructor, so the destination was `<process.cwd()>/.system-data/activity.log`
+ * — fixed at construction time, from whatever directory the process happened to
+ * start in. Five API route modules build one at module scope
+ * (`routes/config.ts`, `routes/notifications.ts`, `routes/audit.ts`,
+ * `routes/records/handlers-common.ts`, `routes/users/handlers-common.ts`), i.e.
+ * at import time, long before any instance context is installed. An eagerly
+ * computed path can therefore never be right for them. Resolving per use means
+ * the log always follows the instance that is actually current.
+ *
+ * That default also disagreed with core, which passed `{ dataDir: config.dataDir }`
+ * and so wrote `<dataDir>/activity.log` — a third location. All three now agree
+ * on `<systemDataDir>/activity.log`, which is where the bulk of the trail
+ * already lived (the API's cwd default landed there whenever the process was
+ * started from the instance root, which is the normal case and the one the
+ * Docker image arranges). See docs/backlog/2026-07-post-audit-hardening.md.
  */
 export class AuditLogger {
-  private readonly logPath: string;
+  /** Explicit destination directory; when unset the instance context decides. */
+  private readonly dir?: string;
+  private readonly fileName: string;
   private readonly maxEntries: number;
   // FA-CORE-004: track dropped audit writes so an invisible gap in the
   // trust/transparency trail (full disk, permissions) is observable rather
@@ -45,16 +69,32 @@ export class AuditLogger {
   private readonly failFast: boolean;
 
   constructor(options?: {
-    dataDir?: string;
+    /**
+     * Directory to write the log into. Omit it — the instance context is the
+     * right answer for every production caller. Deliberately NOT named
+     * `dataDir`: that name is what led core to pass `config.dataDir` and split
+     * the trail across two files.
+     */
+    dir?: string;
     fileName?: string;
     maxEntries?: number;
     failFast?: boolean;
   }) {
-    const dataDir = options?.dataDir ?? '.system-data';
-    const fileName = options?.fileName ?? 'activity.log';
-    this.logPath = path.join(dataDir, fileName);
+    this.dir = options?.dir;
+    this.fileName = options?.fileName ?? 'activity.log';
     this.maxEntries = options?.maxEntries ?? 10000;
     this.failFast = options?.failFast ?? false;
+  }
+
+  /**
+   * Resolved per use, never cached — see the class comment. An absolute path
+   * from the instance context, so it cannot follow the working directory.
+   */
+  private get logPath(): string {
+    return path.join(
+      this.dir ?? getInstanceContext().systemDataDir,
+      this.fileName
+    );
   }
 
   /** Number of audit entries that failed to persist since construction. */

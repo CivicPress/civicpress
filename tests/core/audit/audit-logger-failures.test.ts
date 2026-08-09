@@ -17,7 +17,7 @@ describe('AuditLogger write-failure accounting (FA-CORE-004)', () => {
   }
 
   it('counts dropped writes without throwing by default', async () => {
-    const logger = new AuditLogger({ dataDir: makeUnwritableDir() });
+    const logger = new AuditLogger({ dir: makeUnwritableDir() });
     expect(logger.getWriteFailureCount()).toBe(0);
 
     await logger.log({ source: 'core', action: 'test:event', outcome: 'success' });
@@ -28,7 +28,7 @@ describe('AuditLogger write-failure accounting (FA-CORE-004)', () => {
 
   it('rethrows on write failure when failFast is set', async () => {
     const logger = new AuditLogger({
-      dataDir: makeUnwritableDir(),
+      dir: makeUnwritableDir(),
       failFast: true,
     });
 
@@ -40,7 +40,7 @@ describe('AuditLogger write-failure accounting (FA-CORE-004)', () => {
 
   it('records nothing failed on a healthy path', async () => {
     const okDir = fs.mkdtempSync(path.join(os.tmpdir(), 'civic-audit-ok-'));
-    const logger = new AuditLogger({ dataDir: okDir });
+    const logger = new AuditLogger({ dir: okDir });
     await logger.log({ source: 'core', action: 'test:event', outcome: 'success' });
     expect(logger.getWriteFailureCount()).toBe(0);
   });

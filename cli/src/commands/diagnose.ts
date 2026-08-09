@@ -94,7 +94,7 @@ export function registerDiagnoseCommand(cli: CAC) {
             searchService: civic.getDatabaseService().getSearchService(),
             configManager: CentralConfigManager,
             logger: civic['logger'] as Logger,
-            auditLogger: new AuditLogger({ dataDir }),
+            auditLogger: new AuditLogger(),
             dataDir,
             cacheManager: civic.getCacheManager(),
           });
@@ -278,7 +278,7 @@ function registerComponentCommands(cli: CAC) {
               searchService: civic.getDatabaseService().getSearchService(),
               configManager: CentralConfigManager,
               logger: civic['logger'] as Logger,
-              auditLogger: new AuditLogger({ dataDir: config.dataDir }),
+              auditLogger: new AuditLogger(),
               dataDir: config.dataDir,
             });
 

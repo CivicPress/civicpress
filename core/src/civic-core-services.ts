@@ -246,9 +246,11 @@ export function registerCivicPressServices(
   // Step 10.5: Register the unified AuditChannel (Phase 2c Task 9 — closes
   // core-001 + core-013). Wraps AuditLogger (file-JSONL, resilient) + DB
   // logAuditEvent (queryable). File-JSONL first; DB second.
-  container.singleton('auditLogger', (c) => {
-    const config = c.resolve<CivicPressConfig>('config');
-    return new AuditLogger({ dataDir: config.dataDir });
+  container.singleton('auditLogger', () => {
+    // No directory argument: the instance context owns that answer. This used
+    // to pass `config.dataDir`, which wrote `<dataDir>/activity.log` while the
+    // API wrote `<cwd>/.system-data/activity.log` — one trail in two files.
+    return new AuditLogger();
   });
   container.singleton('auditChannel', (c) => {
     const db = c.resolve<DatabaseService>('database');

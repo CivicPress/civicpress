@@ -66,7 +66,7 @@ export function createDiagnoseRouter() {
         searchService: civicPress.getDatabaseService().getSearchService(),
         configManager: CentralConfigManager,
         logger: civicPress['logger'] as Logger,
-        auditLogger: new AuditLogger({ dataDir }),
+        auditLogger: new AuditLogger(),
         dataDir,
         cacheManager: civicPress.getCacheManager(),
       });
@@ -229,7 +229,7 @@ export function createDiagnoseRouter() {
           searchService: civicPress.getDatabaseService().getSearchService(),
           configManager: CentralConfigManager,
           logger: civicPress['logger'] as Logger,
-          auditLogger: new AuditLogger({ dataDir }),
+          auditLogger: new AuditLogger(),
           dataDir,
         });
 
@@ -375,7 +375,7 @@ export function createDiagnoseRouter() {
           searchService: civicPress.getDatabaseService().getSearchService(),
           configManager: CentralConfigManager,
           logger: civicPress['logger'] as Logger,
-          auditLogger: new AuditLogger({ dataDir }),
+          auditLogger: new AuditLogger(),
           dataDir,
         });
 

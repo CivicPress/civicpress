@@ -65,6 +65,18 @@ once, instead of independently in a dozen places that each fell back to
   silently fell back to defaults on any migrated instance.
 - **Template base paths, the diagnostics config checker and `civic diagnose`**
   all resolved `.system-data` from the working directory.
+- **The API wrote its audit trail to the working directory.** `AuditLogger`
+  defaulted to the relative `'.system-data'`, joined once in the constructor, so
+  the destination was `<process.cwd()>/.system-data/activity.log` — decided by
+  wherever the process was launched. Five API route modules build one at import
+  time, before any instance exists, so records/users/config/notification audit
+  entries landed outside the instance whenever the server was started from
+  anywhere but its own root. Core meanwhile passed `config.dataDir` and wrote
+  `<dataDir>/activity.log`, a third location, so one trail lived in two files
+  and `GET /api/v1/audit` agreed with the writer only by coincidence. The path
+  is now resolved per use from the instance context, and all three callers
+  converge on `<systemDataDir>/activity.log` — the location that already held
+  the history. An orphaned `data/activity.log` may remain on older instances.
 - **The test suite failed CI while every test passed.** `build-test` exited 1 on
   `Error: [vitest-worker]: Timeout calling "onTaskUpdate"` with 201/201 files
   and 1845/1845 tests green. Vitest's worker↔main RPC has a hard 60s timeout,
