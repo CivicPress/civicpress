@@ -60,6 +60,46 @@ interface ApiRecord {
   isDraft?: boolean;
 }
 
+/**
+ * THE published-only gate. Every anonymous-reachable read of the `records`
+ * table goes through this one function — list, search and summary all did their
+ * own thing before, and that is precisely how the hole stayed open.
+ *
+ * The read paths used to apply no status filter at all, on the stated grounds
+ * that location implies publication: "table location (records table) determines
+ * published state". Nothing enforced it. `RecordStore.createRecord` inserts
+ * `status || 'draft'`, and `IndexingService.syncToDatabase` copies every on-disk
+ * index entry in whatever status it carries — a sync the API runs at startup.
+ * Measured, an anonymous caller got draft, pending_review, approved, rejected,
+ * archived, published and undeclared custom statuses; search returned the draft
+ * bodies and `/summary` published their counts.
+ *
+ * Fail-closed: only statuses whose config says `public: true` are visible, and
+ * naming a non-public status anonymously yields NOTHING rather than falling
+ * through to an unfiltered query. Authenticated callers are untouched here;
+ * per-record permissions still apply above.
+ */
+function statusFilterFor(
+  user: AuthUser | undefined,
+  requestedStatus: string | undefined
+): { visible: 'all' | 'some' | 'nothing'; status: string | undefined } {
+  if (user) return { visible: 'all', status: requestedStatus };
+
+  const publicStatuses = CentralConfigManager.getPublicRecordStatuses();
+  const requested = requestedStatus
+    ? requestedStatus
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean)
+    : null;
+  const allowed = requested
+    ? requested.filter((s) => publicStatuses.includes(s))
+    : publicStatuses;
+
+  if (allowed.length === 0) return { visible: 'nothing', status: undefined };
+  return { visible: 'some', status: allowed.join(',') };
+}
+
 export interface RecordsListingDeps {
   civicPress: CivicPress;
   recordManager: RecordManager;
@@ -236,47 +276,18 @@ export class RecordsListing {
     // Calculate offset from page number (page is 1-based)
     const offset = (page - 1) * limit;
 
-    // PUBLISHED-ONLY GATE for anonymous callers.
-    //
-    // This path used to apply no status filter at all, on the stated grounds
-    // that "table location determines published state" — every record in
-    // `records` is published by definition. Nothing enforced that:
-    // `RecordStore.createRecord` inserts `status || 'draft'` and
-    // `IndexingService.syncToDatabase` copies every on-disk index entry in
-    // whatever status it has. Inserting rows directly and asking anonymously
-    // returned draft, pending_review, archived, published AND an unknown
-    // custom status — all of them.
-    //
-    // So the gate is on status, and it is fail-closed: only statuses that
-    // declare `public: true` are visible. An authenticated caller is
-    // unaffected; per-record permissions still apply above this.
-    let effectiveStatus = status;
-    if (!user) {
-      const publicStatuses = CentralConfigManager.getPublicRecordStatuses();
-      const requested = status
-        ? status
-            .split(',')
-            .map((s) => s.trim())
-            .filter(Boolean)
-        : null;
-      const allowed = requested
-        ? requested.filter((s) => publicStatuses.includes(s))
-        : publicStatuses;
-
-      // Asking only for non-public statuses anonymously is an empty result,
-      // not an unfiltered one — never fall through to "no filter".
-      if (allowed.length === 0) {
-        return {
-          records: [],
-          totalCount: 0,
-          currentPage: page,
-          totalPages: 0,
-          pageSize: limit,
-          sort,
-        };
-      }
-      effectiveStatus = allowed.join(',');
+    const gate = statusFilterFor(user, status);
+    if (gate.visible === 'nothing') {
+      return {
+        records: [],
+        totalCount: 0,
+        currentPage: page,
+        totalPages: 0,
+        pageSize: limit,
+        sort,
+      };
     }
+    const effectiveStatus = gate.status;
 
     // Get records from the record manager with pagination and sorting
     // Sort is now handled at database level with kind priority
@@ -410,11 +421,26 @@ export class RecordsListing {
     // Calculate offset from page number (page is 1-based)
     const offset = (page - 1) * limit;
 
+    // Search is a read of the same corpus, so it takes the same gate. Before
+    // this it returned unpublished records in FULL to anonymous callers —
+    // strictly worse than the list, which at least only leaked what it listed.
+    const gate = statusFilterFor(user, status);
+    if (gate.visible === 'nothing') {
+      return {
+        records: [],
+        totalCount: 0,
+        currentPage: page,
+        totalPages: 0,
+        pageSize: limit,
+        sort,
+      };
+    }
+
     // Get search results with proper pagination and sorting
     // Sort is now handled at database level with kind priority
     const result = await this.deps.recordManager.searchRecords(query, {
       type,
-      status,
+      status: gate.status,
       limit: limit,
       offset: offset,
       sort: sort,
@@ -514,13 +540,29 @@ export class RecordsListing {
   /**
    * Get aggregate record summary
    */
-  async getRecordSummary(filters: { type?: string; status?: string }): Promise<{
+  async getRecordSummary(
+    filters: { type?: string; status?: string },
+    user?: AuthUser
+  ): Promise<{
     total: number;
     types: Record<string, number>;
     statuses: Record<string, number>;
   }> {
     const db = this.deps.civicPress.getDatabaseService();
-    const { whereClause, params } = buildFilterClause(filters || {});
+
+    // Aggregates are a disclosure too: this endpoint published a per-status
+    // histogram, so an anonymous caller could read "3 drafts, 1 pending_review"
+    // straight off the public API — the count and existence of unpublished work
+    // without its content.
+    const gate = statusFilterFor(user, filters?.status);
+    if (gate.visible === 'nothing') {
+      return { total: 0, types: {}, statuses: {} };
+    }
+
+    const { whereClause, params } = buildFilterClause({
+      ...(filters || {}),
+      status: gate.status,
+    });
 
     const typeRows = await db.query<{ type?: string; count: number }>(
       `SELECT type, COUNT(*) as count FROM records ${whereClause} GROUP BY type`,

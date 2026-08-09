@@ -1503,9 +1503,31 @@ not caused by it.
       authenticated caller, because its subject is SQL filtering, not
       visibility.
 
-      ⚠️ **Not covered, deliberately:** `GET /records/summary` still aggregates
-      counts across all statuses for anonymous callers (counts only, no
-      content), and the search endpoint was not audited. Both are follow-ups.
+      **Both follow-ups CLOSED same day (2026-08-09).**
+
+      - **`GET /search` was the worst of the read paths** — it returned
+        unpublished records **in full** to anonymous callers, not merely their
+        existence. Gated.
+      - **`GET /records/summary`** published a per-status histogram, so
+        "3 drafts, 1 pending_review" was readable straight off the public API —
+        the count and existence of unpublished work. Gated. Like
+        `/linked-records` it had **no auth middleware**, so it also needed
+        `optionalAuth` or authenticated callers would have been gated as
+        anonymous.
+      - All three read paths now share ONE function, `statusFilterFor(user,
+        status)` in `records-service/listing.ts`. List, search and summary each
+        reasoned about visibility independently before, which is exactly how the
+        hole stayed open; there is now a single place to get it wrong.
+
+      ⚠️ **A latent bug this surfaced, worth remembering.** The gate expresses
+      "any publicly-visible status" as a comma-separated LIST, but three SQL
+      builders accepted only a bare `status = ?` — `search/sqlite/sql-builder.ts`,
+      `search/sqlite/facets.ts` and the LIKE fallback in `record-store.ts`. The
+      list path had supported `IN (...)` for years; search never did. So the
+      first version of this fix made public search return **nothing at all**
+      rather than a filtered set — caught by probing the endpoint, not by the
+      suite, which had no test for public search content. All three now parse a
+      list the same way `type` already did.
 
 Still open from the plan's own list, unchanged: the device `--enroll`
 signing-key registration, the three metadata representations, and the

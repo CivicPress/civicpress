@@ -8,10 +8,7 @@ import type {
   DatabaseAdapter,
   SqlParam,
 } from '../../database/database-adapter.js';
-import type {
-  SearchOptions,
-  SearchFacets,
-} from '../search-service.js';
+import type { SearchOptions, SearchFacets } from '../search-service.js';
 import { parseSearchQuery, buildFTS5Query } from '../query-parser.js';
 
 interface FacetRow {
@@ -51,9 +48,22 @@ export async function getFacets(
     }
   }
 
+  // Comma-separated, matching sql-builder.ts — facet counts must be computed
+  // over the same rows the results come from, or an anonymous caller sees
+  // facet counts for records the gate is withholding.
   if (status) {
-    baseWhereClause += ' AND r.status = ?';
-    params.push(status);
+    const statusFilters = status
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (statusFilters.length === 1) {
+      baseWhereClause += ' AND r.status = ?';
+      params.push(statusFilters[0]);
+    } else if (statusFilters.length > 1) {
+      const placeholders = statusFilters.map(() => '?').join(',');
+      baseWhereClause += ` AND r.status IN (${placeholders})`;
+      params.push(...statusFilters);
+    }
   }
 
   const typeQuery = `

@@ -139,6 +139,50 @@ describe('public reads are gated on status, not on table location', () => {
     expect(published.status).toBe(200);
   });
 
+  it('search does not return unpublished records', async () => {
+    // Search was the worst of the read paths: it returned unpublished records
+    // in FULL to anonymous callers, not merely their existence.
+    const res = await request(context.api.getApp()).get(
+      '/api/v1/search?q=Gate&limit=200'
+    );
+    expect(res.status).toBe(200);
+
+    const records = res.body?.data?.records ?? res.body?.data?.results ?? [];
+    const publicStatuses = CentralConfigManager.getPublicRecordStatuses();
+    const seen = records
+      .filter((r: { id?: string }) => String(r.id).startsWith('gate-'))
+      .map((r: { status?: string }) => r.status);
+
+    expect(seen.length).toBeGreaterThan(0); // ...but public search still works
+    expect(seen.filter((s: string) => !publicStatuses.includes(s))).toEqual([]);
+  });
+
+  it('the summary histogram does not count unpublished records', async () => {
+    // Aggregates disclose too: this published a per-status histogram, so
+    // "3 drafts, 1 pending_review" was readable straight off the public API.
+    const res = await request(context.api.getApp()).get(
+      '/api/v1/records/summary'
+    );
+    expect(res.status).toBe(200);
+
+    const statuses = res.body?.data?.statuses ?? {};
+    const publicStatuses = CentralConfigManager.getPublicRecordStatuses();
+    expect(
+      Object.keys(statuses).filter((s) => !publicStatuses.includes(s))
+    ).toEqual([]);
+    expect(Object.keys(statuses)).toContain('published');
+  });
+
+  it('an authenticated caller still sees the whole summary', async () => {
+    const res = await request(context.api.getApp())
+      .get('/api/v1/records/summary')
+      .set('Authorization', `Bearer ${context.adminToken}`);
+    expect(res.status).toBe(200);
+
+    const statuses = res.body?.data?.statuses ?? {};
+    expect(Object.keys(statuses)).toContain('draft');
+  });
+
   it('an authenticated caller is unaffected', async () => {
     const res = await request(context.api.getApp())
       .get('/api/v1/records?limit=200')

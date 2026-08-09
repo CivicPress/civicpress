@@ -98,7 +98,8 @@ searchRouter.get(
         query as string,
         {
           type: type as string,
-          // No status filter - table location (records table) determines published state
+          // No status filter here: RecordsService applies the public-status
+          // gate for anonymous callers and leaves authenticated ones alone.
           limit: pageSize,
           page: currentPage,
           sort: (sort as string) || 'relevance', // Default to relevance for search

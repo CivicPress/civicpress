@@ -212,9 +212,23 @@ export class RecordStore {
       }
     }
 
+    // Comma-separated, like `type` above and like the FTS builder. A bare
+    // equality here would make the LIKE fallback disagree with FTS about what a
+    // status LIST means — and the fallback runs exactly when the search service
+    // is down, i.e. when nobody is watching.
     if (options?.status) {
-      sql += ' AND r.status = ?';
-      params.push(options.status);
+      const statusFilters = options.status
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
+      if (statusFilters.length === 1) {
+        sql += ' AND r.status = ?';
+        params.push(statusFilters[0]);
+      } else if (statusFilters.length > 1) {
+        const placeholders = statusFilters.map(() => '?').join(',');
+        sql += ` AND r.status IN (${placeholders})`;
+        params.push(...statusFilters);
+      }
     }
 
     // Count ALL matches before the window narrows the query. Captured here,

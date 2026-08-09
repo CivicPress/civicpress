@@ -65,6 +65,18 @@ named gaps. **Stub/Planned**: advertised but not yet functional.
   `--no-emoji`; `FA-API-019` CSRF non-session-binding). A follow-up sweep
   audited the five deferred carry-forward surfaces (no live vulnerabilities
   found) and applied Low defense-in-depth hardening.
+- **Found after that audit, and fixed (2026-08-09):** anonymous API reads were
+  not gated on publication at all. The read paths decided visibility by which
+  table a row was in, an invariant asserted in comments and enforced nowhere, so
+  a caller with no credentials could list unpublished records, fetch one by id
+  in full, read its frontmatter and markdown body, search its contents, and read
+  a per-status histogram of how many existed. Publication is now a property of
+  the record's **status** (`public: true`, fail-closed) and every anonymous read
+  path goes through one gate. Two of those endpoints — `/records/summary` and
+  `/geography/:id/linked-records` — turned out to carry no authentication
+  middleware whatsoever. Nothing was deployed publicly at the time. This was not
+  an `FA-*` finding; it was found by inspecting what a test run left on disk and
+  then probing the endpoints directly.
 - **Supply chain:** osv-scanner (PR diff-gate + weekly) and CodeQL SAST
   (report-only) run in CI; dependency advisories were remediated 94 → 2 (the
   residual two are a brace-expansion DoS not reachable from the request
