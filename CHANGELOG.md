@@ -65,6 +65,17 @@ once, instead of independently in a dozen places that each fell back to
   silently fell back to defaults on any migrated instance.
 - **Template base paths, the diagnostics config checker and `civic diagnose`**
   all resolved `.system-data` from the working directory.
+- **The secrets manager kept writing to the previous instance.**
+  `SecretsManager` is a process-wide singleton, and it resolved its
+  `secrets.yml` path once in the constructor from the first caller's `dataDir` —
+  so `getInstance()` silently ignored the location every later caller asked for.
+  A process that moves between instances therefore read and wrote the wrong
+  one's secret, and when that directory no longer existed it was **re-created**
+  to hold a freshly minted key: a signing secret persisted outside the lifecycle
+  of any live instance (1186 stray directories in the test suite, each holding
+  nothing but `.system-data/secrets.yml`). The path now resolves per use,
+  `getInstance()` re-points to the instance actually requested, and the cached
+  root secret and derived keys are dropped with it rather than carried across.
 - **The API wrote its audit trail to the working directory.** `AuditLogger`
   defaulted to the relative `'.system-data'`, joined once in the constructor, so
   the destination was `<process.cwd()>/.system-data/activity.log` — decided by

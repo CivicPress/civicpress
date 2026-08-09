@@ -1372,18 +1372,56 @@ pass closed elsewhere, in two places it did not reach.
       `/tmp/api-test-…/data/.civic/org-config.yml`, i.e. the audited object was
       in a temp instance while the audit record went to the repo.
 
-- [ ] **The signing-secret writer runs after teardown and can strand a
-      `secrets.yml` anywhere.** `cleanupAPITestContext` deletes its temp root
-      correctly, yet 1186 `/tmp/api-test-*` directories had accumulated since
-      2026-07-20 (~125–240 per full-suite day, 442 MB total) containing
-      **nothing but `.system-data/secrets.yml`** — proof the tree was removed
-      and then re-created by a lazy secret write racing the API shutdown. The
-      same writer is why a stale `modules/realtime/.system-data/secrets.yml`
-      (2025-12-22) sits in a module directory where no instance lives. Not a
-      disclosure risk on its own — these are ephemeral dev/test secrets — but a
-      process that mints and persists a signing secret outside the instance
-      lifecycle should not be able to create an instance directory as a side
-      effect. Temp dirs cleared 2026-08-09; the writer is unfixed.
+- [x] **The signing-secret writer runs after teardown and can strand a
+      `secrets.yml` anywhere.** **FIXED 2026-08-09.** `cleanupAPITestContext`
+      deletes its temp root correctly, yet 1186 `/tmp/api-test-*` directories
+      had accumulated since 2026-07-20 (~125–240 per full-suite day, 442 MB
+      total) containing **nothing but `.system-data/secrets.yml`**.
+
+      Cause — the same shape as the `AuditLogger` item above.
+      `SecretsManager` is a process-wide singleton that computed
+      `secretsFilePath` **once, in the constructor**, from the FIRST caller's
+      `dataDir`; `getInstance(otherDataDir)` then silently ignored its arguments
+      forever after. So from the second API test onward, `initialize()` looked
+      for the secret at the FIRST test's path, found nothing (that tree had been
+      deleted), generated a fresh secret, and `generateAndSaveSecret`'s
+      `mkdir(recursive)` **re-created the deleted directory** to hold it. Not a
+      race with shutdown as first supposed — a stale pointer. It also means
+      every test after the first was signing with a secret belonging to a
+      different instance.
+
+      Two more strays had the same root. `/tmp/.system-data/` (secrets.yml +
+      storage/, 2026-07-20) came from `tests/core/security/secrets.test.ts`
+      passing a bare temp dir as `dataDir`: `resolveSystemDataDir` takes
+      `dirname(dataDir)` as the root, so the root was the shared `/tmp`. And
+      `modules/realtime/.system-data/secrets.yml` (2025-12-22) is the same
+      writer landing wherever the resolution pointed.
+
+      Fix: `secretsFilePath` resolves **per use**, and `getInstance` actually
+      re-points to the requested location, dropping the cached root secret and
+      derived keys with it (they belonged to the previous instance). Added
+      `SecretsManager.resetInstance()` to replace the
+      `(SecretsManager as any).instance = undefined` reach-in the tests were
+      using, and pointed the secrets tests at `<tempDir>/data` so their
+      generated secrets land inside what they clean up. Pinned by
+      `tests/core/security/secrets-instance-scoping.test.ts` (4 tests),
+      negative-controlled: making `repointTo` a no-op — the old behavior — fails
+      2 of the 4, including the cross-instance key leak.
+
+      Measured after the fix: a full suite run writes **no `secrets.yml`
+      anywhere under `/tmp`** (`find /tmp -maxdepth 3 -name secrets.yml
+      -newermt <run start>` → empty), against ~125–240 stranded per run before.
+      All three strays cleared 2026-08-09.
+
+- [ ] **Residual (small, different cause):** the same measured run still left
+      **one** stray temp directory — `/tmp/civicpress-test-XXXXXX` containing an
+      **empty** `.system-data`, so nothing secret is written into it any more.
+      The `civicpress-test-` mkdtemp prefix belongs to
+      `core/src/di/test-utils.ts`,
+      `core/src/di/__tests__/civicpress-integration.test.ts` and
+      `cli/src/commands/__tests__/diagnose.test.ts`; one of them creates the
+      directory and does not remove it on teardown. One directory per full run
+      rather than hundreds, and no secret material — worth tidying, not urgent.
 
 The rest of this section is carried over from
 `docs/plans/2026-08-08-contributor-devx-and-hardening.md` (now closed) so it
