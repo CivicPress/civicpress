@@ -1423,6 +1423,33 @@ pass closed elsewhere, in two places it did not reach.
       directory and does not remove it on teardown. One directory per full run
       rather than hundreds, and no secret material — worth tidying, not urgent.
 
+- [ ] **e2e fixtures pass a bare tmpdir as `dataDir`, so their instance root
+      becomes the SHARED `/tmp`.** Found 2026-08-09 by noticing `/tmp/.system-data`
+      had reappeared after being cleared. **Test-only — not a production
+      defect:** `resolveSystemDataDir` derives the root as `dirname(dataDir)`
+      only as a fallback for a config built directly, never through
+      `CentralConfigManager`, so a real `.civicrc`-backed instance is unaffected.
+
+      The pattern is `testDir = mkdtemp(os.tmpdir(), 'bb-…')` followed by
+      `new CivicPress({ dataDir: testDir })`. `dirname(testDir)` is `/tmp`, so
+      `systemDataDir` resolves to **`/tmp/.system-data`** — shared by every test
+      and every concurrent run on the machine, and outside the temp directory
+      the test cleans up. Observed there: a `secrets.yml` and a populated
+      `storage/recordings_raw/` full of `.mp4` fixtures. The tests clearly do not
+      intend this — several of them go on to reference
+      `path.join(testDir, '.system-data', 'test.db')` explicitly, so the fixture
+      and the resolver disagree about where the instance root is.
+
+      Affects `tests/broadcast-box/backfill-e2e.test.ts`,
+      `device-to-worker-e2e.test.ts`, `broadcast-box-mount-e2e.test.ts`,
+      `redaction-e2e.test.ts`, `tests/core/merge-capture.test.ts`,
+      `tests/transcription/transcription-e2e.test.ts` and
+      `tests/realtime/harness.ts`. Fix is `dataDir: join(testDir, 'data')` (and
+      move the `records/` seeding under it) so the root is `testDir` and system
+      state lands inside what teardown removes. Per-file verification needed —
+      each seeds its own tree — which is why it was recorded rather than done in
+      the same pass. Strays cleared 2026-08-09.
+
 The rest of this section is carried over from
 `docs/plans/2026-08-08-contributor-devx-and-hardening.md` (now closed) so it
 stays discoverable. Those items are **pre-existing** — surfaced by that work,
