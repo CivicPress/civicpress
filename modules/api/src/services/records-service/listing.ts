@@ -6,6 +6,7 @@ import {
   userCan,
   DatabaseService,
   Logger,
+  CentralConfigManager,
 } from '@civicpress/core';
 import type { AuthUser, RecordRow } from '@civicpress/core';
 import { normalizeDateString, buildFilterClause } from './helpers.js';
@@ -235,11 +236,53 @@ export class RecordsListing {
     // Calculate offset from page number (page is 1-based)
     const offset = (page - 1) * limit;
 
+    // PUBLISHED-ONLY GATE for anonymous callers.
+    //
+    // This path used to apply no status filter at all, on the stated grounds
+    // that "table location determines published state" — every record in
+    // `records` is published by definition. Nothing enforced that:
+    // `RecordStore.createRecord` inserts `status || 'draft'` and
+    // `IndexingService.syncToDatabase` copies every on-disk index entry in
+    // whatever status it has. Inserting rows directly and asking anonymously
+    // returned draft, pending_review, archived, published AND an unknown
+    // custom status — all of them.
+    //
+    // So the gate is on status, and it is fail-closed: only statuses that
+    // declare `public: true` are visible. An authenticated caller is
+    // unaffected; per-record permissions still apply above this.
+    let effectiveStatus = status;
+    if (!user) {
+      const publicStatuses = CentralConfigManager.getPublicRecordStatuses();
+      const requested = status
+        ? status
+            .split(',')
+            .map((s) => s.trim())
+            .filter(Boolean)
+        : null;
+      const allowed = requested
+        ? requested.filter((s) => publicStatuses.includes(s))
+        : publicStatuses;
+
+      // Asking only for non-public statuses anonymously is an empty result,
+      // not an unfiltered one — never fall through to "no filter".
+      if (allowed.length === 0) {
+        return {
+          records: [],
+          totalCount: 0,
+          currentPage: page,
+          totalPages: 0,
+          pageSize: limit,
+          sort,
+        };
+      }
+      effectiveStatus = allowed.join(',');
+    }
+
     // Get records from the record manager with pagination and sorting
     // Sort is now handled at database level with kind priority
     const result = await this.deps.recordManager.listRecords({
       type,
-      status,
+      status: effectiveStatus,
       limit: limit,
       offset: offset,
       sort: sort,
@@ -292,9 +335,12 @@ export class RecordsListing {
         }
       } catch (error) {
         // If permission check fails, skip draft checking silently
-        this.deps.logger.warn('Failed to check drafts for unpublished changes', {
-          error: error instanceof Error ? error.message : String(error),
-        });
+        this.deps.logger.warn(
+          'Failed to check drafts for unpublished changes',
+          {
+            error: error instanceof Error ? error.message : String(error),
+          }
+        );
       }
     }
 
@@ -419,9 +465,12 @@ export class RecordsListing {
         }
       } catch (error) {
         // If permission check fails, skip draft checking silently
-        this.deps.logger.warn('Failed to check drafts for unpublished changes', {
-          error: error instanceof Error ? error.message : String(error),
-        });
+        this.deps.logger.warn(
+          'Failed to check drafts for unpublished changes',
+          {
+            error: error instanceof Error ? error.message : String(error),
+          }
+        );
       }
     }
 

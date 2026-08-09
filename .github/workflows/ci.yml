@@ -26,6 +26,15 @@ on:
   push:
     branches:
       - main
+      # `develop` is the integration branch: everything lands here first and
+      # only later goes to main as a release PR. Without this trigger a branch
+      # could merge into develop and never see the heavy suite in a clean
+      # environment, which is exactly what happened on 2026-08-08 — a red
+      # `build-test` sat on develop unnoticed for a day (an unhandled
+      # worker-RPC error), and separately a test asserting on the gitignored
+      # `.civicrc` was green locally and would only have failed on a clean
+      # clone. `gh workflow run ci.yml --ref develop` was the manual stopgap.
+      - develop
       - 'renovate/**'
   workflow_dispatch:
 

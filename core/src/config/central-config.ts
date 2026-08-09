@@ -763,6 +763,23 @@ export class CentralConfigManager {
   }
 
   /**
+   * The statuses an ANONYMOUS reader is allowed to see.
+   *
+   * Fail-closed: a status is public only if its config says `public: true`.
+   * Read paths must gate on this rather than on where a row happens to live —
+   * `records` was documented as "published by definition", but
+   * `RecordStore.createRecord` defaults a row to `status: 'draft'` and
+   * `IndexingService.syncToDatabase` copies every on-disk entry in regardless
+   * of status, so nothing actually held that invariant up.
+   */
+  static getPublicRecordStatuses(): string[] {
+    const recordStatuses = this.getRecordStatusesConfig();
+    return Object.entries(recordStatuses)
+      .filter(([, status]) => status.public === true)
+      .map(([key]) => key);
+  }
+
+  /**
    * Reset cached configuration (useful for testing). Clears the memoized
    * instance context too — leaving it behind would let a test that relocates
    * the instance keep resolving paths against the previous root.

@@ -65,6 +65,22 @@ once, instead of independently in a dozen places that each fell back to
   silently fell back to defaults on any migrated instance.
 - **Template base paths, the diagnostics config checker and `civic diagnose`**
   all resolved `.system-data` from the working directory.
+- **Anonymous readers could see unpublished records.** The public read path
+  applied no status filter, on the stated grounds that location implies
+  publication — everything in the `records` table is published "by definition".
+  Nothing enforced that: `RecordStore.createRecord` inserts `status || 'draft'`
+  and the indexer syncs every on-disk entry in whatever status it carries. In
+  practice an anonymous caller listing records received every status present —
+  draft, pending_review, approved, rejected included — `GET /records/<id>`
+  returned an unpublished record in full, `/records/<id>/frontmatter` served its
+  entire markdown body, and `/geography/:id/linked-records` had no
+  authentication on it at all. Visibility is now a property of the status:
+  `RecordStatusConfig` gains `public`, defaulting to **not public**, with
+  `published`, `archived` and `expired` declared public; every anonymous read
+  path is gated on that set, and an unpublished record answers 404 rather than
+  403 so its existence is not disclosed either. Authenticated callers are
+  unaffected. **Municipalities running a custom `record_statuses_config` should
+  confirm which of their statuses need `public: true`.**
 - **The secrets manager kept writing to the previous instance.**
   `SecretsManager` is a process-wide singleton, and it resolved its
   `secrets.yml` path once in the constructor from the first caller's `dataDir` —

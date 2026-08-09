@@ -565,7 +565,14 @@ export class RecordStore {
   async listRecords(
     options: {
       type?: string;
-      status?: string; // Deprecated: All records in this table are published by definition
+      /**
+       * Optional status filter. NOT deprecated, and NOT redundant: this table
+       * is not published-only. `createRecord` inserts `status || 'draft'` and
+       * the indexer syncs every on-disk entry whatever its status, so callers
+       * serving anonymous readers MUST pass the publicly-visible set (the API
+       * does this in RecordsService.listRecords).
+       */
+      status?: string;
       /** Page size, or `'all'` for the complete set. Defaults to `'all'`. */
       limit?: number | 'all';
       offset?: number;
@@ -599,8 +606,8 @@ export class RecordStore {
       }
     }
 
-    // Status filter is deprecated - all records in records table are published by definition
-    // Keeping for backward compatibility, but it's ignored for published endpoints
+    // Status filter. See the option's doc comment: the records table is not
+    // published-only, so this is the mechanism the public read path relies on.
     if (options.status) {
       const statusFilters = options.status.split(',').map((s) => s.trim());
       if (statusFilters.length === 1) {

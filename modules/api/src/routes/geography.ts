@@ -15,7 +15,11 @@ import {
   applyGeographyPreset,
 } from '@civicpress/core';
 import type { GeographyCategory, GeographyFileType } from '@civicpress/core';
-import { AuthenticatedRequest, requirePermission } from '../middleware/auth.js';
+import {
+  AuthenticatedRequest,
+  requirePermission,
+  optionalAuth,
+} from '../middleware/auth.js';
 import { handleApiError, logApiSuccess } from '../utils/api-logger.js';
 import type { RecordsService } from '../services/records-service.js';
 
@@ -471,6 +475,13 @@ export function createGeographyRouter(
     param('id').isString().notEmpty().withMessage('Invalid geography ID'),
     query('page').optional().isInt({ min: 1 }).toInt(),
     query('limit').optional().isInt({ min: 1, max: 100 }).toInt(),
+    // This route carried no auth middleware at all, so `req.user` was always
+    // undefined and every caller — signed in or not — got the unfiltered
+    // corpus. It needs optionalAuth for two reasons: so an anonymous caller is
+    // correctly gated to public statuses by RecordsService, and so an
+    // authenticated one still sees what they are entitled to instead of being
+    // gated as anonymous.
+    optionalAuth(recordsService.getCivicPress()),
     async (req: AuthenticatedRequest, res: Response) => {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
@@ -498,11 +509,14 @@ export function createGeographyRouter(
         // Only the requested page is ever materialized, and `total` /
         // `totalPages` come from that same filtered COUNT — so the numbers mean
         // exactly what they meant after the Tier-C fix.
-        const result = await recordsService.listRecords({
-          page,
-          limit,
-          linkedGeographyId: id,
-        });
+        const result = await recordsService.listRecords(
+          {
+            page,
+            limit,
+            linkedGeographyId: id,
+          },
+          req.user
+        );
 
         handleSuccess(
           'get_linked_records',

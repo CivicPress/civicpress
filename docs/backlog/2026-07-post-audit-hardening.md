@@ -1448,19 +1448,65 @@ not caused by it.
       is flaky on the dev VM (parallel DB/auth races), so the standing advice is
       `--no-verify` — which means the hook gates nothing. This was Phase 2b's
       third bullet and is the one part not done.
-- [ ] **`ci.yml` (`build-test`) does not run on pushes to `develop`** — only on
+- [x] **`ci.yml` (`build-test`) does not run on pushes to `develop`** — only on
       PRs, pushes to `main`, and `renovate/**`. So a branch can land on
       `develop` without the heavy suite ever running in a clean environment.
       That is exactly where the 2026-08-08 pass's one CI-only failure would have
-      hidden (a test asserting on the gitignored `.civicrc`, green locally).
-      Either add `develop` to the push triggers or make the develop→main PR the
-      explicit gate. Workaround for now: `gh workflow run ci.yml --ref develop`.
+      hidden (a test asserting on the gitignored `.civicrc`, green locally), and
+      it is why the red `build-test` of 2026-08-08 sat unnoticed for a day.
+      **FIXED 2026-08-09:** `develop` added to the push triggers. The manual
+      stopgap (`gh workflow run ci.yml --ref develop`) is no longer required.
 - [ ] **`resolveModulesDir` precedence is exclusive** — a `modules/` directory
       beside the data root hides every installed-code module rather than
       merging. Intended (it preserves the dev/Docker layout) but sharp; revisit
       if instance-local modules become a real use case.
 
-Still open from the plan's own list, unchanged: the **published-only gate**
-(public reads return anything _indexed_, not `status=published`), the device
-`--enroll` signing-key registration, the three metadata representations, and the
+- [x] **🔴 The published-only gate — public reads were not gated at all.**
+      **FIXED 2026-08-09.** The read path decided visibility by LOCATION:
+      `read-handlers.ts` said "No status filter - table location (records table)
+      determines published state" and `RecordStore.listRecords` agreed ("all
+      records in records table are published by definition"). Nothing enforced
+      it — `RecordStore.createRecord` inserts `status || 'draft'`, and
+      `IndexingService.syncToDatabase` copies every on-disk index entry in
+      whatever status it carries (a sync the API runs at startup).
+
+      **Measured, not inferred.** Inserting one row per status and asking as an
+      anonymous caller returned **every one of them** — draft, pending_review,
+      under_review, approved, rejected, published, archived, and a custom status
+      nobody declared. `GET /api/v1/records/<draft-id>` answered **200 with the
+      full body**, and `/:id/frontmatter` served the frontmatter plus the entire
+      markdown body. `GET /geography/:id/linked-records` had **no auth
+      middleware at all**, so `req.user` was never populated and it returned the
+      unfiltered corpus to everyone.
+
+      Fix — visibility is now a property of the STATUS, fail-closed:
+
+      - `RecordStatusConfig` gains `public?: boolean`; absent means not public,
+        so a municipality's custom status ("in_camera", "legal_hold") cannot
+        become world-readable by omission. `published`, `archived` and `expired`
+        are the declared-public defaults — a repealed bylaw stays part of the
+        public record. `mergeRecordStatuses` carries `public` across an override
+        so re-labelling `published` cannot silently blank a public site.
+      - `CentralConfigManager.getPublicRecordStatuses()` is the one authority.
+      - `RecordsService.listRecords` gates any caller with no user; asking for a
+        non-public status by name yields an empty result rather than falling
+        through to "no filter". `getFrontmatterYaml` and the by-id read gate
+        too (404, not 403 — whether an unpublished record exists at an id is
+        not public either). `/linked-records` got `optionalAuth` so anonymous
+        callers are gated while authenticated ones keep their view.
+
+      Pinned by `tests/api/public-published-only.test.ts` (6 tests) which drives
+      the read path with a row in every status, so it holds regardless of which
+      writers exist. ⚠️ The one test that changed,
+      `tests/integration/pagination-sql-side.test.ts`, called the service with
+      no user while seeding `adopted`/`draft` fixtures — it now lists as an
+      authenticated caller, because its subject is SQL filtering, not
+      visibility.
+
+      ⚠️ **Not covered, deliberately:** `GET /records/summary` still aggregates
+      counts across all statuses for anonymous callers (counts only, no
+      content), and the search endpoint was not audited. Both are follow-ups.
+
+Still open from the plan's own list, unchanged: the device `--enroll`
+signing-key registration, the three metadata representations, and the
 core↔storage circular build dep.
