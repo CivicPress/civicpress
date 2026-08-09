@@ -8,7 +8,8 @@ import {
   afterAll,
   vi,
 } from 'vitest';
-import { execSync } from 'child_process';
+import { exec, execSync } from 'child_process';
+import { promisify } from 'util';
 import { join, dirname } from 'path';
 import {
   existsSync,
@@ -28,6 +29,18 @@ import {
   setInstanceContext,
   resolveInstanceContext,
 } from '@civicpress/core';
+
+/**
+ * Awaited subprocess execution, for fixtures that are already `async`.
+ *
+ * `execSync` blocks the vitest worker's event loop for the whole subprocess;
+ * `exec` yields it. Fixtures that spawn the CLI use this so the worker can
+ * service its RPC channel between tests (see createCLITestContext).
+ */
+const execAsync = promisify(exec);
+
+/** `exec` buffers output in memory; the CLI's `--json` payloads can be large. */
+const EXEC_MAX_BUFFER = 32 * 1024 * 1024;
 
 // Test configuration
 export interface TestConfig {
@@ -1408,18 +1421,31 @@ export async function createCLITestContext(): Promise<CLITestContext> {
   // Ensure CLI is built before executing commands
   ensureCliBuilt();
 
-  // Initialize CivicPress
-  execSync(`cd ${config.testDir} && node ${TEST_CONFIG.CLI_PATH} init --yes`, {
-    stdio: 'pipe',
-  });
+  // AWAITED, not execSync — and that matters far beyond style. Each of these
+  // spawns a whole `node cli/dist/index.js`, and `execSync` blocks the vitest
+  // worker's event loop for the entire subprocess. Every `await` in a CLI test
+  // between here and the next real I/O resolves from cache, which only drains
+  // MICROTASKS: the loop never reaches its poll phase, so the worker cannot read
+  // the main process's replies on the IPC channel. Vitest's worker→main
+  // `onTaskUpdate` RPC has a hard 60s birpc timeout, so a file that spends a
+  // minute of uninterrupted synchronous subprocess time fails the whole run with
+  // `[vitest-worker]: Timeout calling "onTaskUpdate"` while every test passes.
+  // These two awaits are the per-test event-loop turn that keeps that from
+  // happening — they replace the `await simpleGit().init()` that used to sit
+  // here and, incidentally, was the only thing yielding. See
+  // docs/backlog/2026-07-post-audit-hardening.md.
+  await execAsync(
+    `cd ${config.testDir} && node ${TEST_CONFIG.CLI_PATH} init --yes`,
+    { maxBuffer: EXEC_MAX_BUFFER }
+  );
 
   // Create admin user using simulated authentication (for testing)
   let adminToken: string | undefined;
   try {
     // Use simulated authentication for admin user
-    const authResult = execSync(
+    const { stdout: authResult } = await execAsync(
       `cd ${config.testDir} && node ${TEST_CONFIG.CLI_PATH} auth:simulated --username testadmin --role admin --json`,
-      { encoding: 'utf8' }
+      { encoding: 'utf8', maxBuffer: EXEC_MAX_BUFFER }
     );
 
     // Extract JSON from the output using the helper function

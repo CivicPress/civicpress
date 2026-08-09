@@ -61,8 +61,9 @@ export default defineConfig({
         minThreads: 1,
       },
     },
-    // Also reduce how many test files run concurrently
-    fileParallelism: 2,
+    // `fileParallelism` is a BOOLEAN — it only says whether files may run in
+    // parallel, never how many. The real cap here is `maxThreads: 2` above.
+    fileParallelism: true,
 
     environment: 'happy-dom',
     setupFiles: ['./tests/ui/setup.ts'],

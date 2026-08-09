@@ -65,6 +65,20 @@ once, instead of independently in a dozen places that each fell back to
   silently fell back to defaults on any migrated instance.
 - **Template base paths, the diagnostics config checker and `civic diagnose`**
   all resolved `.system-data` from the working directory.
+- **The test suite failed CI while every test passed.** `build-test` exited 1 on
+  `Error: [vitest-worker]: Timeout calling "onTaskUpdate"` with 201/201 files
+  and 1845/1845 tests green. Vitest's worker↔main RPC has a hard 60s timeout,
+  and a worker can only read the reply when its event loop reaches the poll
+  phase. CLI tests drive the product through `execSync`, which blocks the loop
+  for the whole subprocess, and the `await`s in between resolve from cache —
+  draining only microtasks, never advancing the loop. `tests/cli/users.test.ts`
+  ran 44s on an idle machine, and 64s under contention, as one unbroken block;
+  the reply sat unread in the channel until the expired timer fired ahead of it.
+  Introduced here, by replacing this pass's `await simpleGit().init()` (a real
+  async child process, and the only thing yielding the loop per `beforeEach`)
+  with a synchronous `execSync('git init')`. The CLI fixture now awaits its
+  subprocesses, and a global setup hook gives every test one real event-loop
+  turn, bounding the worst-case block to a single test's synchronous work.
 
 ### Changed
 

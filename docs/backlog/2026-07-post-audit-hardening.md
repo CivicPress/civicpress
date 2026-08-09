@@ -1255,27 +1255,71 @@ they are pre-existing gaps the audit made visible.
 
 ## Discovered during the 2026-08-08 InstanceContext / DevX pass
 
-- [ ] **🔴 BLOCKING — `develop` CI is red: vitest exits 1 on an unhandled worker
+- [x] **🔴 BLOCKING — `develop` CI is red: vitest exits 1 on an unhandled worker
       error.** `[vitest-worker]: Timeout calling "onTaskUpdate"`, raised inside
       vitest's own worker↔main RPC layer (no CivicPress frame in the stack).
       **All 201 test files and 1845 tests PASS** — vitest counts the unhandled
       error as a run failure, so the process exits 1 and `build-test` goes red.
       Reproduced on two consecutive CI runs of `efe7559`
-      (`gh run     31283421555`) and in ~3 of 4 local full-suite runs.
-      **Regression, not pre-existing:** the last full CI before this work (PR
-      #31, 2026-08-07) had zero unhandled errors. Not yet attributed to a
-      specific commit or test file — with `fileParallelism: 2` the stalled
-      worker is not necessarily the file that last reported, so this needs a
-      bisect across the 14 commits. ⚠️ **Watch out when measuring:**
+      (`gh run     31283421555`) and in ~3 of 4 local full-suite runs. **FIXED
+      2026-08-09.** Root cause, measured rather than bisected — an
+      event-loop-lag probe in the main process and in every worker, plus per-RPC
+      timing:
+
+      Vitest's worker↔main RPC (birpc) puts a hard **60s** timeout on every
+      round trip, and `onTaskUpdate` is one. A worker can only read the reply
+      when its event loop reaches the **poll** phase. CLI tests drive the
+      product with `execSync('node cli/dist/index.js …')`, which blocks the loop
+      for the whole subprocess, and the `await`s between those calls resolve
+      from an already-warm cache — awaiting a settled promise drains only the
+      **microtask** queue and never advances the loop to timers or poll. So an
+      all-synchronous test file runs start to finish without one loop turn.
+      `tests/cli/users.test.ts` measured a **single continuous 44.0s block on an
+      idle machine and 64.2s under full-suite contention** — the only block in
+      the entire suite over 60s, matching the single error exactly. Meanwhile
+      the main process's worst block was **0.0s** across 2020 task updates: the
+      reply had arrived long before and simply sat unread, and when the worker
+      came up for air Node ran the timers phase _before_ the poll phase, so the
+      expired timeout fired ahead of the delivered response.
+
+      **Why it was a regression:** this batch replaced
+      `await simpleGit(dir).init()` in `createCLITestContext` with
+      `createTestInstance()`'s synchronous `execSync('git init')`. That await
+      was a real async child process — the one thing per `beforeEach` that
+      yielded the loop. Removing it merged the fixture's two `node cli` spawns
+      and the whole file's `execSync` calls into one unbroken synchronous run.
+
+      **Fix (two layers):** `createCLITestContext` now `await`s its CLI
+      subprocesses via `promisify(exec)` instead of `execSync`; and
+      `tests/fixtures/event-loop-yield.ts` (a global `setupFiles` hook) gives
+      every test one genuine `setImmediate` turn, which bounds the worst-case
+      block to a single test's synchronous work and covers files like
+      `tests/cli/sync.test.ts` that spawn the CLI from their own `beforeEach`
+      rather than through the shared fixture. After the fix no worker block in
+      the full suite exceeds 3s. ⚠️ **Watch out when measuring:**
       `npx vitest … | tail` reports _tail's_ exit code, which is how this stayed
-      hidden — always capture vitest's own `$?`. Do NOT paper over it with
-      `dangerouslyIgnoreUnhandledErrors`; that would mask real unhandled errors
+      hidden — always capture vitest's own `$?`. Not papered over with
+      `dangerouslyIgnoreUnhandledErrors`, which would mask real unhandled errors
       too.
-- [ ] **Stale rationale in `vitest.config.mjs`.** `pool: 'forks'` is justified
+
+- [x] **Stale rationale in `vitest.config.mjs`.** `pool: 'forks'` was justified
       by a comment saying it is needed "for API tests that use
-      `process.chdir()`". That chdir was removed on 2026-08-08 (from both the
-      API and the fixtures), so the stated reason no longer holds. Re-evaluate
-      the pool choice — plausibly relevant to the RPC-timeout item above.
+      `process.chdir()`". **Re-evaluated 2026-08-09: keep forks.** The premise
+      was wrong — `process.chdir()` was removed from the API fixtures but is
+      still called by `tests/cli/sync.test.ts`,
+      `tests/core/config-discovery.test.ts` and `test-setup.ts`'s cleanup, and
+      it is simply unavailable in worker threads. Switching pools would also not
+      have helped the RPC-timeout item above: a blocked thread cannot read its
+      MessagePort any more than a blocked fork can read its IPC channel. Comment
+      corrected to the real reason.
+
+- [x] **`fileParallelism: 2` was a no-op** (found while investigating the
+      above). `fileParallelism` is a **boolean**; any truthy value just means
+      "run files in parallel", so the documented two-file cap never applied and
+      the suite has always run at the pool default of
+      `availableParallelism() - 1` forks. Left at the default deliberately —
+      that is what CI has actually been exercising — with the config comment
+      corrected and `maxWorkers` named as the knob for a real cap.
 
 The rest of this section is carried over from
 `docs/plans/2026-08-08-contributor-devx-and-hardening.md` (now closed) so it

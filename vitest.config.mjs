@@ -19,21 +19,32 @@ export default defineConfig({
     // Rebuild core/cli dist iff their source is newer (see the file) — keeps
     // CLI-subprocess tests from silently running stale compiled code.
     globalSetup: ['./tests/global-setup.mjs'],
-    // Limit how many worker processes Vitest uses
-    // Use forks instead of threads for API tests that use process.chdir()
-    // Limited to prevent CPU overload when debugging tests
+    // Gives every test one real event-loop turn. Read the file before removing
+    // it — without it an all-`execSync` test file blocks its worker past the
+    // 60s birpc deadline on `onTaskUpdate` and fails the run with an unhandled
+    // error while every test passes.
+    setupFiles: ['./tests/fixtures/event-loop-yield.ts'],
+    // forks, not threads: `process.chdir()` throws ERR_WORKER_UNSUPPORTED_OPERATION
+    // in a worker thread, and tests/cli/sync.test.ts,
+    // tests/core/config-discovery.test.ts and test-setup.ts's cleanup still call
+    // it. (The 2026-08-08 pass removed chdir from the API and its fixtures, not
+    // from the suite.) Switching pools would also not have helped the RPC-timeout
+    // bug above — a blocked thread cannot read its MessagePort any more than a
+    // blocked fork can read its IPC channel.
     pool: 'forks',
     poolOptions: {
       forks: {
         singleFork: false,
-        // Limit concurrent forks to prevent CPU overload
         isolate: true,
       },
     },
-    // Limit concurrent test file processes to prevent CPU overload.
-    // (Single value; previous duplicate `fileParallelism: 1` + `: 2`
-    // produced a "Duplicate key" warning every test run.)
-    fileParallelism: 2,
+    // NOTE: `fileParallelism` is a BOOLEAN. This was `fileParallelism: 2` for a
+    // long time under a comment claiming it capped concurrency at two files; it
+    // never did — any truthy value just means "run files in parallel", so the
+    // suite has always run at the pool default of `availableParallelism() - 1`
+    // forks. Left at the default deliberately (that is what CI has been
+    // exercising); use `maxWorkers` if a real cap is ever wanted.
+    fileParallelism: true,
     alias: {
       // Resolve @civicpress/core to the built dist — the SAME single copy the
       // broadcast-box / transcription / realtime modules resolve (they require
