@@ -1424,11 +1424,12 @@ pass closed elsewhere, in two places it did not reach.
       rather than hundreds, and no secret material — worth tidying, not urgent.
 
 - [ ] **e2e fixtures pass a bare tmpdir as `dataDir`, so their instance root
-      becomes the SHARED `/tmp`.** Found 2026-08-09 by noticing `/tmp/.system-data`
-      had reappeared after being cleared. **Test-only — not a production
-      defect:** `resolveSystemDataDir` derives the root as `dirname(dataDir)`
-      only as a fallback for a config built directly, never through
-      `CentralConfigManager`, so a real `.civicrc`-backed instance is unaffected.
+      becomes the SHARED `/tmp`.** Found 2026-08-09 by noticing
+      `/tmp/.system-data` had reappeared after being cleared. **Test-only — not
+      a production defect:** `resolveSystemDataDir` derives the root as
+      `dirname(dataDir)` only as a fallback for a config built directly, never
+      through `CentralConfigManager`, so a real `.civicrc`-backed instance is
+      unaffected.
 
       The pattern is `testDir = mkdtemp(os.tmpdir(), 'bb-…')` followed by
       `new CivicPress({ dataDir: testDir })`. `dirname(testDir)` is `/tmp`, so
