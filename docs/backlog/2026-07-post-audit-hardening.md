@@ -1321,6 +1321,52 @@ they are pre-existing gaps the audit made visible.
       that is what CI has actually been exercising — with the config comment
       corrected and `maxWorkers` named as the knob for a real cap.
 
+## Discovered during the 2026-08-09 post-fix housekeeping
+
+Both found by inspecting what a full test run leaves behind on disk. Neither is
+caused by the CI fix; both are the same cwd-resolution class the InstanceContext
+pass closed elsewhere, in two places it did not reach.
+
+- [ ] **🔴 The API writes its audit trail to `process.cwd()`, not to the
+      instance.** `AuditLogger`'s constructor defaults to the **relative**
+      `dataDir = '.system-data'` (`core/src/audit/audit-logger.ts:54`), so
+      `path.join` resolves it against the working directory at write time. Five
+      API route modules construct it with **no argument at module scope** —
+      `routes/config.ts:15`, `routes/notifications.ts:12`, `routes/audit.ts:7`,
+      `routes/records/handlers-common.ts:6`, `routes/users/handlers-common.ts:3`
+      — so records/users/config/notification audit entries land in
+      `<cwd>/.system-data/activity.log`. This is the transparency trail, so it
+      matters more than the notification-config equivalent already fixed.
+
+      Two consequences, both observed. (1) **The trail is split in two.** Core
+      builds the logger correctly but as `{ dataDir: config.dataDir }`
+      (`civic-core-services.ts:251`), which writes `<dataDir>/activity.log` —
+      note `dataDir`, not `systemDataDir`, so that is a _third_ location. The
+      API routes write `<cwd>/.system-data/activity.log`. `GET /api/v1/audit`
+      reads the cwd one, so the two agree only by coincidence when cwd happens
+      to be the instance root (true in the Docker image, WORKDIR `/instance`;
+      false for `civic serve` started from anywhere else). (2) **Tests pollute
+      the checkout.** A full suite run appended 2204 entries to this repo's own
+      `.system-data/activity.log` — including one whose payload points at
+      `/tmp/api-test-…/data/.civic/org-config.yml`, i.e. the audited object was
+      in a temp instance while the audit record went to the repo. Fix: resolve
+      from `getInstanceContext().systemDataDir` and stop defaulting to a
+      relative path; then decide which of the three locations is canonical and
+      migrate.
+
+- [ ] **The signing-secret writer runs after teardown and can strand a
+      `secrets.yml` anywhere.** `cleanupAPITestContext` deletes its temp root
+      correctly, yet 1186 `/tmp/api-test-*` directories had accumulated since
+      2026-07-20 (~125–240 per full-suite day, 442 MB total) containing
+      **nothing but `.system-data/secrets.yml`** — proof the tree was removed
+      and then re-created by a lazy secret write racing the API shutdown. The
+      same writer is why a stale `modules/realtime/.system-data/secrets.yml`
+      (2025-12-22) sits in a module directory where no instance lives. Not a
+      disclosure risk on its own — these are ephemeral dev/test secrets — but a
+      process that mints and persists a signing secret outside the instance
+      lifecycle should not be able to create an instance directory as a side
+      effect. Temp dirs cleared 2026-08-09; the writer is unfixed.
+
 The rest of this section is carried over from
 `docs/plans/2026-08-08-contributor-devx-and-hardening.md` (now closed) so it
 stays discoverable. Those items are **pre-existing** — surfaced by that work,
