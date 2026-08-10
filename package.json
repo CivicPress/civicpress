@@ -99,7 +99,8 @@
   },
   "lint-staged": {
     "*.{ts,tsx,js,jsx,vue}": [
-      "prettier --write"
+      "prettier --write",
+      "node scripts/lint-staged-eslint.mjs"
     ],
     "*.{json,yml,yaml}": [
       "prettier --write"

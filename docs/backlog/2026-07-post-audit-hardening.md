@@ -107,11 +107,12 @@ dropped (reason inline)
       2026-08-10 during a close-out audit; verified 2026-08-10 that `v0.3.0` is
       now present both locally and on the remote, pointing at the candidate
       commit named below (`dd487eb`). The release provenance between v0.2.1 and
-      v0.3.1 is no longer broken. Original entry follows. `CHANGELOG.md` carries a full `## [0.3.0] - 2026-08-04`
-      section and the release commit `b38b636 chore(release): v0.3.0` is on
-      `main`, but no `v0.3.0` tag exists locally or on the remote — every other
-      release has one, so `git checkout v0.3.0` fails and there is a hole in the
-      release provenance between v0.2.1 and v0.3.1.
+      v0.3.1 is no longer broken. Original entry follows. `CHANGELOG.md` carries
+      a full `## [0.3.0] - 2026-08-04` section and the release commit
+      `b38b636 chore(release): v0.3.0` is on `main`, but no `v0.3.0` tag exists
+      locally or on the remote — every other release has one, so
+      `git checkout v0.3.0` fails and there is a hole in the release provenance
+      between v0.2.1 and v0.3.1.
 
       Candidate commit: **`dd487eb`** (`Merge pull request #28 from
       CivicPress/develop`). That follows this repo's own convention — `v0.3.1`
@@ -1135,7 +1136,7 @@ surfaced these **real** (non-doc) findings — captured here so they become
 tracked work rather than getting lost. None are regressions from recent work;
 they are pre-existing gaps the audit made visible.
 
-**Correctness / truthfulness (worth fixing)**
+### Correctness / truthfulness (worth fixing)
 
 - [x] **Notifications mis-report SMTP failures as success.**
       `NotificationService` ignores `ChannelResponse.success`
@@ -1163,7 +1164,7 @@ they are pre-existing gaps the audit made visible.
       registered, so those 4 are silently skipped — 1 of 5 default hooks does
       real work.
 
-**CI / test-coverage gaps**
+### CI / test-coverage gaps
 
 - [x] **Realtime module unit suite (13 files, ~5,200 LoC) does not run in CI.**
       `modules/realtime/src/**/__tests__` is not in the root vitest `include`
@@ -1257,7 +1258,7 @@ they are pre-existing gaps the audit made visible.
   - Storage suite now 204 green (was 166); `tsc --noEmit` + eslint clean. The UI
     page-component/composable gap above remains open.
 
-**UI rough edges (quick)**
+### UI rough edges (quick)
 
 - [x] `ConfigurationField.vue:19` ships a debug artifact —
       `<pre class="…bg-amber-200">{{ fieldType }} ??</pre>` on every structured
@@ -1292,7 +1293,7 @@ they are pre-existing gaps the audit made visible.
       operator notification center, and CLI. On `origin/develop`
       (`7f7ef4d`→`8795802`).
 
-**Advertised-but-stub (honesty — either implement or stop advertising)**
+### Advertised-but-stub (honesty — either implement or stop advertising)
 
 - [x] Geography **KML / GPX / Shapefile** appear in every API/UI/CLI type enum
       but `createGeographyFile` throws "not yet implemented" — GeoJSON is the
@@ -1304,7 +1305,7 @@ they are pre-existing gaps the audit made visible.
       have no loader and no JS sandbox — spec-only (`docs/specs/workflows.md` is
       unimplemented design).
 
-**Dead-code cleanup (low)**
+### Dead-code cleanup (low)
 
 - [x] **Storage failover / retry / metrics — DELETED 2026-07-30.** Even deader
       than described: the wiring setters (`setRetryManager` /
@@ -1691,11 +1692,12 @@ not caused by it.
       frontmatter is the authority for its own number, a number assigned during
       sync would live only in the database and vanish on the next re-index, and
       validating there would fail the sync of any corpus predating these rules.
+
 - [x] **A caller-supplied `metadata.document_number` bypasses numbering. FIXED
       2026-08-10.** It was stored with no uniqueness check —
       `DocumentNumberGenerator.validate()` existed but had **zero call sites**,
-      and the base record schema declares `document_number` with no pattern.
-      A supplied number is now checked against the type's configured format
+      and the base record schema declares `document_number` with no pattern. A
+      supplied number is now checked against the type's configured format
       (`ValidationError`) and claimed for uniqueness (`ConflictError`).
 
       ⚠️ `validate()` was itself broken for the case it would first be used in:
@@ -1708,6 +1710,7 @@ not caused by it.
       Only LEGAL types are policed. A non-legal type has no configured format
       to be judged against (`getFormat` would answer `DOC`), so a
       locally-meaningful identifier on a meeting record is left alone.
+
 - [x] **Document-number assignment is a read-then-write race. FIXED
       2026-08-10.** Two concurrent creates of the same type/year could be issued
       the same number — no lock, and no uniqueness constraint on the column,
@@ -1727,10 +1730,63 @@ not caused by it.
       read-then-write shape makes both concurrency tests fail — 12 parallel
       creates all receive `BYL-2026-001` — and reverting the
       `createRecordWithId` fix fails 3 of the 5 publish-path tests.
-- [ ] **Make the pre-commit hook a fast, reliable subset.** The full-suite hook
-      is flaky on the dev VM (parallel DB/auth races), so the standing advice is
-      `--no-verify` — which means the hook gates nothing. This was Phase 2b's
-      third bullet and is the one part not done.
+
+- [x] **Make the pre-commit hook a fast, reliable subset. DONE 2026-08-10.** The
+      full-suite hook was flaky on the dev VM (parallel DB/auth races), so the
+      standing advice became `--no-verify` — which meant the hook gated nothing.
+      This was Phase 2b's third bullet.
+
+      ⚠️ **This entry was half-stale, which is worth knowing before trusting the
+      next one.** The hook had ALREADY been slimmed to `lint-staged` +
+      `registry:check` (by the Tier-A CI commit, which says so in passing). What
+      was actually missing was the gate that catches something: `lint-staged`
+      ran **Prettier only**, so no lint error could ever fail a commit —
+      including `@typescript-eslint/no-explicit-any`, which is an **error** in
+      `core`/`cli` `src`.
+
+      **What landed:** ESLint over staged JS/TS/Vue, via
+      `scripts/lint-staged-eslint.mjs`. ESLint is installed per package with a
+      per-package `eslint.config.cjs` (the root `lint` script fans out with
+      `pnpm -r --filter … exec eslint .`), so a staged set spanning several
+      packages cannot be linted by one invocation. The script groups staged
+      files by owning package and runs each package's own binary on its share.
+      Ownership is DISCOVERED — walk up to the nearest directory having both an
+      `eslint.config.*` and an installed `eslint` — rather than matched against
+      a hard-coded package list, so a new package is linted the day it exists.
+      Files under no such directory are skipped with a printed note, because a
+      silent skip reads as "this passed lint".
+
+      Warnings do not block; errors do. That matches CI (0 errors required, 8
+      known warnings).
+
+      **Measured, end to end:** a file with two `no-explicit-any` errors is
+      REFUSED (verified `HEAD` did not move), and a real clean commit through
+      the full hook takes **1.9s** — `registry:check` alone is 0.23s, ESLint on
+      two files ~1.4s.
+
+      ⚠️ **Tests and `tsc` are deliberately NOT in the hook.** Tests need a
+      database and built `dist`; a sound typecheck is whole-program and needs
+      sibling packages built. Both fail on a fresh clone for reasons unrelated
+      to the commit — the identical trap that produced the `--no-verify` habit
+      in the first place. Contract now written down in `CONTRIBUTING.md`.
+
+      ⚠️ Note for this multi-worktree VM: `lint-staged` takes its own backup via
+      **`git stash`**, and the stash stack is shared across worktrees. It
+      creates and drops its own entry automatically, but see
+      [[civicpress-precommit-suite-flaky]] before running concurrent commits.
+
+      ⚠️ **Found by the new hook blocking this very commit — the markdown half
+      was ALREADY a `--no-verify` generator.** `markdownlint --fix` has been in
+      `lint-staged` all along, and it fails on any pre-existing violation in a
+      file you touch, whether or not your edit caused it and whether or not
+      `--fix` can repair it. Editing THIS tracker was impossible without
+      `--no-verify`: five `MD036` (emphasis-used-as-heading) violations at lines
+      1138–1307, none auto-fixable, none anywhere near a line being changed.
+      Fixed properly here — those five labels are now real `###` headings, so
+      they reach the document outline too — but the general shape remains: **a
+      per-file linter will always be able to block you for somebody else's
+      debt.** Worth watching; if it bites again, the answer is to fix the
+      offending file rather than to loosen the hook.
 
 - [ ] **`pnpm lint` reports 8 warnings, and they should be left alone until
       someone checks the unbuilt case.** 0 errors, so CI is green. Seven are
@@ -1756,15 +1812,31 @@ not caused by it.
       it is why the red `build-test` of 2026-08-08 sat unnoticed for a day.
       **FIXED 2026-08-09:** `develop` added to the push triggers. The manual
       stopgap (`gh workflow run ci.yml --ref develop`) is no longer required.
-- [ ] **Which types get numbered is a hard-coded list, not the config.**
-      Surfaced 2026-08-10 while unifying the three numbering call sites, and
-      deliberately left alone. `LEGAL_RECORD_TYPES` (bylaw, ordinance, policy,
-      proclamation, resolution) is what triggers numbering — so a municipality
-      that configures `document_number_formats` for some OTHER type gets a
-      format that is never used, with no error saying so. The natural fix is to
-      union the list with the configured formats, but that changes which
-      records in a legal register receive citable identities, which is a
-      decision for a maintainer rather than a side effect of a refactor.
+- [x] **Which types get numbered is a hard-coded list, not the config. FIXED
+      2026-08-10 — maintainer chose the union.** Surfaced the same day while
+      unifying the three numbering call sites, and deliberately left open then:
+      `LEGAL_RECORD_TYPES` (bylaw, ordinance, policy, proclamation, resolution)
+      was what triggered numbering, so an instance configuring
+      `document_number_formats` for some OTHER type got a format that was never
+      used, with no error saying so.
+
+      Put to a maintainer as three options — leave hard-coded / union with the
+      configured formats / warn but don't number — and **the union was chosen**.
+      `isNumberedRecordType` is now "a built-in legal type OR a type with a
+      configured format": writing the format down is how you ask for numbering.
+
+      ⚠️ **Behaviour change on upgrade** for any instance already configuring a
+      format for a non-legal type — those records begin receiving numbers at
+      their next create. Nothing backfills, so such a type starts its sequence
+      at 001 from the day of the upgrade rather than renumbering its history.
+
+      A format entry only counts if it has a usable prefix: `getFormat` copies
+      `prefix` straight through, so honouring a malformed entry would mint
+      `undefined-2026-001` — a citable identity built from a typo. Config
+      access stays non-fatal (matching `getFormat`), so an unreadable config
+      leaves the built-in types numbering as they always did instead of failing
+      every record creation on the instance.
+
 - [ ] **`resolveModulesDir` precedence is exclusive** — a `modules/` directory
       beside the data root hides every installed-code module rather than
       merging. Intended (it preserves the dev/Docker layout) but sharp; revisit

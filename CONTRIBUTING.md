@@ -74,7 +74,7 @@ A few useful resources to consult before contributing:
 - Roadmap and direction: [docs/roadmap.md](docs/roadmap.md)
 - Project status and current implementation:
   [docs/project-status.md](docs/project-status.md)
-- Public interest and participation form: https://tally.so/r/wAYBvN
+- Public interest and participation form: <https://tally.so/r/wAYBvN>
 
 These documents will give you a clear sense of the goals, priorities, and
 expectations for CivicPress.
@@ -149,6 +149,30 @@ docs: update contributing guide
 fix: resolve null error in records-service
 refactor: simplify indexing logic
 ```
+
+## The Pre-Commit Hook
+
+A Husky `pre-commit` hook runs on every commit. It is deliberately small — a
+couple of seconds, and nothing that needs a database, a network, or built
+output:
+
+- **lint-staged** — Prettier (and markdownlint on `.md`) over the staged files,
+  then ESLint over the staged JS/TS/Vue. Each file is linted by the package that
+  owns it, since ESLint is installed per package rather than at the root. Lint
+  **errors** block the commit; warnings do not.
+- **`pnpm registry:check`** — catches duplicate CLI commands, endpoints, or
+  components (~0.2s).
+
+Tests and `tsc` are **not** in the hook, on purpose. Tests need a database and
+built `dist` output; a whole-program typecheck needs sibling packages built.
+Either one fails on a fresh clone for reasons that have nothing to do with your
+commit, and a hook that cries wolf is a hook everyone bypasses — which is
+exactly what happened to the previous full-suite version. CI runs the full suite
+on every pull request and on pushes to `develop` and `main`.
+
+`git commit --no-verify` should not be routine. If you find yourself reaching
+for it, the hook has regressed into something too slow or too flaky — please
+report that rather than routing around it.
 
 ## Pull Requests
 
