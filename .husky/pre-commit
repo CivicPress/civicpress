@@ -1,10 +1,30 @@
 #!/usr/bin/env sh
 . "$(dirname -- "$0")/_/husky.sh"
 
-# Keep this hook fast and deterministic: formatting + the cheap registry
-# invariant only. Build + full test suite moved to CI (.github/workflows/
-# ci.yml) — the old full-suite hook was flaky on parallel DB/auth races and
-# trained everyone to commit with --no-verify, which gated nothing.
+# Fast and deterministic, by design. The old full-suite hook was flaky on
+# parallel DB/auth races, so the standing advice became `--no-verify` — and a
+# hook everyone bypasses gates nothing. Everything here is under a few seconds
+# and depends on nothing but the checked-out files: no database, no network,
+# no build output.
+#
+# What runs:
+#   lint-staged     prettier/markdownlint on staged files, then ESLint on the
+#                   staged JS/TS/Vue via scripts/lint-staged-eslint.mjs (each
+#                   file linted by the package that owns it). Errors block the
+#                   commit; the 8 known warnings do not.
+#   registry:check  duplicate CLI commands / endpoints / components (~0.2s).
+#
+# What deliberately does NOT run, so the hook stays trustworthy:
+#   tests      even a targeted slice needs a database and built dist output;
+#              that is precisely the flakiness that trained the bypass. CI
+#              runs the full suite on every PR and on pushes to develop/main.
+#   tsc        a sound typecheck is whole-program, not per-file, and it needs
+#              sibling packages BUILT — on a fresh clone or after a dependency
+#              change it fails for reasons that have nothing to do with the
+#              commit. Same trap: a hook that cries wolf gets bypassed.
+#
+# If you find yourself reaching for --no-verify, the hook has regressed into
+# something too slow or too flaky. Fix the hook rather than routing around it.
 
 pnpm exec lint-staged
 pnpm run registry:check

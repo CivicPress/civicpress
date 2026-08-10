@@ -41,8 +41,8 @@ publicly while these were open.
   format-aware matcher, so legal numbering continues from what has actually been
   issued.
 - **A `document_numbers` reservation table**, and one authority
-  (`resolveDocumentNumber`) that every record-creating path now goes through.
-  A number is CLAIMED — insert against a PRIMARY KEY — before the record row
+  (`resolveDocumentNumber`) that every record-creating path now goes through. A
+  number is CLAIMED — insert against a PRIMARY KEY — before the record row
   exists, which is what makes it safe under concurrency; the sequence is read
   from issued numbers and reservations together, so a database predating the
   table needs no backfill. Saga compensation hands a number back rather than
@@ -77,8 +77,8 @@ publicly while these were open.
 - **Document-number assignment was a read-then-write race.** Two concurrent
   creates of the same type and year computed the same next sequence and both
   kept it — nothing locked, and with the number inside the metadata JSON there
-  is no column to constrain. Reservation closes it; pinned by a concurrency
-  test that fails against the old shape.
+  is no column to constrain. Reservation closes it; pinned by a concurrency test
+  that fails against the old shape.
 - **The orphaned-file cleaner could delete the wrong tree.** It resolved a
   relative local provider path against the literal `.system-data` — i.e.
   `process.cwd()` — so when run from anywhere but the instance root it scanned a
@@ -211,6 +211,28 @@ publicly while these were open.
 
 ### Changed
 
+- **Configuring a `document_number_format` now enables numbering for that
+  type.** Which types got an official number was a hard-coded list, so an
+  instance could define a perfectly good format for `meeting` or `permit` and
+  never see a single number issued, with nothing saying why. It is now the
+  built-in legal types OR any type with a configured format — writing the format
+  down is how you ask for numbering. ⚠️ **Behaviour change on upgrade:** an
+  instance already configuring a format for a non-legal type starts issuing
+  numbers for it at the next create. Nothing backfills, so that type's sequence
+  begins at 001 from the upgrade rather than renumbering its history. A format
+  entry is ignored unless it has a usable prefix, since honouring a malformed
+  one would mint `undefined-2026-001`.
+- **The pre-commit hook actually gates something now.** It ran Prettier and the
+  registry check — no lint — so no lint error could fail a commit, including
+  `no-explicit-any`, which is an _error_ in `core`/`cli` source. ESLint now runs
+  over staged JS/TS/Vue through `scripts/lint-staged-eslint.mjs`, which groups
+  staged files by owning package (ESLint is installed per package, so one
+  invocation cannot cover a spanning change) and discovers ownership by walking
+  up to the nearest `eslint.config.*` rather than a hard-coded list. Errors
+  block, warnings do not, and a clean commit through the whole hook takes ~2s.
+  Tests and `tsc` stay out deliberately — both need built output and fail on a
+  fresh clone for reasons unrelated to the commit, which is what trained the
+  `--no-verify` habit. Contract documented in `CONTRIBUTING.md`.
 - **Module discovery follows one rule.** Three independent answers to "where are
   the modules?" (the schema builder's fallback, the DI resolver, and the
   storage-module import) are now a single `resolveModulesDir()`. When they
