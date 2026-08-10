@@ -4,7 +4,7 @@
  * in the monorepo `tests/` suite.
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { readFile } from 'node:fs/promises';
 import { Readable } from 'node:stream';
 import {
@@ -66,6 +66,26 @@ const TRANSCRIPT: TranscriptResult = {
   text: 'Bonjour.',
   segments: [{ start: 0, end: 1.2, text: 'Bonjour.' }],
 };
+
+/**
+ * prepareAudio stages the A/V in a temp dir and hands back an AudioRef with a
+ * cleanup(). These tests called it directly and never released the staging, so
+ * each run stranded a directory in os.tmpdir(). Going through this helper also
+ * means the tests exercise the cleanup contract the worker relies on.
+ */
+const stagedRefs: Array<{ cleanup?: () => Promise<void> }> = [];
+
+async function prepare(gw: any, session: any) {
+  const ref = await gw.prepareAudio(session);
+  stagedRefs.push(ref);
+  return ref;
+}
+
+afterEach(async () => {
+  for (const ref of stagedRefs.splice(0)) {
+    await ref.cleanup?.();
+  }
+});
 
 describe('CoreRecordsGateway.findNeedingTranscription', () => {
   it('keeps only sessions with capture.av_file + segments (manifest applied) and no transcript_status', async () => {
@@ -205,7 +225,7 @@ describe('CoreRecordsGateway.prepareAudio', () => {
       },
     });
 
-    const ref = await gw.prepareAudio({ id: 's1', capture: { av_file: 'uuid-x' } });
+    const ref = await prepare(gw, { id: 's1', capture: { av_file: 'uuid-x' } });
 
     expect(await readFile(ref.path, 'utf-8')).toBe('CHUNK-1CHUNK-2');
     expect(getFileContent).not.toHaveBeenCalled();
@@ -220,7 +240,7 @@ describe('CoreRecordsGateway.prepareAudio', () => {
       },
     });
     await expect(
-      gw.prepareAudio({ id: 's1', capture: { av_file: 'gone' } })
+      prepare(gw, { id: 's1', capture: { av_file: 'gone' } })
     ).rejects.toThrow(/not found in storage/);
   });
 
@@ -240,7 +260,7 @@ describe('CoreRecordsGateway.prepareAudio', () => {
       },
     });
     await expect(
-      gw.prepareAudio({ id: 's1', capture: { av_file: 'uuid-x' } })
+      prepare(gw, { id: 's1', capture: { av_file: 'uuid-x' } })
     ).rejects.toThrow(/provider connection reset/);
   });
 
@@ -253,7 +273,7 @@ describe('CoreRecordsGateway.prepareAudio', () => {
         async downloadFileStream() { return Readable.from([Buffer.from('X')]); },
       },
     });
-    const ref = await gw.prepareAudio({
+    const ref = await prepare(gw, {
       id: 's1',
       capture: { av_file: '../../../../etc/passwd' },
     });
@@ -268,7 +288,7 @@ describe('CoreRecordsGateway.prepareAudio', () => {
       records: fakeStore([]).store,
       storage: { async getFileContent() { return bytes; } },
     });
-    const ref = await gw.prepareAudio({ id: 's1', capture: { av_file: 'uuid-x' } });
+    const ref = await prepare(gw, { id: 's1', capture: { av_file: 'uuid-x' } });
     expect(ref.path).toContain('uuid-x');
     expect(await readFile(ref.path)).toEqual(bytes);
   });
@@ -279,7 +299,7 @@ describe('CoreRecordsGateway.prepareAudio', () => {
       storage: { async getFileContent() { return null; } },
     });
     await expect(
-      gw.prepareAudio({ id: 's1', capture: { av_file: 'gone' } })
+      prepare(gw, { id: 's1', capture: { av_file: 'gone' } })
     ).rejects.toThrow(/not found in storage/);
   });
 
@@ -291,7 +311,7 @@ describe('CoreRecordsGateway.prepareAudio', () => {
       records: fakeStore([]).store,
       storage: { async getFileContent() { return bytes; } },
     });
-    const ref = await gw.prepareAudio({
+    const ref = await prepare(gw, {
       id: 's1',
       capture: { av_file: '../../../../etc/passwd' },
     });

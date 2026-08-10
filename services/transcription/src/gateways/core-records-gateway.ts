@@ -336,28 +336,37 @@ export class CoreRecordsGateway implements RecordsGateway {
     // is defended independently.)
     const path = join(dir, basename(uuid)); // raw container; the engine decodes to WAV
 
-    if (storage.downloadFileStream) {
-      const stream = await storage.downloadFileStream(uuid);
-      if (!stream) {
+    // The temp dir exists before anything can fail, and a caller that gets an
+    // exception never receives the AudioRef — so it never receives the
+    // cleanup() either. Release it here on any failure, or a session whose A/V
+    // cannot be fetched strands one empty dir per retry, every cycle, forever.
+    try {
+      if (storage.downloadFileStream) {
+        const stream = await storage.downloadFileStream(uuid);
+        if (!stream) {
+          throw new Error(
+            `A/V ${uuid} for session ${session.id} not found in storage`
+          );
+        }
+        // pipeline() destroys both ends on failure, so a mid-transfer provider
+        // error can't leak an open handle or leave a silently truncated file
+        // that the engine would happily transcribe as a short meeting.
+        await pipeline(stream, createWriteStream(path));
+        return { path, cleanup: () => releaseTempDir(dir) };
+      }
+
+      const buffer = await storage.getFileContent(uuid);
+      if (!buffer) {
         throw new Error(
           `A/V ${uuid} for session ${session.id} not found in storage`
         );
       }
-      // pipeline() destroys both ends on failure, so a mid-transfer provider
-      // error can't leak an open handle or leave a silently truncated file
-      // that the engine would happily transcribe as a short meeting.
-      await pipeline(stream, createWriteStream(path));
+      await writeFile(path, buffer);
       return { path, cleanup: () => releaseTempDir(dir) };
+    } catch (error) {
+      await releaseTempDir(dir);
+      throw error;
     }
-
-    const buffer = await storage.getFileContent(uuid);
-    if (!buffer) {
-      throw new Error(
-        `A/V ${uuid} for session ${session.id} not found in storage`
-      );
-    }
-    await writeFile(path, buffer);
-    return { path, cleanup: () => releaseTempDir(dir) };
   }
 
   /**

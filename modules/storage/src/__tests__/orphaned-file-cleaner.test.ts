@@ -2,7 +2,7 @@
  * Unit Tests for Orphaned File Cleaner
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import type { StorageDatabaseService } from '../types/storage.types.js';
 import { OrphanedFileCleaner } from '../cleanup/orphaned-file-cleaner.js';
 import { Logger } from '@civicpress/core';
@@ -70,6 +70,18 @@ describe('OrphanedFileCleaner', () => {
       null, // azureContainerClient
       mockLogger
     );
+  });
+
+  // Two tests below mkdtemp their own root instead of using testDataDir.
+  const extraDirs: string[] = [];
+
+  afterEach(async () => {
+    // This suite mkdtemp'd a data dir per test and removed none, so every run
+    // left them in os.tmpdir() (60 across the three storage suites).
+    for (const dir of [testDataDir, ...extraDirs.splice(0)]) {
+      if (!dir) continue;
+      await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
+    }
   });
 
   describe('findOrphanedFiles', () => {
@@ -356,6 +368,7 @@ describe('OrphanedFileCleaner', () => {
       const base = await fs.mkdtemp(
         path.join(os.tmpdir(), 'civicpress-orphan-base-')
       );
+      extraDirs.push(base);
       await fs.mkdir(path.join(base, 'storage', 'public'), { recursive: true });
       const orphan = path.join(base, 'storage', 'public', 'stray.txt');
       await fs.writeFile(orphan, 'stray');
@@ -410,6 +423,7 @@ describe('OrphanedFileCleaner', () => {
       const absolute = await fs.mkdtemp(
         path.join(os.tmpdir(), 'civicpress-orphan-abs-')
       );
+      extraDirs.push(absolute);
       await fs.mkdir(path.join(absolute, 'public'), { recursive: true });
 
       const absoluteCleaner = new OrphanedFileCleaner(

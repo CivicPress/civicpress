@@ -1,6 +1,6 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterAll } from 'vitest';
 import { spawnSync } from 'child_process';
-import { mkdtempSync, mkdirSync } from 'fs';
+import { mkdtempSync, mkdirSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
 import { join, resolve } from 'path';
 import { pathToFileURL } from 'url';
@@ -23,8 +23,17 @@ import { pathToFileURL } from 'url';
 describe('ConfigurationService — bundled defaults resolution', () => {
   const coreEntry = resolve(__dirname, '../../core/dist/index.js');
 
+  // Each call mints a foreign cwd; without this they accumulate in os.tmpdir().
+  const foreignCwds: string[] = [];
+  afterAll(() => {
+    for (const dir of foreignCwds.splice(0)) {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   const loadFromForeignCwd = (configType: string) => {
     const cwd = mkdtempSync(join(tmpdir(), 'civic-cfg-cwd-'));
+    foreignCwds.push(cwd);
     const dataPath = join(cwd, 'data', '.civic');
     mkdirSync(dataPath, { recursive: true });
 

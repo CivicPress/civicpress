@@ -1529,6 +1529,28 @@ pass closed elsewhere, in two places it did not reach.
       `/tmp/.system-data` and no stray `secrets.yml`. 204 root files, lint 0
       errors, UI 56, realtime 12, transcription 7, broadcast-box 17, storage 18.
 
+      ⚠️ **Follow-up 2026-08-10 — that "0" was the ROOT suite only, and the
+      module suites had their own litter.** Measuring every suite the way CI
+      runs them found ~88 more directories per full pass: 60 from the three
+      storage fixtures (`orphaned-file-cleaner`, `streaming-operations`,
+      `sidecar-manifest` — none had teardown, and two inline `mkdtemp`s in the
+      first were missed by the first sweep), 20 from
+      `broadcast-box/redaction-worker`, plus `bb-authz` and the newly-merged
+      `config-defaults-resolution`. All now clean up.
+
+      That sweep also surfaced a **third transcription bug**: `prepareAudio`
+      creates its staging dir before the fetch that can fail, and a caller that
+      gets an exception never receives the `AudioRef` — so it never receives the
+      `cleanup()`. A session whose A/V could not be fetched stranded one empty
+      directory **per retry, every cycle, indefinitely**. It now releases the
+      directory itself before rethrowing. Its own tests never noticed because
+      they asserted only on the rejection.
+
+      **Measured end state: 1 directory after ALL suites** — `civicpress-uploads`,
+      the fixed multer staging path created by production code and reused rather
+      than accumulated. Everything else is zero. Lesson recorded: measure module
+      and service suites separately; a root-suite number says nothing about them.
+
 - [x] **e2e fixtures pass a bare tmpdir as `dataDir`, so their instance root
       becomes the SHARED `/tmp`.** **FIXED 2026-08-10.** Found 2026-08-09 by
       noticing `/tmp/.system-data` had reappeared after being cleared.

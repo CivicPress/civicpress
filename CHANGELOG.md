@@ -20,7 +20,9 @@ migration turned up defects well outside it, because each fix exposed the next.
 Most consequential: **anonymous API reads were not gated on publication at all**
 — unpublished records were listable, fetchable in full, searchable and countable
 by a caller with no credentials, and two of those endpoints had no
-authentication middleware on them whatsoever. Also here: a signing secret
+authentication middleware on them whatsoever. In the same vein, **a draft
+record's attachments were fetchable by anyone holding the file's UUID**, because
+editor uploads landed in the `public` folder. Also here: a signing secret
 written outside any live instance, the audit trail written to the working
 directory, every transcription job leaking its multi-GB source recording, and
 the realtime server writing snapshots after shutdown. Nothing was deployed
@@ -83,7 +85,12 @@ publicly while these were open.
   is normal", against a 16 GiB upload cap — was left in `os.tmpdir()` after
   every completed job, filling the disk of a long-running instance one meeting
   at a time. `AudioRef` now carries a `cleanup()` the worker calls in a
-  `finally`, so the staging is released on the failure path too.
+  `finally`, so the staging is released on the failure path too. `prepareAudio`
+  also releases the directory itself when the fetch throws: it creates the
+  staging before anything can fail, and a caller that gets an exception never
+  receives the `AudioRef` — so it never receives the `cleanup()` either. A
+  session whose A/V could not be fetched was stranding one directory per retry,
+  every cycle, indefinitely.
 - **The realtime server could write snapshots after `shutdown()` returned.**
   Three paths escaped teardown: the periodic snapshot pass was fire-and-forget
   so `clearInterval` could not stop one already running; room finalization was
@@ -113,6 +120,21 @@ publicly while these were open.
   existence is not disclosed either. Authenticated callers are unaffected.
   **Municipalities running a custom `record_statuses_config` should confirm
   which of their statuses need `public: true`.**
+- **A draft record's attachments were readable by anyone with the file's UUID.**
+  Editor uploads landed in the `public` storage folder, so an attachment was
+  fetchable from the moment it was uploaded — before the record carrying it was
+  ever published. Simply moving them somewhere private would have broken the
+  opposite case, since citizens must be able to read a published record's
+  attachments anonymously. The record is now the source of truth for its
+  attachments' visibility: uploads land in a new `attachments` folder
+  (`access: authenticated`, unioned into existing `storage.yml` files by
+  `mergeWithDefaults`, so existing instances pick it up), and the single-file
+  read gate serves a file the folder tier would refuse when a **published**
+  record references it — via `attached_files` or as a bare UUID embedded in the
+  Markdown body, which is how a dragged-in image is stored.
+- **Editor attachments ignored the configured storage folder**, and **bundled
+  config defaults resolved from the working directory** rather than from the
+  package — the same cwd-resolution class as the entries above.
 - **Search and its facets ignored a multi-status filter.** `search/sqlite`'s
   query builder, its facet counts, and the LIKE fallback in `RecordStore` each
   accepted only a bare `status = ?`, while the list path had supported
