@@ -25,7 +25,7 @@ are **partial or stubbed** — the workflow _engine_, non-GeoJSON geography, clo
 storage providers, and multi-channel notifications. Those are named plainly
 below; nothing important is hidden behind a green checkmark.
 
-**At a glance**
+### At a glance
 
 - **Version:** v0.3.1 (Alpha) · **License:** MIT
 - **Stack:** TypeScript / Node, pnpm monorepo, Nuxt 4 + `@nuxt/ui` v4 (MIT),
@@ -77,14 +77,31 @@ named gaps. **Stub/Planned**: advertised but not yet functional.
   middleware whatsoever. Nothing was deployed publicly at the time. This was not
   an `FA-*` finding; it was found by inspecting what a test run left on disk and
   then probing the endpoints directly.
+- **Also found after that audit, and fixed (2026-08-10): legal document
+  numbering.** In a civic register the document number is the citable identity
+  of a record, and all three ways of getting one were broken. Records published
+  from a draft — the primary editor path — were never numbered **at all**,
+  because numbering lived at two of the three record-creating call sites and not
+  the one publishing goes through; those records were permanently unnumbered and
+  invisible to the lookup that decides what everything after them is numbered. A
+  caller-supplied number was stored with no format or uniqueness check. And
+  assignment was a read-then-write race that could hand the same number to two
+  concurrent creates. Numbering now runs on every create path through a single
+  authority, and uniqueness is a database guarantee (a reservation table claimed
+  before the record row exists) rather than a convention. Index-sync is
+  deliberately exempt: it re-reads records already on disk, where the
+  frontmatter is the authority.
 - **Supply chain:** osv-scanner (PR diff-gate + weekly) and CodeQL SAST
   (report-only) run in CI; dependency advisories were remediated 94 → 2 (the
   residual two are a brace-expansion DoS not reachable from the request
   surface); a `SECURITY.md` disclosure policy is published.
 - **Tests & CI:** ~265 test files (~2,500 cases) run green in parallel in CI.
   Honest coverage gaps: the auth-flow pages and editor composables have
-  component tests, but there is no full editor-SFC mount and no browser-e2e
-  layer; cloud storage providers are exercised only against a mocked SDK
+  component tests, but there is no full editor-SFC mount; the browser layer is a
+  **3-test Playwright smoke suite** (`tests/e2e-browser/smoke.spec.ts` — the app
+  boots and hydrates, the records browser renders a record from the API, the
+  login page renders its form), which gates every PR but is not a comprehensive
+  e2e layer; cloud storage providers are exercised only against a mocked SDK
   boundary (no live S3/GCS/Azure integration test).
 
 ## In progress / next (Roadmap-tier — need scoping)
