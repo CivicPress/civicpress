@@ -57,10 +57,38 @@ dropped (reason inline)
       saga concurrency test
 - [x] Session revocation (`deleteUserSessions` on logout + password change) —
       `tests/core/session-revocation.test.ts` (7 tests).
-- [ ] **Still open (needs repo admin, not code):** required-status-checks branch
-      protection on both repos — the current token lacks admin. Exact `gh api`
-      commands are in the PR bodies (status checks only; requiring PRs would
-      disable Renovate branch automerge).
+- [x] **Required-status-checks branch protection on the monorepo — ALREADY DONE;
+      this entry was stale.** Verified 2026-08-10 against the API: a repository
+      **ruleset** named `main` (id 19597452) has been `active` since
+      **2026-07-23**, targeting `~DEFAULT_BRANCH`, with rules `deletion`,
+      `non_fast_forward` and `required_status_checks` — requiring **`build-test`
+      AND `truth-check`**, `strict_required_status_checks_policy: true` (branch
+      must be current before merging) and **no bypass actors**.
+
+      ⚠️ **Why it kept looking open:** protection comes from a *ruleset*, not
+      classic branch protection, so `GET /repos/:o/:r/branches/main/protection`
+      returns **404** while `GET /repos/:o/:r/branches/main` reports
+      `"protected": true`. Checking the classic endpoint — the obvious thing to
+      do — says "unprotected" and is wrong. Query
+      `GET /repos/:o/:r/rulesets` instead.
+
+      Still open for the **device/BroadcastBox repo**, which has no protection
+      (see [[broadcast-box-hw-open-work]]).
+
+- [ ] **⚠️ `truth-check` is a REQUIRED status check but its workflow has a paths
+      filter.** `truth-check.yml` runs on `pull_request` only for `docs/**`,
+      `scripts/audit-truth-check*`, the workflow itself, or `Makefile`. Because
+      the ruleset requires the `truth-check` context on every PR to `main`, a PR
+      that touches none of those paths waits forever on a check that will never
+      report — the classic required-check-plus-paths-filter deadlock. Not
+      hypothetical: it blocks any code-only release PR.
+
+      (The 2026-08-10 develop→main PR is unaffected — it touches four `docs/`
+      files, and the gate passes: `audit-truth-check: PASS`.)
+
+      Fix options: drop the paths filter so the job always runs (it is ~10s), or
+      add a skip-job that reports the same context, or remove `truth-check` from
+      the required set and rely on it as an advisory push gate.
 
 - [ ] **`v0.3.0` was released but never tagged** (found 2026-08-10 during a
       close-out audit). `CHANGELOG.md` carries a full `## [0.3.0] - 2026-08-04`
