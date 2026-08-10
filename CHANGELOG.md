@@ -15,6 +15,17 @@ is a single-root instance resolver: "where is this instance?" is now answered
 once, instead of independently in a dozen places that each fell back to
 `process.cwd()`. Several live bugs fell out of that migration.
 
+**Read the Fixed section even if you skim the rest.** What began as a resolver
+migration turned up defects well outside it, because each fix exposed the next.
+Most consequential: **anonymous API reads were not gated on publication at all**
+— unpublished records were listable, fetchable in full, searchable and countable
+by a caller with no credentials, and two of those endpoints had no
+authentication middleware on them whatsoever. Also here: a signing secret
+written outside any live instance, the audit trail written to the working
+directory, every transcription job leaking its multi-GB source recording, and
+the realtime server writing snapshots after shutdown. Nothing was deployed
+publicly while these were open.
+
 ### Added
 
 - **`resolveInstanceContext()`** (`@civicpress/core`) — resolves the instance

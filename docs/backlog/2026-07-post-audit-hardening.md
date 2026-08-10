@@ -1541,6 +1541,23 @@ not caused by it.
       is flaky on the dev VM (parallel DB/auth races), so the standing advice is
       `--no-verify` — which means the hook gates nothing. This was Phase 2b's
       third bullet and is the one part not done.
+
+- [ ] **`pnpm lint` reports 8 warnings, and they should be left alone until
+      someone checks the unbuilt case.** 0 errors, so CI is green. Seven are
+      "Unused eslint-disable directive" (`civic-core-services.ts:348`, four in
+      `saga-hardening.integration.test.ts`, two in `single-file-handlers.ts`)
+      plus one pre-existing `vue/multi-word-component-names`.
+
+      ⚠️ **Do not just `--fix` them.** An earlier note claimed `1292aab` had made
+      lint silent; it had not, and the reason the directives look dead is
+      probably state-dependent: the rules they suppress
+      (`no-unsafe-assignment`, `no-explicit-any`) only fire when
+      `@civicpress/core`'s types do NOT resolve. CI builds before linting, so
+      the built state is what reports them as unused — remove them and lint may
+      go red on an unbuilt tree (a clean clone, or an editor before first
+      build). Verify against both states before touching them; deliberately
+      skipped 2026-08-09/10 as poor risk/benefit next to the correctness work.
+
 - [x] **`ci.yml` (`build-test`) does not run on pushes to `develop`** — only on
       PRs, pushes to `main`, and `renovate/**`. So a branch can land on
       `develop` without the heavy suite ever running in a clean environment.
