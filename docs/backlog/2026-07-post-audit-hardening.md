@@ -62,6 +62,24 @@ dropped (reason inline)
       commands are in the PR bodies (status checks only; requiring PRs would
       disable Renovate branch automerge).
 
+- [ ] **`v0.3.0` was released but never tagged** (found 2026-08-10 during a
+      close-out audit). `CHANGELOG.md` carries a full `## [0.3.0] - 2026-08-04`
+      section and the release commit `b38b636 chore(release): v0.3.0` is on
+      `main`, but no `v0.3.0` tag exists locally or on the remote — every other
+      release has one, so `git checkout v0.3.0` fails and there is a hole in the
+      release provenance between v0.2.1 and v0.3.1.
+
+      Candidate commit: **`dd487eb`** (`Merge pull request #28 from
+      CivicPress/develop`). That follows this repo's own convention — `v0.3.1`
+      points at the merge-to-main commit (`c27a410`, PR #31), **not** at the
+      `chore(release)` bump. Verified `dd487eb` contains the `b38b636` bump, is
+      on `main`, and precedes the `v0.3.1` tag commit.
+
+          git tag -a v0.3.0 dd487eb -m "v0.3.0" && git push origin v0.3.0
+
+      Deliberately left for a maintainer: a release tag is effectively permanent
+      and pointing one at the wrong commit is worse than its absence.
+
 ## Tier B — security correctness
 
 **TIER CLOSED 2026-07-20.** All seven were already implemented — they landed
