@@ -5,8 +5,10 @@ import { nextTick } from 'vue';
 /**
  * EditorAttachments now offers a real drag-and-drop / click upload (via the
  * reused FileUpload dropzone) in addition to linking existing storage files.
- * These tests pin the upload wiring: the dropzone targets the record-type
- * folder (public fallback), uploaded files are mapped into the record's
+ * These tests pin the upload wiring: the dropzone targets the `attachments`
+ * folder — a CONFIGURED folder (a record-type name is rejected with
+ * FOLDER_NOT_FOUND) that is `access: authenticated`, so a draft's attachments
+ * are not anonymously readable — uploaded files are mapped into the record's
  * attachment shape and emitted, and the dropzone is hidden while the record is
  * locked (disabled). FileUpload / FileBrowserPopover and the i18n + attachment-
  * type composables are stubbed so we exercise EditorAttachments in isolation.
@@ -62,23 +64,31 @@ const findUpload = (wrapper: ReturnType<typeof mountAttachments>) =>
   wrapper.findComponent({ name: 'FileUpload' });
 
 describe('EditorAttachments — upload', () => {
-  it('renders the upload dropzone targeting the record-type folder', () => {
-    const wrapper = mountAttachments({ recordType: 'bylaw' });
+  it('renders the upload dropzone targeting the attachments folder', () => {
+    const wrapper = mountAttachments({});
     const upload = findUpload(wrapper);
     expect(upload.exists()).toBe(true);
-    expect(upload.props('folder')).toBe('bylaw');
+    expect(upload.props('folder')).toBe('attachments');
   });
 
-  it('falls back to the public folder when no record type is given', () => {
+  // Regression: the folder used to be the record type, which is never a
+  // configured storage folder — every editor upload 404'd (FOLDER_NOT_FOUND).
+  it('does not use the record type as the storage folder', () => {
+    const wrapper = mountAttachments({ recordType: 'session' });
+    expect(findUpload(wrapper).props('folder')).toBe('attachments');
+  });
+
+  // The folder must not be a `public`-tier one: a draft's attachments would be
+  // world-readable by UUID before the record is ever published.
+  it('does not upload into an anonymously readable folder', () => {
     const wrapper = mountAttachments({});
-    expect(findUpload(wrapper).props('folder')).toBe('public');
+    expect(['public', 'sessions', 'icons', 'recordings']).not.toContain(
+      findUpload(wrapper).props('folder')
+    );
   });
 
   it('attaches uploaded files mapped into the record attachment shape', async () => {
-    const wrapper = mountAttachments({
-      attachedFiles: [],
-      recordType: 'bylaw',
-    });
+    const wrapper = mountAttachments({ attachedFiles: [] });
     findUpload(wrapper).vm.$emit('upload-complete', [
       {
         id: 'uuid-1',

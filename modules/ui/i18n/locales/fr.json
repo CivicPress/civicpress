@@ -260,6 +260,7 @@
       "selected": "sélectionné",
       "addFiles": "Lier des fichiers",
       "folders": {
+        "attachments": "Pièces jointes",
         "public": "Public",
         "sessions": "Séances",
         "permits": "Permis",

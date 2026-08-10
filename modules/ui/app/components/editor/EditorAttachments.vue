@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, onMounted } from 'vue';
 import FileBrowserPopover from '~/components/storage/FileBrowserPopover.vue';
 import FileUpload from '~/components/storage/FileUpload.vue';
 import { useAttachmentTypes } from '~/composables/useAttachmentTypes';
@@ -15,8 +15,6 @@ interface Props {
     description?: string;
     category?: string;
   }>;
-  /** Record type — used as the storage folder for newly uploaded attachments. */
-  recordType?: string;
   disabled?: boolean;
 }
 
@@ -62,11 +60,20 @@ const handleFilesSelected = (files: SelectedFile[]) => {
   });
 };
 
-// Files uploaded directly from the editor land in a storage folder named after
-// the record type (falling back to the public folder), then attach to the
-// record just like browsed files. The upload API creates the folder if needed,
-// and files are later read by UUID, so the folder is only where the bytes live.
-const uploadFolder = computed(() => props.recordType || 'public');
+// Files uploaded from the editor land in the `attachments` storage folder,
+// then attach to the record just like browsed files. Files are read back by
+// UUID, so the folder is only where the bytes live.
+//
+// `attachments` is configured `access: authenticated` on purpose: a DRAFT
+// record's attachments must not be readable anonymously. The API opens them to
+// citizens the moment a record referencing the file is published, so the bytes
+// never have to move (see checkFileReadAccess).
+//
+// This used to be `props.recordType`, on the assumption that the upload API
+// creates folders on demand. It does not: storage folders are a fixed,
+// configured set and an unconfigured name is rejected with FOLDER_NOT_FOUND,
+// so uploading from the editor 404'd for every record type.
+const uploadFolder = 'attachments';
 
 interface UploadedFile {
   id: string;

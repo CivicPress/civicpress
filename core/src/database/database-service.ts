@@ -387,6 +387,12 @@ export class DatabaseService {
     return this.records.getRecord(...args);
   }
 
+  async isFileReferencedByPublishedRecord(
+    ...args: Parameters<RecordStore['isFileReferencedByPublishedRecord']>
+  ): ReturnType<RecordStore['isFileReferencedByPublishedRecord']> {
+    return this.records.isFileReferencedByPublishedRecord(...args);
+  }
+
   async updateRecord(
     ...args: Parameters<RecordStore['updateRecord']>
   ): Promise<void> {
