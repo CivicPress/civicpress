@@ -403,6 +403,75 @@ export class RecordStore {
   }
 
   /**
+   * Every document number RESERVED for a type, issued or not yet written.
+   *
+   * `getDocumentNumbers` only sees numbers that reached a record row, which is
+   * one step too late to decide the next sequence: between reserving a number
+   * and inserting the record there is a window (a whole saga, on the publish
+   * path) in which a concurrent create would read the same "highest issued"
+   * and pick the same next number. Reservations close that window, and reading
+   * both sources means a database predating this table — where numbers exist
+   * only in record metadata — still gets the right answer with no backfill.
+   */
+  async getReservedDocumentNumbers(recordType: string): Promise<string[]> {
+    const rows = await this.adapter.query<{ document_number: string }>(
+      `SELECT document_number FROM document_numbers WHERE record_type = ?`,
+      [recordType]
+    );
+    return rows
+      .map((row) => row.document_number)
+      .filter((value): value is string => typeof value === 'string');
+  }
+
+  /**
+   * Claim `documentNumber` for `recordId`. True if this caller won it.
+   *
+   * The whole point is the return value: `INSERT OR IGNORE` against the
+   * PRIMARY KEY means exactly one concurrent caller can get `true` for a given
+   * number, and the losers are told so rather than failing. Re-reserving the
+   * same number for the same record also answers `true` — the sync and retry
+   * paths can re-run without a spurious conflict.
+   */
+  async reserveDocumentNumber(
+    documentNumber: string,
+    recordType: string,
+    year: number,
+    recordId: string
+  ): Promise<boolean> {
+    const result = await this.adapter.execute(
+      `INSERT OR IGNORE INTO document_numbers
+         (document_number, record_type, year, record_id)
+       VALUES (?, ?, ?, ?)`,
+      [documentNumber, recordType, year, recordId]
+    );
+
+    if ((result.changes ?? 0) > 0) return true;
+
+    // Lost the race — unless the existing holder IS this record.
+    const existing = await this.adapter.query<{ record_id: string }>(
+      `SELECT record_id FROM document_numbers WHERE document_number = ?`,
+      [documentNumber]
+    );
+    return existing.length > 0 && existing[0].record_id === recordId;
+  }
+
+  /**
+   * Give a reserved number back, so a create that failed after reserving does
+   * not burn a sequence. Called from saga compensation; a legal register is
+   * expected to be gapless-ish, and a hole left by a rolled-back create is
+   * indistinguishable, later, from a record someone removed.
+   */
+  async releaseDocumentNumber(
+    documentNumber: string,
+    recordId: string
+  ): Promise<void> {
+    await this.adapter.execute(
+      `DELETE FROM document_numbers WHERE document_number = ? AND record_id = ?`,
+      [documentNumber, recordId]
+    );
+  }
+
+  /**
    * Is this storage file referenced by at least one PUBLISHED record?
    *
    * The storage read gate uses this to let an attachment become publicly

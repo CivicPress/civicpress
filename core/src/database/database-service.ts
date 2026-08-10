@@ -417,6 +417,24 @@ export class DatabaseService {
     return this.records.getDocumentNumbers(...args);
   }
 
+  async getReservedDocumentNumbers(
+    ...args: Parameters<RecordStore['getReservedDocumentNumbers']>
+  ): ReturnType<RecordStore['getReservedDocumentNumbers']> {
+    return this.records.getReservedDocumentNumbers(...args);
+  }
+
+  async reserveDocumentNumber(
+    ...args: Parameters<RecordStore['reserveDocumentNumber']>
+  ): ReturnType<RecordStore['reserveDocumentNumber']> {
+    return this.records.reserveDocumentNumber(...args);
+  }
+
+  async releaseDocumentNumber(
+    ...args: Parameters<RecordStore['releaseDocumentNumber']>
+  ): ReturnType<RecordStore['releaseDocumentNumber']> {
+    return this.records.releaseDocumentNumber(...args);
+  }
+
   // ---------------------------------------------------------------------------
   // Draft management — delegated to DraftStore
   // ---------------------------------------------------------------------------

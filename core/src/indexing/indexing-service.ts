@@ -556,6 +556,10 @@ export class IndexingService {
         skipFileGeneration: true,
         skipAudit: true, // Skip audit logging during sync
         skipHooks: true, // Skip hooks during sync
+        // The file on disk is the authority for its own number: adopt what the
+        // frontmatter says, valid or not, rather than re-numbering it or
+        // failing the sync of a corpus that predates these rules.
+        skipDocumentNumbering: true,
       },
       {
         // Sync-time sentinel user: indexing rehydrates records from disk and
