@@ -24,7 +24,7 @@ import {
 } from '../utils/record-paths.js';
 import matter from 'gray-matter';
 import { RecordValidationError } from '../errors/domain-errors.js';
-import { DocumentNumberGenerator } from '../utils/document-number-generator.js';
+import { resolveDocumentNumber } from '../records/document-numbering.js';
 
 /**
  * Context for CreateRecord saga
@@ -101,33 +101,16 @@ class CreateInRecordsStep extends BaseSagaStep<
       // Prepare metadata
       const safeMetadata = { ...(request.metadata || {}) };
 
-      // Auto-generate document number for legal record types if not provided
-      const legalTypes = [
-        'bylaw',
-        'ordinance',
-        'policy',
-        'proclamation',
-        'resolution',
-      ];
-      let documentNumber = safeMetadata.document_number;
-      if (!documentNumber && legalTypes.includes(request.type)) {
-        const documentDate = request.createdAt
-          ? new Date(request.createdAt)
-          : creationDate;
-        const year = Number.isNaN(documentDate.getTime())
-          ? new Date().getFullYear()
-          : documentDate.getFullYear();
-        const sequence = await DocumentNumberGenerator.getNextSequence(
-          request.type,
-          year,
-          this.db
-        );
-        documentNumber = DocumentNumberGenerator.generate(
-          request.type,
-          year,
-          sequence
-        );
-      }
+      // Document number: assigned, or validated if the caller supplied one.
+      const documentNumber = await resolveDocumentNumber({
+        recordId,
+        recordType: request.type,
+        supplied: safeMetadata.document_number,
+        createdAt: request.createdAt,
+        fallbackDate: creationDate,
+        db: this.db,
+        skip: request.skipDocumentNumbering,
+      });
 
       // Ensure metadata defaults
       if (user?.username && safeMetadata.author === undefined) {
@@ -225,6 +208,14 @@ class CreateInRecordsStep extends BaseSagaStep<
         await this.db
           .getAdapter()
           .execute('DELETE FROM records WHERE id = ?', [result.id]);
+
+        // Hand the document number back. A create that rolled back should not
+        // burn a sequence — the hole it would leave in a legal register is
+        // indistinguishable, later, from a record someone removed.
+        const documentNumber = result.metadata?.document_number;
+        if (typeof documentNumber === 'string' && documentNumber) {
+          await this.db.releaseDocumentNumber(documentNumber, result.id);
+        }
         coreDebug(
           `Compensated: Deleted record ${result.id} from records table`,
           {

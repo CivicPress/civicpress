@@ -40,6 +40,13 @@ publicly while these were open.
 - **Real document-number sequencing.** `RecordStore.getDocumentNumbers()` plus a
   format-aware matcher, so legal numbering continues from what has actually been
   issued.
+- **A `document_numbers` reservation table**, and one authority
+  (`resolveDocumentNumber`) that every record-creating path now goes through.
+  A number is CLAIMED — insert against a PRIMARY KEY — before the record row
+  exists, which is what makes it safe under concurrency; the sequence is read
+  from issued numbers and reservations together, so a database predating the
+  table needs no backfill. Saga compensation hands a number back rather than
+  burning it.
 
 ### Fixed
 
@@ -50,6 +57,28 @@ publicly while these were open.
   the highest issued number, scoped by prefix AND year, and honours custom
   `document_number_formats` (a prefix containing a digit, or a `.` / `_`
   separator, previously matched nothing and restarted the sequence).
+- **🔴 Records published from a draft were never numbered at all.** Numbering
+  lived at two of the three create paths; the draft → publish saga goes through
+  `RecordManager.createRecordWithId`, which had no numbering block — so a bylaw
+  published the way the editor publishes bylaws was stored with **no
+  `document_number`**. Permanently unnumbered, missing from
+  `getDocumentNumbers()`, and therefore invisible to the sequence of every
+  record numbered after it. Numbering now happens at publish, which is also the
+  right moment for a legal register: abandoned drafts do not burn sequences.
+- **A caller-supplied `document_number` bypassed every check.** It was stored
+  verbatim — `DocumentNumberGenerator.validate()` existed with zero call sites
+  and the schema declared no pattern — so a record could carry another record's
+  number, or anything at all. A supplied number is now checked against the
+  type's CONFIGURED format (`ValidationError`) and claimed for uniqueness
+  (`ConflictError`). `validate()` itself was broken for the case it would first
+  be used in: it compared against the BUILT-IN prefix, so on any instance with
+  custom `document_number_formats` it rejected precisely what the generator
+  emits.
+- **Document-number assignment was a read-then-write race.** Two concurrent
+  creates of the same type and year computed the same next sequence and both
+  kept it — nothing locked, and with the number inside the metadata JSON there
+  is no column to constrain. Reservation closes it; pinned by a concurrency
+  test that fails against the old shape.
 - **The orphaned-file cleaner could delete the wrong tree.** It resolved a
   relative local provider path against the literal `.system-data` — i.e.
   `process.cwd()` — so when run from anywhere but the instance root it scanned a

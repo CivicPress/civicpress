@@ -103,8 +103,11 @@ dropped (reason inline)
       carries no paths filter, so it always reports. Any future required check
       must satisfy the same rule — **required contexts cannot be conditional.**
 
-- [ ] **`v0.3.0` was released but never tagged** (found 2026-08-10 during a
-      close-out audit). `CHANGELOG.md` carries a full `## [0.3.0] - 2026-08-04`
+- [x] **`v0.3.0` was released but never tagged — DONE, tag now exists.** Found
+      2026-08-10 during a close-out audit; verified 2026-08-10 that `v0.3.0` is
+      now present both locally and on the remote, pointing at the candidate
+      commit named below (`dd487eb`). The release provenance between v0.2.1 and
+      v0.3.1 is no longer broken. Original entry follows. `CHANGELOG.md` carries a full `## [0.3.0] - 2026-08-04`
       section and the release commit `b38b636 chore(release): v0.3.0` is on
       `main`, but no `v0.3.0` tag exists locally or on the remote — every other
       release has one, so `git checkout v0.3.0` fails and there is a hole in the
@@ -1663,22 +1666,67 @@ The rest of this section is carried over from
 stays discoverable. Those items are **pre-existing** — surfaced by that work,
 not caused by it.
 
-- [ ] **Legal numbering does not reach the primary editor path.**
-      `DocumentNumberGenerator` has exactly TWO production call sites
-      (`RecordManager.createRecord`, `create-record-saga`). The draft → publish
-      flow goes through `RecordManager.createRecordWithId`, which has **no
-      numbering block at all**, so those records land with **no
+- [x] **Legal numbering does not reach the primary editor path. FIXED
+      2026-08-10.** `DocumentNumberGenerator` had exactly TWO production call
+      sites (`RecordManager.createRecord`, `create-record-saga`). The draft →
+      publish flow goes through `RecordManager.createRecordWithId`, which had
+      **no numbering block at all**, so those records landed with **no
       `document_number`** — permanently unnumbered and invisible to
-      `getDocumentNumbers()`. Numbering itself is now correct wherever it
-      happens (fixed 2026-08-08); this is the gap in _where_ it happens.
-- [ ] **A caller-supplied `metadata.document_number` bypasses numbering** and is
-      stored with no uniqueness check. `DocumentNumberGenerator.validate()`
-      exists but has **zero call sites**, and the base record schema declares
-      `document_number` with no pattern.
-- [ ] **Document-number assignment is a read-then-write race.** Two concurrent
-      creates of the same type/year can be issued the same number — there is no
-      lock and no uniqueness constraint on the column (it lives in the metadata
-      JSON, so there is no column to constrain).
+      `getDocumentNumbers()`, and so to the sequence of every record numbered
+      after them. Numbering itself was already correct wherever it happened
+      (fixed 2026-08-08); this was the gap in _where_ it happened.
+
+      All three of these were fixed together, because they are one thing: the
+      rule was written out twice and reached two of the three create paths.
+      There is now a single authority, `core/src/records/document-numbering.ts`
+      (`resolveDocumentNumber`), that every path calls — so a fourth create
+      path cannot quietly miss one of the rules.
+
+      Numbering happens at PUBLISH on this path, which is also the right moment
+      for a legal register: an abandoned draft does not burn a sequence.
+
+      ⚠️ **The index-sync path is deliberately exempt** (`skipDocumentNumbering`
+      on `CreateRecordRequest`, set at `indexing-service.ts`). Sync is not
+      creating records, it is re-reading ones that already exist on disk: the
+      frontmatter is the authority for its own number, a number assigned during
+      sync would live only in the database and vanish on the next re-index, and
+      validating there would fail the sync of any corpus predating these rules.
+- [x] **A caller-supplied `metadata.document_number` bypasses numbering. FIXED
+      2026-08-10.** It was stored with no uniqueness check —
+      `DocumentNumberGenerator.validate()` existed but had **zero call sites**,
+      and the base record schema declares `document_number` with no pattern.
+      A supplied number is now checked against the type's configured format
+      (`ValidationError`) and claimed for uniqueness (`ConflictError`).
+
+      ⚠️ `validate()` was itself broken for the case it would first be used in:
+      it compared the parsed prefix against **`getDefaultPrefix`**, the built-in
+      map, so on any instance configuring `document_number_formats` it rejected
+      exactly what `generate()` emits. It now matches against the configured
+      format (`matchesFormat`), sharing the regex builder with `matchSequence`
+      — the same bug that function's comment already describes, in its sibling.
+
+      Only LEGAL types are policed. A non-legal type has no configured format
+      to be judged against (`getFormat` would answer `DOC`), so a
+      locally-meaningful identifier on a meeting record is left alone.
+- [x] **Document-number assignment is a read-then-write race. FIXED
+      2026-08-10.** Two concurrent creates of the same type/year could be issued
+      the same number — no lock, and no uniqueness constraint on the column,
+      since it lives in the metadata JSON and there is no column to constrain.
+
+      Fix: a `document_numbers` table whose PRIMARY KEY **is** the lock. The
+      number is RESERVED before the record row exists, so the loser of a race
+      gets a constraint violation and retries with the next sequence instead of
+      silently duplicating. The next sequence is read from issued numbers and
+      reservations TOGETHER, so a database predating the table gets the right
+      answer with no backfill. Saga compensation releases the number rather
+      than burning it. No FK to `records(id)` — reservation precedes the insert,
+      so with `foreign_keys=ON` an FK would reject every reservation (same
+      reason `record_locks` has none).
+
+      **Negative-controlled, not just asserted:** restoring the old
+      read-then-write shape makes both concurrency tests fail — 12 parallel
+      creates all receive `BYL-2026-001` — and reverting the
+      `createRecordWithId` fix fails 3 of the 5 publish-path tests.
 - [ ] **Make the pre-commit hook a fast, reliable subset.** The full-suite hook
       is flaky on the dev VM (parallel DB/auth races), so the standing advice is
       `--no-verify` — which means the hook gates nothing. This was Phase 2b's
@@ -1708,6 +1756,15 @@ not caused by it.
       it is why the red `build-test` of 2026-08-08 sat unnoticed for a day.
       **FIXED 2026-08-09:** `develop` added to the push triggers. The manual
       stopgap (`gh workflow run ci.yml --ref develop`) is no longer required.
+- [ ] **Which types get numbered is a hard-coded list, not the config.**
+      Surfaced 2026-08-10 while unifying the three numbering call sites, and
+      deliberately left alone. `LEGAL_RECORD_TYPES` (bylaw, ordinance, policy,
+      proclamation, resolution) is what triggers numbering — so a municipality
+      that configures `document_number_formats` for some OTHER type gets a
+      format that is never used, with no error saying so. The natural fix is to
+      union the list with the configured formats, but that changes which
+      records in a legal register receive citable identities, which is a
+      decision for a maintainer rather than a side effect of a refactor.
 - [ ] **`resolveModulesDir` precedence is exclusive** — a `modules/` directory
       beside the data root hides every installed-code module rather than
       merging. Intended (it preserves the dev/Docker layout) but sharp; revisit

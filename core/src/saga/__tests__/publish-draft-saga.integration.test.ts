@@ -551,4 +551,97 @@ describe('PublishDraftSaga Integration', () => {
       expect(state?.correlationId).toBe(correlationId);
     });
   });
+
+  /**
+   * Legal numbering has to reach THIS path, and for a long time it did not.
+   * `DocumentNumberGenerator` had two production call sites, `createRecord`
+   * and `create-record-saga`; publishing goes through
+   * `RecordManager.createRecordWithId`, which had no numbering block at all.
+   * So a bylaw published the way the editor publishes bylaws was stored with
+   * no `document_number` — permanently unnumbered, and invisible to the
+   * lookup that decides what every later record is numbered.
+   *
+   * These assert on what came back out of the database, not on the saga's
+   * return value, because the number has to be persisted to be citable.
+   */
+  describe('Legal document numbering', () => {
+    async function publishDraft(
+      draftId: string,
+      metadata: Record<string, unknown> = {},
+      type = 'bylaw'
+    ) {
+      await db.createDraft({
+        id: draftId,
+        title: `Draft ${draftId}`,
+        type,
+        status: 'draft',
+        markdown_body: '# Content',
+        metadata: JSON.stringify({ author: 'testuser', ...metadata }),
+        author: 'testuser',
+        created_by: 'testuser',
+      });
+
+      const saga = new PublishDraftSaga(
+        db,
+        recordManager,
+        civic.getGitEngine(),
+        civic.getHookSystem(),
+        civic.getIndexingService(),
+        testDir
+      );
+
+      await sagaExecutor.execute(saga, {
+        correlationId: `numbering-${draftId}`,
+        startedAt: new Date(),
+        draftId,
+        user: testUser,
+        metadata: { recordId: draftId, draftId },
+      });
+
+      const record = await db.getRecord(draftId);
+      const stored = record?.metadata
+        ? (JSON.parse(record.metadata as string) as Record<string, unknown>)
+        : {};
+      return stored.document_number as string | undefined;
+    }
+
+    it('numbers a bylaw published from a draft', async () => {
+      const year = new Date().getFullYear();
+
+      expect(await publishDraft('numbering-1')).toBe(`BYL-${year}-001`);
+    });
+
+    it('does not issue the same number to the next publish', async () => {
+      const year = new Date().getFullYear();
+
+      expect(await publishDraft('numbering-a')).toBe(`BYL-${year}-001`);
+      expect(await publishDraft('numbering-b')).toBe(`BYL-${year}-002`);
+    });
+
+    it('keeps a number the draft already carries', async () => {
+      const year = new Date().getFullYear();
+
+      expect(
+        await publishDraft('numbering-kept', {
+          document_number: `BYL-${year}-077`,
+        })
+      ).toBe(`BYL-${year}-077`);
+    });
+
+    it('leaves a non-legal type unnumbered', async () => {
+      expect(
+        await publishDraft('numbering-meeting', {}, 'meeting')
+      ).toBeUndefined();
+    });
+
+    it('makes the number visible to the next lookup', async () => {
+      // The failure this guards: an unnumbered record contributes nothing to
+      // getDocumentNumbers, so numbering silently restarts around it.
+      await publishDraft('numbering-visible');
+
+      expect(await db.getDocumentNumbers('bylaw')).toEqual([
+        `BYL-${new Date().getFullYear()}-001`,
+      ]);
+    });
+  });
 });

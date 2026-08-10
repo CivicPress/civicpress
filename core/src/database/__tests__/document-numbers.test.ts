@@ -94,4 +94,103 @@ describe('RecordStore.getDocumentNumbers (real SQLite)', () => {
       'BYL-2026-003'
     );
   });
+
+  /**
+   * The reservation table is what makes numbering safe under concurrency, so
+   * these run against real SQLite too — the guarantee IS the PRIMARY KEY, and
+   * a fake reserver would be asserting on the thing under test.
+   */
+  describe('reservations', () => {
+    it('lets exactly one caller win a given number', async () => {
+      expect(
+        await store.reserveDocumentNumber('BYL-2026-001', 'bylaw', 2026, 'a')
+      ).toBe(true);
+      expect(
+        await store.reserveDocumentNumber('BYL-2026-001', 'bylaw', 2026, 'b')
+      ).toBe(false);
+    });
+
+    it('is idempotent for the same record — a retry is not a conflict', async () => {
+      await store.reserveDocumentNumber('BYL-2026-001', 'bylaw', 2026, 'a');
+
+      expect(
+        await store.reserveDocumentNumber('BYL-2026-001', 'bylaw', 2026, 'a')
+      ).toBe(true);
+    });
+
+    it('reports reserved numbers before any record row exists', async () => {
+      await store.reserveDocumentNumber('BYL-2026-001', 'bylaw', 2026, 'a');
+
+      // The whole point: nothing is in `records` yet.
+      expect(await store.getDocumentNumbers('bylaw')).toEqual([]);
+      expect(await store.getReservedDocumentNumbers('bylaw')).toEqual([
+        'BYL-2026-001',
+      ]);
+    });
+
+    it('scopes reservations to the record type', async () => {
+      await store.reserveDocumentNumber('BYL-2026-001', 'bylaw', 2026, 'a');
+      await store.reserveDocumentNumber('ORD-2026-001', 'ordinance', 2026, 'b');
+
+      expect(await store.getReservedDocumentNumbers('bylaw')).toEqual([
+        'BYL-2026-001',
+      ]);
+    });
+
+    it('releases a number only to the record holding it', async () => {
+      await store.reserveDocumentNumber('BYL-2026-001', 'bylaw', 2026, 'a');
+
+      // A different record cannot release someone else's reservation.
+      await store.releaseDocumentNumber('BYL-2026-001', 'b');
+      expect(await store.getReservedDocumentNumbers('bylaw')).toEqual([
+        'BYL-2026-001',
+      ]);
+
+      await store.releaseDocumentNumber('BYL-2026-001', 'a');
+      expect(await store.getReservedDocumentNumbers('bylaw')).toEqual([]);
+    });
+  });
+
+  /**
+   * The race this was written to close: assignment used to read the highest
+   * issued number and then write, with nothing in between, so two concurrent
+   * creates of the same type and year were handed the SAME number. Negative
+   * control: replacing `assign` with the old read-then-write shape
+   * (getNextSequence + generate, no reservation) makes both of these fail.
+   */
+  describe('concurrent assignment', () => {
+    it('never issues the same number twice', async () => {
+      const assignments = await Promise.all(
+        Array.from({ length: 12 }, (_, i) =>
+          DocumentNumberGenerator.assign('bylaw', 2026, `record-${i}`, store)
+        )
+      );
+
+      expect(new Set(assignments).size).toBe(assignments.length);
+    });
+
+    it('issues a dense sequence, so a race leaves no gaps either', async () => {
+      const assignments = await Promise.all(
+        Array.from({ length: 5 }, (_, i) =>
+          DocumentNumberGenerator.assign('bylaw', 2026, `record-${i}`, store)
+        )
+      );
+
+      expect(assignments.sort()).toEqual([
+        'BYL-2026-001',
+        'BYL-2026-002',
+        'BYL-2026-003',
+        'BYL-2026-004',
+        'BYL-2026-005',
+      ]);
+    });
+
+    it('continues past numbers that only exist in record metadata', async () => {
+      await addRecord('legacy', 'bylaw', { document_number: 'BYL-2026-001' });
+
+      expect(
+        await DocumentNumberGenerator.assign('bylaw', 2026, 'new', store)
+      ).toBe('BYL-2026-002');
+    });
+  });
 });

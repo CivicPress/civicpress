@@ -207,6 +207,29 @@ export const CORE_TABLE_STATEMENTS: string[] = [
     expires_at DATETIME
   )`,
 
+  // Issued legal document numbers — the uniqueness authority for numbering.
+  //
+  // The number itself lives in the record's metadata JSON, so there is no
+  // column on `records` to constrain and nothing stopped two concurrent
+  // creates of the same type/year from being issued the same number: the
+  // sequence was read, then written, with no lock between. This table turns
+  // the PRIMARY KEY into that lock — a number is RESERVED here before the
+  // record row exists, so the loser of a race gets a constraint violation and
+  // retries with the next sequence instead of silently duplicating.
+  //
+  // Deliberately NO FK to records(id), for the same reason record_locks has
+  // none: reservation happens before the record is inserted (and, on the
+  // draft→publish path, against an id that lives in record_drafts until the
+  // saga commits), so an enforced FK would reject every reservation with
+  // foreign_keys=ON.
+  `CREATE TABLE IF NOT EXISTS document_numbers (
+    document_number TEXT PRIMARY KEY,
+    record_type TEXT NOT NULL,
+    year INTEGER NOT NULL,
+    record_id TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`,
+
   // Saga states table for saga pattern persistence and recovery
   `CREATE TABLE IF NOT EXISTS saga_states (
     id TEXT PRIMARY KEY,
