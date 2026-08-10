@@ -125,6 +125,13 @@ export async function createTestConfig(options?: {
 
   return {
     dataDir: testDir,
+    // Explicit, not inferred. `resolveSystemDataDir` falls back to
+    // `dirname(dataDir)` as the instance root, and `dataDir` here is a bare
+    // mkdtemp directory — so the root resolved to the SHARED os tmpdir and
+    // every instance built from this helper wrote its secrets there, into one
+    // `/tmp/.system-data` outside any test's cleanup. This is already the path
+    // `dbFile` above defaults to, so the config now simply says so.
+    systemDataDir: path.join(testDir, '.system-data'),
     database: {
       type: 'sqlite' as const,
       sqlite: {

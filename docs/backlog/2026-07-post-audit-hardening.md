@@ -1423,13 +1423,13 @@ pass closed elsewhere, in two places it did not reach.
       directory and does not remove it on teardown. One directory per full run
       rather than hundreds, and no secret material — worth tidying, not urgent.
 
-- [ ] **e2e fixtures pass a bare tmpdir as `dataDir`, so their instance root
-      becomes the SHARED `/tmp`.** Found 2026-08-09 by noticing
-      `/tmp/.system-data` had reappeared after being cleared. **Test-only — not
-      a production defect:** `resolveSystemDataDir` derives the root as
-      `dirname(dataDir)` only as a fallback for a config built directly, never
-      through `CentralConfigManager`, so a real `.civicrc`-backed instance is
-      unaffected.
+- [x] **e2e fixtures pass a bare tmpdir as `dataDir`, so their instance root
+      becomes the SHARED `/tmp`.** **FIXED 2026-08-10.** Found 2026-08-09 by
+      noticing `/tmp/.system-data` had reappeared after being cleared.
+      **Test-only — not a production defect:** `resolveSystemDataDir` derives
+      the root as `dirname(dataDir)` only as a fallback for a config built
+      directly, never through `CentralConfigManager`, so a real
+      `.civicrc`-backed instance is unaffected.
 
       The pattern is `testDir = mkdtemp(os.tmpdir(), 'bb-…')` followed by
       `new CivicPress({ dataDir: testDir })`. `dirname(testDir)` is `/tmp`, so
@@ -1441,15 +1441,35 @@ pass closed elsewhere, in two places it did not reach.
       `path.join(testDir, '.system-data', 'test.db')` explicitly, so the fixture
       and the resolver disagree about where the instance root is.
 
-      Affects `tests/broadcast-box/backfill-e2e.test.ts`,
-      `device-to-worker-e2e.test.ts`, `broadcast-box-mount-e2e.test.ts`,
-      `redaction-e2e.test.ts`, `tests/core/merge-capture.test.ts`,
-      `tests/transcription/transcription-e2e.test.ts` and
-      `tests/realtime/harness.ts`. Fix is `dataDir: join(testDir, 'data')` (and
-      move the `records/` seeding under it) so the root is `testDir` and system
-      state lands inside what teardown removes. Per-file verification needed —
-      each seeds its own tree — which is why it was recorded rather than done in
-      the same pass. Strays cleared 2026-08-09.
+      **Fix applied:** every affected construction now passes an explicit
+      `systemDataDir: path.join(testDir, '.system-data')`. That was chosen over
+      the originally-sketched `dataDir: join(testDir, 'data')`: the explicit
+      value short-circuits the `dirname()` inference entirely (it is the first
+      branch of `resolveSystemDataDir`), it is a single added line per site
+      rather than a restructuring of each fixture's `records/` seeding, and it
+      is exactly the path each file already assumes for its own sqlite database
+      — so the fixture and the resolver now agree instead of merely coinciding.
+
+      ⚠️ **The original file list above was incomplete — it was the result of
+      grepping, and grep found the ones that say `dataDir: testDir`.** Fixing
+      those seven and re-running the full suite showed `/tmp/.system-data`
+      coming back anyway. Bisecting by directory, then by file, turned up
+      **nine more sites**, none of which the grep pattern would have caught:
+      `core/src/di/test-utils.ts` (the shared `createTestConfig` helper) and
+      eight `core/src/**/__tests__` integration tests —
+      `di/civicpress-integration`, `records/record-manager-audit-channel`, and
+      the six saga tests (`saga-e2e`, `saga-failure-injection`,
+      `create-/update-/archive-record-saga.integration`,
+      `publish-draft-saga.integration`). **16 sites total.** Worth remembering:
+      for "where does this stray file come from", bisecting the suite is
+      reliable where grepping for a remembered code shape is not.
+
+      Verified by measurement at each step. With the fixture unmodified a single
+      run of `backfill-e2e` recreated `/tmp/.system-data` containing
+      `secrets.yml` and a populated `storage/`; with the line added it does not.
+      Bisecting all 57 `core/src` test files reported eight polluters before the
+      fix and **zero** after. A full suite run now ends with no
+      `/tmp/.system-data` and zero stray `secrets.yml` anywhere under `/tmp`.
 
 The rest of this section is carried over from
 `docs/plans/2026-08-08-contributor-devx-and-hardening.md` (now closed) so it
