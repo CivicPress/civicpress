@@ -23,6 +23,7 @@
  * @module records/document-numbering
  */
 
+import { CentralConfigManager } from '../config/central-config.js';
 import { ConflictError, ValidationError } from '../errors/index.js';
 import {
   DocumentNumberGenerator,
@@ -30,14 +31,8 @@ import {
 } from '../utils/document-number-generator.js';
 
 /**
- * Record types that carry an official document number.
- *
- * Kept exactly as the two copies of this list had it. Note what it means: a
- * municipality that configures `document_number_formats` for some OTHER type
- * gets no numbers for it, because membership here — not the presence of a
- * configured format — is what triggers numbering. Arguably wrong, but it is
- * long-standing behaviour and changing which types get numbered is a decision
- * about a legal register, not a refactor; see the backlog entry.
+ * Record types that carry an official document number by default, with no
+ * configuration at all.
  */
 export const LEGAL_RECORD_TYPES: readonly string[] = [
   'bylaw',
@@ -47,8 +42,54 @@ export const LEGAL_RECORD_TYPES: readonly string[] = [
   'resolution',
 ];
 
-export function isLegalRecordType(recordType: string): boolean {
-  return LEGAL_RECORD_TYPES.includes(recordType);
+/**
+ * Does this type get an official document number?
+ *
+ * The built-in legal types, OR any type the instance has given a
+ * `document_number_formats` entry. Configuring a format used to be a silent
+ * no-op — membership in the hard-coded list was the only trigger, so an
+ * instance could define a perfectly good format for `meeting` or `permit` and
+ * never see a single number issued, with nothing anywhere saying why. Writing
+ * the format down is now the way you ask for numbering.
+ *
+ * ⚠️ This is a behaviour change for any instance that already configures a
+ * format for a non-legal type: those records begin receiving numbers at their
+ * next create. Records already stored are untouched — nothing backfills — so
+ * such a type starts its sequence at 001 from the day of the upgrade.
+ */
+export function isNumberedRecordType(recordType: string): boolean {
+  if (LEGAL_RECORD_TYPES.includes(recordType)) return true;
+
+  return hasUsablePrefix(configuredFormat(recordType));
+}
+
+/**
+ * The configured format entry for a type, or undefined.
+ *
+ * Config access is deliberately non-fatal here, matching
+ * `DocumentNumberGenerator.getFormat`: an unreadable or malformed config
+ * should leave the built-in types numbering exactly as they always did, not
+ * fail every record creation on the instance.
+ */
+function configuredFormat(recordType: string): unknown {
+  try {
+    return CentralConfigManager.getDocumentNumberFormats()?.[recordType];
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * A format entry only counts if it can actually produce a number. `getFormat`
+ * copies `prefix` straight through, so an entry missing one would mint
+ * `undefined-2026-001` — a citable identity built from a typo. Better to leave
+ * the type unnumbered and let config validation report the entry.
+ */
+function hasUsablePrefix(format: unknown): boolean {
+  if (!format || typeof format !== 'object') return false;
+
+  const prefix = (format as { prefix?: unknown }).prefix;
+  return typeof prefix === 'string' && prefix.trim().length > 0;
 }
 
 export interface ResolveDocumentNumberParams {
@@ -88,10 +129,11 @@ export async function resolveDocumentNumber(
   const year = numberingYear(params);
 
   if (suppliedNumber) {
-    // Only legal types have a format to be judged against — `getFormat` would
-    // answer 'DOC' for anything else, and rejecting a locally-meaningful
-    // identifier on a non-legal record is not this function's business.
-    if (!isLegalRecordType(recordType)) {
+    // Only a numbered type has a format to be judged against — `getFormat`
+    // would answer 'DOC' for anything else, and rejecting a
+    // locally-meaningful identifier on an unnumbered record is not this
+    // function's business.
+    if (!isNumberedRecordType(recordType)) {
       return suppliedNumber;
     }
 
@@ -128,7 +170,7 @@ export async function resolveDocumentNumber(
     return suppliedNumber;
   }
 
-  if (!isLegalRecordType(recordType)) {
+  if (!isNumberedRecordType(recordType)) {
     return undefined;
   }
 

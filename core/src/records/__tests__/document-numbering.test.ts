@@ -249,6 +249,120 @@ describe('resolveDocumentNumber — a supplied number is checked, not trusted', 
   });
 });
 
+describe('resolveDocumentNumber — which types get numbered', () => {
+  function withFormats(formats: Record<string, unknown>) {
+    vi.spyOn(CentralConfigManager, 'getDocumentNumberFormats').mockReturnValue(
+      formats as unknown as ReturnType<
+        typeof CentralConfigManager.getDocumentNumberFormats
+      >
+    );
+  }
+
+  it('numbers a type the instance configured a format for', async () => {
+    // Configuring a format used to be a silent no-op: only the hard-coded
+    // legal list triggered numbering, so this entry issued nothing, ever.
+    withFormats({
+      meeting: { prefix: 'MTG', separator: '-', sequence_padding: 3 },
+    });
+
+    const number = await resolveDocumentNumber({
+      recordId: 'r1',
+      recordType: 'meeting',
+      createdAt: '2026-03-04T00:00:00.000Z',
+      db: fakeReserver(),
+    });
+
+    expect(number).toBe('MTG-2026-001');
+  });
+
+  it('still numbers the built-in legal types with no config at all', async () => {
+    withFormats({});
+
+    expect(
+      await resolveDocumentNumber({
+        recordId: 'r1',
+        recordType: 'bylaw',
+        createdAt: '2026-03-04T00:00:00.000Z',
+        db: fakeReserver(),
+      })
+    ).toBe('BYL-2026-001');
+  });
+
+  it('leaves an unconfigured, non-legal type unnumbered', async () => {
+    withFormats({
+      meeting: { prefix: 'MTG', separator: '-', sequence_padding: 3 },
+    });
+
+    expect(
+      await resolveDocumentNumber({
+        recordId: 'r1',
+        recordType: 'permit',
+        createdAt: '2026-03-04T00:00:00.000Z',
+        db: fakeReserver(),
+      })
+    ).toBeUndefined();
+  });
+
+  it('ignores a format entry with no usable prefix', async () => {
+    // getFormat copies `prefix` straight through, so honouring this entry
+    // would mint `undefined-2026-001` — a citable identity built from a typo.
+    withFormats({ meeting: { separator: '-', sequence_padding: 3 } });
+
+    expect(
+      await resolveDocumentNumber({
+        recordId: 'r1',
+        recordType: 'meeting',
+        createdAt: '2026-03-04T00:00:00.000Z',
+        db: fakeReserver(),
+      })
+    ).toBeUndefined();
+  });
+
+  it('keeps numbering the built-in types when config access throws', async () => {
+    vi.spyOn(
+      CentralConfigManager,
+      'getDocumentNumberFormats'
+    ).mockImplementation(() => {
+      throw new Error('unreadable config');
+    });
+
+    expect(
+      await resolveDocumentNumber({
+        recordId: 'r1',
+        recordType: 'bylaw',
+        createdAt: '2026-03-04T00:00:00.000Z',
+        db: fakeReserver(),
+      })
+    ).toBe('BYL-2026-001');
+  });
+
+  it('now vets a supplied number on a configured type too', async () => {
+    withFormats({
+      meeting: { prefix: 'MTG', separator: '-', sequence_padding: 3 },
+    });
+
+    expect(
+      await resolveDocumentNumber({
+        recordId: 'r1',
+        recordType: 'meeting',
+        supplied: 'MTG-2026-009',
+        createdAt: '2026-03-04T00:00:00.000Z',
+        db: fakeReserver(),
+      })
+    ).toBe('MTG-2026-009');
+
+    await expect(
+      resolveDocumentNumber({
+        recordId: 'r2',
+        recordType: 'meeting',
+        supplied: 'not-a-number',
+        createdAt: '2026-03-04T00:00:00.000Z',
+        db: fakeReserver(),
+      })
+    ).rejects.toBeInstanceOf(ValidationError);
+  });
+});
+
 describe('resolveDocumentNumber — the sync exemption', () => {
   it('adopts what the file says, without validating or reserving', async () => {
     const db = fakeReserver(['BYL-2026-001']);
