@@ -672,8 +672,34 @@ follow-up. (Storage, config+CLI, API-routes clusters + saga/BB/notifications.)
       index signature; a full `nuxt typecheck` proved nothing relied on them).
       Coordinated test updates — the ~7 assertions that deliberately pinned old
       shapes now read `error.message`.
-- [ ] HW `ffmpeg_capture.py` decomposition; `command_handler.py` dispatch table;
-      storage provider Strategy
+- [x] **HW `ffmpeg_capture.py` decomposition — DONE 2026-08-01** (device-repo PR
+      #4, stacked on #3). Extracted the ~1300 pure lines that turn capture
+      config into an FFmpeg argv list / `filter_complex` string into
+      `capture/command_builder.py`: a `CaptureContext` dataclass snapshot (so
+      the builders provably cannot reach process handles or mutate service state
+      — their whole input surface is declared in one place) plus a
+      `CaptureCommandBuilder` holding the eight builders under public names.
+      `FFmpegCaptureService` keeps the process lifecycle and retains every
+      `_build_*` method as a thin delegating wrapper, so no caller or test
+      changed. **2910 → 1657 lines.** Behaviour preservation was proven by
+      differential testing rather than by inspection: a harness loaded the
+      pre-refactor module alongside the refactored one and compared every
+      builder's exact output across 3 platforms × 7 encoder configs × 9 output
+      sets × 5 PiP layouts × 3 watermark configs × 4 quality presets × camera
+      and audio permutations — **328,860 invocations, 0 mismatches.** The
+      lifecycle half (start/stop/monitor, ~1650 lines) could still be split
+      further if it earns it.
+  - ⚠️ **`command_handler.py` dispatch table was ALREADY DONE** (BB-HW-005) —
+    this entry was stale, not open. `__init__` builds a 24-entry
+    `self._command_handlers` map (with `get_sources`/`list_sources` and
+    `set_pip`/`pip.configure` aliases) and `handle_command` routes through
+    `.get()`, rejecting unknown actions as an error ACK. The code even comments
+    "Replaces the former elif chain (BB-HW-005)".
+  - ⚠️ **`storage provider Strategy` — recommend dropping.** There is exactly
+    one provider (`CivicPressUploader`) and no ABC/Protocol anywhere in
+    `services/storage/`. A Strategy abstraction around a single implementation
+    is speculative generality; revisit only if a second storage backend is
+    actually planned.
 - [x] **Config discovery — DONE 2026-07-21/22.** (a) Deleted dead
       `ConfigDiscovery` (`CIVIC_DIR='.system-data'` while config lives in
       `.civic/`, so it never found anything; zero callers/tests). (b) Fixed two
@@ -828,7 +854,42 @@ follow-up. (Storage, config+CLI, API-routes clusters + saga/BB/notifications.)
       loudly instead of skipping; unset (local dev) keeps the clean self-skip.
       Verified all three modes: required+present → real suite runs+passes (guard
       skips); required+missing → hard fail; unset+missing → clean skip.
-- [ ] HW capture-builder tests; frontend tests
+- [x] **HW capture-builder tests; frontend tests — DONE 2026-08-01**
+      (device-repo PRs #3 and #5).
+  - **Capture builders (PR #3, 65 tests).** `ffmpeg_capture.py` had eight
+    builder methods; only `_build_ffmpeg_command` had direct coverage, and the
+    rest were untested or mocked out by the process-startup tests — despite
+    being where two appliance bugs already landed (the multi-output filtergraph
+    pad reuse, and FA-HW-016's `-vf` beside `-filter_complex`). Now covers
+    per-platform input selection (v4l2/avfoundation/dshow), overlay position
+    maps, PiP index resolution and sizing, watermark input indices, VAAPI
+    hwupload chains and the split-per-output pad discipline. Verified the tests
+    bite by mutating the source five ways (pad reuse, `-vf` beside
+    `-filter_complex`, watermark index ignoring the audio input, VAAPI mapping
+    pre-hwupload pads, dropped `format=yuv420p`) — each fails the suite.
+  - **Frontend (PR #5, 51 tests → 54 with PR #6).** `frontend/` had **no test
+    runner at all**. Stood up standalone Vitest + `@vue/test-utils` on happy-dom
+    (not `@nuxt/test-utils` — the app is `ssr: false`, so booting real Nuxt per
+    file buys nothing), with shims for `#imports`, `useState`, the `U*`
+    components and the auto-imported globals. `pnpm test` now runs in CI between
+    typecheck and build. Covers `useApi` (the FA-HW-001 setup-token path),
+    `useWebRtc`, `useSetupProgress`, `DangerAction`, `SetupChecklist`; seven
+    source mutations confirmed to fail.
+    - ⚠️ **`import.meta.client` needs a source transform under Vitest.** Vite's
+      `define` does NOT substitute it, so it arrives `undefined` and every
+      client-guarded branch silently dead-ends **while the suite still reports
+      green** — false confidence, not a visible failure. Fixed with an
+      `enforce: 'pre'` plugin that rewrites it space-padded to identical width
+      (stack traces stay accurate). This is the same wall that had deferred
+      `useCsrf`/`useRecordDetail` in this repo; now ported here (`f6199b7`).
+    - The new tests surfaced **2 pre-existing UI defects**, fixed in PR #6:
+      `SetupChecklist`'s dismiss button was unreachable (guarded on
+      `allComplete`, but `app.vue` only mounts it when `showBanner` —
+      `!allComplete && !dismissed` — is true, so `dismiss()` was dead code); and
+      `useWebRtc.start()` called `stop()` without awaiting it, so a failed
+      preview settled on `'stopped'` rather than `'error'` — user-visible, since
+      `preview.vue` renders `errorMessage` only in the `'error'` state, leaving
+      the operator with no reason for the failure.
 - [x] **Skip triage — DONE (skip portion; 2026-07-24, commit `7502987` on
       `origin/develop`).** The "36 skips" (2026-07-14/15 count) is burned down:
       phases 7e–7j cleared the quarantine cluster, and a 2026-07-24 sweep took
