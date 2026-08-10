@@ -217,13 +217,23 @@ _Not yet done in 2b:_ the remaining `create*` helpers are still exported and
 used directly by some suites, and the pre-commit hook is untouched — so
 `--no-verify` is still the standing advice.
 
+> **Superseded 2026-08-10 — the hook part is done and `--no-verify` is no longer
+> the standing advice.** The hook runs lint-staged (Prettier + markdownlint,
+> then ESLint over staged JS/TS/Vue routed to each file's owning package) plus
+> `registry:check`, and a clean commit through all of it takes ~2s. Tests and
+> `tsc` are deliberately excluded — both need built output and fail on a fresh
+> clone for reasons unrelated to the commit, which is what created the bypass
+> habit in the first place. The contract now lives in `CONTRIBUTING.md`; see the
+> closed entry in `docs/backlog/2026-07-post-audit-hardening.md`. The
+> `create*`-helper half of this paragraph is still accurate.
+
 ---
 
 ## Opportunistic hardening (fold in when adjacent — NOT scheduled)
 
 Pull from this list when a task already has us in the relevant code.
 
-**Correctness**
+### Correctness
 
 - [x] **Document numbers always `1`** — `getNextSequence` was a stub that logged
       a warning and returned 1, and BOTH call sites
@@ -235,18 +245,26 @@ Pull from this list when a task already has us in the relevant code.
       highest-matching +1, scoped by prefix AND year. 17 tests, 5 of them
       against real SQLite.
 
-      ⚠️ **Scope correction** (found in the pre-merge review; the commit message
-      for `88b66b9` overstates this as "every" record). `DocumentNumberGenerator`
-      has exactly TWO production call sites. The primary editor path —
-      create draft → publish — goes through `RecordManager.createRecordWithId`,
-      which has **no numbering block at all**, so those records land with **no
-      `document_number`**. That is pre-existing and untouched by this work, but
-      it bounds the fix: numbering is correct now wherever it happens, and the
-      draft→publish path still needs numbering wired in. Related gaps, all
-      pre-existing: a caller-supplied `metadata.document_number` bypasses
-      generation with no uniqueness check (`DocumentNumberGenerator.validate()`
-      exists but has zero call sites), and concurrent creates can race for the
-      same number. → **follow-up work item.**
+  ⚠️ **Scope correction** (found in the pre-merge review; the commit message for
+  `88b66b9` overstates this as "every" record). `DocumentNumberGenerator` has
+  exactly TWO production call sites. The primary editor path — create draft →
+  publish — goes through `RecordManager.createRecordWithId`, which has **no
+  numbering block at all**, so those records land with **no `document_number`**.
+  That is pre-existing and untouched by this work, but it bounds the fix:
+  numbering is correct now wherever it happens, and the draft→publish path still
+  needs numbering wired in. Related gaps, all pre-existing: a caller-supplied
+  `metadata.document_number` bypasses generation with no uniqueness check
+  (`DocumentNumberGenerator.validate()` exists but has zero call sites), and
+  concurrent creates can race for the same number. → **follow-up work item.**
+
+  **That follow-up is DONE (2026-08-10) — all three gaps are closed.** Numbering
+  reaches `createRecordWithId`, so records published from a draft are numbered
+  at publish; a caller-supplied number is checked against the type's configured
+  format and claimed for uniqueness; and the race is closed by a
+  `document_numbers` reservation table whose PRIMARY KEY is the lock.
+  Separately, a configured `document_number_formats` entry now enables numbering
+  for that type rather than being a silent no-op. See the closed entries in
+  `docs/backlog/2026-07-post-audit-hardening.md`.
 
 - [x] **`storage.yml` `backend.path` ignored** — absorbed by
       `InstanceContext.storageRoot`, and two live cwd bugs fixed alongside it
@@ -266,7 +284,7 @@ Pull from this list when a task already has us in the relevant code.
       was reading the stub and silently falling back to defaults on any migrated
       instance.
 
-**Security**
+### Security
 
 - **No "published-only" gate** — public reads return anything _indexed_
   (`workflow_state != internal_only`), not `status=published`
@@ -276,7 +294,7 @@ Pull from this list when a task already has us in the relevant code.
   session manifests arrive **unverified**. → fold in when touching broadcast-box
   enrollment.
 
-**Robustness**
+### Robustness
 
 - **Silent CLI failures** (exit 1, no message). → do with the "loud failures"
   quick win.

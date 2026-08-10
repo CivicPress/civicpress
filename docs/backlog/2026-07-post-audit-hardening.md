@@ -804,6 +804,13 @@ follow-up. (Storage, config+CLI, API-routes clusters + saga/BB/notifications.)
       the TEST-file `no-explicit-any` `warn`→`off` per module (source stays
       `error`). **Process note: run `eslint` locally before pushing — CI does.**
 
+      **Update 2026-08-10: the gap this item describes is now closed at the
+      source.** The pre-commit hook runs ESLint over staged JS/TS/Vue, so the
+      class of failure recorded here — an error-level `no-explicit-any` landing
+      green locally and red in CI — is caught before the commit exists rather
+      than by remembering a process note. See the "fast, reliable subset" entry
+      below.
+
 - [x] **Tier-C skeptic coverage-gap follow-up — DONE 2026-07-20.** Covered by
       `tests/api/pagination-sql-side.test.ts` ("geography linked-records" block,
       4 tests): rows linking the geography across multiple pages, exact `total`
