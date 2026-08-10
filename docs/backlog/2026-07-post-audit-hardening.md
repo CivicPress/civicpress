@@ -75,20 +75,33 @@ dropped (reason inline)
       Still open for the **device/BroadcastBox repo**, which has no protection
       (see [[broadcast-box-hw-open-work]]).
 
-- [ ] **⚠️ `truth-check` is a REQUIRED status check but its workflow has a paths
-      filter.** `truth-check.yml` runs on `pull_request` only for `docs/**`,
-      `scripts/audit-truth-check*`, the workflow itself, or `Makefile`. Because
-      the ruleset requires the `truth-check` context on every PR to `main`, a PR
-      that touches none of those paths waits forever on a check that will never
-      report — the classic required-check-plus-paths-filter deadlock. Not
-      hypothetical: it blocks any code-only release PR.
+- [x] **⚠️ `truth-check` was a REQUIRED status check with a paths filter — a
+      deadlock. FIXED 2026-08-10.** `truth-check.yml` runs on `pull_request`
+      only for `docs/**`, `scripts/audit-truth-check*`, the workflow itself, or
+      `Makefile`. Because the ruleset requires the `truth-check` context on
+      every PR to `main`, a PR that touches none of those paths waits forever on
+      a check that will never report — the classic
+      required-check-plus-paths-filter deadlock. Not hypothetical: it blocks any
+      code-only release PR.
 
       (The 2026-08-10 develop→main PR is unaffected — it touches four `docs/`
       files, and the gate passes: `audit-truth-check: PASS`.)
 
-      Fix options: drop the paths filter so the job always runs (it is ~10s), or
-      add a skip-job that reports the same context, or remove `truth-check` from
-      the required set and rely on it as an advisory push gate.
+      **Confirmed against history, not just reasoned:** across the last 12
+      merged PRs, every one touching a filtered path reported a `truth-check`
+      context and **PR #24, which touched none, has no `truth-check` context at
+      all** — an equivalent PR today could never merge to `main`.
+
+      **Fix: the `paths:` filter is gone from the `pull_request` trigger**, so
+      the check always reports. That was the cheap end of three options (the
+      others being a skip-job reporting the same context, or dropping it from
+      the required set) — the job is a shell scan that finishes in ~10s, so
+      running it on every PR costs nothing worth protecting, and it adds no
+      moving parts.
+
+      ⚠️ `build-test` never had this problem: `ci.yml`'s `pull_request` trigger
+      carries no paths filter, so it always reports. Any future required check
+      must satisfy the same rule — **required contexts cannot be conditional.**
 
 - [ ] **`v0.3.0` was released but never tagged** (found 2026-08-10 during a
       close-out audit). `CHANGELOG.md` carries a full `## [0.3.0] - 2026-08-04`
