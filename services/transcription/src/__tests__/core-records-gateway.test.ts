@@ -5,7 +5,8 @@
  */
 
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { readFile } from 'node:fs/promises';
+import { readdir, readFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { Readable } from 'node:stream';
 import {
   CoreRecordsGateway,
@@ -242,6 +243,42 @@ describe('CoreRecordsGateway.prepareAudio', () => {
     await expect(
       prepare(gw, { id: 's1', capture: { av_file: 'gone' } })
     ).rejects.toThrow(/not found in storage/);
+  });
+
+  // The failure paths above assert only that prepareAudio REJECTS. That left
+  // the cleanup half unpinned: prepareAudio mkdtemps its staging BEFORE the
+  // fetch that can fail, and a caller that gets an exception never receives the
+  // AudioRef — so it never receives the cleanup() either. Without the gateway
+  // releasing the directory itself, a session whose A/V cannot be fetched
+  // stranded one empty dir per retry, every cycle, forever. Deleting the
+  // try/catch in prepareAudio must fail this test.
+  it('releases its staging directory when the fetch fails', async () => {
+    const before = new Set(
+      (await readdir(tmpdir())).filter((n) => n.startsWith('transcribe-av-'))
+    );
+
+    const gw = new CoreRecordsGateway({
+      records: fakeStore([]).store,
+      storage: {
+        async getFileContent() {
+          return null;
+        },
+        async downloadFileStream() {
+          return null;
+        },
+      },
+    });
+
+    await expect(
+      // Deliberately NOT via prepare(): a rejecting call never yields a ref to
+      // register, which is exactly the case the gateway has to handle alone.
+      gw.prepareAudio({ id: 's1', capture: { av_file: 'gone' } } as any)
+    ).rejects.toThrow(/not found in storage/);
+
+    const after = (await readdir(tmpdir())).filter(
+      (n) => n.startsWith('transcribe-av-') && !before.has(n)
+    );
+    expect(after).toEqual([]);
   });
 
   it('propagates a mid-transfer stream failure instead of writing a truncated file', async () => {
