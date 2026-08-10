@@ -10,7 +10,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { mkdtempSync } from 'fs';
+import { mkdtempSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import {
@@ -65,10 +65,17 @@ function fakeEmailChannel(sink: ChannelRequest[]): NotificationChannel {
  * that is a real configured instance, which silently flipped both the
  * "no user-facing channel" and "email configured" cases.
  */
+/**
+ * Roots handed out by `isolatedConfig`, removed in afterEach. Each call minted
+ * a temp dir and nothing removed them — 6 stray `/tmp/civic-notif-cfg-*` per
+ * full run.
+ */
+const isolatedConfigRoots: string[] = [];
+
 function isolatedConfig(): NotificationConfig {
-  return new NotificationConfig(
-    mkdtempSync(join(tmpdir(), 'civic-notif-cfg-'))
-  );
+  const dir = mkdtempSync(join(tmpdir(), 'civic-notif-cfg-'));
+  isolatedConfigRoots.push(dir);
+  return new NotificationConfig(dir);
 }
 
 /** A NotificationService whose email channel is the recording fake + enabled. */
@@ -108,6 +115,9 @@ describe('PasswordRecoveryService', () => {
       delete process.env.CIVIC_CONSOLE_NOTIFICATIONS;
     else process.env.CIVIC_CONSOLE_NOTIFICATIONS = savedConsole;
     vi.restoreAllMocks();
+    for (const dir of isolatedConfigRoots.splice(0)) {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   it('no eligible account → no-op, no token minted, no operator task', async () => {

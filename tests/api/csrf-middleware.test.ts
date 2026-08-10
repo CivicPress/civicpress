@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import express from 'express';
 import request from 'supertest';
 import * as fs from 'fs';
@@ -10,12 +10,23 @@ import { csrfMiddleware } from '../../modules/api/src/middleware/csrf.js';
 // FA-API-018: the CSRF layer must not be skippable by a header any client can
 // set. The only legitimate skips are Bearer-token auth (header auth is not
 // cross-site forgeable) and a valid CSRF token.
+const csrfTempDirs: string[] = [];
+
+afterAll(() => {
+  // Both beforeAll blocks in this file mkdtemp'd a directory and neither
+  // removed it, leaving two strays per full run.
+  for (const d of csrfTempDirs.splice(0)) {
+    fs.rmSync(d, { recursive: true, force: true });
+  }
+});
+
 describe('csrfMiddleware (FA-API-018)', () => {
   let app: express.Express;
   let csrf: CsrfProtection;
 
   beforeAll(async () => {
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'civic-csrf-mw-'));
+    csrfTempDirs.push(tempDir);
     process.env.CIVICPRESS_SECRET = 'a'.repeat(128);
     const secretsManager = SecretsManager.getInstance(tempDir);
     await secretsManager.initialize();
@@ -77,6 +88,7 @@ describe('csrfMiddleware — config-validate skip under the real /api/v1/config 
 
   beforeAll(async () => {
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'civic-csrf-mount-'));
+    csrfTempDirs.push(tempDir);
     process.env.CIVICPRESS_SECRET = 'a'.repeat(128);
     const secretsManager = SecretsManager.getInstance(tempDir);
     await secretsManager.initialize();

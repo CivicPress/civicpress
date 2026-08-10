@@ -144,6 +144,12 @@ describe('Realtime Module Integration', () => {
     // Create config
     config = {
       dataDir: testDir,
+      // Explicit, not inferred. `resolveSystemDataDir` falls back to
+      // `dirname(dataDir)` as the instance root, and `dataDir` here is a bare
+      // mkdtemp directory — so the root resolved to the SHARED os tmpdir and
+      // this instance's secrets landed in `/tmp/.system-data`. Same path the
+      // sqlite file below already uses.
+      systemDataDir: path.join(testDir, '.system-data'),
       database: {
         type: 'sqlite',
         sqlite: {

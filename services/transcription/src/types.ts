@@ -88,6 +88,20 @@ export interface DraftTopic {
 /** A handle to fetched A/V the engine can read (e.g. a local file path). */
 export interface AudioRef {
   path: string;
+  /**
+   * Release whatever backing the handle needed — set by a `prepareAudio` that
+   * allocated something (the core gateway stages the raw container in a temp
+   * dir). The worker calls it in a `finally`, so it must be idempotent and must
+   * not throw.
+   *
+   * This exists because the staged file is a full council recording: the
+   * gateway's own comment notes single-digit GB is normal and the upload cap is
+   * 16 GiB. Without a release step every completed job left one of those in
+   * `os.tmpdir()` forever — the engine cleaned its own scratch dir but nothing
+   * owned the container. Optional so a fake/in-memory gateway that allocates
+   * nothing simply omits it.
+   */
+  cleanup?: () => Promise<void>;
 }
 
 /**

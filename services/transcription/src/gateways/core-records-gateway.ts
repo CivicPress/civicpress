@@ -18,7 +18,7 @@
  */
 
 import { createWriteStream } from 'node:fs';
-import { mkdtemp, writeFile } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, basename } from 'node:path';
 import { pipeline } from 'node:stream/promises';
@@ -35,6 +35,14 @@ import type {
   Visibility,
 } from '../types.js';
 import { renderVtt } from '../vtt.js';
+
+/**
+ * Remove a staged-A/V temp dir. Never throws: this runs from the worker's
+ * `finally`, and a failure to tidy up must not mask (or become) a job failure.
+ */
+async function releaseTempDir(dir: string): Promise<void> {
+  await rm(dir, { recursive: true, force: true }).catch(() => {});
+}
 
 /** A parsed core record (only the fields this gateway reads). */
 export interface CoreRecord {
@@ -339,7 +347,7 @@ export class CoreRecordsGateway implements RecordsGateway {
       // error can't leak an open handle or leave a silently truncated file
       // that the engine would happily transcribe as a short meeting.
       await pipeline(stream, createWriteStream(path));
-      return { path };
+      return { path, cleanup: () => releaseTempDir(dir) };
     }
 
     const buffer = await storage.getFileContent(uuid);
@@ -349,7 +357,7 @@ export class CoreRecordsGateway implements RecordsGateway {
       );
     }
     await writeFile(path, buffer);
-    return { path };
+    return { path, cleanup: () => releaseTempDir(dir) };
   }
 
   /**

@@ -65,6 +65,24 @@ once, instead of independently in a dozen places that each fell back to
   silently fell back to defaults on any migrated instance.
 - **Template base paths, the diagnostics config checker and `civic diagnose`**
   all resolved `.system-data` from the working directory.
+- **Every transcription job leaked its source recording to disk.**
+  `prepareAudio` stages the meeting's A/V in a temp directory for the engine to
+  decode and returns the path; nothing ever removed it. The whisper engine
+  cleaned its own scratch directory, so the staged container — "single-digit GB
+  is normal", against a 16 GiB upload cap — was left in `os.tmpdir()` after
+  every completed job, filling the disk of a long-running instance one meeting
+  at a time. `AudioRef` now carries a `cleanup()` the worker calls in a
+  `finally`, so the staging is released on the failure path too.
+- **The realtime server could write snapshots after `shutdown()` returned.**
+  Three paths escaped teardown: the periodic snapshot pass was fire-and-forget
+  so `clearInterval` could not stop one already running; room finalization was
+  likewise fire-and-forget, and cancelling the grace timer does not cancel a
+  finalize in flight; and `shutdown()` closes client sockets _after_ its final
+  snapshot pass, so each disconnect armed a fresh finalize once the server was
+  already down. Shutdown now waits for the in-flight periodic pass and for every
+  outstanding finalization, and a client leaving during shutdown no longer arms
+  one — the final pass already covers it, so this also drops a duplicate
+  snapshot write per room.
 - **Anonymous readers could see unpublished records.** The public read path
   applied no status filter, on the stated grounds that location implies
   publication — everything in the `records` table is published "by definition".

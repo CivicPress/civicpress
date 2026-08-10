@@ -16,7 +16,7 @@
  * 7. The schemaPath field is set only when fragment file exists
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
@@ -47,6 +47,13 @@ describe('ModuleResolver — discovery characterization (Phase 2d W1-T2)', () =>
 
   beforeEach(() => {
     root = setupFixtureRoot();
+  });
+
+  afterEach(() => {
+    // One fixture root per test and nothing removed them — 12 stray
+    // `/tmp/civicpress-modulereslver-*` per full run. `force` because one test
+    // deliberately deletes the root to assert the missing-dir behaviour.
+    rmSync(root, { recursive: true, force: true });
   });
 
   it('finds top-level modules with module.json (legacy layout)', () => {

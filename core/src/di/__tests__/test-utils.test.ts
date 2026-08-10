@@ -4,7 +4,7 @@
  * Tests for the DI test utility functions.
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterAll } from 'vitest';
 import {
   createTestContainer,
   createMockContainer,
@@ -16,6 +16,9 @@ import {
 } from '../test-utils.js';
 import { Logger } from '../../utils/logger.js';
 import { DatabaseService } from '../../database/database-service.js';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 describe('Test Utilities', () => {
   describe('createTestContainer', () => {
@@ -67,8 +70,18 @@ describe('Test Utilities', () => {
   });
 
   describe('createTestConfig', () => {
+    // createTestConfig mkdtemps when given no dataDir, and nothing here removed
+    // the result — one stray per run.
+    const createdDirs: string[] = [];
+    afterAll(() => {
+      for (const d of createdDirs.splice(0)) {
+        rmSync(d, { recursive: true, force: true });
+      }
+    });
+
     it('should create a test configuration', async () => {
       const config = await createTestConfig();
+      createdDirs.push(config.dataDir);
 
       expect(config.dataDir).toBeDefined();
       expect(config.database).toBeDefined();
@@ -76,7 +89,12 @@ describe('Test Utilities', () => {
     });
 
     it('should allow custom options', async () => {
-      const customDir = '/tmp/custom-test';
+      // Was the hardcoded '/tmp/custom-test'. createTestConfig mkdir's the
+      // parent of its sqlite file, so that literal path had been sitting in
+      // /tmp with a `.system-data` inside it since 2026-07-20 — and being fixed
+      // rather than random, it was also shared with every concurrent run.
+      const customDir = mkdtempSync(join(tmpdir(), 'civicpress-custom-test-'));
+      createdDirs.push(customDir);
       const config = await createTestConfig({ dataDir: customDir });
 
       expect(config.dataDir).toBe(customDir);

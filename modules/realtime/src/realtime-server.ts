@@ -194,6 +194,16 @@ export class RealtimeServer {
   private realtimeConfig: RealtimeConfig | null = null;
   private initialized: boolean = false;
   private snapshotInterval: NodeJS.Timeout | null = null;
+  /** In-flight periodic snapshot pass, awaited by shutdown(). */
+  private pendingPeriodicSnapshot: Promise<void> | null = null;
+  /**
+   * Set for the duration of shutdown(). A client leaving during shutdown must
+   * NOT arm a room finalize: shutdown runs its own authoritative final snapshot
+   * pass, and the disconnects it triggers by closing every socket would
+   * otherwise schedule fresh finalizes AFTER that pass and after the drain —
+   * writing snapshots once shutdown had already returned.
+   */
+  private shuttingDown = false;
   private static readonly SNAPSHOT_CLEANUP_INTERVAL_MS = 6 * 60 * 60 * 1000; // 6h TTL sweep
   // Message rate limiting: clientId -> { count: number, resetTime: number }
   private messageRateLimits: Map<
@@ -306,7 +316,18 @@ export class RealtimeServer {
       // applySnapshot methods it used were removed as dead code (Phase 3 followup).
       if (this.realtimeConfig.snapshots.interval > 0) {
         this.snapshotInterval = setInterval(() => {
-          void this.runPeriodicSnapshots();
+          // Tracked, not fire-and-forget. `clearInterval` in shutdown() stops
+          // FUTURE ticks but cannot cancel a pass already in flight, so a
+          // periodic snapshot could still be writing after shutdown() resolved
+          // — landing files on disk after the caller believed the server was
+          // down. Observed in tests as a snapshot re-creating a directory that
+          // teardown had just removed; in production it is a write racing
+          // whatever runs after shutdown.
+          this.pendingPeriodicSnapshot = this.runPeriodicSnapshots().finally(
+            () => {
+              this.pendingPeriodicSnapshot = null;
+            }
+          );
         }, this.realtimeConfig.snapshots.interval * 1000);
         if (typeof this.snapshotInterval.unref === 'function') {
           this.snapshotInterval.unref();
@@ -1188,7 +1209,10 @@ export class RealtimeServer {
       room.removeClient(clientId);
       // Spec §6.3: last-client-leave starts the room's grace timer (finalize on
       // elapse; reconnect cancels). After removeClient so the count is accurate.
-      this.roomManager?.handleRoomClientLeave(fullRoomId);
+      // Skipped during shutdown — see `shuttingDown`.
+      if (!this.shuttingDown) {
+        this.roomManager?.handleRoomClientLeave(fullRoomId);
+      }
     }
     this.messageRateLimits.delete(clientId);
 
@@ -1617,6 +1641,7 @@ export class RealtimeServer {
     coreInfo('Shutting down realtime server...', {
       operation: 'realtime:server:shutdown',
     });
+    this.shuttingDown = true;
 
     // Detach from the (process-wide) core hook bus first: a listener left behind
     // would keep this dead server — and every map it owns — reachable forever.
@@ -1628,9 +1653,18 @@ export class RealtimeServer {
       this.snapshotInterval = null;
     }
     this.snapshotManager?.stopCleanup();
+    // Let an already-running periodic pass finish before the final pass below,
+    // so no snapshot write outlives shutdown(). Errors are the pass's own to
+    // log; shutdown must not fail because a snapshot did.
+    await this.pendingPeriodicSnapshot?.catch(() => {});
     // Cancel pending grace finalizers — shutdown does its own final snapshot
     // pass below, so an armed timer would double-snapshot / fire post-teardown.
     this.roomManager?.clearAllGraceTimers();
+    // Clearing timers cancels finalizes that have not STARTED. One already
+    // running is a snapshot write in flight, and it has to be waited for or it
+    // lands after shutdown() resolves — which is what left a snapshot behind in
+    // a directory teardown had already removed.
+    await this.roomManager?.drainFinalizations();
 
     // Final snapshot pass for all live rooms — via the HANDLER path (binary +
     // collaborative Markdown draft), the same path periodic/grace-finalize use, so

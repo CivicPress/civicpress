@@ -1413,15 +1413,60 @@ pass closed elsewhere, in two places it did not reach.
       -newermt <run start>` → empty), against ~125–240 stranded per run before.
       All three strays cleared 2026-08-09.
 
-- [ ] **Residual (small, different cause):** the same measured run still left
-      **one** stray temp directory — `/tmp/civicpress-test-XXXXXX` containing an
-      **empty** `.system-data`, so nothing secret is written into it any more.
-      The `civicpress-test-` mkdtemp prefix belongs to
-      `core/src/di/test-utils.ts`,
-      `core/src/di/__tests__/civicpress-integration.test.ts` and
-      `cli/src/commands/__tests__/diagnose.test.ts`; one of them creates the
-      directory and does not remove it on teardown. One directory per full run
-      rather than hundreds, and no secret material — worth tidying, not urgent.
+- [x] **Temp-directory litter: a full run left ~37 of its own directories
+      behind.** **FIXED 2026-08-10.** Started as "ordinary teardown litter with
+      no secret material" and was mostly that — but measuring it turned up **two
+      production bugs**, both write-after-shutdown, which is why it is worth
+      more than a line.
+
+      Method: sweep `/tmp`, snapshot it, run the full suite, diff, then group
+      the new directories by mkdtemp prefix — the prefix names the fixture. That
+      gave an exact inventory (37 across 10 prefixes) instead of a guess, and it
+      is how the two real bugs surfaced at all.
+
+      **Production bug 1 — every transcription job leaked its source
+      recording.** `CoreRecordsGateway.prepareAudio` stages the A/V in a
+      `mkdtemp` dir and returns the path; `worker.ts` transcribed and never
+      removed it. The whisper engine cleans its own scratch dir, so nothing
+      owned the container — and the gateway's own comment notes "single-digit GB
+      is normal, the upload cap is 16 GiB". A long-running instance fills its
+      disk one meeting at a time. `AudioRef` now carries an optional
+      `cleanup()`, the gateway supplies it, and the worker calls it in a
+      `finally` so the failure path (the one that repeats on a retry loop) is
+      covered too.
+
+      **Production bug 2 — the realtime server wrote snapshots after
+      `shutdown()` resolved.** Three separate undrained paths, found by tracing
+      the writes and correlating them per-directory against teardown:
+      (a) the periodic snapshot was `void this.runPeriodicSnapshots()`, so
+      `clearInterval` stopped future ticks but not a pass in flight;
+      (b) `RoomManager` fired `void this.finalizeRoom(...)` at two sites, which
+      `clearAllGraceTimers()` cannot cancel once started; and (c) — the one that
+      actually survived the first two fixes — `shutdown()` closes every socket
+      *after* its final snapshot pass, and each close fires the disconnect
+      handler, which armed a **fresh** finalize after the drain. Now:
+      `pendingPeriodicSnapshot` and `RoomManager.drainFinalizations()` are
+      awaited by shutdown, and a `shuttingDown` flag stops a client-leave from
+      arming a finalize at all during shutdown (the final pass is authoritative,
+      so this also removes a duplicate snapshot).
+
+      The rest was genuine fixture litter: missing teardown in
+      `discovery-characterization` (12/run), `password-recovery-service`
+      (6/run), `csrf-middleware` (2), `audit-logger-failures` (3),
+      `di/test-utils.test.ts` (1) — plus that last file's hardcoded
+      `/tmp/custom-test`, a fixed path shared with every concurrent run that had
+      been sitting there since 2026-07-20.
+
+      ⚠️ Two more instance-root sites in the **realtime module's own** suite
+      (`src/__tests__/test-utils.ts` ×2 and `realtime.integration.test.ts`) also
+      needed the explicit `systemDataDir` — the module suites run from inside
+      the package with their own vitest config, so a root-suite check does not
+      cover them. **Check `modules/*` and `services/*` suites separately.**
+
+      Verified: full root suite leaves **0** new temp directories; every module
+      suite (`realtime`, `transcription`, `broadcast-box`, `storage`) leaves no
+      `/tmp/.system-data` and no stray `secrets.yml`. 204 root files, lint 0
+      errors, UI 56, realtime 12, transcription 7, broadcast-box 17, storage 18.
 
 - [x] **e2e fixtures pass a bare tmpdir as `dataDir`, so their instance root
       becomes the SHARED `/tmp`.** **FIXED 2026-08-10.** Found 2026-08-09 by
