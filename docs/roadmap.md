@@ -251,7 +251,59 @@ integration.
 - Add comprehensive audit logs for actions
 - Enhance hooks/events system for advanced module extensibility
 - Improve workflow status visibility in API responses
-- Advanced workflow features (conditional transitions, multi-step approvals)
+- ~~Advanced workflow features (conditional transitions, multi-step approvals)~~
+  — **dropped 2026-08-11, see below**
+
+**Why "advanced workflow features" was dropped (2026-08-11).** The two halves
+turned out to be a thing that already works and a thing nobody had defined.
+
+- **Multi-step approvals already work**, with configuration alone. The workflow
+  spec's own multi-step example is written entirely in `statuses:`,
+  `transitions:` and `roles.<role>.can_transition:`, all of which are
+  implemented and enforced. A draft → proposed → reviewed → approved chain with
+  clerk and council holding different rights is a `workflows.yml` edit, not a
+  feature. (Per-record-type lifecycles were silently ignored until 2026-08-11;
+  that was a bug and is fixed.)
+- **"Conditional transitions" was never defined.** The word "condition" appears
+  nowhere in the 797-line `docs/specs/workflows.md`. It was a phrase in this
+  goal list with no design, no spec and no requesting user behind it, so it
+  could not be estimated, let alone built. Rather than leave an unbuildable line
+  item in an active milestone, it is dropped. **Revisit when a municipality asks
+  for something concrete** — the request will name which of the shapes below it
+  actually needs.
+
+**Groundwork for that revisit**, so it does not start from scratch. Three
+readings were considered, in increasing cost:
+
+1. **Field predicates** — "a bylaw may not reach `approved` without an attached
+   impact assessment." Expressible as JSON Schema over the record, evaluated by
+   the AJV instance already in `core/src/records/record-schema-validator.ts`,
+   and matching the idiom the spec already uses for `actions[].params_schema`.
+   No new persisted state. The design care is that `transitions` values already
+   have two shapes (`string[]` and `{ value: [...] }`), so a third needs to be
+   backwards compatible.
+2. **Separation of duties** — "whoever moved it to `reviewed` may not approve
+   it." ⚠️ **Verified 2026-08-11: this is NOT as cheap as it looks**, and the
+   check is why. The DB `audit_logs` table cannot answer "who performed the last
+   transition, and between which statuses": record writes log a generic
+   `update_record` / `publish_record` action whose message is free text with no
+   from/to pair. The one place the pair IS captured is
+   `POST /records/:id/status` (`records:status` with `metadata.previousStatus` /
+   `newStatus` and the actor) — but that goes to `AuditLogger`, which appends
+   JSON lines to a **rotated file** (`<systemDataDir>/activity.log`), not a
+   queryable store. Building an authorization control on a rotating file would
+   mean parsing it on every transition, and rotation means the evidence can age
+   out — a control that silently weakens over time. A status change made through
+   the generic update path or the publish saga records no pair at all. So this
+   needs a small piece of durable structure first (a `status_transitions` table,
+   or structured columns on `audit_logs`), which is worth knowing before anyone
+   scopes it as an afternoon's work.
+3. **N-of-M approvals** — "two councillors must sign off." Not a predicate but a
+   feature: an approvals table, an endpoint to cast one, progress UI, and —
+   easiest to overlook — a rule for invalidating approvals when the record is
+   edited after they are collected, or you approve v1 and publish v5.
+
+Full analysis: `docs/plans/2026-08-11-v04x-scoping.md`.
 
 ### Deliverables
 
