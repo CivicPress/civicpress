@@ -26,5 +26,19 @@
 # If you find yourself reaching for --no-verify, the hook has regressed into
 # something too slow or too flaky. Fix the hook rather than routing around it.
 
+# Dependencies missing → say so, in one line, and get out of the way.
+#
+# Without this the hook dies inside pnpm with
+# `ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL Command "lint-staged" not found` and exit
+# 254, which names neither the cause nor the cure. That happens on a fresh
+# clone and in every new git worktree — exactly the moments someone is least
+# able to tell "my commit is bad" from "my checkout is not set up", and exactly
+# how a hook teaches people to reach for --no-verify.
+if [ ! -x "node_modules/.bin/lint-staged" ]; then
+  echo "pre-commit: dependencies are not installed — run 'pnpm install' first."
+  echo "            (skip this once with 'git commit --no-verify')"
+  exit 1
+fi
+
 pnpm exec lint-staged
 pnpm run registry:check
