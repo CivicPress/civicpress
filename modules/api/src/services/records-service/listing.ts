@@ -167,7 +167,8 @@ export class RecordsListing {
       await this.deps.workflowManager.validateTransition(
         currentStatus,
         newStatus,
-        user.role
+        user.role,
+        record.type
       );
 
     if (!transitionValidation.valid) {
@@ -233,7 +234,8 @@ export class RecordsListing {
     const role = user?.role;
     const allowed = await this.deps.workflowManager.getAvailableTransitions(
       fromStatus,
-      role
+      role,
+      record.type
     );
     return allowed || [];
   }

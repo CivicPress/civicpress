@@ -14,6 +14,16 @@ updated: '2026-05-17'
 > user-workflow loader or sandbox, and the REST `workflows` route is a `501`
 > stub. Authoritative status: `docs/project-status.md` (Workflow engine =
 > Partial).
+>
+> **Update 2026-08-11 — the declarative half is now fully honoured.** Statuses,
+> transitions, `roles.<role>.can_transition` and the **"Department-Specific
+> Workflows"** shape below (`recordTypes.<type>.transitions` / `.roles`) are all
+> read and enforced. Until this date only `recordTypes.<type>.statuses` was:
+> per-type transitions and roles were declared here and in the TypeScript
+> interface, and **silently ignored** at runtime, so an instance that configured
+> a per-type lifecycle exactly as documented got the global one instead. That
+> means the **multi-step approval** example below works today with configuration
+> alone — it needs no `.js` engine.
 
 ## Name
 

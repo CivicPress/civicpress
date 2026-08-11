@@ -59,6 +59,30 @@ database guarantee rather than a convention.
 
 ### Fixed
 
+- **Per-record-type workflows were silently ignored.** `docs/specs/workflows.md`
+  documents "Department-Specific Workflows" — a bylaw and a policy having
+  different lifecycles via `recordTypes.<type>.transitions` — and
+  `RecordTypeConfig` has declared `transitions` and `roles` all along. Only
+  `statuses` was ever read: `validateTransition` and `getAvailableTransitions`
+  took **no record type** and judged every record against the **global** graph,
+  so an instance configuring a per-type lifecycle exactly as documented got the
+  global one instead, with nothing reporting that its configuration had been
+  dropped. Both now accept an optional trailing record type, and all seven call
+  sites pass it — `assertStatusWritableByRole` was already **receiving** the
+  type and discarding it.
+
+  A type that declares its own `transitions` (or `roles`) **replaces** the
+  global set rather than merging, matching how per-type `statuses` already
+  behaved and how the spec's example writes each lifecycle out in full.
+
+  ⚠️ **This closed a hole as well as a gap.** `getControlledStatuses` — which
+  decides whether the status-write guard runs at all — collected targets from
+  the global graph only, and its caller returns **early**, skipping validation
+  entirely, for any status it does not report. A status reachable only through
+  some type's own graph was therefore writable by any role with the transition
+  check never running. It now unions every type's graph, deliberately
+  over-inclusive: more statuses gated, each then judged per type.
+
 - **Legal document numbers were always `1`.** `getNextSequence` was a stub that
   returned 1, and both call sites fed it straight into the generator, so every
   legal-type record they created came out as `<PREFIX>-<YEAR>-001` — silent
