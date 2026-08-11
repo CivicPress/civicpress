@@ -91,6 +91,20 @@ named gaps. **Stub/Planned**: advertised but not yet functional.
   before the record row exists) rather than a convention. Index-sync is
   deliberately exempt: it re-reads records already on disk, where the
   frontmatter is the authority.
+- **Also found after that audit, and fixed (2026-08-11): per-record-type
+  workflows, and a status-guard bypass behind them.** The workflow spec
+  documents "Department-Specific Workflows" — a bylaw and a policy having
+  different lifecycles — and `RecordTypeConfig` declared `transitions` and
+  `roles` all along, but only `statuses` was ever read: the transition checks
+  took no record type and judged every record against the global graph, so an
+  instance configuring a per-type lifecycle exactly as documented silently got
+  the global one. Fixing that surfaced the sharper half. `getControlledStatuses`
+  decides whether the status-write guard runs at all, and it collected targets
+  from the global graph only, while its caller returns **early** — skipping
+  validation entirely — for any status it does not report. So a status reachable
+  only through a record type's own graph was writable by any role, with the
+  transition check never running. Both are closed; the second is pinned by a
+  test that fails if the per-type union is removed.
 - **Supply chain:** osv-scanner (PR diff-gate + weekly) and CodeQL SAST
   (report-only) run in CI; dependency advisories were remediated 94 → 2 (the
   residual two are a brace-expansion DoS not reachable from the request
