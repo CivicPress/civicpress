@@ -16,7 +16,9 @@
 
 _metadata:
   name: 'Workflow & Status Management'
-  description: 'Define record statuses, transitions, and role-based permissions'
+  description:
+    'Define record statuses, status transitions, and which roles may make them
+    (record permissions live in roles.yml)'
   version: '1.0.0'
   editable: true
 
