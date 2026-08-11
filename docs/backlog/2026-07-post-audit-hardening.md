@@ -1920,3 +1920,84 @@ not caused by it.
 Still open from the plan's own list, unchanged: the device `--enroll`
 signing-key registration, the three metadata representations, and the
 core↔storage circular build dep.
+
+## Silent-no-op config sweep (2026-08-11)
+
+Run deliberately, after hitting the same bug class three times in a week by
+accident: **configuration that is documented and declared, and that nothing
+reads.** Each earlier instance surfaced while doing something else —
+`document_number_formats` for a non-legal type (never used),
+`recordTypes.<type>.transitions` / `.roles` (declared in the spec AND the
+TypeScript interface, never read), and `getControlledStatuses` skipping its own
+gate. Three in one corner of the config surface is enough evidence to go looking
+on purpose.
+
+Method: enumerate declared keys (the `core/src/config` interfaces, the shipped
+`core/src/defaults/*.yml`, and `docs/specs/workflows.md`), then grep for a
+reader of each. A key with no reader is the finding.
+
+⚠️ **Why a config no-op is worse than a missing feature:** the operator believes
+it took effect. Nothing errors and nothing warns, so the belief survives until
+something is audited.
+
+### Findings
+
+- [ ] **`hooks.enabled`, `workflows.enabled` and `audit.enabled` are written
+      into every instance and read by nothing.** `civic init` writes all three
+      into `.civicrc` (`cli/src/commands/init.ts`, `?? true`), and a whole-repo
+      grep finds **no reader** — not under those names, not as `hooksEnabled` /
+      `auditEnabled`, nowhere. They read as feature switches and are inert.
+
+      The sharp one is `audit.enabled`. Setting it `false` does not stop the
+      audit trail, and — worse for an operator reasoning about the system —
+      seeing it `true` suggests the trail is on *because* of it.
+
+      Deciding what to do needs a product call, not just a patch: either wire
+      the three up, or delete them from what `civic init` generates. Note that
+      for a civic system "the audit trail can be switched off in config" may be
+      undesirable on purpose, in which case the honest fix is to remove the key
+      rather than implement it.
+
+- [ ] **`workflows.yml` `can_edit` / `can_delete` / `can_view` are never
+      consulted; `can_create` only by the CLI.** `docs/specs/workflows.md`
+      documents all four under **"Role Permissions"**. Their only reader is
+      `WorkflowConfigManager.validateAction`, which has exactly **one** call
+      site — `cli/src/commands/create.ts` — and that call passes the literal
+      `'create'`. So three of the four keys are dead everywhere, and the fourth
+      is enforced in the CLI but not the API.
+
+      The API enforces permissions through a *different* system entirely:
+      `roles.yml` via `userCan` / `RoleManager`, at ~59 `requirePermission`
+      sites. So there are two role configurations, one of which is largely
+      decorative.
+
+      ⚠️ **Security-adjacent, though NOT a vulnerability.** The spec's example
+      is `public: can_view: [bylaw, policy, resolution]`, which an operator can
+      reasonably read as "this is what the public may see". It is not: public
+      visibility is governed by the status `public` flag added 2026-08-09,
+      which is fail-closed and independent of this key. So nothing is exposed
+      that should not be — but an operator could believe they had restricted
+      public visibility here and be wrong.
+
+### Checked and NOT findings
+
+Recorded so they are not re-investigated:
+
+- `analytics.yml`, `attachment-types.yml`, `link-categories.yml` and
+  `geography-presets.yml` all have real readers.
+- **The `org-config` fields are fine, despite appearances.** `timezone`,
+  `repo_url` and the `custom.*` branding fields are written by `civic init` and
+  never referenced by the bundled UI — but `GET /info` returns the org config
+  **wholesale** (`organization: orgConfig`), so they are served to any client
+  and a custom frontend can consume them. Unused by our UI is not the same as
+  unread. This one was a false positive until the `/info` route was checked.
+- `actions:` (manual UI triggers) in `docs/specs/workflows.md` is not
+  implemented, but the spec's own status banner says so plainly. Honestly
+  documented as a design target, not a silent no-op.
+
+### Not yet swept
+
+This pass covered `core/src/config`, `core/src/defaults` and the workflow spec.
+Not yet examined: `roles.yml`'s own permission keys, `storage.yml`'s `global.*`
+tuning block, `notifications.yml` channel options, and the `module.json`
+manifest schema.
