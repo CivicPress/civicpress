@@ -28,6 +28,14 @@ directory, every transcription job leaking its multi-GB source recording, and
 the realtime server writing snapshots after shutdown. Nothing was deployed
 publicly while these were open.
 
+**One more gate was found open.** `getControlledStatuses` decides whether the
+status-write guard runs at all, and it only knew about the global transition
+graph — while its caller returns early, skipping validation entirely, for any
+status it does not report. A status reachable only through a record type's own
+workflow was therefore writable by any role with the transition check never
+running. That surfaced while fixing the reason per-type workflows existed on
+paper but not in practice.
+
 **Legal document numbering is the other thing to read.** In a civic register the
 document number IS the citable identity of a record, and all three ways of
 getting one were broken: records published from a draft — the primary editor
