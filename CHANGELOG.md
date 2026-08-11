@@ -28,6 +28,15 @@ directory, every transcription job leaking its multi-GB source recording, and
 the realtime server writing snapshots after shutdown. Nothing was deployed
 publicly while these were open.
 
+**Legal document numbering is the other thing to read.** In a civic register the
+document number IS the citable identity of a record, and all three ways of
+getting one were broken: records published from a draft — the primary editor
+path — were never numbered **at all**; a caller-supplied number was stored with
+no format or uniqueness check; and assignment was a read-then-write race that
+could issue one number twice. Numbering now happens on every create path,
+through a single authority, against a reservation table that makes uniqueness a
+database guarantee rather than a convention.
+
 ### Added
 
 - **`resolveInstanceContext()`** (`@civicpress/core`) — resolves the instance
