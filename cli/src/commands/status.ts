@@ -155,14 +155,16 @@ export function statusCommand(cli: CAC) {
               await workflowManager.validateTransition(
                 currentStatus,
                 newStatus,
-                options.role
+                options.role,
+                recordType
               );
 
             if (!transitionValidation.valid) {
               const availableTransitions =
                 await workflowManager.getAvailableTransitions(
                   currentStatus,
-                  options.role
+                  options.role,
+                  recordType
                 );
 
               cliError(

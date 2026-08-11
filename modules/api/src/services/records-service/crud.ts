@@ -49,9 +49,7 @@ interface ApiRecord {
     path: string;
     original_name: string;
     description?: string;
-    category?:
-      | string
-      | { label: string; value: string; description: string };
+    category?: string | { label: string; value: string; description: string };
   }>;
   linkedRecords: Array<{
     id: string;
@@ -188,7 +186,8 @@ export class RecordsCrud {
     // would skip the review chain, so such a status must be a valid transition
     // FROM the initial status for this role.
     if (typeof data.status === 'string') {
-      const controlled = await this.deps.workflowManager.getControlledStatuses();
+      const controlled =
+        await this.deps.workflowManager.getControlledStatuses();
       if (controlled.has(data.status)) {
         const statuses = await this.deps.workflowManager.getAvailableStatuses(
           data.type
@@ -198,7 +197,8 @@ export class RecordsCrud {
           const check = await this.deps.workflowManager.validateTransition(
             initialStatus,
             data.status,
-            user.role
+            user.role,
+            data.type
           );
           if (!check.valid) {
             throw new HttpError(
@@ -428,12 +428,14 @@ export class RecordsCrud {
       typeof data.status === 'string' &&
       data.status !== currentRecord.status
     ) {
-      const controlled = await this.deps.workflowManager.getControlledStatuses();
+      const controlled =
+        await this.deps.workflowManager.getControlledStatuses();
       if (controlled.has(data.status)) {
         const check = await this.deps.workflowManager.validateTransition(
           currentRecord.status,
           data.status,
-          user.role
+          user.role,
+          currentRecord.type
         );
         if (!check.valid) {
           throw new HttpError(

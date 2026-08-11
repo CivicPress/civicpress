@@ -92,27 +92,89 @@ export class WorkflowConfigManager {
     };
   }
 
+  /**
+   * A config list, in either shape it may be stored in.
+   *
+   * A value is normally a plain `string[]`, but config that has been through
+   * the metadata-carrying editor comes back as `{ value: string[], type, … }`.
+   * Every reader has to cope with both, and this used to be written out inline
+   * at ~10 sites — which is exactly how the per-record-type path could come to
+   * disagree with the global one about what a list is.
+   */
+  private unwrapList(raw: unknown): string[] {
+    if (Array.isArray(raw)) return raw as string[];
+    if (raw && typeof raw === 'object' && 'value' in raw) {
+      return ((raw as { value?: string[] }).value || []) as string[];
+    }
+    return [];
+  }
+
+  /**
+   * The transition graph that governs `recordType`.
+   *
+   * A type that declares its own `transitions` REPLACES the global graph
+   * rather than merging with it — matching how `getAvailableStatuses` already
+   * treats per-type `statuses`, and matching the spec's
+   * "Department-Specific Workflows" example, which writes each type's
+   * lifecycle out in full. A type that declares none inherits the global graph.
+   */
+  private async transitionsFor(
+    recordType?: string
+  ): Promise<Record<string, unknown>> {
+    const config = await this.loadConfig();
+    const typeTransitions = recordType
+      ? config.recordTypes?.[recordType]?.transitions
+      : undefined;
+    return (typeTransitions ?? config.transitions ?? {}) as Record<
+      string,
+      unknown
+    >;
+  }
+
+  /**
+   * The role permissions that govern `recordType`, with the same
+   * replace-not-merge rule. `RecordTypeConfig.roles` has been declared since
+   * this interface was written and was never read — the same silent-no-op as
+   * the transitions it sits beside, so it is honoured here too.
+   */
+  private async rolesFor(
+    recordType?: string
+  ): Promise<Record<string, RolePermissions>> {
+    const config = await this.loadConfig();
+    const typeRoles = recordType
+      ? config.recordTypes?.[recordType]?.roles
+      : undefined;
+    return typeRoles ?? config.roles ?? {};
+  }
+
+  /**
+   * Transition targets this role may reach from `fromStatus`, including any
+   * granted by the `any` wildcard.
+   */
+  private roleTransitionTargets(
+    roleConfig: RolePermissions,
+    fromStatus: string
+  ): string[] {
+    if (!roleConfig.can_transition) return [];
+    return [
+      ...this.unwrapList(roleConfig.can_transition[fromStatus]),
+      ...this.unwrapList(roleConfig.can_transition['any']),
+    ];
+  }
+
+  /**
+   * @param recordType - when given, the type's own workflow governs if it
+   * declares one. Optional and trailing, so existing callers keep the global
+   * behaviour they had.
+   */
   async validateTransition(
     fromStatus: string,
     toStatus: string,
-    role?: string
+    role?: string,
+    recordType?: string
   ): Promise<{ valid: boolean; reason?: string }> {
-    const config = await this.loadConfig();
-
-    // Check if transition is allowed - handle both old and new metadata formats
-    let allowedTransitions: string[] = [];
-    if (config.transitions[fromStatus]) {
-      if (Array.isArray(config.transitions[fromStatus])) {
-        allowedTransitions = config.transitions[fromStatus] as string[];
-      } else if (
-        config.transitions[fromStatus] &&
-        typeof config.transitions[fromStatus] === 'object' &&
-        'value' in config.transitions[fromStatus]
-      ) {
-        allowedTransitions =
-          (config.transitions[fromStatus] as { value?: string[] }).value || [];
-      }
-    }
+    const transitions = await this.transitionsFor(recordType);
+    const allowedTransitions = this.unwrapList(transitions[fromStatus]);
 
     if (!allowedTransitions.includes(toStatus)) {
       const transitionsText =
@@ -121,7 +183,7 @@ export class WorkflowConfigManager {
           : 'none (final status)';
 
       // Check if this might be a typo (e.g., "review" instead of "reviewed")
-      const availableStatuses = await this.getAvailableStatuses();
+      const availableStatuses = await this.getAvailableStatuses(recordType);
       const similarStatus = availableStatuses.find(
         (status) =>
           status.toLowerCase().includes(toStatus.toLowerCase()) ||
@@ -141,7 +203,8 @@ export class WorkflowConfigManager {
 
     // Check role permissions if role is provided
     if (role) {
-      const roleConfig = config.roles[role];
+      const roles = await this.rolesFor(recordType);
+      const roleConfig = roles[role];
       if (!roleConfig) {
         return {
           valid: false,
@@ -149,36 +212,7 @@ export class WorkflowConfigManager {
         };
       }
 
-      let allowedForRole: string[] = [];
-      if (roleConfig.can_transition) {
-        if (roleConfig.can_transition[fromStatus]) {
-          if (Array.isArray(roleConfig.can_transition[fromStatus])) {
-            allowedForRole = roleConfig.can_transition[fromStatus] as string[];
-          } else if (
-            roleConfig.can_transition[fromStatus] &&
-            typeof roleConfig.can_transition[fromStatus] === 'object' &&
-            'value' in roleConfig.can_transition[fromStatus]
-          ) {
-            allowedForRole =
-              (roleConfig.can_transition[fromStatus] as { value?: string[] }).value || [];
-          }
-        }
-
-        if (roleConfig.can_transition['any']) {
-          let anyTransitions: string[] = [];
-          if (Array.isArray(roleConfig.can_transition['any'])) {
-            anyTransitions = roleConfig.can_transition['any'] as string[];
-          } else if (
-            roleConfig.can_transition['any'] &&
-            typeof roleConfig.can_transition['any'] === 'object' &&
-            'value' in roleConfig.can_transition['any']
-          ) {
-            anyTransitions =
-              (roleConfig.can_transition['any'] as { value?: string[] }).value || [];
-          }
-          allowedForRole = [...allowedForRole, ...anyTransitions];
-        }
-      }
+      const allowedForRole = this.roleTransitionTargets(roleConfig, fromStatus);
 
       if (!allowedForRole.includes(toStatus)) {
         return {
@@ -267,17 +301,28 @@ export class WorkflowConfigManager {
     const config = await this.loadConfig();
     const controlled = new Set<string>();
     const collect = (raw: unknown) => {
-      let targets: string[] = [];
-      if (Array.isArray(raw)) {
-        targets = raw as string[];
-      } else if (raw && typeof raw === 'object' && 'value' in raw) {
-        targets = ((raw as { value?: string[] }).value || []) as string[];
-      }
-      targets.forEach((s) => controlled.add(s));
+      this.unwrapList(raw).forEach((s) => controlled.add(s));
     };
+
     for (const raw of Object.values(config.transitions || {})) {
       collect(raw);
     }
+
+    // Per-record-type graphs count too, and leaving them out was not merely
+    // incomplete — it was a hole. The caller
+    // (`assertStatusWritableByRole`) returns EARLY, skipping validation
+    // entirely, for any status it does not consider controlled. So a status
+    // reachable only through some type's own transition graph would have been
+    // writable by any role without the transition check ever running. This is
+    // a union across all types on purpose: "controlled" means "governed by a
+    // transition graph somewhere", and being over-inclusive here only causes
+    // MORE validation, which then answers per-type correctly.
+    for (const typeConfig of Object.values(config.recordTypes || {})) {
+      for (const raw of Object.values(typeConfig?.transitions || {})) {
+        collect(raw);
+      }
+    }
+
     return controlled;
   }
 
@@ -312,69 +357,30 @@ export class WorkflowConfigManager {
     return [];
   }
 
+  /**
+   * @param recordType - when given, the type's own workflow governs if it
+   * declares one. Optional and trailing, so existing callers keep the global
+   * behaviour they had.
+   */
   async getAvailableTransitions(
     fromStatus: string,
-    role?: string
+    role?: string,
+    recordType?: string
   ): Promise<string[]> {
-    const config = await this.loadConfig();
-
-    // Handle both old and new metadata formats
-    let allTransitions: string[] = [];
-    if (config.transitions[fromStatus]) {
-      if (Array.isArray(config.transitions[fromStatus])) {
-        // Old format: direct array
-        allTransitions = config.transitions[fromStatus] as string[];
-      } else if (
-        config.transitions[fromStatus] &&
-        typeof config.transitions[fromStatus] === 'object' &&
-        'value' in config.transitions[fromStatus]
-      ) {
-        // New format: { value: string[], type: string, description: string, required: boolean }
-        allTransitions = (config.transitions[fromStatus] as { value?: string[] }).value || [];
-      }
-    }
+    const transitions = await this.transitionsFor(recordType);
+    const allTransitions = this.unwrapList(transitions[fromStatus]);
 
     if (!role) {
       return allTransitions;
     }
 
-    const roleConfig = config.roles[role];
+    const roles = await this.rolesFor(recordType);
+    const roleConfig = roles[role];
     if (!roleConfig) {
       return [];
     }
 
-    let roleTransitions: string[] = [];
-    if (roleConfig.can_transition) {
-      if (roleConfig.can_transition[fromStatus]) {
-        if (Array.isArray(roleConfig.can_transition[fromStatus])) {
-          // Old format: direct array
-          roleTransitions = roleConfig.can_transition[fromStatus] as string[];
-        } else if (
-          roleConfig.can_transition[fromStatus] &&
-          typeof roleConfig.can_transition[fromStatus] === 'object' &&
-          'value' in roleConfig.can_transition[fromStatus]
-        ) {
-          // New format: { value: string[], type: string, description: string, required: boolean }
-          roleTransitions =
-            (roleConfig.can_transition[fromStatus] as { value?: string[] }).value || [];
-        }
-      }
-
-      if (roleConfig.can_transition['any']) {
-        let anyTransitions: string[] = [];
-        if (Array.isArray(roleConfig.can_transition['any'])) {
-          anyTransitions = roleConfig.can_transition['any'] as string[];
-        } else if (
-          roleConfig.can_transition['any'] &&
-          typeof roleConfig.can_transition['any'] === 'object' &&
-          'value' in roleConfig.can_transition['any']
-        ) {
-          anyTransitions =
-            (roleConfig.can_transition['any'] as { value?: string[] }).value || [];
-        }
-        roleTransitions = [...roleTransitions, ...anyTransitions];
-      }
-    }
+    const roleTransitions = this.roleTransitionTargets(roleConfig, fromStatus);
 
     // Return the intersection of all possible transitions and role-allowed transitions
     // If no role restrictions, return all transitions
