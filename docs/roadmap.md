@@ -260,8 +260,38 @@ integration.
 - Comprehensive audit trail UI
 - Foundation for future collaborative editing
 
-**Note:** Basic workflow engine and permissions are already implemented
-(v0.1.x). This phase focuses on UI integration and advanced features.
+**⚠️ Starting point — corrected 2026-08-11, verified against the code.** This
+section previously said "basic workflow engine and permissions are already
+implemented (v0.1.x). This phase focuses on UI integration and advanced
+features." That is **half true**, and the wrong half sets the wrong expectation
+for what this milestone costs.
+
+- **Permissions: yes, real.** Roles via `userCan` / `RoleManager`, enforced at
+  ~59 `requirePermission` sites across the API, hardened through the `FA-*`
+  audit and tested end-to-end. Building management UI on top of this is
+  genuinely "UI integration".
+- **Workflow _validation_: yes, real.** `WorkflowConfigManager` owns statuses
+  and legal transitions, and create / update / publish enforce them
+  (`assertStatusWritableByRole`, per `FA-API-008`).
+- **Workflow _engine_: no.** `core/src/workflows/workflow-engine.ts` registers
+  exactly **one** real workflow — `update-index`, driven by the `record:updated`
+  hook. The former `approval` / `publication` / `archival` entries were log-only
+  stubs and were **deliberately removed** in core-002 rather than left
+  advertised. Programmable civic workflows are **spec-only**
+  (`docs/specs/workflows.md`): the design is sandboxed user `.js` files in
+  `data/.civic/workflows/`, and **no loader and no sandbox executor exist**.
+
+So "advanced workflow features (conditional transitions, multi-step approvals)"
+above is not a UI task sitting on a finished engine — it presumes an execution
+engine that has yet to be built, and sandboxing user-supplied code in a system
+of record is a security-sensitive design problem, not a detail.
+`Workflow _engine_ (programmable)` is listed as **Partial** in
+`docs/project-status.md`, which was accurate while this note was not.
+
+**Scope this milestone before starting it.** The shape is a real decision —
+UI-only on the validation that already works, declarative config-driven
+transitions, or the spec'd sandboxed loader — and they differ by a large factor
+in cost and risk.
 
 ---
 
