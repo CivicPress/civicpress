@@ -1042,19 +1042,23 @@ async function setupCivicrcFromFile(
   // the first command onwards. `modules` is routed to config.yml below;
   // `record_types` has no reader at all — the live setting is
   // `record_types_config`, which config.yml already carries.
+  //
+  // `hooks.enabled`, `workflows.enabled` and `audit.enabled` are NOT written
+  // either, as of 2026-08-11. All three were emitted here and read by nothing
+  // anywhere in the repo — inert switches that an operator would reasonably
+  // take for feature flags. The worst was `audit.enabled`: setting it false
+  // never stopped the audit trail, and seeing it true implied the trail was on
+  // because of it. Writing a key that does nothing is worse than omitting the
+  // feature, because the operator believes it took effect.
+  //
+  // Reintroducing any of them means wiring a real gate first — hook emission,
+  // workflow execution, or audit writes — and for a system of record, whether
+  // the audit trail SHOULD be switchable from config is a decision to make
+  // deliberately rather than inherit from a template.
   const civicrc = {
     version: '1.0.0',
     dataDir: dataDir,
     default_role: config.default_role || 'clerk',
-    hooks: {
-      enabled: config.hooks?.enabled ?? true,
-    },
-    workflows: {
-      enabled: config.workflows?.enabled ?? true,
-    },
-    audit: {
-      enabled: config.audit?.enabled ?? true,
-    },
     database: {
       type: config.database?.type || 'sqlite',
       sqlite:

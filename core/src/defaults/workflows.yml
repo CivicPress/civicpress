@@ -1,10 +1,23 @@
 # Workflow Configuration
-# This file defines record statuses, transitions, and role-based permissions
+# This file defines record statuses, transitions, and the roles allowed to move
+# records between them.
+#
+# SCOPE — this file governs STATUS TRANSITIONS only. Who may create, edit,
+# delete or view a record is `roles.yml`, enforced through `userCan` /
+# RoleManager across the API. That is the authority; do not add can_edit /
+# can_delete / can_view here expecting them to take effect.
+#
+# Those three keys used to ship in this file and were read by nothing (swept
+# 2026-08-11). `can_view` was the misleading one: it looked like it controlled
+# what the public could see, while actual public visibility is decided by the
+# `public` flag on each record status — fail-closed, and independent of this
+# file. `can_create` is still honoured, but only by the `civic create` CLI
+# command; the API gates creation through roles.yml like everything else.
 
 _metadata:
-  name: "Workflow & Status Management"
-  description: "Define record statuses, transitions, and role-based permissions"
-  version: "1.0.0"
+  name: 'Workflow & Status Management'
+  description: 'Define record statuses, transitions, and role-based permissions'
+  version: '1.0.0'
   editable: true
 
 # Available Record Statuses
@@ -67,36 +80,6 @@ roles:
       type: 'array'
       description: 'Record types admin can create'
       required: true
-    can_edit:
-      value:
-        - bylaw
-        - policy
-        - resolution
-        - proclamation
-        - ordinance
-      type: 'array'
-      description: 'Record types admin can edit'
-      required: true
-    can_delete:
-      value:
-        - bylaw
-        - policy
-        - resolution
-        - proclamation
-        - ordinance
-      type: 'array'
-      description: 'Record types admin can delete'
-      required: true
-    can_view:
-      value:
-        - bylaw
-        - policy
-        - resolution
-        - proclamation
-        - ordinance
-      type: 'array'
-      description: 'Record types admin can view'
-      required: true
     can_transition:
       draft:
         value: [proposed, archived]
@@ -133,24 +116,6 @@ roles:
       type: 'array'
       description: 'Record types clerk can create'
       required: true
-    can_edit:
-      value:
-        - bylaw
-        - policy
-        - resolution
-      type: 'array'
-      description: 'Record types clerk can edit'
-      required: true
-    can_view:
-      value:
-        - bylaw
-        - policy
-        - resolution
-        - proclamation
-        - ordinance
-      type: 'array'
-      description: 'Record types clerk can view'
-      required: true
     can_transition:
       draft:
         value: [proposed]
@@ -158,14 +123,8 @@ roles:
         description: 'Statuses clerk can transition draft records to'
         required: true
 
+  # Kept as an explicit empty transition set rather than dropped entirely: the
+  # role must still resolve here, or `validateTransition` reports "role not
+  # found" instead of "this role may not make that transition".
   public:
-    can_view:
-      value:
-        - bylaw
-        - policy
-        - resolution
-        - proclamation
-        - ordinance
-      type: 'array'
-      description: 'Record types public users can view'
-      required: true
+    can_transition: {}

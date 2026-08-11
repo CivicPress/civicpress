@@ -1942,11 +1942,18 @@ something is audited.
 
 ### Findings
 
-- [ ] **`hooks.enabled`, `workflows.enabled` and `audit.enabled` are written
-      into every instance and read by nothing.** `civic init` writes all three
-      into `.civicrc` (`cli/src/commands/init.ts`, `?? true`), and a whole-repo
-      grep finds **no reader** — not under those names, not as `hooksEnabled` /
-      `auditEnabled`, nowhere. They read as feature switches and are inert.
+- [x] **`hooks.enabled`, `workflows.enabled` and `audit.enabled` are written
+      into every instance and read by nothing. FIXED 2026-08-11 — removed from
+      `civic init`** rather than implemented, per maintainer decision. New
+      instances no longer carry keys that do nothing; existing `.civicrc` files
+      keep theirs, still inert and now harmless to delete by hand. The comment
+      at the write site records what reintroducing any of them would require,
+      and flags that making the audit trail switchable from config is a decision
+      to take deliberately rather than inherit from a template. `civic init`
+      writes all three into `.civicrc` (`cli/src/commands/init.ts`, `?? true`),
+      and a whole-repo grep finds **no reader** — not under those names, not as
+      `hooksEnabled` / `auditEnabled`, nowhere. They read as feature switches
+      and are inert.
 
       The sharp one is `audit.enabled`. Setting it `false` does not stop the
       audit trail, and — worse for an operator reasoning about the system —
@@ -1958,13 +1965,22 @@ something is audited.
       undesirable on purpose, in which case the honest fix is to remove the key
       rather than implement it.
 
-- [ ] **`workflows.yml` `can_edit` / `can_delete` / `can_view` are never
-      consulted; `can_create` only by the CLI.** `docs/specs/workflows.md`
-      documents all four under **"Role Permissions"**. Their only reader is
-      `WorkflowConfigManager.validateAction`, which has exactly **one** call
-      site — `cli/src/commands/create.ts` — and that call passes the literal
-      `'create'`. So three of the four keys are dead everywhere, and the fourth
-      is enforced in the CLI but not the API.
+- [x] **`workflows.yml` `can_edit` / `can_delete` / `can_view` are never
+      consulted; `can_create` only by the CLI. FIXED 2026-08-11 — `roles.yml`
+      documented as the authority** rather than wiring a second permission
+      system, per maintainer decision. The three unenforced keys are gone from
+      the shipped defaults; `workflows.yml` gained a header stating it governs
+      status transitions only; and the spec's "Role Permissions" section is now
+      a per-key enforcement table with an explicit warning that `can_view` does
+      NOT control public visibility. ⚠️ One structural note: the `public` role
+      kept an explicit empty `can_transition: {}` — deleting its only key would
+      have left an empty mapping, and `validateTransition` would then report
+      "role not found" instead of "that role may not make that transition".
+      `docs/specs/workflows.md` documents all four under **"Role Permissions"**.
+      Their only reader is `WorkflowConfigManager.validateAction`, which has
+      exactly **one** call site — `cli/src/commands/create.ts` — and that call
+      passes the literal `'create'`. So three of the four keys are dead
+      everywhere, and the fourth is enforced in the CLI but not the API.
 
       The API enforces permissions through a *different* system entirely:
       `roles.yml` via `userCan` / `RoleManager`, at ~59 `requirePermission`
