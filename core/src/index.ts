@@ -296,6 +296,22 @@ export {
 } from './config/central-config.js';
 export type { CentralConfig } from './config/central-config.js';
 
+// Export the instance context — the single-root resolver every module reads
+// layout from (data root vs code root; see config/instance-context.ts).
+export {
+  resolveInstanceContext,
+  getInstanceContext,
+  setInstanceContext,
+  resetInstanceContext,
+  resolveCodeRoot,
+  findConfigFile,
+} from './config/instance-context.js';
+export type {
+  InstanceContext,
+  InstanceConfigInput,
+  ResolveInstanceContextOptions,
+} from './config/instance-context.js';
+
 // Export record types configuration
 export {
   DEFAULT_RECORD_TYPES,

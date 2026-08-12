@@ -8,6 +8,289 @@ and this project adheres to
 
 ## [Unreleased]
 
+<!-- markdownlint-disable MD024 -->
+
+A **contributor DevX + resolution-hardening** pass ahead of v0.4.x. Its keystone
+is a single-root instance resolver: "where is this instance?" is now answered
+once, instead of independently in a dozen places that each fell back to
+`process.cwd()`. Several live bugs fell out of that migration.
+
+**Read the Fixed section even if you skim the rest.** What began as a resolver
+migration turned up defects well outside it, because each fix exposed the next.
+Most consequential: **anonymous API reads were not gated on publication at all**
+— unpublished records were listable, fetchable in full, searchable and countable
+by a caller with no credentials, and two of those endpoints had no
+authentication middleware on them whatsoever. In the same vein, **a draft
+record's attachments were fetchable by anyone holding the file's UUID**, because
+editor uploads landed in the `public` folder. Also here: a signing secret
+written outside any live instance, the audit trail written to the working
+directory, every transcription job leaking its multi-GB source recording, and
+the realtime server writing snapshots after shutdown. Nothing was deployed
+publicly while these were open.
+
+**One more gate was found open.** `getControlledStatuses` decides whether the
+status-write guard runs at all, and it only knew about the global transition
+graph — while its caller returns early, skipping validation entirely, for any
+status it does not report. A status reachable only through a record type's own
+workflow was therefore writable by any role with the transition check never
+running. That surfaced while fixing the reason per-type workflows existed on
+paper but not in practice.
+
+**Legal document numbering is the other thing to read.** In a civic register the
+document number IS the citable identity of a record, and all three ways of
+getting one were broken: records published from a draft — the primary editor
+path — were never numbered **at all**; a caller-supplied number was stored with
+no format or uniqueness check; and assignment was a read-then-write race that
+could issue one number twice. Numbering now happens on every create path,
+through a single authority, against a reservation table that makes uniqueness a
+database guarantee rather than a convention.
+
+### Added
+
+- **`resolveInstanceContext()`** (`@civicpress/core`) — resolves the instance
+  root ONCE (an explicit argument, or a single `.civicrc` walk-up) and derives
+  `dataDir` / `systemDataDir` / `modulesDir` / `storageRoot` from it. It
+  distinguishes the DATA root from `codeRoot`, the installed-code location, so a
+  split deployment (the Docker image ships code at `/app` and runs with WORKDIR
+  `/instance`) discovers modules correctly — modules are code, not data. A root
+  can also be **installed** via `setInstanceContext()` rather than discovered.
+- **Real document-number sequencing.** `RecordStore.getDocumentNumbers()` plus a
+  format-aware matcher, so legal numbering continues from what has actually been
+  issued.
+- **A `document_numbers` reservation table**, and one authority
+  (`resolveDocumentNumber`) that every record-creating path now goes through. A
+  number is CLAIMED — insert against a PRIMARY KEY — before the record row
+  exists, which is what makes it safe under concurrency; the sequence is read
+  from issued numbers and reservations together, so a database predating the
+  table needs no backfill. Saga compensation hands a number back rather than
+  burning it.
+
+### Fixed
+
+- **Per-record-type workflows were silently ignored.** `docs/specs/workflows.md`
+  documents "Department-Specific Workflows" — a bylaw and a policy having
+  different lifecycles via `recordTypes.<type>.transitions` — and
+  `RecordTypeConfig` has declared `transitions` and `roles` all along. Only
+  `statuses` was ever read: `validateTransition` and `getAvailableTransitions`
+  took **no record type** and judged every record against the **global** graph,
+  so an instance configuring a per-type lifecycle exactly as documented got the
+  global one instead, with nothing reporting that its configuration had been
+  dropped. Both now accept an optional trailing record type, and all seven call
+  sites pass it — `assertStatusWritableByRole` was already **receiving** the
+  type and discarding it.
+
+  A type that declares its own `transitions` (or `roles`) **replaces** the
+  global set rather than merging, matching how per-type `statuses` already
+  behaved and how the spec's example writes each lifecycle out in full.
+
+  ⚠️ **This closed a hole as well as a gap.** `getControlledStatuses` — which
+  decides whether the status-write guard runs at all — collected targets from
+  the global graph only, and its caller returns **early**, skipping validation
+  entirely, for any status it does not report. A status reachable only through
+  some type's own graph was therefore writable by any role with the transition
+  check never running. It now unions every type's graph, deliberately
+  over-inclusive: more statuses gated, each then judged per type.
+
+- **Legal document numbers were always `1`.** `getNextSequence` was a stub that
+  returned 1, and both call sites fed it straight into the generator, so every
+  legal-type record they created came out as `<PREFIX>-<YEAR>-001` — silent
+  duplicates of the record's own citable identity. Numbering now continues from
+  the highest issued number, scoped by prefix AND year, and honours custom
+  `document_number_formats` (a prefix containing a digit, or a `.` / `_`
+  separator, previously matched nothing and restarted the sequence).
+- **🔴 Records published from a draft were never numbered at all.** Numbering
+  lived at two of the three create paths; the draft → publish saga goes through
+  `RecordManager.createRecordWithId`, which had no numbering block — so a bylaw
+  published the way the editor publishes bylaws was stored with **no
+  `document_number`**. Permanently unnumbered, missing from
+  `getDocumentNumbers()`, and therefore invisible to the sequence of every
+  record numbered after it. Numbering now happens at publish, which is also the
+  right moment for a legal register: abandoned drafts do not burn sequences.
+- **A caller-supplied `document_number` bypassed every check.** It was stored
+  verbatim — `DocumentNumberGenerator.validate()` existed with zero call sites
+  and the schema declared no pattern — so a record could carry another record's
+  number, or anything at all. A supplied number is now checked against the
+  type's CONFIGURED format (`ValidationError`) and claimed for uniqueness
+  (`ConflictError`). `validate()` itself was broken for the case it would first
+  be used in: it compared against the BUILT-IN prefix, so on any instance with
+  custom `document_number_formats` it rejected precisely what the generator
+  emits.
+- **Document-number assignment was a read-then-write race.** Two concurrent
+  creates of the same type and year computed the same next sequence and both
+  kept it — nothing locked, and with the number inside the metadata JSON there
+  is no column to constrain. Reservation closes it; pinned by a concurrency test
+  that fails against the old shape.
+- **The orphaned-file cleaner could delete the wrong tree.** It resolved a
+  relative local provider path against the literal `.system-data` — i.e.
+  `process.cwd()` — so when run from anywhere but the instance root it scanned a
+  different tree than the database it compared against, and every file it found
+  there looked like an orphan. `cleanupOrphanedFiles` deletes those, so this was
+  a live data-loss path rather than a harmless empty scan.
+- **Cloud storage credentials were read from the working directory.**
+  `CredentialManager` was constructed with no path and fell back to
+  `<cwd>/.system-data/storage.yml`, making file-configured credentials invisible
+  outside the instance root. A relative GCS `keyFilename` now resolves against
+  the instance root too.
+- **The storage CLI read a different `storage.yml` than core and the API.** It
+  computed its own systemDataDir from cwd behind a test heuristic that sniffed
+  the data path (`dataDir.includes('/tmp/') || dataDir.includes('test')`), so a
+  production instance whose dataDir merely contained "test" took the test
+  branch.
+- **`civic init` produced an instance that nagged about its own config.** All
+  three `.civicrc` writers seeded top-level `modules` and `record_types`, both
+  deprecated there, so every freshly-initialised instance warned "Deprecated: …
+  Prefer data/.civic/config.yml" on every command. `modules` now lives only in
+  `data/.civic/config.yml`; `record_types` had no reader at all.
+- **Notification config and audit log followed the working directory.** Both
+  defaulted to a relative `.system-data`, and the DI container read
+  `notifications.yml` from `dataDir` — the location the configuration service
+  migrates the file OUT of, leaving a pointer stub — so the notification config
+  silently fell back to defaults on any migrated instance.
+- **Template base paths, the diagnostics config checker and `civic diagnose`**
+  all resolved `.system-data` from the working directory.
+- **Every transcription job leaked its source recording to disk.**
+  `prepareAudio` stages the meeting's A/V in a temp directory for the engine to
+  decode and returns the path; nothing ever removed it. The whisper engine
+  cleaned its own scratch directory, so the staged container — "single-digit GB
+  is normal", against a 16 GiB upload cap — was left in `os.tmpdir()` after
+  every completed job, filling the disk of a long-running instance one meeting
+  at a time. `AudioRef` now carries a `cleanup()` the worker calls in a
+  `finally`, so the staging is released on the failure path too. `prepareAudio`
+  also releases the directory itself when the fetch throws: it creates the
+  staging before anything can fail, and a caller that gets an exception never
+  receives the `AudioRef` — so it never receives the `cleanup()` either. A
+  session whose A/V could not be fetched was stranding one directory per retry,
+  every cycle, indefinitely.
+- **The realtime server could write snapshots after `shutdown()` returned.**
+  Three paths escaped teardown: the periodic snapshot pass was fire-and-forget
+  so `clearInterval` could not stop one already running; room finalization was
+  likewise fire-and-forget, and cancelling the grace timer does not cancel a
+  finalize in flight; and `shutdown()` closes client sockets _after_ its final
+  snapshot pass, so each disconnect armed a fresh finalize once the server was
+  already down. Shutdown now waits for the in-flight periodic pass and for every
+  outstanding finalization, and a client leaving during shutdown no longer arms
+  one — the final pass already covers it, so this also drops a duplicate
+  snapshot write per room.
+- **Anonymous readers could see unpublished records.** The public read path
+  applied no status filter, on the stated grounds that location implies
+  publication — everything in the `records` table is published "by definition".
+  Nothing enforced that: `RecordStore.createRecord` inserts `status || 'draft'`
+  and the indexer syncs every on-disk entry in whatever status it carries. In
+  practice an anonymous caller listing records received every status present —
+  draft, pending_review, approved, rejected included — `GET /records/<id>`
+  returned an unpublished record in full, `/records/<id>/frontmatter` served its
+  entire markdown body, `GET /search` returned unpublished records in full,
+  `GET /records/summary` published a per-status histogram of them, and both
+  `/geography/:id/linked-records` and `/records/summary` had no authentication
+  on them at all. Visibility is now a property of the status:
+  `RecordStatusConfig` gains `public`, defaulting to **not public**, with
+  `published`, `archived` and `expired` declared public. Every anonymous read
+  path — list, by-id, frontmatter, search, summary and linked-records — goes
+  through one gate, and an unpublished record answers 404 rather than 403 so its
+  existence is not disclosed either. Authenticated callers are unaffected.
+  **Municipalities running a custom `record_statuses_config` should confirm
+  which of their statuses need `public: true`.**
+- **A draft record's attachments were readable by anyone with the file's UUID.**
+  Editor uploads landed in the `public` storage folder, so an attachment was
+  fetchable from the moment it was uploaded — before the record carrying it was
+  ever published. Simply moving them somewhere private would have broken the
+  opposite case, since citizens must be able to read a published record's
+  attachments anonymously. The record is now the source of truth for its
+  attachments' visibility: uploads land in a new `attachments` folder
+  (`access: authenticated`, unioned into existing `storage.yml` files by
+  `mergeWithDefaults`, so existing instances pick it up), and the single-file
+  read gate serves a file the folder tier would refuse when a **published**
+  record references it — via `attached_files` or as a bare UUID embedded in the
+  Markdown body, which is how a dragged-in image is stored.
+- **Editor attachments ignored the configured storage folder**, and **bundled
+  config defaults resolved from the working directory** rather than from the
+  package — the same cwd-resolution class as the entries above.
+- **Search and its facets ignored a multi-status filter.** `search/sqlite`'s
+  query builder, its facet counts, and the LIKE fallback in `RecordStore` each
+  accepted only a bare `status = ?`, while the list path had supported
+  `status IN (...)` for years. Passing a list matched nothing at all rather than
+  matching any of them — invisible until the published-only gate started
+  expressing "any publicly-visible status" as a list, at which point it would
+  have emptied public search entirely.
+- **The secrets manager kept writing to the previous instance.**
+  `SecretsManager` is a process-wide singleton, and it resolved its
+  `secrets.yml` path once in the constructor from the first caller's `dataDir` —
+  so `getInstance()` silently ignored the location every later caller asked for.
+  A process that moves between instances therefore read and wrote the wrong
+  one's secret, and when that directory no longer existed it was **re-created**
+  to hold a freshly minted key: a signing secret persisted outside the lifecycle
+  of any live instance (1186 stray directories in the test suite, each holding
+  nothing but `.system-data/secrets.yml`). The path now resolves per use,
+  `getInstance()` re-points to the instance actually requested, and the cached
+  root secret and derived keys are dropped with it rather than carried across.
+- **The API wrote its audit trail to the working directory.** `AuditLogger`
+  defaulted to the relative `'.system-data'`, joined once in the constructor, so
+  the destination was `<process.cwd()>/.system-data/activity.log` — decided by
+  wherever the process was launched. Five API route modules build one at import
+  time, before any instance exists, so records/users/config/notification audit
+  entries landed outside the instance whenever the server was started from
+  anywhere but its own root. Core meanwhile passed `config.dataDir` and wrote
+  `<dataDir>/activity.log`, a third location, so one trail lived in two files
+  and `GET /api/v1/audit` agreed with the writer only by coincidence. The path
+  is now resolved per use from the instance context, and all three callers
+  converge on `<systemDataDir>/activity.log` — the location that already held
+  the history. An orphaned `data/activity.log` may remain on older instances.
+- **The test suite failed CI while every test passed.** `build-test` exited 1 on
+  `Error: [vitest-worker]: Timeout calling "onTaskUpdate"` with 201/201 files
+  and 1845/1845 tests green. Vitest's worker↔main RPC has a hard 60s timeout,
+  and a worker can only read the reply when its event loop reaches the poll
+  phase. CLI tests drive the product through `execSync`, which blocks the loop
+  for the whole subprocess, and the `await`s in between resolve from cache —
+  draining only microtasks, never advancing the loop. `tests/cli/users.test.ts`
+  ran 44s on an idle machine, and 64s under contention, as one unbroken block;
+  the reply sat unread in the channel until the expired timer fired ahead of it.
+  Introduced here, by replacing this pass's `await simpleGit().init()` (a real
+  async child process, and the only thing yielding the loop per `beforeEach`)
+  with a synchronous `execSync('git init')`. The CLI fixture now awaits its
+  subprocesses, and a global setup hook gives every test one real event-loop
+  turn, bounding the worst-case block to a single test's synchronous work.
+
+### Changed
+
+- **Configuring a `document_number_format` now enables numbering for that
+  type.** Which types got an official number was a hard-coded list, so an
+  instance could define a perfectly good format for `meeting` or `permit` and
+  never see a single number issued, with nothing saying why. It is now the
+  built-in legal types OR any type with a configured format — writing the format
+  down is how you ask for numbering. ⚠️ **Behaviour change on upgrade:** an
+  instance already configuring a format for a non-legal type starts issuing
+  numbers for it at the next create. Nothing backfills, so that type's sequence
+  begins at 001 from the upgrade rather than renumbering its history. A format
+  entry is ignored unless it has a usable prefix, since honouring a malformed
+  one would mint `undefined-2026-001`.
+- **The pre-commit hook actually gates something now.** It ran Prettier and the
+  registry check — no lint — so no lint error could fail a commit, including
+  `no-explicit-any`, which is an _error_ in `core`/`cli` source. ESLint now runs
+  over staged JS/TS/Vue through `scripts/lint-staged-eslint.mjs`, which groups
+  staged files by owning package (ESLint is installed per package, so one
+  invocation cannot cover a spanning change) and discovers ownership by walking
+  up to the nearest `eslint.config.*` rather than a hard-coded list. Errors
+  block, warnings do not, and a clean commit through the whole hook takes ~2s.
+  Tests and `tsc` stay out deliberately — both need built output and fail on a
+  fresh clone for reasons unrelated to the commit, which is what trained the
+  `--no-verify` habit. Contract documented in `CONTRIBUTING.md`.
+- **Module discovery follows one rule.** Three independent answers to "where are
+  the modules?" (the schema builder's fallback, the DI resolver, and the
+  storage-module import) are now a single `resolveModulesDir()`. When they
+  disagreed, schema-extension lookup validated against a different module set
+  than it discovered — the shape of the BroadcastBox redaction bug.
+- **The API no longer calls `process.chdir()` during `initialize()`** — a
+  process-wide side effect from a library init, previously needed so
+  cwd-relative database paths resolved. Paths now come from the instance
+  context.
+- **Two duplicate `.civicrc` walk-ups removed** (the diagnostics one silently
+  gave up after 10 levels, so it could report on a different config file than
+  the one actually loaded); one implementation remains.
+- **Hermetic test harness.** `createTestInstance()` builds an isolated instance
+  and installs it, replacing fixtures that had to `process.chdir()` into their
+  own directory to be discovered. Test runs no longer write a stray
+  `.system-data` into the repository checkout.
+
 ## [0.3.1] - 2026-08-06
 
 <!-- markdownlint-disable MD024 -->

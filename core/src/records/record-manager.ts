@@ -12,7 +12,7 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import { createHash } from 'crypto';
 import { RecordParser } from './record-parser.js';
-import { DocumentNumberGenerator } from '../utils/document-number-generator.js';
+import { resolveDocumentNumber } from './document-numbering.js';
 import { buildRecordRelativePath } from '../utils/record-paths.js';
 import { UnifiedCacheManager } from '../cache/unified-cache-manager.js';
 import { RecordSagas } from './record-manager/sagas.js';
@@ -245,32 +245,16 @@ export class RecordManager {
     // Remove any author property from request.metadata to avoid overwriting existing values unintentionally
     const safeMetadata = { ...(request.metadata || {}) };
 
-    // Auto-generate document number for legal record types if not provided
-    const legalTypes = [
-      'bylaw',
-      'ordinance',
-      'policy',
-      'proclamation',
-      'resolution',
-    ];
-    let documentNumber = safeMetadata.document_number;
-    if (!documentNumber && legalTypes.includes(request.type)) {
-      const documentDate = request.createdAt
-        ? new Date(request.createdAt)
-        : creationDate;
-      const year = Number.isNaN(documentDate.getTime())
-        ? new Date().getFullYear()
-        : documentDate.getFullYear();
-      const sequence = await DocumentNumberGenerator.getNextSequence(
-        request.type,
-        year
-      );
-      documentNumber = DocumentNumberGenerator.generate(
-        request.type,
-        year,
-        sequence
-      );
-    }
+    // Document number: assigned, or validated if the caller supplied one.
+    const documentNumber = await resolveDocumentNumber({
+      recordId,
+      recordType: request.type,
+      supplied: safeMetadata.document_number,
+      createdAt: request.createdAt,
+      fallbackDate: creationDate,
+      db: this.db,
+      skip: request.skipDocumentNumbering,
+    });
 
     // Ensure metadata defaults
     if (user?.username && safeMetadata.author === undefined) {
@@ -402,6 +386,24 @@ export class RecordManager {
 
     // Remove any author property from request.metadata to avoid overwriting existing values unintentionally
     const safeMetadata2 = { ...(request.metadata || {}) };
+
+    // Document number. This path had no numbering at all, which is why records
+    // published from a draft — the primary editor flow — were created without
+    // one. A draft that already carries a number keeps it (validated); one
+    // that does not is numbered here, at publish, which is also the right
+    // moment for a legal register: abandoned drafts do not burn sequences.
+    const documentNumber = await resolveDocumentNumber({
+      recordId,
+      recordType: request.type,
+      supplied: safeMetadata2.document_number,
+      createdAt: request.createdAt,
+      fallbackDate: creationDate,
+      db: this.db,
+      skip: request.skipDocumentNumbering,
+    });
+    if (documentNumber) {
+      safeMetadata2.document_number = documentNumber;
+    }
 
     if (user?.username && safeMetadata2.author === undefined) {
       safeMetadata2.author = user.username;
@@ -969,7 +971,6 @@ export class RecordManager {
   ): Promise<string[]> {
     return this.search.getSearchSuggestions(...args);
   }
-
 
   /**
    * Publish a draft record using the saga pattern

@@ -2,7 +2,7 @@
  * Unit Tests for Orphaned File Cleaner
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import type { StorageDatabaseService } from '../types/storage.types.js';
 import { OrphanedFileCleaner } from '../cleanup/orphaned-file-cleaner.js';
 import { Logger } from '@civicpress/core';
@@ -70,6 +70,18 @@ describe('OrphanedFileCleaner', () => {
       null, // azureContainerClient
       mockLogger
     );
+  });
+
+  // Two tests below mkdtemp their own root instead of using testDataDir.
+  const extraDirs: string[] = [];
+
+  afterEach(async () => {
+    // This suite mkdtemp'd a data dir per test and removed none, so every run
+    // left them in os.tmpdir() (60 across the three storage suites).
+    for (const dir of [testDataDir, ...extraDirs.splice(0)]) {
+      if (!dir) continue;
+      await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
+    }
   });
 
   describe('findOrphanedFiles', () => {
@@ -277,7 +289,9 @@ describe('OrphanedFileCleaner', () => {
 
       expect(result.errors.length).toBeGreaterThan(0);
       expect(result.errors[0].file).toBe('/nonexistent/path/file.txt');
-      expect(result.errors[0].error).toContain("Provider 'unknown-provider' not found");
+      expect(result.errors[0].error).toContain(
+        "Provider 'unknown-provider' not found"
+      );
     });
 
     it('should handle mismatched files', async () => {
@@ -338,6 +352,91 @@ describe('OrphanedFileCleaner', () => {
       await expect(brokenCleaner.findOrphanedFiles('local')).rejects.toThrow(
         'DB error'
       );
+    });
+  });
+
+  /**
+   * A RELATIVE local provider path used to resolve against the literal
+   * `.system-data`, i.e. against process.cwd(). Run from anywhere but the
+   * instance root, the scan listed a different tree than the database it was
+   * compared against — so every file it found looked like an `in_storage`
+   * orphan, and cleanupOrphanedFiles() deletes those. The base must come from
+   * the owning service instead.
+   */
+  describe('relative provider path resolution', () => {
+    it('resolves a relative path against basePath, not the working directory', async () => {
+      const base = await fs.mkdtemp(
+        path.join(os.tmpdir(), 'civicpress-orphan-base-')
+      );
+      extraDirs.push(base);
+      await fs.mkdir(path.join(base, 'storage', 'public'), { recursive: true });
+      const orphan = path.join(base, 'storage', 'public', 'stray.txt');
+      await fs.writeFile(orphan, 'stray');
+
+      const relativeCleaner = new OrphanedFileCleaner(
+        databaseService as unknown as StorageDatabaseService,
+        { providers: { local: { type: 'local', path: 'storage' } } } as any,
+        null,
+        null,
+        mockLogger,
+        base
+      );
+
+      const orphaned = await relativeCleaner.findOrphanedFiles('local');
+
+      expect(orphaned.map((o) => o.path)).toContain(orphan);
+    });
+
+    it('refuses to guess a base rather than scanning the wrong tree', async () => {
+      const baseless = new OrphanedFileCleaner(
+        databaseService as unknown as StorageDatabaseService,
+        { providers: { local: { type: 'local', path: 'storage' } } } as any,
+        null,
+        null,
+        mockLogger
+        // no basePath
+      );
+
+      await expect(baseless.findOrphanedFiles('local')).rejects.toThrow(
+        /needs an absolute basePath/
+      );
+    });
+
+    it('rejects a RELATIVE basePath too, not just a missing one', async () => {
+      // A relative base would re-introduce the cwd-anchored resolution this
+      // guard exists to prevent — `.system-data` was exactly such a value.
+      const relativeBase = new OrphanedFileCleaner(
+        databaseService as unknown as StorageDatabaseService,
+        { providers: { local: { type: 'local', path: 'storage' } } } as any,
+        null,
+        null,
+        mockLogger,
+        '.system-data'
+      );
+
+      await expect(relativeBase.findOrphanedFiles('local')).rejects.toThrow(
+        /needs an absolute basePath/
+      );
+    });
+
+    it('still honors an absolute provider path with no basePath', async () => {
+      const absolute = await fs.mkdtemp(
+        path.join(os.tmpdir(), 'civicpress-orphan-abs-')
+      );
+      extraDirs.push(absolute);
+      await fs.mkdir(path.join(absolute, 'public'), { recursive: true });
+
+      const absoluteCleaner = new OrphanedFileCleaner(
+        databaseService as unknown as StorageDatabaseService,
+        { providers: { local: { type: 'local', path: absolute } } } as any,
+        null,
+        null,
+        mockLogger
+      );
+
+      await expect(
+        absoluteCleaner.findOrphanedFiles('local')
+      ).resolves.toBeInstanceOf(Array);
     });
   });
 });

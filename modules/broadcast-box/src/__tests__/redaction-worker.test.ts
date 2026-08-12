@@ -7,7 +7,7 @@
  * attached_files entry).
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
@@ -130,11 +130,17 @@ function sessionRecord(
 
 describe('RedactionWorker', () => {
   let rawPath: string;
+  let rawDir: string;
 
   beforeEach(async () => {
-    const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'redaction-test-'));
-    rawPath = path.join(dir, 'raw.mp4');
+    rawDir = await fs.mkdtemp(path.join(os.tmpdir(), 'redaction-test-'));
+    rawPath = path.join(rawDir, 'raw.mp4');
     await fs.writeFile(rawPath, 'raw-bytes');
+  });
+
+  afterEach(async () => {
+    // One temp dir per test, previously never removed.
+    await fs.rm(rawDir, { recursive: true, force: true }).catch(() => {});
   });
 
   function makeWorker(

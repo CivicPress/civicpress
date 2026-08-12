@@ -3,28 +3,35 @@
 _A unified, authoritative roadmap for CivicPress, guiding the project from early
 alpha toward a stable, production-grade civic infrastructure platform._
 
-**Current Version:** v0.2.0 (Alpha)
+**Current Version:** v0.3.1 (Alpha)
 
-> **Current status (2026-07-30) — supersedes every snapshot below.** The
-> 2026-07-02 two-repo audit (`docs/audits/2026-07-02-full-audit.md`, `FA-*`
-> registry) is the authoritative findings tracker and is **fully remediated** —
-> every finding closed or an explicit accepted-deferral. Since the 2026-07-15
-> snapshot, an entire post-audit-hardening arc landed on `main` (PRs #19–#22,
-> `main` at `e4f64bd`): audit Tiers A–D and test-health phases 7e–7j (#19);
-> tech-debt refactors (withCli, API-envelope standardization, config/dataDir
-> anchoring) (#20); two production-bug fixes (published records leaking into
-> drafts; record locks expiring mid-edit), the core-002 hook→WorkflowEngine
-> wiring, supply-chain scanning (osv-scanner, CodeQL, `SECURITY.md`), and a 94→2
-> osv-advisory dependency remediation (#21); and CodeQL SAST with a Node/pnpm
-> `engines` reconcile (#22). `develop` carries a further security-tail batch —
-> the audit's deferred carry-forward surfaces audited (no live vulnerabilities),
-> plus Low defense-in-depth hardening and dead-code cleanup — pending the next
-> develop→main PR. **Genuinely open (Roadmap-tier, need scoping):** `ui-003`
-> public-read prerender (SSG — static public record pages; **not** live SSR,
-> which is decided against — deferred to the "easy deployment" epic); signed
-> appliance image; HW/device-repo work; equity/i18n; device-repo
-> required-status-checks branch protection. The phase-tracking and status
-> snapshots below are historical; the forward-looking milestone sections stand.
+> **Current status (2026-08-07) — supersedes every snapshot below.** `main` is
+> at **v0.3.1** (tagged). The 2026-07-02 two-repo audit
+> (`docs/audits/2026-07-02-full-audit.md`, `FA-*` registry) is fully remediated,
+> and the entire post-audit-hardening arc has landed on `main` (PRs #19–#23):
+> audit Tiers A–D and test-health phases 7e–7j; tech-debt refactors (withCli,
+> API-envelope standardization, config/dataDir anchoring); two production-bug
+> fixes (published records leaking into drafts; record locks expiring mid-edit);
+> the core-002 hook→WorkflowEngine wiring; supply-chain scanning (osv-scanner,
+> CodeQL, `SECURITY.md`) with a 94→2 dependency remediation; CodeQL SAST; and
+> the deferred security-tail carry-forward (surfaces audited — no live
+> vulnerabilities — plus Low defense-in-depth hardening).
+>
+> Two release milestones have shipped since: **v0.3.x — Editor, Attachments &
+> Civic UX is complete** (rich editor, drag-and-drop attachments, EN/FR parity,
+> spec-reality gate — released across 0.2.1 → 0.3.0), and **v0.3.1** added a
+> **deployment & onboarding layer** (one-command `civic init` / `serve` /
+> `doctor` + a Docker/compose/nginx stack + a curated demo seed) and a thin
+> **BroadcastBox operator UI**, plus record round-trip and CLI `--json`
+> correctness fixes. **The active milestone is now v0.4.x — Workflow Engine +
+> Permissions** (§5).
+>
+> **Still open / needs scoping:** public-read prerender (SSG — static public
+> record pages; live SSR is decided against); signed appliance image; broader
+> equity/i18n; device-repo required-status-checks branch protection; and
+> developer-experience polish (hermetic tests, a single blessed `dev` command, a
+> reproducible dev environment). The phase-tracking and status snapshots below
+> are historical; the forward-looking milestone sections stand.
 
 **Status (2026-06-03 snapshot — historical; superseded by the 2026-07-30 banner
 above).** The post-audit base refactor (Phases 2a–2d + the lint-rule rollout,
@@ -120,10 +127,12 @@ sustainability.
 
 The development path is organized into the following major phases:
 
-- **v0.2.x — Core Maturity and Stability**
-- **v0.3.x — Editor, Attachments, and Civic UX**
-- **v0.4.x — Workflow Engine + Permissions**
-- **v0.5–0.8 — Municipal Pilot Readiness**
+- **v0.2.x — Core Maturity and Stability** — ✅ shipped
+- **v0.3.x — Editor, Attachments, and Civic UX** — ✅ complete (released 0.2.1 →
+  0.3.0)
+- **v0.4.x — Workflow Engine + Permissions** — ⏭️ active milestone
+- **v0.5–0.8 — Municipal Pilot Readiness** — deployment/onboarding groundwork
+  pulled forward in v0.3.1 (one-command deploy + operator UI)
 - **v0.9 — Production Candidate**
 - **v1.0 — Stable Release**
 
@@ -131,7 +140,7 @@ Each phase includes objectives and expected deliverables.
 
 ---
 
-# 3. v0.2.x — Core Maturity and Stability 🟡 SHIPPED — refactor in progress
+# 3. v0.2.x — Core Maturity and Stability ✅ SHIPPED (refactor complete)
 
 **Focus:** Indexing, search, architecture cleanup, reliability improvements.
 
@@ -188,7 +197,15 @@ registry.
 
 ---
 
-# 4. v0.3.x — Editor, Attachments, Civic UX, and Refactor Completion
+# 4. v0.3.x — Editor, Attachments, Civic UX, and Refactor Completion ✅ COMPLETE
+
+**Status:** Complete — released across **0.2.1 → 0.3.0**. The feature work (rich
+Markdown editor, drag-and-drop attachments, EN/FR i18n parity, record activity
+feed) shipped in 0.2.1; 0.3.0 closed the milestone's test and documentation exit
+criteria (browser e2e, live cloud-storage test, the spec-reality frontmatter
+gate), so every spec under `docs/specs/` now matches implementation reality. A
+follow-on **0.3.1** then added a deployment & onboarding layer and a
+BroadcastBox operator UI (pilot-readiness groundwork pulled forward — see §6).
 
 **Focus:** Improve clerk-facing daily usability and make the platform visually
 compelling for demonstrations and municipal outreach. **Couples with the
@@ -220,7 +237,9 @@ focuses on UX enhancements.
 
 ---
 
-# 5. v0.4.x — Workflow Engine + Permissions
+# 5. v0.4.x — Workflow Engine + Permissions ⏭️ ACTIVE MILESTONE
+
+**Status:** Next up — not yet started. This is the current development frontier.
 
 **Focus:** Enhance workflows and permissions with advanced features and UI
 integration.
@@ -232,7 +251,59 @@ integration.
 - Add comprehensive audit logs for actions
 - Enhance hooks/events system for advanced module extensibility
 - Improve workflow status visibility in API responses
-- Advanced workflow features (conditional transitions, multi-step approvals)
+- ~~Advanced workflow features (conditional transitions, multi-step approvals)~~
+  — **dropped 2026-08-11, see below**
+
+**Why "advanced workflow features" was dropped (2026-08-11).** The two halves
+turned out to be a thing that already works and a thing nobody had defined.
+
+- **Multi-step approvals already work**, with configuration alone. The workflow
+  spec's own multi-step example is written entirely in `statuses:`,
+  `transitions:` and `roles.<role>.can_transition:`, all of which are
+  implemented and enforced. A draft → proposed → reviewed → approved chain with
+  clerk and council holding different rights is a `workflows.yml` edit, not a
+  feature. (Per-record-type lifecycles were silently ignored until 2026-08-11;
+  that was a bug and is fixed.)
+- **"Conditional transitions" was never defined.** The word "condition" appears
+  nowhere in the 797-line `docs/specs/workflows.md`. It was a phrase in this
+  goal list with no design, no spec and no requesting user behind it, so it
+  could not be estimated, let alone built. Rather than leave an unbuildable line
+  item in an active milestone, it is dropped. **Revisit when a municipality asks
+  for something concrete** — the request will name which of the shapes below it
+  actually needs.
+
+**Groundwork for that revisit**, so it does not start from scratch. Three
+readings were considered, in increasing cost:
+
+1. **Field predicates** — "a bylaw may not reach `approved` without an attached
+   impact assessment." Expressible as JSON Schema over the record, evaluated by
+   the AJV instance already in `core/src/records/record-schema-validator.ts`,
+   and matching the idiom the spec already uses for `actions[].params_schema`.
+   No new persisted state. The design care is that `transitions` values already
+   have two shapes (`string[]` and `{ value: [...] }`), so a third needs to be
+   backwards compatible.
+2. **Separation of duties** — "whoever moved it to `reviewed` may not approve
+   it." ⚠️ **Verified 2026-08-11: this is NOT as cheap as it looks**, and the
+   check is why. The DB `audit_logs` table cannot answer "who performed the last
+   transition, and between which statuses": record writes log a generic
+   `update_record` / `publish_record` action whose message is free text with no
+   from/to pair. The one place the pair IS captured is
+   `POST /records/:id/status` (`records:status` with `metadata.previousStatus` /
+   `newStatus` and the actor) — but that goes to `AuditLogger`, which appends
+   JSON lines to a **rotated file** (`<systemDataDir>/activity.log`), not a
+   queryable store. Building an authorization control on a rotating file would
+   mean parsing it on every transition, and rotation means the evidence can age
+   out — a control that silently weakens over time. A status change made through
+   the generic update path or the publish saga records no pair at all. So this
+   needs a small piece of durable structure first (a `status_transitions` table,
+   or structured columns on `audit_logs`), which is worth knowing before anyone
+   scopes it as an afternoon's work.
+3. **N-of-M approvals** — "two councillors must sign off." Not a predicate but a
+   feature: an approvals table, an endpoint to cast one, progress UI, and —
+   easiest to overlook — a rule for invalidating approvals when the record is
+   edited after they are collected, or you approve v1 and publish v5.
+
+Full analysis: `docs/plans/2026-08-11-v04x-scoping.md`.
 
 ### Deliverables
 
@@ -241,8 +312,38 @@ integration.
 - Comprehensive audit trail UI
 - Foundation for future collaborative editing
 
-**Note:** Basic workflow engine and permissions are already implemented
-(v0.1.x). This phase focuses on UI integration and advanced features.
+**⚠️ Starting point — corrected 2026-08-11, verified against the code.** This
+section previously said "basic workflow engine and permissions are already
+implemented (v0.1.x). This phase focuses on UI integration and advanced
+features." That is **half true**, and the wrong half sets the wrong expectation
+for what this milestone costs.
+
+- **Permissions: yes, real.** Roles via `userCan` / `RoleManager`, enforced at
+  ~59 `requirePermission` sites across the API, hardened through the `FA-*`
+  audit and tested end-to-end. Building management UI on top of this is
+  genuinely "UI integration".
+- **Workflow _validation_: yes, real.** `WorkflowConfigManager` owns statuses
+  and legal transitions, and create / update / publish enforce them
+  (`assertStatusWritableByRole`, per `FA-API-008`).
+- **Workflow _engine_: no.** `core/src/workflows/workflow-engine.ts` registers
+  exactly **one** real workflow — `update-index`, driven by the `record:updated`
+  hook. The former `approval` / `publication` / `archival` entries were log-only
+  stubs and were **deliberately removed** in core-002 rather than left
+  advertised. Programmable civic workflows are **spec-only**
+  (`docs/specs/workflows.md`): the design is sandboxed user `.js` files in
+  `data/.civic/workflows/`, and **no loader and no sandbox executor exist**.
+
+So "advanced workflow features (conditional transitions, multi-step approvals)"
+above is not a UI task sitting on a finished engine — it presumes an execution
+engine that has yet to be built, and sandboxing user-supplied code in a system
+of record is a security-sensitive design problem, not a detail.
+`Workflow _engine_ (programmable)` is listed as **Partial** in
+`docs/project-status.md`, which was accurate while this note was not.
+
+**Scope this milestone before starting it.** The shape is a real decision —
+UI-only on the validation that already works, declarative config-driven
+transitions, or the spec'd sandboxed loader — and they differ by a large factor
+in cost and risk.
 
 ---
 

@@ -12,17 +12,28 @@ describe('SecretsManager', () => {
   let secretsManager: SecretsManager;
   const testSecret = 'a'.repeat(128);
 
+  // `dataDir`, not the instance root. `resolveSystemDataDir` derives the root by
+  // taking `dirname(dataDir)`, so passing a bare temp directory here made the
+  // root `/tmp` and every auto-generated secret in this file landed in a SHARED
+  // `/tmp/.system-data/secrets.yml` — outside the temp dir the test cleans up,
+  // and shared with every other test run on the machine. Pointing at
+  // `<tempDir>/data` puts it in `<tempDir>/.system-data`, inside what afterEach
+  // removes.
+  let dataDir: string;
+
   beforeEach(() => {
     tempDir = fs.mkdtempSync(
       path.join(os.tmpdir(), 'civicpress-secrets-test-')
     );
+    dataDir = path.join(tempDir, 'data');
+    fs.mkdirSync(dataDir, { recursive: true });
   });
 
   afterEach(() => {
     if (tempDir && fs.existsSync(tempDir)) {
       fs.rmSync(tempDir, { recursive: true, force: true });
     }
-    (SecretsManager as any).instance = undefined;
+    SecretsManager.resetInstance();
     delete process.env.CIVICPRESS_SECRET;
   });
 
@@ -56,7 +67,7 @@ describe('SecretsManager', () => {
 
   test('should initialize with environment variable', async () => {
     process.env.CIVICPRESS_SECRET = testSecret;
-    secretsManager = SecretsManager.getInstance(tempDir);
+    secretsManager = SecretsManager.getInstance(dataDir);
     await secretsManager.initialize();
 
     const signingKey = secretsManager.getSessionSigningKey();
@@ -65,7 +76,7 @@ describe('SecretsManager', () => {
   });
 
   test('should auto-generate secret if neither env nor file exists', async () => {
-    secretsManager = SecretsManager.getInstance(tempDir);
+    secretsManager = SecretsManager.getInstance(dataDir);
     await secretsManager.initialize();
 
     // Should be able to use keys after initialization
@@ -76,7 +87,7 @@ describe('SecretsManager', () => {
 
   test('should derive consistent keys for same scope', async () => {
     process.env.CIVICPRESS_SECRET = testSecret;
-    secretsManager = SecretsManager.getInstance(tempDir);
+    secretsManager = SecretsManager.getInstance(dataDir);
     await secretsManager.initialize();
 
     const key1 = secretsManager.deriveKey('session', 'signing');
@@ -88,7 +99,7 @@ describe('SecretsManager', () => {
 
   test('should derive different keys for different scopes', async () => {
     process.env.CIVICPRESS_SECRET = testSecret;
-    secretsManager = SecretsManager.getInstance(tempDir);
+    secretsManager = SecretsManager.getInstance(dataDir);
     await secretsManager.initialize();
 
     const sessionKey = secretsManager.deriveKey('session', 'signing');
@@ -102,7 +113,7 @@ describe('SecretsManager', () => {
 
   test('should sign and verify data', async () => {
     process.env.CIVICPRESS_SECRET = testSecret;
-    secretsManager = SecretsManager.getInstance(tempDir);
+    secretsManager = SecretsManager.getInstance(dataDir);
     await secretsManager.initialize();
 
     const key = secretsManager.getSessionSigningKey();
@@ -118,7 +129,7 @@ describe('SecretsManager', () => {
 
   test('should reject incorrect signature', async () => {
     process.env.CIVICPRESS_SECRET = testSecret;
-    secretsManager = SecretsManager.getInstance(tempDir);
+    secretsManager = SecretsManager.getInstance(dataDir);
     await secretsManager.initialize();
 
     const key = secretsManager.getSessionSigningKey();
@@ -131,7 +142,7 @@ describe('SecretsManager', () => {
 
   test('should get all pre-configured keys', async () => {
     process.env.CIVICPRESS_SECRET = testSecret;
-    secretsManager = SecretsManager.getInstance(tempDir);
+    secretsManager = SecretsManager.getInstance(dataDir);
     await secretsManager.initialize();
 
     const sessionKey = secretsManager.getSessionSigningKey();
@@ -151,7 +162,7 @@ describe('SecretsManager', () => {
   });
 
   test('should throw error when using keys before initialization', () => {
-    secretsManager = SecretsManager.getInstance(tempDir);
+    secretsManager = SecretsManager.getInstance(dataDir);
 
     expect(() => {
       secretsManager.getSessionSigningKey();

@@ -56,6 +56,14 @@ describe('recordings backfill e2e (real records + storage)', () => {
 
     civic = new CivicPress({
       dataDir: testDir,
+      // Explicit, not inferred. `resolveSystemDataDir` falls back to
+      // `dirname(dataDir)` as the instance root, and `dataDir` here is a bare
+      // mkdtemp directory — so the root resolved to the SHARED `/tmp` and this
+      // instance's secrets, storage and DB landed in `/tmp/.system-data`:
+      // outside the tree teardown removes, and shared with every other test and
+      // concurrent run on the machine. This is the path the file already
+      // assumes for its own sqlite file.
+      systemDataDir: path.join(testDir, '.system-data'),
       database: {
         type: 'sqlite',
         sqlite: { file: path.join(testDir, '.system-data', 'test.db') },

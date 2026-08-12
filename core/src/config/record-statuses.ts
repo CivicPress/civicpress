@@ -4,6 +4,16 @@ export interface RecordStatusConfig {
   source?: 'core' | 'module' | 'plugin';
   source_name?: string;
   priority?: number;
+  /**
+   * May an ANONYMOUS reader see records in this status?
+   *
+   * Absent means **no**. Publication is the act that makes a civic record
+   * public, so a status has to say so explicitly — a municipality adding a
+   * custom status ("in_camera", "legal_hold") must not have it become world
+   * readable by omission. Custom statuses are merged OVER these defaults, so
+   * the public set below survives unless it is deliberately overridden.
+   */
+  public?: boolean;
 }
 
 export interface RecordStatusesConfig {
@@ -49,6 +59,8 @@ export const DEFAULT_RECORD_STATUSES: RecordStatusesConfig = {
     description: 'Publicly available and in effect',
     source: 'core',
     priority: 5,
+    // The status whose own description is 'Publicly available and in effect'.
+    public: true,
   },
   rejected: {
     label: 'Rejected',
@@ -61,12 +73,16 @@ export const DEFAULT_RECORD_STATUSES: RecordStatusesConfig = {
     description: 'No longer active but preserved for reference',
     source: 'core',
     priority: 7,
+    // A repealed or superseded bylaw stays part of the public record.
+    public: true,
   },
   expired: {
     label: 'Expired',
     description: 'Past its effective date and no longer in force',
     source: 'core',
     priority: 8,
+    // Past its effective date, but still citable history.
+    public: true,
   },
 };
 
@@ -129,7 +145,17 @@ export function mergeRecordStatuses(
       const newPriority = status.priority || 0;
 
       if (newPriority >= existingPriority) {
-        merged[key] = { ...status };
+        // An override REPLACES the definition, with one exception: `public`
+        // carries over unless the override states it. Otherwise a municipality
+        // that re-labels `published` in its own config silently drops
+        // `public: true` and its entire public site goes blank. Fail-safe
+        // rather than fail-open — omitting `public` on a NEW status still
+        // means not public — but "I renamed a label" must not mean "I
+        // unpublished everything".
+        merged[key] = {
+          ...status,
+          public: status.public ?? merged[key].public,
+        };
       }
     } else {
       merged[key] = status;

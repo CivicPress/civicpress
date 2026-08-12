@@ -8,22 +8,35 @@ import * as path from 'path';
 import * as os from 'os';
 import { TemplateValidator } from '../template-validator.js';
 import type { Template } from '../../utils/template-engine.js';
+import {
+  resolveInstanceContext,
+  setInstanceContext,
+  resetInstanceContext,
+} from '../../config/instance-context.js';
 
 describe('TemplateValidator', () => {
   let validator: TemplateValidator;
   let testDataDir: string;
+  let instanceRoot: string;
 
   beforeEach(() => {
     testDataDir = fs.mkdtempSync(
       path.join(os.tmpdir(), 'civicpress-validator-test-')
     );
 
+    // Base templates live in the INSTANCE's `.system-data`. This used to mkdir
+    // into `<cwd>/.system-data`, i.e. the repository checkout.
+    instanceRoot = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'civicpress-validator-instance-')
+    );
+    setInstanceContext(resolveInstanceContext({ root: instanceRoot }));
+
     // Create directory structure
     fs.mkdirSync(path.join(testDataDir, '.civic', 'templates', 'bylaw'), {
       recursive: true,
     });
     fs.mkdirSync(
-      path.join(process.cwd(), '.system-data', 'templates', 'bylaw'),
+      path.join(instanceRoot, '.system-data', 'templates', 'bylaw'),
       { recursive: true }
     );
 
@@ -40,28 +53,12 @@ describe('TemplateValidator', () => {
       }
     }
 
-    // Cleanup system templates (only test files)
-    const systemTemplatePath = path.join(
-      process.cwd(),
-      '.system-data',
-      'templates',
-      'bylaw'
-    );
-    if (fs.existsSync(systemTemplatePath)) {
+    // The instance is disposable — drop it wholesale rather than picking test
+    // files back out of the repository checkout.
+    resetInstanceContext();
+    if (instanceRoot && fs.existsSync(instanceRoot)) {
       try {
-        const files = fs.readdirSync(systemTemplatePath);
-        for (const file of files) {
-          if (
-            file.endsWith('.md') &&
-            (file.startsWith('test-') || file.includes('test'))
-          ) {
-            try {
-              fs.unlinkSync(path.join(systemTemplatePath, file));
-            } catch {
-              // Ignore individual file errors
-            }
-          }
-        }
+        fs.rmSync(instanceRoot, { recursive: true, force: true });
       } catch {
         // Ignore cleanup errors
       }

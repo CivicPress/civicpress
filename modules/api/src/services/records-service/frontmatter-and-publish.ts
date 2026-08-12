@@ -16,12 +16,9 @@ import {
   userCan,
   DatabaseService,
   Logger,
+  CentralConfigManager,
 } from '@civicpress/core';
-import type {
-  AuthUser,
-  Geography,
-  TableInfoRow,
-} from '@civicpress/core';
+import type { AuthUser, Geography, TableInfoRow } from '@civicpress/core';
 import { normalizeDateString } from './helpers.js';
 import { assertStatusWritableByRole } from './status-transition-guard.js';
 
@@ -64,9 +61,7 @@ function parseJsonObject(
   }
 }
 
-function parseJsonArray<T = unknown>(
-  value: string | undefined | null
-): T[] {
+function parseJsonArray<T = unknown>(value: string | undefined | null): T[] {
   if (!value) return [];
   try {
     const parsed = JSON.parse(value);
@@ -113,6 +108,20 @@ export class RecordsFrontmatterAndPublish {
   ): Promise<string | null> {
     const recordData = await this.getDraftOrRecord(id, user);
     if (!recordData) {
+      return null;
+    }
+
+    // PUBLISHED-ONLY GATE. This endpoint serves the record's frontmatter and
+    // full markdown body, so it needs the same status gate as the list and
+    // by-id reads — otherwise it is the way around them. Null becomes a 404 in
+    // the handler, which is the right answer: the existence of an unpublished
+    // record at a given id is not public either.
+    if (
+      !user &&
+      !CentralConfigManager.getPublicRecordStatuses().includes(
+        String(recordData.status)
+      )
+    ) {
       return null;
     }
 
@@ -338,9 +347,9 @@ export class RecordsFrontmatterAndPublish {
         draft.type
       );
       const initialStatus = statuses[0];
-      const published = (await this.deps
-        .getRecord(id)
-        .catch(() => null)) as { status?: string } | null;
+      const published = (await this.deps.getRecord(id).catch(() => null)) as {
+        status?: string;
+      } | null;
       const fromStatus = published?.status || initialStatus;
       if (fromStatus) {
         await assertStatusWritableByRole(this.deps.workflowManager, {

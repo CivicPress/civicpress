@@ -18,6 +18,12 @@ import {
   validateRecordStatusConfig,
   mergeRecordStatuses,
 } from './record-statuses.js';
+import {
+  getInstanceContext,
+  resolveInstanceContext,
+  resetInstanceContext,
+  setInstanceContext,
+} from './instance-context.js';
 
 export interface AnalyticsConfig {
   enabled?: boolean;
@@ -96,6 +102,12 @@ export interface CentralConfig {
    * `resolveSystemDataDir()`.
    */
   systemDataDir?: string;
+  /**
+   * Optional override for where `module.json` manifests are discovered.
+   * Relative paths resolve against the project root. Unset means the standard
+   * rule (a `modules/` beside the data root, else the installed-code location).
+   */
+  modulesDir?: string;
   // System configuration (from .civicrc)
   modules?: string[];
   record_types?: string[];
@@ -142,7 +154,9 @@ export interface CentralConfig {
  * The fallback is reached ONLY by a config built directly (never through
  * CentralConfigManager, so it carries no `.civicrc` anchor) — chiefly some
  * unit tests. It reproduces the old `dirname(dataDir)` behavior so those
- * callers don't move.
+ * callers don't move. A RELATIVE `dataDir` resolves against the instance root
+ * rather than `process.cwd()`, so even this fallback stops depending on the
+ * directory the process was launched from.
  */
 export function resolveSystemDataDir(config: {
   dataDir: string;
@@ -151,7 +165,7 @@ export function resolveSystemDataDir(config: {
   if (config.systemDataDir) return config.systemDataDir;
   const root = path.isAbsolute(config.dataDir)
     ? path.dirname(config.dataDir)
-    : path.resolve(process.cwd(), path.dirname(config.dataDir));
+    : path.resolve(getInstanceContext().root, path.dirname(config.dataDir));
   return path.join(root, '.system-data');
 }
 
@@ -174,7 +188,6 @@ export function resolveProjectRoot(config: {
  * Reads from .civicrc file in the project root.
  */
 export class CentralConfigManager {
-  private static readonly CONFIG_FILENAME = '.civicrc';
   private static config: CentralConfig | null = null;
   private static loggerOptions: LoggerOptions = {};
   private static logger: Logger = new Logger();
@@ -208,8 +221,20 @@ export class CentralConfigManager {
     // wins for dataDir.
     const envDataDir = process.env.CIVIC_DATA_DIR;
 
-    // Find .civicrc file
-    const configPath = this.findConfigFile();
+    // Resolve the instance layout ONCE. `projectRoot` is the single anchor
+    // every path below derives from; it is the directory holding `.civicrc`,
+    // or — when there is none — the directory the walk-up started in. Before
+    // this, five separate `configPath ? dirname(configPath) : process.cwd()`
+    // expressions each re-derived it, so a process launched from a
+    // subdirectory could land on a different root per path.
+    //
+    // Reading through getInstanceContext() (rather than resolving afresh) is
+    // what lets a caller INSTALL a root instead of being found by a walk-up —
+    // the hermetic test harness sets one explicitly, so tests no longer have to
+    // chdir into a fixture directory to be discovered.
+    const instance = getInstanceContext();
+    const configPath = instance.configPath;
+    const projectRoot = instance.root;
     const fallbackPath = configPath
       ? path.join(path.dirname(configPath), '.civicrc.default')
       : null;
@@ -223,8 +248,7 @@ export class CentralConfigManager {
         const configContent = fs.readFileSync(configPath, 'utf8');
         mainConfig = yaml.parse(configContent) as CentralConfig;
 
-        // Resolve relative paths
-        const projectRoot = path.dirname(configPath);
+        // Resolve relative paths against the one resolved root
         if (mainConfig.dataDir && !path.isAbsolute(mainConfig.dataDir)) {
           mainConfig.dataDir = path.resolve(projectRoot, mainConfig.dataDir);
         }
@@ -239,8 +263,8 @@ export class CentralConfigManager {
         const fallbackContent = fs.readFileSync(fallbackPath, 'utf8');
         fallbackConfig = yaml.parse(fallbackContent) as CentralConfig;
 
-        // Resolve relative paths for fallback config
-        const projectRoot = path.dirname(fallbackPath);
+        // Resolve relative paths for fallback config (same root — the
+        // `.civicrc.default` sits beside the `.civicrc`)
         if (
           fallbackConfig.dataDir &&
           !path.isAbsolute(fallbackConfig.dataDir)
@@ -293,17 +317,14 @@ export class CentralConfigManager {
     // Ensure we have a valid config
     if (!mergedConfig.dataDir) {
       // Default to 'data' directory relative to project root
-      const projectRoot = configPath ? path.dirname(configPath) : process.cwd();
       mergedConfig.dataDir = path.resolve(projectRoot, 'data');
     } else if (!path.isAbsolute(mergedConfig.dataDir)) {
       // Resolve relative paths to absolute
-      const projectRoot = configPath ? path.dirname(configPath) : process.cwd();
       mergedConfig.dataDir = path.resolve(projectRoot, mergedConfig.dataDir);
     }
     if (!mergedConfig.database) {
-      // Use project root (where .civicrc is located) instead of process.cwd()
-      // This ensures consistent database path regardless of execution context
-      const projectRoot = configPath ? path.dirname(configPath) : process.cwd();
+      // Anchored to the project root (where `.civicrc` lives), so the database
+      // path is the same regardless of execution context.
       mergedConfig.database = {
         type: 'sqlite',
         sqlite: {
@@ -315,23 +336,18 @@ export class CentralConfigManager {
       !path.isAbsolute(mergedConfig.database.sqlite.file)
     ) {
       // If database path is relative, resolve it relative to project root
-      const projectRoot = configPath ? path.dirname(configPath) : process.cwd();
       mergedConfig.database.sqlite.file = path.resolve(
         projectRoot,
         mergedConfig.database.sqlite.file
       );
     }
 
-    // Resolve `.system-data/` ONCE, anchored to the project root (the directory
-    // holding `.civicrc`, or cwd when none was found) — never derived by
+    // `.system-data/` is anchored to the project root — never derived by
     // stripping a segment off `dataDir`. This is the single source of truth the
     // storage/secrets/realtime/broadcast-box services read via
     // resolveSystemDataDir(); it keeps the DB and every other piece of system
     // data in ONE place regardless of where `dataDir` points.
-    {
-      const projectRoot = configPath ? path.dirname(configPath) : process.cwd();
-      mergedConfig.systemDataDir = path.join(projectRoot, '.system-data');
-    }
+    mergedConfig.systemDataDir = instance.systemDataDir;
 
     // Deprecation notices for legacy fields
     const deprecated: Array<keyof CentralConfig> = [
@@ -354,6 +370,26 @@ export class CentralConfigManager {
     }
 
     this.config = mergedConfig;
+
+    // Publish the layout that the MERGED config implies (CIVIC_DATA_DIR and
+    // `.civicrc.default` can both move `dataDir`), so every consumer reading
+    // `getInstanceContext()` sees the same answers this manager just computed
+    // instead of re-deriving them from the raw file.
+    setInstanceContext(
+      resolveInstanceContext({
+        root: projectRoot,
+        config: {
+          dataDir: mergedConfig.dataDir,
+          systemDataDir: mergedConfig.systemDataDir,
+          // Forward the `modulesDir` override too. Omitting it meant a
+          // `modulesDir:` in `.civicrc` was accepted by resolveInstanceContext
+          // in isolation but silently dropped for the real, process-wide
+          // context — so the documented override did nothing in practice.
+          modulesDir: mergedConfig.modulesDir,
+        },
+      })
+    );
+
     return this.config;
   }
 
@@ -375,9 +411,7 @@ export class CentralConfigManager {
    * resolveSystemDataDir() rather than each stripping a segment off dataDir.
    */
   static getSystemDataDir(): string {
-    return (
-      this.getConfig().systemDataDir ?? path.join(process.cwd(), '.system-data')
-    );
+    return this.getConfig().systemDataDir ?? getInstanceContext().systemDataDir;
   }
 
   /**
@@ -389,8 +423,7 @@ export class CentralConfigManager {
    * command invoked outside the repo still targets the real project.
    */
   static getProjectRoot(): string {
-    const configPath = this.findConfigFile();
-    return configPath ? path.dirname(configPath) : process.cwd();
+    return getInstanceContext().root;
   }
 
   /**
@@ -730,35 +763,29 @@ export class CentralConfigManager {
   }
 
   /**
-   * Find the .civicrc file
+   * The statuses an ANONYMOUS reader is allowed to see.
+   *
+   * Fail-closed: a status is public only if its config says `public: true`.
+   * Read paths must gate on this rather than on where a row happens to live —
+   * `records` was documented as "published by definition", but
+   * `RecordStore.createRecord` defaults a row to `status: 'draft'` and
+   * `IndexingService.syncToDatabase` copies every on-disk entry in regardless
+   * of status, so nothing actually held that invariant up.
    */
-  private static findConfigFile(): string | null {
-    let currentPath = process.cwd();
-    const rootPath = path.parse(currentPath).root;
-
-    // Check current directory and parent directories until we reach the filesystem root
-    while (currentPath !== rootPath) {
-      const configPath = path.join(currentPath, this.CONFIG_FILENAME);
-      if (fs.existsSync(configPath)) {
-        this.logger.debug(`Found .civicrc at: ${configPath}`);
-        return configPath;
-      }
-      const parentPath = path.dirname(currentPath);
-      // Prevent infinite loop if we can't go up further
-      if (parentPath === currentPath) {
-        break;
-      }
-      currentPath = parentPath;
-    }
-
-    this.logger.debug(`No .civicrc found, searched from: ${process.cwd()}`);
-    return null;
+  static getPublicRecordStatuses(): string[] {
+    const recordStatuses = this.getRecordStatusesConfig();
+    return Object.entries(recordStatuses)
+      .filter(([, status]) => status.public === true)
+      .map(([key]) => key);
   }
 
   /**
-   * Reset cached configuration (useful for testing)
+   * Reset cached configuration (useful for testing). Clears the memoized
+   * instance context too — leaving it behind would let a test that relocates
+   * the instance keep resolving paths against the previous root.
    */
   static reset(): void {
     this.config = null;
+    resetInstanceContext();
   }
 }

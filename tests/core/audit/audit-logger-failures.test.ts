@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterAll } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
@@ -8,8 +8,17 @@ import { AuditLogger } from '../../../core/src/audit/audit-logger.js';
 // be observable — counted and, for strict deployments, fatal — not a silent
 // gap in the trust/transparency trail.
 describe('AuditLogger write-failure accounting (FA-CORE-004)', () => {
+  // Every mkdtemp in this file was left behind — three strays per full run.
+  const tempRoots: string[] = [];
+  afterAll(() => {
+    for (const d of tempRoots.splice(0)) {
+      fs.rmSync(d, { recursive: true, force: true });
+    }
+  });
+
   function makeUnwritableDir(): string {
     const base = fs.mkdtempSync(path.join(os.tmpdir(), 'civic-audit-fail-'));
+    tempRoots.push(base);
     // A file where a directory is expected makes mkdir/append throw.
     const collision = path.join(base, 'blocker');
     fs.writeFileSync(collision, 'x');
@@ -17,7 +26,7 @@ describe('AuditLogger write-failure accounting (FA-CORE-004)', () => {
   }
 
   it('counts dropped writes without throwing by default', async () => {
-    const logger = new AuditLogger({ dataDir: makeUnwritableDir() });
+    const logger = new AuditLogger({ dir: makeUnwritableDir() });
     expect(logger.getWriteFailureCount()).toBe(0);
 
     await logger.log({ source: 'core', action: 'test:event', outcome: 'success' });
@@ -28,7 +37,7 @@ describe('AuditLogger write-failure accounting (FA-CORE-004)', () => {
 
   it('rethrows on write failure when failFast is set', async () => {
     const logger = new AuditLogger({
-      dataDir: makeUnwritableDir(),
+      dir: makeUnwritableDir(),
       failFast: true,
     });
 
@@ -40,7 +49,8 @@ describe('AuditLogger write-failure accounting (FA-CORE-004)', () => {
 
   it('records nothing failed on a healthy path', async () => {
     const okDir = fs.mkdtempSync(path.join(os.tmpdir(), 'civic-audit-ok-'));
-    const logger = new AuditLogger({ dataDir: okDir });
+    tempRoots.push(okDir);
+    const logger = new AuditLogger({ dir: okDir });
     await logger.log({ source: 'core', action: 'test:event', outcome: 'success' });
     expect(logger.getWriteFailureCount()).toBe(0);
   });

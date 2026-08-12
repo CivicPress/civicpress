@@ -98,10 +98,25 @@ export function buildSearchSQL(
     }
   }
 
+  // Comma-separated, like the `type` filter directly above. This was a bare
+  // `status = ?`, so a caller passing a LIST (which is how the published-only
+  // gate expresses "any publicly-visible status") matched literally nothing —
+  // public search would have gone silently empty rather than filtered.
   if (status) {
-    whereClause += ' AND r.status = ?';
-    params.push(status);
-    countParams.push(status);
+    const statusFilters = status
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (statusFilters.length === 1) {
+      whereClause += ' AND r.status = ?';
+      params.push(statusFilters[0]);
+      countParams.push(statusFilters[0]);
+    } else if (statusFilters.length > 1) {
+      const placeholders = statusFilters.map(() => '?').join(',');
+      whereClause += ` AND r.status IN (${placeholders})`;
+      params.push(...statusFilters);
+      countParams.push(...statusFilters);
+    }
   }
 
   const query = `

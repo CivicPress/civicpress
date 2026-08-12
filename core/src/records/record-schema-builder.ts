@@ -15,6 +15,7 @@ import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { CentralConfigManager } from '../config/central-config.js';
+import { getInstanceContext } from '../config/instance-context.js';
 import { Logger } from '../utils/logger.js';
 import { ModuleResolver } from '../modules/module-resolver.js';
 
@@ -61,9 +62,9 @@ const pluginSchemas = new Map<
 /**
  * Injected ModuleResolver for filesystem-based module discovery.
  * Set by civic-core-services.ts at startup (Phase 2d W1-T2). When unset,
- * mergeModuleExtensions falls back to a process.cwd()-based default for
- * backward compatibility during the migration; production code paths
- * always set this.
+ * mergeModuleExtensions falls back to the instance context's modulesDir —
+ * the same rule the injected resolver is built from, so the two can no longer
+ * disagree. Production code paths always set this.
  */
 let injectedModuleResolver: ModuleResolver | null = null;
 
@@ -73,14 +74,38 @@ export function setModuleResolver(resolver: ModuleResolver): void {
   schemaCache.clear();
 }
 
+/**
+ * Memoized fallback resolver, keyed by the directory it scans.
+ *
+ * A ModuleResolver caches its scan internally, so building a NEW one per call
+ * re-walked the module tree every time. That was nearly free while the fallback
+ * pointed at a `cwd/modules` that usually did not exist; now that it resolves to
+ * a real tree, an uninjected caller (e.g. `getSchemaExtensionFieldNames`, hit
+ * once per record serialization) would rescan the filesystem on every call.
+ */
+let fallbackResolver: { dir: string; resolver: ModuleResolver } | null = null;
+
 function getModuleResolver(): ModuleResolver {
   if (injectedModuleResolver) {
     return injectedModuleResolver;
   }
-  // Fallback for direct test invocations / pre-init contexts. Same shape as
-  // the pre-W1-T2 behavior (look under cwd/modules) but routed through the
-  // resolver abstraction.
-  return new ModuleResolver(join(process.cwd(), 'modules'));
+  // Deterministic fallback for pre-init / direct-invocation contexts: the
+  // instance context's modulesDir — the SAME rule the injected resolver uses
+  // (civic-core-services builds it from `resolveModulesDir(...)`). Raw
+  // `process.cwd()/modules` silently returned the wrong/empty module set when
+  // the process ran from a directory other than the instance root (the
+  // BroadcastBox redaction-pipeline failure mode:
+  // `getSchemaExtensionFieldNames('session')` came back empty, so `capture` was
+  // mis-nested). There is no cwd fallback left here — the context always
+  // resolves, and for a split deployment it points at the installed code.
+  const modulesDir = getInstanceContext().modulesDir;
+  if (!fallbackResolver || fallbackResolver.dir !== modulesDir) {
+    fallbackResolver = {
+      dir: modulesDir,
+      resolver: new ModuleResolver(modulesDir),
+    };
+  }
+  return fallbackResolver.resolver;
 }
 
 /**
@@ -219,7 +244,10 @@ export class RecordSchemaBuilder {
   /**
    * Merge type-specific schema extension (geography, session)
    */
-  private static mergeTypeExtension(schema: JsonSchemaObject, recordType: string): void {
+  private static mergeTypeExtension(
+    schema: JsonSchemaObject,
+    recordType: string
+  ): void {
     const typeSchemaPath = join(
       __dirname,
       '../schemas/record-type-schemas',
@@ -256,7 +284,10 @@ export class RecordSchemaBuilder {
    * `session` for broadcast-box) needs no core change. Phase 2d W1-T3
    * removed the former hardcoded `moduleName === 'legal-register'` check.
    */
-  private static mergeModuleExtensions(schema: JsonSchemaObject, recordType?: string): void {
+  private static mergeModuleExtensions(
+    schema: JsonSchemaObject,
+    recordType?: string
+  ): void {
     try {
       const modules = CentralConfigManager.getModules();
       const resolver = getModuleResolver();
@@ -325,7 +356,10 @@ export class RecordSchemaBuilder {
   /**
    * Merge plugin schema extensions (registered at runtime)
    */
-  private static mergePluginExtensions(schema: JsonSchemaObject, recordType?: string): void {
+  private static mergePluginExtensions(
+    schema: JsonSchemaObject,
+    recordType?: string
+  ): void {
     for (const [pluginName, pluginSchema] of pluginSchemas.entries()) {
       // Check if this plugin schema applies to this record type
       if (recordType && !pluginSchema.appliesTo(recordType)) {

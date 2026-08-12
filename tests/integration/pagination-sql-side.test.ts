@@ -27,6 +27,20 @@ let service: any;
 const UNPUBLISHED_COUNT = 25;
 const LINKED_COUNT = 12;
 const GEO_ID = 'geo-target';
+
+/**
+ * These cases exercise SQL-side filtering and pagination, not visibility.
+ * `RecordsService.listRecords` gates a caller with NO user down to the
+ * publicly-declared statuses, and this file's fixtures are 'adopted' and
+ * 'draft' — neither is public — so listing anonymously would count zero rows
+ * and the assertions would be measuring the gate instead of the SQL. Listing
+ * as an authenticated caller keeps the subject of the test what it claims.
+ */
+const LISTING_USER = {
+  id: 1,
+  username: 'pagination-test',
+  role: 'admin',
+} as any;
 // A sibling id that is a strict PREFIX-extension of GEO_ID. A naive
 // `LIKE '%geo-target%'` filter would wrongly match this row.
 const GEO_ID_DECOY = 'geo-target-2';
@@ -69,9 +83,8 @@ beforeAll(async () => {
   context = await createAPITestContext();
   db = context.civic.getDatabaseService();
 
-  const { RecordsService } = await import(
-    '../../modules/api/src/services/records-service.js'
-  );
+  const { RecordsService } =
+    await import('../../modules/api/src/services/records-service.js');
   service = new RecordsService(context.civic);
 
   baselineUnpublished = (await service.listUnpublishedRecords({ limit: 1 }))
@@ -225,11 +238,14 @@ describe('listUnpublishedRecords — SQL-side pagination', () => {
 
 describe('geography linked-records — SQL-side filter + pagination', () => {
   it('matches on the geography ELEMENT id — not a substring of the JSON', async () => {
-    const result = await service.listRecords({
-      page: 1,
-      limit: 100,
-      linkedGeographyId: GEO_ID,
-    });
+    const result = await service.listRecords(
+      {
+        page: 1,
+        limit: 100,
+        linkedGeographyId: GEO_ID,
+      },
+      LISTING_USER
+    );
 
     expect(result.totalCount).toBe(LINKED_COUNT);
     const ids = result.records.map((r: { id: string }) => r.id);
@@ -244,11 +260,14 @@ describe('geography linked-records — SQL-side filter + pagination', () => {
     const pageCounts: number[] = [];
 
     for (let page = 1; page <= 4; page++) {
-      const result = await service.listRecords({
-        page,
-        limit: pageSize,
-        linkedGeographyId: GEO_ID,
-      });
+      const result = await service.listRecords(
+        {
+          page,
+          limit: pageSize,
+          linkedGeographyId: GEO_ID,
+        },
+        LISTING_USER
+      );
       expect(result.totalCount).toBe(LINKED_COUNT);
       pageCounts.push(Math.ceil(result.totalCount / pageSize));
       seen.push(...result.records.map((r: { id: string }) => r.id));
@@ -264,20 +283,26 @@ describe('geography linked-records — SQL-side filter + pagination', () => {
   it('survives a row whose linked_geography_files is malformed JSON', async () => {
     // Without `json_valid()`, json_each() raises "malformed JSON" and the whole
     // query — hence the endpoint — fails for everyone.
-    const result = await service.listRecords({
-      page: 1,
-      limit: 100,
-      linkedGeographyId: 'geo-other',
-    });
+    const result = await service.listRecords(
+      {
+        page: 1,
+        limit: 100,
+        linkedGeographyId: 'geo-other',
+      },
+      LISTING_USER
+    );
     expect(result.totalCount).toBe(LINKED_COUNT);
   });
 
   it('returns nothing for a geography no record links', async () => {
-    const result = await service.listRecords({
-      page: 1,
-      limit: 10,
-      linkedGeographyId: 'geo-nobody-links-this',
-    });
+    const result = await service.listRecords(
+      {
+        page: 1,
+        limit: 10,
+        linkedGeographyId: 'geo-nobody-links-this',
+      },
+      LISTING_USER
+    );
     expect(result.totalCount).toBe(0);
     expect(result.records).toHaveLength(0);
   });

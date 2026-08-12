@@ -10,6 +10,9 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { mkdtempSync, rmSync } from 'fs';
+import { tmpdir } from 'os';
+import { join } from 'path';
 import {
   PasswordRecoveryService,
   type ResetTokenIssuer,
@@ -21,11 +24,13 @@ import type {
   NotificationChannel,
 } from '../notification-channel.js';
 
-function fakeIssuer(user: {
-  userId: number;
-  username: string;
-  email?: string;
-} | null) {
+function fakeIssuer(
+  user: {
+    userId: number;
+    username: string;
+    email?: string;
+  } | null
+) {
   return {
     findResetEligibleUser: vi.fn(async () => user),
     mintResetTokenForUser: vi.fn(async () => 'plaintext-token-xyz'),
@@ -50,12 +55,35 @@ function fakeEmailChannel(sink: ChannelRequest[]): NotificationChannel {
   } as unknown as NotificationChannel;
 }
 
+/**
+ * A NotificationConfig rooted in an EMPTY directory, so it is exactly the code
+ * defaults — no `notifications.yml` from any real instance.
+ *
+ * These tests assert what happens with email off / on, so the starting state
+ * has to be owned by the test. Constructed bare, NotificationConfig now reads
+ * the resolved instance's `.system-data/notifications.yml`; on a dev machine
+ * that is a real configured instance, which silently flipped both the
+ * "no user-facing channel" and "email configured" cases.
+ */
+/**
+ * Roots handed out by `isolatedConfig`, removed in afterEach. Each call minted
+ * a temp dir and nothing removed them — 6 stray `/tmp/civic-notif-cfg-*` per
+ * full run.
+ */
+const isolatedConfigRoots: string[] = [];
+
+function isolatedConfig(): NotificationConfig {
+  const dir = mkdtempSync(join(tmpdir(), 'civic-notif-cfg-'));
+  isolatedConfigRoots.push(dir);
+  return new NotificationConfig(dir);
+}
+
 /** A NotificationService whose email channel is the recording fake + enabled. */
 function serviceWithFakeEmail(sink: ChannelRequest[]): {
   service: NotificationService;
   config: NotificationConfig;
 } {
-  const config = new NotificationConfig();
+  const config = isolatedConfig();
   config.updateChannelConfig('email', {
     enabled: true,
     provider: 'smtp',
@@ -83,9 +111,13 @@ describe('PasswordRecoveryService', () => {
   });
 
   afterEach(() => {
-    if (savedConsole === undefined) delete process.env.CIVIC_CONSOLE_NOTIFICATIONS;
+    if (savedConsole === undefined)
+      delete process.env.CIVIC_CONSOLE_NOTIFICATIONS;
     else process.env.CIVIC_CONSOLE_NOTIFICATIONS = savedConsole;
     vi.restoreAllMocks();
+    for (const dir of isolatedConfigRoots.splice(0)) {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   it('no eligible account → no-op, no token minted, no operator task', async () => {
@@ -94,6 +126,7 @@ describe('PasswordRecoveryService', () => {
     const svc = new PasswordRecoveryService({
       issuer,
       operatorNotifier: op as never,
+      notificationConfig: isolatedConfig(),
     });
 
     const outcome = await svc.requestReset('ghost', OPTS);
@@ -110,6 +143,7 @@ describe('PasswordRecoveryService', () => {
     const svc = new PasswordRecoveryService({
       issuer,
       operatorNotifier: op as never,
+      notificationConfig: isolatedConfig(),
     });
 
     const outcome = await svc.requestReset('jo', OPTS);
@@ -125,11 +159,16 @@ describe('PasswordRecoveryService', () => {
 
   it('console sink available → mint token + deliver, no operator task', async () => {
     process.env.CIVIC_CONSOLE_NOTIFICATIONS = 'true';
-    const issuer = fakeIssuer({ userId: 9, username: 'sam', email: 'sam@x.org' });
+    const issuer = fakeIssuer({
+      userId: 9,
+      username: 'sam',
+      email: 'sam@x.org',
+    });
     const op = fakeOperatorNotifier();
     const svc = new PasswordRecoveryService({
       issuer,
       operatorNotifier: op as never,
+      notificationConfig: isolatedConfig(),
       // echo path prints; no outboxDir keeps the test filesystem clean
     });
 
@@ -145,7 +184,11 @@ describe('PasswordRecoveryService', () => {
     process.env.CIVIC_CONSOLE_NOTIFICATIONS = 'false';
     const sink: ChannelRequest[] = [];
     const { service, config } = serviceWithFakeEmail(sink);
-    const issuer = fakeIssuer({ userId: 3, username: 'sam', email: 'sam@x.org' });
+    const issuer = fakeIssuer({
+      userId: 3,
+      username: 'sam',
+      email: 'sam@x.org',
+    });
     const op = fakeOperatorNotifier();
 
     const svc = new PasswordRecoveryService({
@@ -198,6 +241,7 @@ describe('PasswordRecoveryService', () => {
     const svc = new PasswordRecoveryService({
       issuer,
       operatorNotifier: op as never,
+      notificationConfig: isolatedConfig(),
     });
 
     await svc.requestReset('some@email.org', OPTS);

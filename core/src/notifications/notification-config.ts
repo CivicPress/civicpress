@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as yaml from 'js-yaml';
+import { getInstanceContext } from '../config/instance-context.js';
 
 export interface NotificationConfigData {
   channels: {
@@ -103,7 +104,16 @@ export class NotificationConfig {
   private config: NotificationConfigData;
   private configPath: string;
 
-  constructor(dataDir: string = '.system-data') {
+  /**
+   * @param dataDir Directory holding `notifications.yml`. Defaults to the
+   * instance's `.system-data` — the canonical location the configuration
+   * service migrates this file INTO (see `migrateNotificationsIfNeeded`).
+   *
+   * The default used to be the RELATIVE string `.system-data`, resolved against
+   * `process.cwd()`, so a process running outside the instance root read (and
+   * created) a stray config in whatever directory it happened to start in.
+   */
+  constructor(dataDir: string = getInstanceContext().systemDataDir) {
     this.configPath = path.join(dataDir, 'notifications.yml');
     this.config = this.loadConfig();
   }
@@ -399,9 +409,7 @@ export class NotificationConfig {
   /**
    * Update auth template
    */
-  updateAuthTemplate<
-    K extends keyof NotificationConfigData['auth_templates'],
-  >(
+  updateAuthTemplate<K extends keyof NotificationConfigData['auth_templates']>(
     templateName: K,
     template: NotificationConfigData['auth_templates'][K]
   ): void {

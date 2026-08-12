@@ -121,7 +121,13 @@ export class CloudUuidStorageService {
     this.config = config;
     this.basePath = basePath;
     this.logger = new Logger();
-    this.credentialManager = new CredentialManager();
+    // Point the credential manager at THIS instance's storage.yml. Constructed
+    // with no argument it fell back to `<cwd>/.system-data/storage.yml`, so
+    // file-configured cloud credentials were invisible whenever the process ran
+    // from anywhere but the instance root.
+    this.credentialManager = new CredentialManager(
+      nodePath.join(basePath, 'storage.yml')
+    );
 
     // Initialize cache adapter if cache manager provided
     if (cacheManager) {
@@ -334,7 +340,10 @@ export class CloudUuidStorageService {
       this.config,
       this.s3Client,
       this.azureContainerClient,
-      this.logger
+      this.logger,
+      // Without this the cleaner resolved a relative local provider path
+      // against process.cwd() and could delete a DIFFERENT tree's files.
+      this.basePath
     );
   }
 

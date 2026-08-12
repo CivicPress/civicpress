@@ -43,6 +43,13 @@ export class RoomManager {
   // its handler snapshots (Markdown writeback + binary persist), then the room
   // is removed from memory. `graceMs = 0` finalizes synchronously on last leave.
   private graceTimers: Map<string, NodeJS.Timeout> = new Map();
+  /**
+   * Finalizations started but not yet finished. `clearAllGraceTimers()` can
+   * cancel a PENDING timer but not a pass already running, and finalize writes
+   * a snapshot to disk — so without this a snapshot could land after the server
+   * reported itself shut down. `drainFinalizations()` is how shutdown waits.
+   */
+  private pendingFinalizations: Set<Promise<void>> = new Set();
   private graceMs: number = DEFAULT_GRACE_PERIOD_MS;
 
   constructor(logger: Logger, server: RealtimeServer) {
@@ -172,13 +179,13 @@ export class RoomManager {
     }
 
     if (this.graceMs <= 0) {
-      void this.finalizeRoom(roomId);
+      this.trackFinalize(roomId);
       return;
     }
 
     const timer = setTimeout(() => {
       this.graceTimers.delete(roomId);
-      void this.finalizeRoom(roomId);
+      this.trackFinalize(roomId);
     }, this.graceMs);
     // Don't keep the event loop alive solely for a grace timer (process exit /
     // test teardown should not block on a pending finalize).
@@ -192,6 +199,31 @@ export class RoomManager {
       roomId,
       graceMs: this.graceMs,
     });
+  }
+
+  /**
+   * Start a finalize and remember it until it settles, so shutdown can wait.
+   * Replaces a bare `void this.finalizeRoom(...)` at both call sites.
+   */
+  private trackFinalize(roomId: string): void {
+    const p = this.finalizeRoom(roomId)
+      .catch(() => {
+        // finalizeRoom logs its own failures; a drain must never reject.
+      })
+      .finally(() => {
+        this.pendingFinalizations.delete(p);
+      });
+    this.pendingFinalizations.add(p);
+  }
+
+  /**
+   * Await every finalize that has started but not yet completed. Looped
+   * because finalizing one room can, in principle, start another.
+   */
+  async drainFinalizations(): Promise<void> {
+    while (this.pendingFinalizations.size > 0) {
+      await Promise.allSettled([...this.pendingFinalizations]);
+    }
   }
 
   /**

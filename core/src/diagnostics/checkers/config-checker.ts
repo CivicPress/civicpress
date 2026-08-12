@@ -7,6 +7,7 @@
 import { BaseDiagnosticChecker } from '../base-checker.js';
 import { errorMessage, errorStack } from '../../utils/error-narrow.js';
 import { CentralConfigManager } from '../../config/central-config.js';
+import { getInstanceContext } from '../../config/instance-context.js';
 import { ConfigurationService } from '../../config/configuration-service.js';
 import { Logger } from '../../utils/logger.js';
 import {
@@ -615,29 +616,16 @@ export class ConfigurationDiagnosticChecker extends BaseDiagnosticChecker {
   }
 
   /**
-   * Find .civicrc file
+   * The `.civicrc` this instance is actually running from.
+   *
+   * This was a third hand-rolled upward search for `.civicrc` — and one that
+   * could disagree with the others, since it gave up after 10 levels. A
+   * diagnostic that reports on a DIFFERENT config file than the one the system
+   * loaded is worse than no diagnostic, so it now reads the resolved instance
+   * context, the same source CentralConfigManager uses.
    */
   private findCivicrcFile(): string | null {
-    // Try to find .civicrc using the same logic as CentralConfigManager
-    let currentPath = process.cwd();
-    const maxDepth = 10;
-    let depth = 0;
-
-    while (depth < maxDepth) {
-      const configPath = path.join(currentPath, '.civicrc');
-      if (fs.existsSync(configPath)) {
-        return configPath;
-      }
-
-      const parentPath = path.dirname(currentPath);
-      if (parentPath === currentPath) {
-        break;
-      }
-      currentPath = parentPath;
-      depth++;
-    }
-
-    return null;
+    return getInstanceContext().configPath;
   }
 
   /**

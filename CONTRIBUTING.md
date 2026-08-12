@@ -74,7 +74,7 @@ A few useful resources to consult before contributing:
 - Roadmap and direction: [docs/roadmap.md](docs/roadmap.md)
 - Project status and current implementation:
   [docs/project-status.md](docs/project-status.md)
-- Public interest and participation form: https://tally.so/r/wAYBvN
+- Public interest and participation form: <https://tally.so/r/wAYBvN>
 
 These documents will give you a clear sense of the goals, priorities, and
 expectations for CivicPress.
@@ -89,14 +89,35 @@ This section covers the technical workflow for developers.
 
 Before contributing code, ensure you have:
 
-- **Node.js** 20.11.1 or higher (LTS recommended)
-- **pnpm** 8.15.0 or higher (package manager)
+- **Node.js** 22 or higher (see `.nvmrc`; matches the repo's `engines`)
+- **pnpm** 9 or higher — `corepack enable` picks up the pinned `pnpm@9.15.9`
 - **Git** installed and configured
+- **ffmpeg / ffprobe** on your `PATH` (broadcast-box redaction + parts of the
+  test suite)
 
 ## Development Setup
 
-Follow the installation instructions in
-[docs/bootstrap-guide.md](docs/bootstrap-guide.md) to set up your environment.
+```bash
+pnpm install
+pnpm dev:setup   # one-time: build core+cli, create a local instance, seed demo records
+pnpm dev         # run the whole stack with hot reload
+```
+
+`pnpm dev` runs **core (watch) + API + UI** together with prefixed, colour-coded
+logs:
+
+- **API** → <http://localhost:3000>
+- **UI** → <http://localhost:3030>
+- Log in as **`admin` / `Dev-Admin-123!`** — a local-only dev credential.
+
+Editing `core/`, `modules/api/`, or `modules/ui/` source hot-reloads
+automatically. Tests also rebuild stale `core`/`cli` output for you, so you
+never run against stale compiled code.
+
+`pnpm dev` fails fast with a hint if you haven't run `pnpm dev:setup` yet. The
+per-workspace scripts (`pnpm dev:api`, `pnpm dev:ui`, `pnpm dev:core`, …) remain
+for running a single piece. For a deeper setup guide see
+[docs/bootstrap-guide.md](docs/bootstrap-guide.md).
 
 ## Proposal Before Big PRs
 
@@ -128,6 +149,30 @@ docs: update contributing guide
 fix: resolve null error in records-service
 refactor: simplify indexing logic
 ```
+
+## The Pre-Commit Hook
+
+A Husky `pre-commit` hook runs on every commit. It is deliberately small — a
+couple of seconds, and nothing that needs a database, a network, or built
+output:
+
+- **lint-staged** — Prettier (and markdownlint on `.md`) over the staged files,
+  then ESLint over the staged JS/TS/Vue. Each file is linted by the package that
+  owns it, since ESLint is installed per package rather than at the root. Lint
+  **errors** block the commit; warnings do not.
+- **`pnpm registry:check`** — catches duplicate CLI commands, endpoints, or
+  components (~0.2s).
+
+Tests and `tsc` are **not** in the hook, on purpose. Tests need a database and
+built `dist` output; a whole-program typecheck needs sibling packages built.
+Either one fails on a fresh clone for reasons that have nothing to do with your
+commit, and a hook that cries wolf is a hook everyone bypasses — which is
+exactly what happened to the previous full-suite version. CI runs the full suite
+on every pull request and on pushes to `develop` and `main`.
+
+`git commit --no-verify` should not be routine. If you find yourself reaching
+for it, the hook has regressed into something too slow or too flaky — please
+report that rather than routing around it.
 
 ## Pull Requests
 

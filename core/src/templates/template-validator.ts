@@ -6,6 +6,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
+import { getInstanceContext } from '../config/instance-context.js';
 import matter from 'gray-matter';
 import type { Template } from '../utils/template-engine.js';
 import type { ValidationResult, TemplateId } from './types.js';
@@ -19,9 +20,10 @@ export class TemplateValidator {
   constructor(dataDir: string) {
     this.dataDir = dataDir;
     this.customTemplatePath = path.join(dataDir, '.civic', 'templates');
+    // Base templates live in the INSTANCE's `.system-data`, not in whatever
+    // directory the process was started from.
     this.baseTemplatePath = path.join(
-      process.cwd(),
-      '.system-data',
+      getInstanceContext().systemDataDir,
       'templates'
     );
   }

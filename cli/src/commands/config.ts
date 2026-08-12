@@ -4,7 +4,11 @@ import { CAC } from 'cac';
 import { promises as fsp } from 'fs';
 import * as fs from 'fs';
 import * as path from 'path';
-import { ConfigurationService, CentralConfigManager } from '@civicpress/core';
+import {
+  ConfigurationService,
+  CentralConfigManager,
+  resolveCodeRoot,
+} from '@civicpress/core';
 import { createRequire } from 'module';
 import {} from '../utils/global-options.js';
 import { AuthUtils } from '../utils/auth-utils.js';
@@ -15,8 +19,11 @@ function createConfigService(): ConfigurationService {
   const dataDir = central.dataDir || 'data';
   const require = createRequire(import.meta.url);
 
-  // Resolve defaults path via the core package root to work in tests and repo root
-  let defaultsPath = path.join(process.cwd(), 'core', 'src', 'defaults');
+  // Resolve defaults path via the core package root to work in tests and repo
+  // root. The fallback anchors to the installed CODE root rather than
+  // process.cwd(): `core/src/defaults` ships with the code, so looking for it
+  // relative to wherever the command was invoked found it only by luck.
+  let defaultsPath = path.join(resolveCodeRoot(), 'core', 'src', 'defaults');
   try {
     const corePkgPath = require.resolve('@civicpress/core/package.json');
     const coreRoot = path.dirname(corePkgPath); // .../core
@@ -25,13 +32,16 @@ function createConfigService(): ConfigurationService {
       defaultsPath = candidate;
     }
   } catch {
-    // fallback to process.cwd-based path
+    // keep the code-root fallback resolved above
   }
 
   return new ConfigurationService({
     dataPath: path.join(dataDir, '.civic'),
     defaultsPath,
-    systemDataPath: path.join(process.cwd(), '.system-data'),
+    // The instance's `.system-data`, from the config authority — not
+    // `<cwd>/.system-data`, which pointed these commands at a different
+    // instance than the one they were reading dataDir from.
+    systemDataPath: CentralConfigManager.getSystemDataDir(),
   });
 }
 

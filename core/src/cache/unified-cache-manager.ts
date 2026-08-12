@@ -189,7 +189,7 @@ export class UnifiedCacheManager {
 
     await Promise.all(promises);
     this.initialized = true;
-    this.logger.info('Unified cache manager initialized', {
+    this.logger.debug('Unified cache manager initialized', {
       cacheCount: this.caches.size,
     });
   }

@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { coreError } from '../utils/core-output.js';
+import { getInstanceContext } from '../config/instance-context.js';
 
 export interface AuditEntry {
   id: string;
@@ -43,11 +44,29 @@ export interface AuditEntry {
 }
 
 export class NotificationAudit {
-  private auditLogPath: string;
+  private explicitDataDir: string | null;
   private maxEntries: number = 10000;
 
-  constructor(dataDir: string = '.system-data') {
-    this.auditLogPath = path.join(dataDir, 'notification-audit.jsonl');
+  /**
+   * @param dataDir Where the audit log lives. Defaults to the instance's
+   * `.system-data`. It used to default to the RELATIVE string `.system-data`,
+   * which resolved against `process.cwd()` — so every notification audited by a
+   * process running outside the instance root appended to a stray
+   * `<cwd>/.system-data/notification-audit.jsonl` instead of the instance's own
+   * (in the repo, that meant test runs writing into the checkout).
+   */
+  constructor(dataDir?: string) {
+    this.explicitDataDir = dataDir ?? null;
+  }
+
+  /**
+   * Resolved lazily: a NotificationService is often constructed before the
+   * instance context is installed, so binding the path at construction time
+   * would capture whatever root happened to be current then.
+   */
+  private get auditLogPath(): string {
+    const dataDir = this.explicitDataDir ?? getInstanceContext().systemDataDir;
+    return path.join(dataDir, 'notification-audit.jsonl');
   }
 
   /**

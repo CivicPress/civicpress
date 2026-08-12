@@ -9,6 +9,7 @@ import { coreError, coreDebug } from '../utils/core-output.js';
 import { SecretsManager } from '../security/secrets.js';
 import { AuditChannel } from '../audit/audit-channel.js';
 import { registerEmailChannelOn } from './email-validation-service/email-channel-setup.js';
+import { AuthTemplate } from '../notifications/templates/auth-template.js';
 
 const logger = new Logger();
 
@@ -122,11 +123,6 @@ export class EmailValidationService {
    */
   private registerEmailTemplates(): void {
     try {
-      // Import AuthTemplate dynamically to avoid circular dependencies
-      const {
-        AuthTemplate,
-      } = require('../notifications/templates/auth-template.js');
-
       // Initial email verification template
       const emailVerificationTemplate = new AuthTemplate(
         'email_verification',

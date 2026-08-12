@@ -8,6 +8,7 @@
  * carry filesystem state itself.
  */
 
+import { execSync } from 'node:child_process';
 import type { Template, TemplateVariable, Partial } from './types.js';
 
 export class TemplateGenerator {
@@ -250,8 +251,6 @@ export class TemplateGenerator {
 
   private detectAuthor(): string {
     try {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const { execSync } = require('child_process');
       const gitName = execSync('git config user.name', {
         encoding: 'utf8',
       }).trim();

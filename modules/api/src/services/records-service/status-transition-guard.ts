@@ -22,14 +22,17 @@ export async function assertStatusWritableByRole(
     userRole: string;
   }
 ): Promise<void> {
-  const { fromStatus, toStatus, userRole } = params;
+  const { fromStatus, toStatus, type, userRole } = params;
   if (fromStatus === toStatus) return;
   const controlled = await workflowManager.getControlledStatuses();
   if (!controlled.has(toStatus)) return;
+  // `type` was already being passed in and then dropped, so a record type with
+  // its own workflow was judged against the global graph.
   const check = await workflowManager.validateTransition(
     fromStatus,
     toStatus,
-    userRole
+    userRole,
+    type
   );
   if (!check.valid) {
     throw new HttpError(

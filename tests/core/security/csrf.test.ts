@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeEach } from 'vitest';
+import { describe, test, expect, beforeEach, afterEach } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
@@ -16,6 +16,14 @@ describe('CsrfProtection', () => {
     secretsManager = SecretsManager.getInstance(tempDir);
     await secretsManager.initialize();
     csrfProtection = new CsrfProtection(secretsManager);
+  });
+
+  afterEach(() => {
+    // This file mkdtemp'd a directory per test and never removed one, leaving
+    // ~18 empty `/tmp/civicpress-csrf-test-*` behind on every full run.
+    fs.rmSync(tempDir, { recursive: true, force: true });
+    SecretsManager.resetInstance();
+    delete process.env.CIVICPRESS_SECRET;
   });
 
   test('should generate CSRF token', () => {

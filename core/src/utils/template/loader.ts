@@ -9,6 +9,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import matter from 'gray-matter';
+import { getInstanceContext } from '../../config/instance-context.js';
 import type {
   Template,
   TemplateValidation,
@@ -22,9 +23,12 @@ export class TemplateLoader {
   private partialsPath: string;
 
   constructor(dataDir: string) {
+    // Base templates live in the INSTANCE's `.system-data`. Anchoring to
+    // process.cwd() meant a process started outside the instance root looked
+    // for them in — and created them in — whatever directory it happened to
+    // start in (test runs produced a stray `core/.system-data/templates`).
     this.baseTemplatePath = path.join(
-      process.cwd(),
-      '.system-data',
+      getInstanceContext().systemDataDir,
       'templates'
     );
     this.customTemplatePath = path.join(dataDir, '.civic', 'templates');

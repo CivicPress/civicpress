@@ -8,7 +8,8 @@ import {
   afterAll,
   vi,
 } from 'vitest';
-import { execSync } from 'child_process';
+import { execFile, execSync } from 'child_process';
+import { promisify } from 'util';
 import { join, dirname } from 'path';
 import {
   existsSync,
@@ -25,7 +26,29 @@ import {
   RecordParser,
   RecordData,
   CentralConfigManager,
+  setInstanceContext,
+  resolveInstanceContext,
 } from '@civicpress/core';
+
+/**
+ * Awaited subprocess execution, for fixtures that are already `async`.
+ *
+ * `execSync` blocks the vitest worker's event loop for the whole subprocess;
+ * this yields it. Fixtures that spawn the CLI use this so the worker can
+ * service its RPC channel between tests (see createCLITestContext) — that
+ * property is load-bearing, so keep any replacement asynchronous.
+ *
+ * `execFile`, not `exec`: no shell, so the CLI path and the test directory
+ * cannot be re-read as shell syntax. They used to be interpolated into a
+ * `cd <dir> && node <cli> …` string, where `CLI_PATH` is built from
+ * `process.cwd()` — an absolute path taken from the environment, which is what
+ * CodeQL flagged. Nothing hostile could reach it in a test fixture, but a
+ * directory containing a space was already enough to break it.
+ */
+const execFileAsync = promisify(execFile);
+
+/** `exec` buffers output in memory; the CLI's `--json` payloads can be large. */
+const EXEC_MAX_BUFFER = 32 * 1024 * 1024;
 
 // Test configuration
 export interface TestConfig {
@@ -1395,36 +1418,55 @@ export function createExtendedSampleRecords(config: TestConfig) {
 
 // CLI test helpers
 export async function createCLITestContext(): Promise<CLITestContext> {
-  const config = createTestDirectory('cli-test');
-
-  // Create configuration files first
-  createCivicConfig(config);
-  createWorkflowConfig(config);
-  createRolesConfig(config);
-  createStorageConfig(config);
-  createOrgConfig(config);
-  createSampleRecords(config);
+  // One hermetic instance instead of directory + six config writers + git init.
+  // CLI tests still run the binary as a subprocess with `cd <testDir>`, so the
+  // child discovers the instance by walk-up the normal way; the installed
+  // context keeps THIS process pointed at it too.
+  const { createTestInstance } = await import('./test-instance.js');
+  const instance = createTestInstance({ prefix: 'cli-test', records: true });
+  const config = instance.config;
 
   // Ensure CLI is built before executing commands
   ensureCliBuilt();
 
-  // Initialize Git repository for the test directory
-  const { simpleGit } = await import('simple-git');
-  const git = simpleGit(config.testDir);
-  await git.init();
-
-  // Initialize CivicPress
-  execSync(`cd ${config.testDir} && node ${TEST_CONFIG.CLI_PATH} init --yes`, {
-    stdio: 'pipe',
+  // AWAITED, not execSync — and that matters far beyond style. Each of these
+  // spawns a whole `node cli/dist/index.js`, and `execSync` blocks the vitest
+  // worker's event loop for the entire subprocess. Every `await` in a CLI test
+  // between here and the next real I/O resolves from cache, which only drains
+  // MICROTASKS: the loop never reaches its poll phase, so the worker cannot read
+  // the main process's replies on the IPC channel. Vitest's worker→main
+  // `onTaskUpdate` RPC has a hard 60s birpc timeout, so a file that spends a
+  // minute of uninterrupted synchronous subprocess time fails the whole run with
+  // `[vitest-worker]: Timeout calling "onTaskUpdate"` while every test passes.
+  // These two awaits are the per-test event-loop turn that keeps that from
+  // happening — they replace the `await simpleGit().init()` that used to sit
+  // here and, incidentally, was the only thing yielding. See
+  // docs/backlog/2026-07-post-audit-hardening.md.
+  await execFileAsync('node', [TEST_CONFIG.CLI_PATH, 'init', '--yes'], {
+    cwd: config.testDir,
+    maxBuffer: EXEC_MAX_BUFFER,
   });
 
   // Create admin user using simulated authentication (for testing)
   let adminToken: string | undefined;
   try {
     // Use simulated authentication for admin user
-    const authResult = execSync(
-      `cd ${config.testDir} && node ${TEST_CONFIG.CLI_PATH} auth:simulated --username testadmin --role admin --json`,
-      { encoding: 'utf8' }
+    const { stdout: authResult } = await execFileAsync(
+      'node',
+      [
+        TEST_CONFIG.CLI_PATH,
+        'auth:simulated',
+        '--username',
+        'testadmin',
+        '--role',
+        'admin',
+        '--json',
+      ],
+      {
+        cwd: config.testDir,
+        encoding: 'utf8',
+        maxBuffer: EXEC_MAX_BUFFER,
+      }
     );
 
     // Extract JSON from the output using the helper function
@@ -1455,25 +1497,15 @@ export function cleanupCLITestContext(context: CLITestContext) {
 
 // API test helpers
 export async function createAPITestContext(): Promise<APITestContext> {
-  const config = createTestDirectory('api-test');
+  // One hermetic instance (directory + every config file + both git repos),
+  // installed as the process's current instance.
+  const { createTestInstance } = await import('./test-instance.js');
+  const instance = createTestInstance({ prefix: 'api-test', records: true });
+  const config = instance.config;
   const port = getRandomPort();
 
-  // Create configuration files
-  createCivicConfig(config);
-  createWorkflowConfig(config);
-  createRolesConfig(config);
-  createStorageConfig(config);
-  createOrgConfig(config);
-  createSampleRecords(config);
-
-  // Initialize Git repository for the test directory
   const { simpleGit } = await import('simple-git');
-  const git = simpleGit(config.testDir);
-  await git.init();
-
-  // Also initialize Git repository in the data directory where CivicPress expects it
   const dataGit = simpleGit(config.dataDir);
-  await dataGit.init();
 
   // Add sample record files and commit them
   const bylawDir = join(config.dataDir, 'records', 'bylaw');
@@ -1551,37 +1583,34 @@ export async function createAPITestContext(): Promise<APITestContext> {
   const { CivicPressAPI } = await import('../../modules/api/src/index.js');
   const api = new CivicPressAPI(port);
 
-  // Change to test directory so CentralConfigManager finds the .civicrc file
-  const originalCwd = process.cwd();
-  process.chdir(config.testDir);
-
-  // Drop any cached central config (e.g. one the CivicPressAPI constructor or a
-  // prior test resolved while cwd was the repo root — which pins the sqlite DB to
-  // the shared repo-root .system-data/civic.db). Resetting here forces the next
-  // getConfig() to re-resolve from THIS test's .civicrc, so the DB is the isolated
-  // testDir/test.db and users no longer accumulate across files/runs (the 409s).
+  // No chdir. This used to change into the test directory so the `.civicrc`
+  // walk-up would find it, then reset the cached config and chdir back in a
+  // `finally` — global mutable state, and the reason a test that threw could
+  // strand the whole run in the wrong directory. createTestInstance() already
+  // INSTALLED this root, so resolution lands here regardless of cwd. The
+  // CivicPressAPI constructor may have resolved a config before that (pinning
+  // the DB to the shared repo-root .system-data/civic.db), so re-install the
+  // instance's context to be sure this API uses the isolated testDir/test.db.
+  // reset() first (it drops the cached config AND the memoized context), then
+  // re-install — the same order createTestInstance uses.
   CentralConfigManager.reset();
+  setInstanceContext(instance.context);
 
-  try {
-    // Initialize CivicPress core first, then force reload role config before setting up routes
-    await api.initialize(config.dataDir);
+  // Initialize CivicPress core first, then force reload role config before setting up routes
+  await api.initialize(config.dataDir);
 
-    // Force reload role configuration after CivicPress initialization but before routes are fully set up
-    const civicPress = api.getCivicPress();
-    if (civicPress && typeof civicPress.getAuthService === 'function') {
-      await civicPress.getAuthService().reloadRoleConfig();
-    }
+  // Force reload role configuration after CivicPress initialization but before routes are fully set up
+  const civicPress = api.getCivicPress();
+  if (civicPress && typeof civicPress.getAuthService === 'function') {
+    await civicPress.getAuthService().reloadRoleConfig();
+  }
 
-    // Generate the index after creating sample records and initializing the API
-    if (civicPress && typeof civicPress.getIndexingService === 'function') {
-      await civicPress.getIndexingService().generateIndexes({
-        syncDatabase: true,
-        conflictResolution: 'file-wins',
-      });
-    }
-  } finally {
-    // Restore original working directory
-    process.chdir(originalCwd);
+  // Generate the index after creating sample records and initializing the API
+  if (civicPress && typeof civicPress.getIndexingService === 'function') {
+    await civicPress.getIndexingService().generateIndexes({
+      syncDatabase: true,
+      conflictResolution: 'file-wins',
+    });
   }
 
   // Create admin user and get token for authenticated API tests
@@ -1646,15 +1675,13 @@ export async function createExtendedAPITestContext(): Promise<APITestContext> {
 
   // Resolve config against THIS test's .civicrc (isolated testDir/test.db), the
   // same way createAPITestContext does — this helper previously never chdir'd, so
-  // it always hit the shared repo-root DB.
-  const originalCwd = process.cwd();
-  process.chdir(config.testDir);
+  // it always hit the shared repo-root DB. Installing the root replaces the
+  // chdir/restore pair entirely. (This context builds an EXTENDED .civicrc of
+  // its own, so it writes the config files itself rather than going through
+  // createTestInstance.)
   CentralConfigManager.reset();
-  try {
-    await api.initialize(config.dataDir);
-  } finally {
-    process.chdir(originalCwd);
-  }
+  setInstanceContext(resolveInstanceContext({ root: config.testDir }));
+  await api.initialize(config.dataDir);
 
   return {
     api,
@@ -1665,30 +1692,23 @@ export async function createExtendedAPITestContext(): Promise<APITestContext> {
 
 // Core test helpers
 export async function createCoreTestContext(): Promise<CoreTestContext> {
-  const config = createTestDirectory('core-test');
+  // One hermetic instance instead of directory + four config writers + two git
+  // inits assembled by hand. The instance is INSTALLED, so nothing here has to
+  // chdir for CentralConfigManager to find it.
+  const { createTestInstance } = await import('./test-instance.js');
+  const instance = createTestInstance({
+    prefix: 'core-test',
+    storage: false,
+    org: false,
+  });
 
-  // Create configuration files
-  createCivicConfig(config);
-  createWorkflowConfig(config);
-  createRolesConfig(config);
-
-  // Initialize Git repository for the test directory
-  const { simpleGit } = await import('simple-git');
-  const git = simpleGit(config.testDir);
-  await git.init();
-
-  // Also initialize Git repository in the data directory where CivicPress expects it
-  const dataGit = simpleGit(config.dataDir);
-  await dataGit.init();
-
-  // Initialize CivicPress core
   const { CivicPress } = await import('../../core/src/civic-core.js');
   const civic = new CivicPress({
-    dataDir: config.dataDir,
+    dataDir: instance.dataDir,
     database: {
       type: 'sqlite' as const,
       sqlite: {
-        file: join(config.testDir, 'test.db'),
+        file: instance.dbFile,
       },
     },
   });
@@ -1696,8 +1716,8 @@ export async function createCoreTestContext(): Promise<CoreTestContext> {
 
   return {
     civic,
-    testDir: config.testDir,
-    dbPath: join(config.testDir, 'test.db'),
+    testDir: instance.root,
+    dbPath: instance.dbFile,
   };
 }
 

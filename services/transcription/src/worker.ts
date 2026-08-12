@@ -99,8 +99,12 @@ export class TranscriptionWorker {
       decision.kind === 'all_public' ? null : decision.publicRanges;
 
     let transcript;
+    // Declared out here so the `finally` can release it on the failure path
+    // too — a job that throws mid-transcribe staged the container just the
+    // same, and that is the path that repeats every cycle on a retry loop.
+    let audio: Awaited<ReturnType<typeof records.prepareAudio>> | undefined;
     try {
-      const audio = await records.prepareAudio(session);
+      audio = await records.prepareAudio(session);
       transcript = await engine.transcribe({ audio, language, publicRanges });
     } catch (error) {
       // Transient/unexpected failure: leave transcript_status absent so the next
@@ -111,6 +115,12 @@ export class TranscriptionWorker {
         error: error instanceof Error ? error.message : String(error),
       });
       return 'failed';
+    } finally {
+      // Drop the staged container as soon as the engine is done with it. It is
+      // a full meeting recording, so holding it until process exit was not an
+      // option — and nothing was dropping it at all, so every completed job
+      // left one in os.tmpdir() permanently.
+      await audio?.cleanup?.();
     }
 
     // Re-read-before-write idempotency guard (§10.4): if the session gained a

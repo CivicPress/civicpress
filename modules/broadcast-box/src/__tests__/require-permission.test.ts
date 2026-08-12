@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeAll } from 'vitest';
-import { mkdtempSync } from 'node:fs';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { initializeRoleManager } from '@civicpress/core';
@@ -9,8 +9,16 @@ import { requirePermission } from '../middleware/require-permission.js';
 // RoleManager falls back to defaults), which now grants the broadcast-box
 // permissions: admin → all; clerk → devices:view + all sessions; public → none.
 // This verifies both the middleware behaviour AND that the grants are correct.
+let roleManagerDir: string;
+
 beforeAll(() => {
-  initializeRoleManager(mkdtempSync(join(tmpdir(), 'bb-authz-')));
+  roleManagerDir = mkdtempSync(join(tmpdir(), 'bb-authz-'));
+  initializeRoleManager(roleManagerDir);
+});
+
+afterAll(() => {
+  // Previously left behind on every run.
+  rmSync(roleManagerDir, { recursive: true, force: true });
 });
 
 type User = { id: number; username: string; role: string };

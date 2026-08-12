@@ -57,10 +57,73 @@ dropped (reason inline)
       saga concurrency test
 - [x] Session revocation (`deleteUserSessions` on logout + password change) —
       `tests/core/session-revocation.test.ts` (7 tests).
-- [ ] **Still open (needs repo admin, not code):** required-status-checks branch
-      protection on both repos — the current token lacks admin. Exact `gh api`
-      commands are in the PR bodies (status checks only; requiring PRs would
-      disable Renovate branch automerge).
+- [x] **Required-status-checks branch protection on the monorepo — ALREADY DONE;
+      this entry was stale.** Verified 2026-08-10 against the API: a repository
+      **ruleset** named `main` (id 19597452) has been `active` since
+      **2026-07-23**, targeting `~DEFAULT_BRANCH`, with rules `deletion`,
+      `non_fast_forward` and `required_status_checks` — requiring **`build-test`
+      AND `truth-check`**, `strict_required_status_checks_policy: true` (branch
+      must be current before merging) and **no bypass actors**.
+
+      ⚠️ **Why it kept looking open:** protection comes from a *ruleset*, not
+      classic branch protection, so `GET /repos/:o/:r/branches/main/protection`
+      returns **404** while `GET /repos/:o/:r/branches/main` reports
+      `"protected": true`. Checking the classic endpoint — the obvious thing to
+      do — says "unprotected" and is wrong. Query
+      `GET /repos/:o/:r/rulesets` instead.
+
+      Still open for the **device/BroadcastBox repo**, which has no protection
+      (see [[broadcast-box-hw-open-work]]).
+
+- [x] **⚠️ `truth-check` was a REQUIRED status check with a paths filter — a
+      deadlock. FIXED 2026-08-10.** `truth-check.yml` runs on `pull_request`
+      only for `docs/**`, `scripts/audit-truth-check*`, the workflow itself, or
+      `Makefile`. Because the ruleset requires the `truth-check` context on
+      every PR to `main`, a PR that touches none of those paths waits forever on
+      a check that will never report — the classic
+      required-check-plus-paths-filter deadlock. Not hypothetical: it blocks any
+      code-only release PR.
+
+      (The 2026-08-10 develop→main PR is unaffected — it touches four `docs/`
+      files, and the gate passes: `audit-truth-check: PASS`.)
+
+      **Confirmed against history, not just reasoned:** across the last 12
+      merged PRs, every one touching a filtered path reported a `truth-check`
+      context and **PR #24, which touched none, has no `truth-check` context at
+      all** — an equivalent PR today could never merge to `main`.
+
+      **Fix: the `paths:` filter is gone from the `pull_request` trigger**, so
+      the check always reports. That was the cheap end of three options (the
+      others being a skip-job reporting the same context, or dropping it from
+      the required set) — the job is a shell scan that finishes in ~10s, so
+      running it on every PR costs nothing worth protecting, and it adds no
+      moving parts.
+
+      ⚠️ `build-test` never had this problem: `ci.yml`'s `pull_request` trigger
+      carries no paths filter, so it always reports. Any future required check
+      must satisfy the same rule — **required contexts cannot be conditional.**
+
+- [x] **`v0.3.0` was released but never tagged — DONE, tag now exists.** Found
+      2026-08-10 during a close-out audit; verified 2026-08-10 that `v0.3.0` is
+      now present both locally and on the remote, pointing at the candidate
+      commit named below (`dd487eb`). The release provenance between v0.2.1 and
+      v0.3.1 is no longer broken. Original entry follows. `CHANGELOG.md` carries
+      a full `## [0.3.0] - 2026-08-04` section and the release commit
+      `b38b636 chore(release): v0.3.0` is on `main`, but no `v0.3.0` tag exists
+      locally or on the remote — every other release has one, so
+      `git checkout v0.3.0` fails and there is a hole in the release provenance
+      between v0.2.1 and v0.3.1.
+
+      Candidate commit: **`dd487eb`** (`Merge pull request #28 from
+      CivicPress/develop`). That follows this repo's own convention — `v0.3.1`
+      points at the merge-to-main commit (`c27a410`, PR #31), **not** at the
+      `chore(release)` bump. Verified `dd487eb` contains the `b38b636` bump, is
+      on `main`, and precedes the `v0.3.1` tag commit.
+
+          git tag -a v0.3.0 dd487eb -m "v0.3.0" && git push origin v0.3.0
+
+      Deliberately left for a maintainer: a release tag is effectively permanent
+      and pointing one at the wrong commit is worse than its absence.
 
 ## Tier B — security correctness
 
@@ -672,8 +735,34 @@ follow-up. (Storage, config+CLI, API-routes clusters + saga/BB/notifications.)
       index signature; a full `nuxt typecheck` proved nothing relied on them).
       Coordinated test updates — the ~7 assertions that deliberately pinned old
       shapes now read `error.message`.
-- [ ] HW `ffmpeg_capture.py` decomposition; `command_handler.py` dispatch table;
-      storage provider Strategy
+- [x] **HW `ffmpeg_capture.py` decomposition — DONE 2026-08-01** (device-repo PR
+      #4, stacked on #3). Extracted the ~1300 pure lines that turn capture
+      config into an FFmpeg argv list / `filter_complex` string into
+      `capture/command_builder.py`: a `CaptureContext` dataclass snapshot (so
+      the builders provably cannot reach process handles or mutate service state
+      — their whole input surface is declared in one place) plus a
+      `CaptureCommandBuilder` holding the eight builders under public names.
+      `FFmpegCaptureService` keeps the process lifecycle and retains every
+      `_build_*` method as a thin delegating wrapper, so no caller or test
+      changed. **2910 → 1657 lines.** Behaviour preservation was proven by
+      differential testing rather than by inspection: a harness loaded the
+      pre-refactor module alongside the refactored one and compared every
+      builder's exact output across 3 platforms × 7 encoder configs × 9 output
+      sets × 5 PiP layouts × 3 watermark configs × 4 quality presets × camera
+      and audio permutations — **328,860 invocations, 0 mismatches.** The
+      lifecycle half (start/stop/monitor, ~1650 lines) could still be split
+      further if it earns it.
+  - ⚠️ **`command_handler.py` dispatch table was ALREADY DONE** (BB-HW-005) —
+    this entry was stale, not open. `__init__` builds a 24-entry
+    `self._command_handlers` map (with `get_sources`/`list_sources` and
+    `set_pip`/`pip.configure` aliases) and `handle_command` routes through
+    `.get()`, rejecting unknown actions as an error ACK. The code even comments
+    "Replaces the former elif chain (BB-HW-005)".
+  - ⚠️ **`storage provider Strategy` — recommend dropping.** There is exactly
+    one provider (`CivicPressUploader`) and no ABC/Protocol anywhere in
+    `services/storage/`. A Strategy abstraction around a single implementation
+    is speculative generality; revisit only if a second storage backend is
+    actually planned.
 - [x] **Config discovery — DONE 2026-07-21/22.** (a) Deleted dead
       `ConfigDiscovery` (`CIVIC_DIR='.system-data'` while config lives in
       `.civic/`, so it never found anything; zero callers/tests). (b) Fixed two
@@ -714,6 +803,13 @@ follow-up. (Storage, config+CLI, API-routes clusters + saga/BB/notifications.)
       removals), and the test-mock `any` warning noise was retired by flipping
       the TEST-file `no-explicit-any` `warn`→`off` per module (source stays
       `error`). **Process note: run `eslint` locally before pushing — CI does.**
+
+      **Update 2026-08-10: the gap this item describes is now closed at the
+      source.** The pre-commit hook runs ESLint over staged JS/TS/Vue, so the
+      class of failure recorded here — an error-level `no-explicit-any` landing
+      green locally and red in CI — is caught before the commit exists rather
+      than by remembering a process note. See the "fast, reliable subset" entry
+      below.
 
 - [x] **Tier-C skeptic coverage-gap follow-up — DONE 2026-07-20.** Covered by
       `tests/api/pagination-sql-side.test.ts` ("geography linked-records" block,
@@ -828,7 +924,42 @@ follow-up. (Storage, config+CLI, API-routes clusters + saga/BB/notifications.)
       loudly instead of skipping; unset (local dev) keeps the clean self-skip.
       Verified all three modes: required+present → real suite runs+passes (guard
       skips); required+missing → hard fail; unset+missing → clean skip.
-- [ ] HW capture-builder tests; frontend tests
+- [x] **HW capture-builder tests; frontend tests — DONE 2026-08-01**
+      (device-repo PRs #3 and #5).
+  - **Capture builders (PR #3, 65 tests).** `ffmpeg_capture.py` had eight
+    builder methods; only `_build_ffmpeg_command` had direct coverage, and the
+    rest were untested or mocked out by the process-startup tests — despite
+    being where two appliance bugs already landed (the multi-output filtergraph
+    pad reuse, and FA-HW-016's `-vf` beside `-filter_complex`). Now covers
+    per-platform input selection (v4l2/avfoundation/dshow), overlay position
+    maps, PiP index resolution and sizing, watermark input indices, VAAPI
+    hwupload chains and the split-per-output pad discipline. Verified the tests
+    bite by mutating the source five ways (pad reuse, `-vf` beside
+    `-filter_complex`, watermark index ignoring the audio input, VAAPI mapping
+    pre-hwupload pads, dropped `format=yuv420p`) — each fails the suite.
+  - **Frontend (PR #5, 51 tests → 54 with PR #6).** `frontend/` had **no test
+    runner at all**. Stood up standalone Vitest + `@vue/test-utils` on happy-dom
+    (not `@nuxt/test-utils` — the app is `ssr: false`, so booting real Nuxt per
+    file buys nothing), with shims for `#imports`, `useState`, the `U*`
+    components and the auto-imported globals. `pnpm test` now runs in CI between
+    typecheck and build. Covers `useApi` (the FA-HW-001 setup-token path),
+    `useWebRtc`, `useSetupProgress`, `DangerAction`, `SetupChecklist`; seven
+    source mutations confirmed to fail.
+    - ⚠️ **`import.meta.client` needs a source transform under Vitest.** Vite's
+      `define` does NOT substitute it, so it arrives `undefined` and every
+      client-guarded branch silently dead-ends **while the suite still reports
+      green** — false confidence, not a visible failure. Fixed with an
+      `enforce: 'pre'` plugin that rewrites it space-padded to identical width
+      (stack traces stay accurate). This is the same wall that had deferred
+      `useCsrf`/`useRecordDetail` in this repo; now ported here (`f6199b7`).
+    - The new tests surfaced **2 pre-existing UI defects**, fixed in PR #6:
+      `SetupChecklist`'s dismiss button was unreachable (guarded on
+      `allComplete`, but `app.vue` only mounts it when `showBanner` —
+      `!allComplete && !dismissed` — is true, so `dismiss()` was dead code); and
+      `useWebRtc.start()` called `stop()` without awaiting it, so a failed
+      preview settled on `'stopped'` rather than `'error'` — user-visible, since
+      `preview.vue` renders `errorMessage` only in the `'error'` state, leaving
+      the operator with no reason for the failure.
 - [x] **Skip triage — DONE (skip portion; 2026-07-24, commit `7502987` on
       `origin/develop`).** The "36 skips" (2026-07-14/15 count) is burned down:
       phases 7e–7j cleared the quarantine cluster, and a 2026-07-24 sweep took
@@ -1012,7 +1143,7 @@ surfaced these **real** (non-doc) findings — captured here so they become
 tracked work rather than getting lost. None are regressions from recent work;
 they are pre-existing gaps the audit made visible.
 
-**Correctness / truthfulness (worth fixing)**
+### Correctness / truthfulness (worth fixing)
 
 - [x] **Notifications mis-report SMTP failures as success.**
       `NotificationService` ignores `ChannelResponse.success`
@@ -1040,7 +1171,7 @@ they are pre-existing gaps the audit made visible.
       registered, so those 4 are silently skipped — 1 of 5 default hooks does
       real work.
 
-**CI / test-coverage gaps**
+### CI / test-coverage gaps
 
 - [x] **Realtime module unit suite (13 files, ~5,200 LoC) does not run in CI.**
       `modules/realtime/src/**/__tests__` is not in the root vitest `include`
@@ -1134,7 +1265,7 @@ they are pre-existing gaps the audit made visible.
   - Storage suite now 204 green (was 166); `tsc --noEmit` + eslint clean. The UI
     page-component/composable gap above remains open.
 
-**UI rough edges (quick)**
+### UI rough edges (quick)
 
 - [x] `ConfigurationField.vue:19` ships a debug artifact —
       `<pre class="…bg-amber-200">{{ fieldType }} ??</pre>` on every structured
@@ -1169,7 +1300,7 @@ they are pre-existing gaps the audit made visible.
       operator notification center, and CLI. On `origin/develop`
       (`7f7ef4d`→`8795802`).
 
-**Advertised-but-stub (honesty — either implement or stop advertising)**
+### Advertised-but-stub (honesty — either implement or stop advertising)
 
 - [x] Geography **KML / GPX / Shapefile** appear in every API/UI/CLI type enum
       but `createGeographyFile` throws "not yet implemented" — GeoJSON is the
@@ -1181,7 +1312,7 @@ they are pre-existing gaps the audit made visible.
       have no loader and no JS sandbox — spec-only (`docs/specs/workflows.md` is
       unimplemented design).
 
-**Dead-code cleanup (low)**
+### Dead-code cleanup (low)
 
 - [x] **Storage failover / retry / metrics — DELETED 2026-07-30.** Even deader
       than described: the wiring setters (`setRetryManager` /
@@ -1252,3 +1383,540 @@ they are pre-existing gaps the audit made visible.
       coverage before. Verified: a real relocated-`dataDir` project wipes +
       recreates the right locations; CLI suite green (12 files / 89),
       characterization test green (17).
+
+## Discovered during the 2026-08-08 InstanceContext / DevX pass
+
+- [x] **🔴 BLOCKING — `develop` CI is red: vitest exits 1 on an unhandled worker
+      error.** `[vitest-worker]: Timeout calling "onTaskUpdate"`, raised inside
+      vitest's own worker↔main RPC layer (no CivicPress frame in the stack).
+      **All 201 test files and 1845 tests PASS** — vitest counts the unhandled
+      error as a run failure, so the process exits 1 and `build-test` goes red.
+      Reproduced on two consecutive CI runs of `efe7559`
+      (`gh run     31283421555`) and in ~3 of 4 local full-suite runs. **FIXED
+      2026-08-09.** Root cause, measured rather than bisected — an
+      event-loop-lag probe in the main process and in every worker, plus per-RPC
+      timing:
+
+      Vitest's worker↔main RPC (birpc) puts a hard **60s** timeout on every
+      round trip, and `onTaskUpdate` is one. A worker can only read the reply
+      when its event loop reaches the **poll** phase. CLI tests drive the
+      product with `execSync('node cli/dist/index.js …')`, which blocks the loop
+      for the whole subprocess, and the `await`s between those calls resolve
+      from an already-warm cache — awaiting a settled promise drains only the
+      **microtask** queue and never advances the loop to timers or poll. So an
+      all-synchronous test file runs start to finish without one loop turn.
+      `tests/cli/users.test.ts` measured a **single continuous 44.0s block on an
+      idle machine and 64.2s under full-suite contention** — the only block in
+      the entire suite over 60s, matching the single error exactly. Meanwhile
+      the main process's worst block was **0.0s** across 2020 task updates: the
+      reply had arrived long before and simply sat unread, and when the worker
+      came up for air Node ran the timers phase _before_ the poll phase, so the
+      expired timeout fired ahead of the delivered response.
+
+      **Why it was a regression:** this batch replaced
+      `await simpleGit(dir).init()` in `createCLITestContext` with
+      `createTestInstance()`'s synchronous `execSync('git init')`. That await
+      was a real async child process — the one thing per `beforeEach` that
+      yielded the loop. Removing it merged the fixture's two `node cli` spawns
+      and the whole file's `execSync` calls into one unbroken synchronous run.
+
+      **Fix (two layers):** `createCLITestContext` now `await`s its CLI
+      subprocesses via `promisify(exec)` instead of `execSync`; and
+      `tests/fixtures/event-loop-yield.ts` (a global `setupFiles` hook) gives
+      every test one genuine `setImmediate` turn, which bounds the worst-case
+      block to a single test's synchronous work and covers files like
+      `tests/cli/sync.test.ts` that spawn the CLI from their own `beforeEach`
+      rather than through the shared fixture. After the fix no worker block in
+      the full suite exceeds 3s. ⚠️ **Watch out when measuring:**
+      `npx vitest … | tail` reports _tail's_ exit code, which is how this stayed
+      hidden — always capture vitest's own `$?`. Not papered over with
+      `dangerouslyIgnoreUnhandledErrors`, which would mask real unhandled errors
+      too.
+
+- [x] **Stale rationale in `vitest.config.mjs`.** `pool: 'forks'` was justified
+      by a comment saying it is needed "for API tests that use
+      `process.chdir()`". **Re-evaluated 2026-08-09: keep forks.** The premise
+      was wrong — `process.chdir()` was removed from the API fixtures but is
+      still called by `tests/cli/sync.test.ts`,
+      `tests/core/config-discovery.test.ts` and `test-setup.ts`'s cleanup, and
+      it is simply unavailable in worker threads. Switching pools would also not
+      have helped the RPC-timeout item above: a blocked thread cannot read its
+      MessagePort any more than a blocked fork can read its IPC channel. Comment
+      corrected to the real reason.
+
+- [x] **`fileParallelism: 2` was a no-op** (found while investigating the
+      above). `fileParallelism` is a **boolean**; any truthy value just means
+      "run files in parallel", so the documented two-file cap never applied and
+      the suite has always run at the pool default of
+      `availableParallelism() - 1` forks. Left at the default deliberately —
+      that is what CI has actually been exercising — with the config comment
+      corrected and `maxWorkers` named as the knob for a real cap.
+
+## Discovered during the 2026-08-09 post-fix housekeeping
+
+Both found by inspecting what a full test run leaves behind on disk. Neither is
+caused by the CI fix; both are the same cwd-resolution class the InstanceContext
+pass closed elsewhere, in two places it did not reach.
+
+- [x] **🔴 The API writes its audit trail to `process.cwd()`, not to the
+      instance.** **FIXED 2026-08-09.** `AuditLogger` now resolves its path
+      **lazily, per use**, from `getInstanceContext().systemDataDir`; the
+      constructor option is renamed `dataDir` → `dir` (that name is precisely
+      what invited core to pass `config.dataDir` and split the trail), and every
+      caller that was passing a directory — core's DI singleton, three API
+      diagnose sites, two CLI diagnose sites — now passes nothing and lets the
+      context decide. Lazy matters: the five route modules construct at import
+      time, before any context is installed, so an eagerly-computed path could
+      never be right for them.
+
+      All three locations now agree on `<systemDataDir>/activity.log`, which is
+      where the bulk of the trail already lived — the API's cwd default landed
+      there whenever the process started from the instance root, the normal case
+      and the one the Docker image arranges. So this converges on the existing
+      history rather than moving it. Pinned by
+      `tests/core/audit/audit-logger-location.test.ts` (4 tests), which was
+      negative-controlled: reverting the resolver to the old relative default
+      fails 2 of the 4. ⚠️ Leftover: an orphaned `data/activity.log` (core's old
+      `<dataDir>` location) may exist on instances created before this — nothing
+      reads it now; delete or merge it by hand.
+
+      Original report: `AuditLogger`'s constructor defaulted to the **relative**
+      `dataDir = '.system-data'` (`core/src/audit/audit-logger.ts:54`), so
+      `path.join` resolves it against the working directory at write time. Five
+      API route modules construct it with **no argument at module scope** —
+      `routes/config.ts:15`, `routes/notifications.ts:12`, `routes/audit.ts:7`,
+      `routes/records/handlers-common.ts:6`, `routes/users/handlers-common.ts:3`
+      — so records/users/config/notification audit entries land in
+      `<cwd>/.system-data/activity.log`. This is the transparency trail, so it
+      matters more than the notification-config equivalent already fixed.
+
+      Two consequences, both observed. (1) **The trail is split in two.** Core
+      builds the logger correctly but as `{ dataDir: config.dataDir }`
+      (`civic-core-services.ts:251`), which writes `<dataDir>/activity.log` —
+      note `dataDir`, not `systemDataDir`, so that is a _third_ location. The
+      API routes write `<cwd>/.system-data/activity.log`. `GET /api/v1/audit`
+      reads the cwd one, so the two agree only by coincidence when cwd happens
+      to be the instance root (true in the Docker image, WORKDIR `/instance`;
+      false for `civic serve` started from anywhere else). (2) **Tests pollute
+      the checkout.** A full suite run appended 2204 entries to this repo's own
+      `.system-data/activity.log` — including one whose payload points at
+      `/tmp/api-test-…/data/.civic/org-config.yml`, i.e. the audited object was
+      in a temp instance while the audit record went to the repo.
+
+- [x] **The signing-secret writer runs after teardown and can strand a
+      `secrets.yml` anywhere.** **FIXED 2026-08-09.** `cleanupAPITestContext`
+      deletes its temp root correctly, yet 1186 `/tmp/api-test-*` directories
+      had accumulated since 2026-07-20 (~125–240 per full-suite day, 442 MB
+      total) containing **nothing but `.system-data/secrets.yml`**.
+
+      Cause — the same shape as the `AuditLogger` item above.
+      `SecretsManager` is a process-wide singleton that computed
+      `secretsFilePath` **once, in the constructor**, from the FIRST caller's
+      `dataDir`; `getInstance(otherDataDir)` then silently ignored its arguments
+      forever after. So from the second API test onward, `initialize()` looked
+      for the secret at the FIRST test's path, found nothing (that tree had been
+      deleted), generated a fresh secret, and `generateAndSaveSecret`'s
+      `mkdir(recursive)` **re-created the deleted directory** to hold it. Not a
+      race with shutdown as first supposed — a stale pointer. It also means
+      every test after the first was signing with a secret belonging to a
+      different instance.
+
+      Two more strays had the same root. `/tmp/.system-data/` (secrets.yml +
+      storage/, 2026-07-20) came from `tests/core/security/secrets.test.ts`
+      passing a bare temp dir as `dataDir`: `resolveSystemDataDir` takes
+      `dirname(dataDir)` as the root, so the root was the shared `/tmp`. And
+      `modules/realtime/.system-data/secrets.yml` (2025-12-22) is the same
+      writer landing wherever the resolution pointed.
+
+      Fix: `secretsFilePath` resolves **per use**, and `getInstance` actually
+      re-points to the requested location, dropping the cached root secret and
+      derived keys with it (they belonged to the previous instance). Added
+      `SecretsManager.resetInstance()` to replace the
+      `(SecretsManager as any).instance = undefined` reach-in the tests were
+      using, and pointed the secrets tests at `<tempDir>/data` so their
+      generated secrets land inside what they clean up. Pinned by
+      `tests/core/security/secrets-instance-scoping.test.ts` (4 tests),
+      negative-controlled: making `repointTo` a no-op — the old behavior — fails
+      2 of the 4, including the cross-instance key leak.
+
+      Measured after the fix: a full suite run writes **no `secrets.yml`
+      anywhere under `/tmp`** (`find /tmp -maxdepth 3 -name secrets.yml
+      -newermt <run start>` → empty), against ~125–240 stranded per run before.
+      All three strays cleared 2026-08-09.
+
+- [x] **Temp-directory litter: a full run left ~37 of its own directories
+      behind.** **FIXED 2026-08-10.** Started as "ordinary teardown litter with
+      no secret material" and was mostly that — but measuring it turned up **two
+      production bugs**, both write-after-shutdown, which is why it is worth
+      more than a line.
+
+      Method: sweep `/tmp`, snapshot it, run the full suite, diff, then group
+      the new directories by mkdtemp prefix — the prefix names the fixture. That
+      gave an exact inventory (37 across 10 prefixes) instead of a guess, and it
+      is how the two real bugs surfaced at all.
+
+      **Production bug 1 — every transcription job leaked its source
+      recording.** `CoreRecordsGateway.prepareAudio` stages the A/V in a
+      `mkdtemp` dir and returns the path; `worker.ts` transcribed and never
+      removed it. The whisper engine cleans its own scratch dir, so nothing
+      owned the container — and the gateway's own comment notes "single-digit GB
+      is normal, the upload cap is 16 GiB". A long-running instance fills its
+      disk one meeting at a time. `AudioRef` now carries an optional
+      `cleanup()`, the gateway supplies it, and the worker calls it in a
+      `finally` so the failure path (the one that repeats on a retry loop) is
+      covered too.
+
+      **Production bug 2 — the realtime server wrote snapshots after
+      `shutdown()` resolved.** Three separate undrained paths, found by tracing
+      the writes and correlating them per-directory against teardown:
+      (a) the periodic snapshot was `void this.runPeriodicSnapshots()`, so
+      `clearInterval` stopped future ticks but not a pass in flight;
+      (b) `RoomManager` fired `void this.finalizeRoom(...)` at two sites, which
+      `clearAllGraceTimers()` cannot cancel once started; and (c) — the one that
+      actually survived the first two fixes — `shutdown()` closes every socket
+      *after* its final snapshot pass, and each close fires the disconnect
+      handler, which armed a **fresh** finalize after the drain. Now:
+      `pendingPeriodicSnapshot` and `RoomManager.drainFinalizations()` are
+      awaited by shutdown, and a `shuttingDown` flag stops a client-leave from
+      arming a finalize at all during shutdown (the final pass is authoritative,
+      so this also removes a duplicate snapshot).
+
+      The rest was genuine fixture litter: missing teardown in
+      `discovery-characterization` (12/run), `password-recovery-service`
+      (6/run), `csrf-middleware` (2), `audit-logger-failures` (3),
+      `di/test-utils.test.ts` (1) — plus that last file's hardcoded
+      `/tmp/custom-test`, a fixed path shared with every concurrent run that had
+      been sitting there since 2026-07-20.
+
+      ⚠️ Two more instance-root sites in the **realtime module's own** suite
+      (`src/__tests__/test-utils.ts` ×2 and `realtime.integration.test.ts`) also
+      needed the explicit `systemDataDir` — the module suites run from inside
+      the package with their own vitest config, so a root-suite check does not
+      cover them. **Check `modules/*` and `services/*` suites separately.**
+
+      Verified: full root suite leaves **0** new temp directories; every module
+      suite (`realtime`, `transcription`, `broadcast-box`, `storage`) leaves no
+      `/tmp/.system-data` and no stray `secrets.yml`. 204 root files, lint 0
+      errors, UI 56, realtime 12, transcription 7, broadcast-box 17, storage 18.
+
+      ⚠️ **Follow-up 2026-08-10 — that "0" was the ROOT suite only, and the
+      module suites had their own litter.** Measuring every suite the way CI
+      runs them found ~88 more directories per full pass: 60 from the three
+      storage fixtures (`orphaned-file-cleaner`, `streaming-operations`,
+      `sidecar-manifest` — none had teardown, and two inline `mkdtemp`s in the
+      first were missed by the first sweep), 20 from
+      `broadcast-box/redaction-worker`, plus `bb-authz` and the newly-merged
+      `config-defaults-resolution`. All now clean up.
+
+      That sweep also surfaced a **third transcription bug**: `prepareAudio`
+      creates its staging dir before the fetch that can fail, and a caller that
+      gets an exception never receives the `AudioRef` — so it never receives the
+      `cleanup()`. A session whose A/V could not be fetched stranded one empty
+      directory **per retry, every cycle, indefinitely**. It now releases the
+      directory itself before rethrowing. Its own tests never noticed because
+      they asserted only on the rejection.
+
+      **Measured end state: 1 directory after ALL suites** — `civicpress-uploads`,
+      the fixed multer staging path created by production code and reused rather
+      than accumulated. Everything else is zero. Lesson recorded: measure module
+      and service suites separately; a root-suite number says nothing about them.
+
+- [x] **e2e fixtures pass a bare tmpdir as `dataDir`, so their instance root
+      becomes the SHARED `/tmp`.** **FIXED 2026-08-10.** Found 2026-08-09 by
+      noticing `/tmp/.system-data` had reappeared after being cleared.
+      **Test-only — not a production defect:** `resolveSystemDataDir` derives
+      the root as `dirname(dataDir)` only as a fallback for a config built
+      directly, never through `CentralConfigManager`, so a real
+      `.civicrc`-backed instance is unaffected.
+
+      The pattern is `testDir = mkdtemp(os.tmpdir(), 'bb-…')` followed by
+      `new CivicPress({ dataDir: testDir })`. `dirname(testDir)` is `/tmp`, so
+      `systemDataDir` resolves to **`/tmp/.system-data`** — shared by every test
+      and every concurrent run on the machine, and outside the temp directory
+      the test cleans up. Observed there: a `secrets.yml` and a populated
+      `storage/recordings_raw/` full of `.mp4` fixtures. The tests clearly do not
+      intend this — several of them go on to reference
+      `path.join(testDir, '.system-data', 'test.db')` explicitly, so the fixture
+      and the resolver disagree about where the instance root is.
+
+      **Fix applied:** every affected construction now passes an explicit
+      `systemDataDir: path.join(testDir, '.system-data')`. That was chosen over
+      the originally-sketched `dataDir: join(testDir, 'data')`: the explicit
+      value short-circuits the `dirname()` inference entirely (it is the first
+      branch of `resolveSystemDataDir`), it is a single added line per site
+      rather than a restructuring of each fixture's `records/` seeding, and it
+      is exactly the path each file already assumes for its own sqlite database
+      — so the fixture and the resolver now agree instead of merely coinciding.
+
+      ⚠️ **The original file list above was incomplete — it was the result of
+      grepping, and grep found the ones that say `dataDir: testDir`.** Fixing
+      those seven and re-running the full suite showed `/tmp/.system-data`
+      coming back anyway. Bisecting by directory, then by file, turned up
+      **nine more sites**, none of which the grep pattern would have caught:
+      `core/src/di/test-utils.ts` (the shared `createTestConfig` helper) and
+      eight `core/src/**/__tests__` integration tests —
+      `di/civicpress-integration`, `records/record-manager-audit-channel`, and
+      the six saga tests (`saga-e2e`, `saga-failure-injection`,
+      `create-/update-/archive-record-saga.integration`,
+      `publish-draft-saga.integration`). **16 sites total.** Worth remembering:
+      for "where does this stray file come from", bisecting the suite is
+      reliable where grepping for a remembered code shape is not.
+
+      Verified by measurement at each step. With the fixture unmodified a single
+      run of `backfill-e2e` recreated `/tmp/.system-data` containing
+      `secrets.yml` and a populated `storage/`; with the line added it does not.
+      Bisecting all 57 `core/src` test files reported eight polluters before the
+      fix and **zero** after. A full suite run now ends with no
+      `/tmp/.system-data` and zero stray `secrets.yml` anywhere under `/tmp`.
+
+The rest of this section is carried over from
+`docs/plans/2026-08-08-contributor-devx-and-hardening.md` (now closed) so it
+stays discoverable. Those items are **pre-existing** — surfaced by that work,
+not caused by it.
+
+- [x] **Legal numbering does not reach the primary editor path. FIXED
+      2026-08-10.** `DocumentNumberGenerator` had exactly TWO production call
+      sites (`RecordManager.createRecord`, `create-record-saga`). The draft →
+      publish flow goes through `RecordManager.createRecordWithId`, which had
+      **no numbering block at all**, so those records landed with **no
+      `document_number`** — permanently unnumbered and invisible to
+      `getDocumentNumbers()`, and so to the sequence of every record numbered
+      after them. Numbering itself was already correct wherever it happened
+      (fixed 2026-08-08); this was the gap in _where_ it happened.
+
+      All three of these were fixed together, because they are one thing: the
+      rule was written out twice and reached two of the three create paths.
+      There is now a single authority, `core/src/records/document-numbering.ts`
+      (`resolveDocumentNumber`), that every path calls — so a fourth create
+      path cannot quietly miss one of the rules.
+
+      Numbering happens at PUBLISH on this path, which is also the right moment
+      for a legal register: an abandoned draft does not burn a sequence.
+
+      ⚠️ **The index-sync path is deliberately exempt** (`skipDocumentNumbering`
+      on `CreateRecordRequest`, set at `indexing-service.ts`). Sync is not
+      creating records, it is re-reading ones that already exist on disk: the
+      frontmatter is the authority for its own number, a number assigned during
+      sync would live only in the database and vanish on the next re-index, and
+      validating there would fail the sync of any corpus predating these rules.
+
+- [x] **A caller-supplied `metadata.document_number` bypasses numbering. FIXED
+      2026-08-10.** It was stored with no uniqueness check —
+      `DocumentNumberGenerator.validate()` existed but had **zero call sites**,
+      and the base record schema declares `document_number` with no pattern. A
+      supplied number is now checked against the type's configured format
+      (`ValidationError`) and claimed for uniqueness (`ConflictError`).
+
+      ⚠️ `validate()` was itself broken for the case it would first be used in:
+      it compared the parsed prefix against **`getDefaultPrefix`**, the built-in
+      map, so on any instance configuring `document_number_formats` it rejected
+      exactly what `generate()` emits. It now matches against the configured
+      format (`matchesFormat`), sharing the regex builder with `matchSequence`
+      — the same bug that function's comment already describes, in its sibling.
+
+      Only LEGAL types are policed. A non-legal type has no configured format
+      to be judged against (`getFormat` would answer `DOC`), so a
+      locally-meaningful identifier on a meeting record is left alone.
+
+- [x] **Document-number assignment is a read-then-write race. FIXED
+      2026-08-10.** Two concurrent creates of the same type/year could be issued
+      the same number — no lock, and no uniqueness constraint on the column,
+      since it lives in the metadata JSON and there is no column to constrain.
+
+      Fix: a `document_numbers` table whose PRIMARY KEY **is** the lock. The
+      number is RESERVED before the record row exists, so the loser of a race
+      gets a constraint violation and retries with the next sequence instead of
+      silently duplicating. The next sequence is read from issued numbers and
+      reservations TOGETHER, so a database predating the table gets the right
+      answer with no backfill. Saga compensation releases the number rather
+      than burning it. No FK to `records(id)` — reservation precedes the insert,
+      so with `foreign_keys=ON` an FK would reject every reservation (same
+      reason `record_locks` has none).
+
+      **Negative-controlled, not just asserted:** restoring the old
+      read-then-write shape makes both concurrency tests fail — 12 parallel
+      creates all receive `BYL-2026-001` — and reverting the
+      `createRecordWithId` fix fails 3 of the 5 publish-path tests.
+
+- [x] **Make the pre-commit hook a fast, reliable subset. DONE 2026-08-10.** The
+      full-suite hook was flaky on the dev VM (parallel DB/auth races), so the
+      standing advice became `--no-verify` — which meant the hook gated nothing.
+      This was Phase 2b's third bullet.
+
+      ⚠️ **This entry was half-stale, which is worth knowing before trusting the
+      next one.** The hook had ALREADY been slimmed to `lint-staged` +
+      `registry:check` (by the Tier-A CI commit, which says so in passing). What
+      was actually missing was the gate that catches something: `lint-staged`
+      ran **Prettier only**, so no lint error could ever fail a commit —
+      including `@typescript-eslint/no-explicit-any`, which is an **error** in
+      `core`/`cli` `src`.
+
+      **What landed:** ESLint over staged JS/TS/Vue, via
+      `scripts/lint-staged-eslint.mjs`. ESLint is installed per package with a
+      per-package `eslint.config.cjs` (the root `lint` script fans out with
+      `pnpm -r --filter … exec eslint .`), so a staged set spanning several
+      packages cannot be linted by one invocation. The script groups staged
+      files by owning package and runs each package's own binary on its share.
+      Ownership is DISCOVERED — walk up to the nearest directory having both an
+      `eslint.config.*` and an installed `eslint` — rather than matched against
+      a hard-coded package list, so a new package is linted the day it exists.
+      Files under no such directory are skipped with a printed note, because a
+      silent skip reads as "this passed lint".
+
+      Warnings do not block; errors do. That matches CI (0 errors required, 8
+      known warnings).
+
+      **Measured, end to end:** a file with two `no-explicit-any` errors is
+      REFUSED (verified `HEAD` did not move), and a real clean commit through
+      the full hook takes **1.9s** — `registry:check` alone is 0.23s, ESLint on
+      two files ~1.4s.
+
+      ⚠️ **Tests and `tsc` are deliberately NOT in the hook.** Tests need a
+      database and built `dist`; a sound typecheck is whole-program and needs
+      sibling packages built. Both fail on a fresh clone for reasons unrelated
+      to the commit — the identical trap that produced the `--no-verify` habit
+      in the first place. Contract now written down in `CONTRIBUTING.md`.
+
+      ⚠️ Note for this multi-worktree VM: `lint-staged` takes its own backup via
+      **`git stash`**, and the stash stack is shared across worktrees. It
+      creates and drops its own entry automatically, but see
+      [[civicpress-precommit-suite-flaky]] before running concurrent commits.
+
+      ⚠️ **Found by the new hook blocking this very commit — the markdown half
+      was ALREADY a `--no-verify` generator.** `markdownlint --fix` has been in
+      `lint-staged` all along, and it fails on any pre-existing violation in a
+      file you touch, whether or not your edit caused it and whether or not
+      `--fix` can repair it. Editing THIS tracker was impossible without
+      `--no-verify`: five `MD036` (emphasis-used-as-heading) violations at lines
+      1138–1307, none auto-fixable, none anywhere near a line being changed.
+      Fixed properly here — those five labels are now real `###` headings, so
+      they reach the document outline too — but the general shape remains: **a
+      per-file linter will always be able to block you for somebody else's
+      debt.** Worth watching; if it bites again, the answer is to fix the
+      offending file rather than to loosen the hook.
+
+- [ ] **`pnpm lint` reports 8 warnings, and they should be left alone until
+      someone checks the unbuilt case.** 0 errors, so CI is green. Seven are
+      "Unused eslint-disable directive" (`civic-core-services.ts:348`, four in
+      `saga-hardening.integration.test.ts`, two in `single-file-handlers.ts`)
+      plus one pre-existing `vue/multi-word-component-names`.
+
+      ⚠️ **Do not just `--fix` them.** An earlier note claimed `1292aab` had made
+      lint silent; it had not, and the reason the directives look dead is
+      probably state-dependent: the rules they suppress
+      (`no-unsafe-assignment`, `no-explicit-any`) only fire when
+      `@civicpress/core`'s types do NOT resolve. CI builds before linting, so
+      the built state is what reports them as unused — remove them and lint may
+      go red on an unbuilt tree (a clean clone, or an editor before first
+      build). Verify against both states before touching them; deliberately
+      skipped 2026-08-09/10 as poor risk/benefit next to the correctness work.
+
+- [x] **`ci.yml` (`build-test`) does not run on pushes to `develop`** — only on
+      PRs, pushes to `main`, and `renovate/**`. So a branch can land on
+      `develop` without the heavy suite ever running in a clean environment.
+      That is exactly where the 2026-08-08 pass's one CI-only failure would have
+      hidden (a test asserting on the gitignored `.civicrc`, green locally), and
+      it is why the red `build-test` of 2026-08-08 sat unnoticed for a day.
+      **FIXED 2026-08-09:** `develop` added to the push triggers. The manual
+      stopgap (`gh workflow run ci.yml --ref develop`) is no longer required.
+- [x] **Which types get numbered is a hard-coded list, not the config. FIXED
+      2026-08-10 — maintainer chose the union.** Surfaced the same day while
+      unifying the three numbering call sites, and deliberately left open then:
+      `LEGAL_RECORD_TYPES` (bylaw, ordinance, policy, proclamation, resolution)
+      was what triggered numbering, so an instance configuring
+      `document_number_formats` for some OTHER type got a format that was never
+      used, with no error saying so.
+
+      Put to a maintainer as three options — leave hard-coded / union with the
+      configured formats / warn but don't number — and **the union was chosen**.
+      `isNumberedRecordType` is now "a built-in legal type OR a type with a
+      configured format": writing the format down is how you ask for numbering.
+
+      ⚠️ **Behaviour change on upgrade** for any instance already configuring a
+      format for a non-legal type — those records begin receiving numbers at
+      their next create. Nothing backfills, so such a type starts its sequence
+      at 001 from the day of the upgrade rather than renumbering its history.
+
+      A format entry only counts if it has a usable prefix: `getFormat` copies
+      `prefix` straight through, so honouring a malformed entry would mint
+      `undefined-2026-001` — a citable identity built from a typo. Config
+      access stays non-fatal (matching `getFormat`), so an unreadable config
+      leaves the built-in types numbering as they always did instead of failing
+      every record creation on the instance.
+
+- [ ] **`resolveModulesDir` precedence is exclusive** — a `modules/` directory
+      beside the data root hides every installed-code module rather than
+      merging. Intended (it preserves the dev/Docker layout) but sharp; revisit
+      if instance-local modules become a real use case.
+
+- [x] **🔴 The published-only gate — public reads were not gated at all.**
+      **FIXED 2026-08-09.** The read path decided visibility by LOCATION:
+      `read-handlers.ts` said "No status filter - table location (records table)
+      determines published state" and `RecordStore.listRecords` agreed ("all
+      records in records table are published by definition"). Nothing enforced
+      it — `RecordStore.createRecord` inserts `status || 'draft'`, and
+      `IndexingService.syncToDatabase` copies every on-disk index entry in
+      whatever status it carries (a sync the API runs at startup).
+
+      **Measured, not inferred.** Inserting one row per status and asking as an
+      anonymous caller returned **every one of them** — draft, pending_review,
+      under_review, approved, rejected, published, archived, and a custom status
+      nobody declared. `GET /api/v1/records/<draft-id>` answered **200 with the
+      full body**, and `/:id/frontmatter` served the frontmatter plus the entire
+      markdown body. `GET /geography/:id/linked-records` had **no auth
+      middleware at all**, so `req.user` was never populated and it returned the
+      unfiltered corpus to everyone.
+
+      Fix — visibility is now a property of the STATUS, fail-closed:
+
+      - `RecordStatusConfig` gains `public?: boolean`; absent means not public,
+        so a municipality's custom status ("in_camera", "legal_hold") cannot
+        become world-readable by omission. `published`, `archived` and `expired`
+        are the declared-public defaults — a repealed bylaw stays part of the
+        public record. `mergeRecordStatuses` carries `public` across an override
+        so re-labelling `published` cannot silently blank a public site.
+      - `CentralConfigManager.getPublicRecordStatuses()` is the one authority.
+      - `RecordsService.listRecords` gates any caller with no user; asking for a
+        non-public status by name yields an empty result rather than falling
+        through to "no filter". `getFrontmatterYaml` and the by-id read gate
+        too (404, not 403 — whether an unpublished record exists at an id is
+        not public either). `/linked-records` got `optionalAuth` so anonymous
+        callers are gated while authenticated ones keep their view.
+
+      Pinned by `tests/api/public-published-only.test.ts` (6 tests) which drives
+      the read path with a row in every status, so it holds regardless of which
+      writers exist. ⚠️ The one test that changed,
+      `tests/integration/pagination-sql-side.test.ts`, called the service with
+      no user while seeding `adopted`/`draft` fixtures — it now lists as an
+      authenticated caller, because its subject is SQL filtering, not
+      visibility.
+
+      **Both follow-ups CLOSED same day (2026-08-09).**
+
+      - **`GET /search` was the worst of the read paths** — it returned
+        unpublished records **in full** to anonymous callers, not merely their
+        existence. Gated.
+      - **`GET /records/summary`** published a per-status histogram, so
+        "3 drafts, 1 pending_review" was readable straight off the public API —
+        the count and existence of unpublished work. Gated. Like
+        `/linked-records` it had **no auth middleware**, so it also needed
+        `optionalAuth` or authenticated callers would have been gated as
+        anonymous.
+      - All three read paths now share ONE function, `statusFilterFor(user,
+        status)` in `records-service/listing.ts`. List, search and summary each
+        reasoned about visibility independently before, which is exactly how the
+        hole stayed open; there is now a single place to get it wrong.
+
+      ⚠️ **A latent bug this surfaced, worth remembering.** The gate expresses
+      "any publicly-visible status" as a comma-separated LIST, but three SQL
+      builders accepted only a bare `status = ?` — `search/sqlite/sql-builder.ts`,
+      `search/sqlite/facets.ts` and the LIKE fallback in `record-store.ts`. The
+      list path had supported `IN (...)` for years; search never did. So the
+      first version of this fix made public search return **nothing at all**
+      rather than a filtered set — caught by probing the endpoint, not by the
+      suite, which had no test for public search content. All three now parse a
+      list the same way `type` already did.
+
+Still open from the plan's own list, unchanged: the device `--enroll`
+signing-key registration, the three metadata representations, and the
+core↔storage circular build dep.

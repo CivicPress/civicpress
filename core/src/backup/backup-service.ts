@@ -216,9 +216,12 @@ export class BackupService {
           await fs.mkdir(gitDir, { recursive: true });
           gitBundlePath = path.join(gitDir, 'data.bundle');
           // Bundle entire repo (no path filter needed - dataDir is the repo root)
+          // `--` for the same reason as the clone in restoreBackup below:
+          // the destination path must not be readable as a flag. Verified
+          // that `git bundle create -- <file> <rev>` is accepted.
           await execFileAsync(
             'git',
-            ['bundle', 'create', gitBundlePath, 'HEAD'],
+            ['bundle', 'create', '--', gitBundlePath, 'HEAD'],
             { cwd: dataDir }
           );
         } catch (error) {
@@ -543,9 +546,24 @@ export class BackupService {
           '.temp-git-restore'
         );
         try {
-          await execFileAsync('git', ['clone', gitBundlePath, tempClone], {
-            cwd: path.dirname(targetDataDir),
-          });
+          // `--` before the positionals so a path can never be read as an
+          // option. Without it, a bundle path beginning with `-` would be
+          // parsed as a git flag, and `git clone --upload-pack=<cmd>` runs
+          // <cmd> — argument injection that `execFile` does NOT prevent,
+          // because the shell was never the vector: git's own option parser is.
+          //
+          // Not reachable today (`backupDir` is `path.resolve`d at entry, and
+          // an absolute path cannot look like a flag), so this is hardening,
+          // not a live fix. It is worth having because the safety currently
+          // rests on a `path.resolve` far from here: delete that and this call
+          // silently becomes exploitable, with nothing local saying so.
+          await execFileAsync(
+            'git',
+            ['clone', '--', gitBundlePath, tempClone],
+            {
+              cwd: path.dirname(targetDataDir),
+            }
+          );
 
           // Move .git from temp clone to target data directory
           const tempGitDir = path.join(tempClone, '.git');

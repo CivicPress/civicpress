@@ -3,7 +3,7 @@ import { HttpError } from '../../utils/http-error.js';
 import { param, query, validationResult } from 'express-validator';
 import { optionalAuth } from '../../middleware/auth.js';
 import { RecordsService } from '../../services/records-service.js';
-import { userCan } from '@civicpress/core';
+import { userCan, CentralConfigManager } from '@civicpress/core';
 import {
   sendSuccess,
   handleApiError,
@@ -73,8 +73,13 @@ export function registerReadRoutes(
           );
         }
 
-        // Query only records table - all records there are published (by table location)
-        // No status filtering needed - table location determines if record is published
+        // Anonymous callers are gated to publicly-declared statuses inside
+        // RecordsService.listRecords. This used to read "all records there are
+        // published by table location, no status filtering needed" — that was
+        // never enforced anywhere, and a row inserted in any status was served
+        // to the public.
+        // NOTE: `status` is deliberately not read from the query here; the
+        // service decides the visible set.
 
         // Parse pagination parameters
         const pageSize = limit ? parseInt(limit as string) : 50;
@@ -96,7 +101,8 @@ export function registerReadRoutes(
         const result = await recordsService.listRecords(
           {
             type: type as string,
-            // No status filter - table location (records table) determines published state
+            // No status filter here: RecordsService applies the public-status
+            // gate for anonymous callers and leaves authenticated ones alone.
             limit: pageSize,
             page: currentPage,
             sort: (sort as string) || 'created_desc', // Default to created_desc
@@ -139,47 +145,55 @@ export function registerReadRoutes(
   );
 
   // GET /api/records/summary - Aggregate counts
-  router.get('/summary', async (req: Request, res: Response) => {
-    const isAuthenticated = req.user !== undefined;
-    const operation = isAuthenticated
-      ? 'records_summary_authenticated'
-      : 'records_summary_public';
+  //
+  // optionalAuth is required, not optional: without it `req.user` is never
+  // populated, so an authenticated caller would be gated as anonymous and see
+  // only public counts. (The same omission on /geography/:id/linked-records is
+  // what left that endpoint ungated entirely.)
+  router.get(
+    '/summary',
+    optionalAuth(recordsService.getCivicPress()),
+    async (req: Request, res: Response) => {
+      const isAuthenticated = req.user !== undefined;
+      const operation = isAuthenticated
+        ? 'records_summary_authenticated'
+        : 'records_summary_public';
 
-    logApiRequest(req, { operation });
+      logApiRequest(req, { operation });
 
-    try {
-      const { type } = req.query;
+      try {
+        const { type } = req.query;
 
-      // Query only records table - all records there are published (by table location)
-      // No status filtering needed - table location determines if record is published
+        logger.info(
+          `Fetching record summary (${isAuthenticated ? 'authenticated' : 'public'})`,
+          {
+            type,
+            requestId: req.requestId,
+            userId: req.user?.id,
+            userRole: req.user?.role,
+            isAuthenticated,
+          }
+        );
 
-      logger.info(
-        `Fetching record summary (${isAuthenticated ? 'authenticated' : 'public'})`,
-        {
-          type,
-          requestId: req.requestId,
-          userId: req.user?.id,
-          userRole: req.user?.role,
-          isAuthenticated,
-        }
-      );
+        const summary = await recordsService.getRecordSummary(
+          {
+            type: type as string,
+          },
+          req.user
+        );
 
-      const summary = await recordsService.getRecordSummary({
-        type: type as string,
-        // No status filter - table location (records table) determines published state
-      });
-
-      sendSuccess(summary, req, res, { operation });
-    } catch (error) {
-      handleApiError(
-        operation,
-        error,
-        req,
-        res,
-        'Failed to get record summary'
-      );
+        sendSuccess(summary, req, res, { operation });
+      } catch (error) {
+        handleApiError(
+          operation,
+          error,
+          req,
+          res,
+          'Failed to get record summary'
+        );
+      }
     }
-  });
+  );
 
   // GET /api/records/:id/frontmatter - Get frontmatter YAML for a record (handles both public and authenticated access)
   // NOTE: This must come BEFORE /:id route to avoid matching "frontmatter" as an ID
@@ -219,10 +233,7 @@ export function registerReadRoutes(
           }
         );
 
-        const yaml = await recordsService.getFrontmatterYaml(
-          id,
-          req.user
-        );
+        const yaml = await recordsService.getFrontmatterYaml(id, req.user);
 
         if (!yaml) {
           throw new HttpError(404, 'Record not found', 'RECORD_NOT_FOUND');
@@ -347,6 +358,20 @@ export function registerReadRoutes(
         }
 
         if (!record) {
+          throw new HttpError(404, 'Record not found', 'RECORD_NOT_FOUND');
+        }
+
+        // PUBLISHED-ONLY GATE. The list path filters by status for anonymous
+        // callers; fetching by id has to agree, or the gate is just an
+        // enumeration speed bump — before this, GET on a draft's id returned
+        // 200 with the full body. 404 rather than 403: whether an unpublished
+        // record exists at a given id is itself not public.
+        if (
+          !isAuthenticated &&
+          !CentralConfigManager.getPublicRecordStatuses().includes(
+            String(record.status)
+          )
+        ) {
           throw new HttpError(404, 'Record not found', 'RECORD_NOT_FOUND');
         }
 

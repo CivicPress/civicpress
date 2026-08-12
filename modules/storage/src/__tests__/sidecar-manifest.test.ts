@@ -5,7 +5,7 @@
  * DB rows can be rebuilt from disk after a metadata-DB loss.
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import type { StorageDatabaseService } from '../types/storage.types.js';
 import { CloudUuidStorageService } from '../cloud-uuid-storage-service.js';
 import { UnifiedCacheManager } from '@civicpress/core';
@@ -97,6 +97,14 @@ describe('Sidecar manifests (FA-STOR-004)', () => {
     storageService.setDatabaseService(
       databaseService as unknown as StorageDatabaseService
     );
+  });
+
+  afterEach(async () => {
+    // This suite mkdtemp'd a data dir per test and removed none, so every run
+    // left them in os.tmpdir().
+    if (testDataDir) {
+      await fs.rm(testDataDir, { recursive: true, force: true }).catch(() => {});
+    }
   });
 
   const upload = async (filename: string) => {

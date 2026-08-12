@@ -79,6 +79,12 @@ export interface CreateRecordRequest {
   skipFileGeneration?: boolean; // Skip file generation/updates
   skipAudit?: boolean; // Skip audit logging (for sync operations)
   skipHooks?: boolean; // Skip hook emissions (for sync operations)
+  // Adopt `metadata.document_number` exactly as given: no assignment, no
+  // format check, no uniqueness claim. For index-sync, which is re-reading
+  // records that already exist on disk rather than creating new ones — there
+  // the frontmatter is the source of truth, and a number assigned during sync
+  // would live only in the database and vanish on the next re-index.
+  skipDocumentNumbering?: boolean;
   geography?: Geography;
   attachedFiles?: Array<{
     id: string;
@@ -245,12 +251,12 @@ export class CivicPress {
 
   async initialize(): Promise<void> {
     try {
-      this.logger.info('Initializing CivicPress...');
+      this.logger.debug('Initializing CivicPress...');
 
       // Initialize database first
       const db = this.container.resolve<DatabaseService>('database');
       await db.initialize();
-      this.logger.info('Database initialized');
+      this.logger.debug('Database initialized');
 
       // FA-CORE-001: recover sagas orphaned by a prior crash BEFORE any new
       // work starts — release their held resource locks and surface any
@@ -287,7 +293,7 @@ export class CivicPress {
       const hooks = this.container.resolve<HookSystem>('hooks');
       await hooks.initialize();
 
-      this.logger.info('CivicPress initialized');
+      this.logger.debug('CivicPress initialized');
     } catch (error) {
       this.logger.error('Failed to initialize CivicPress:', error);
       throw error;

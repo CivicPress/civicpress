@@ -33,23 +33,83 @@ export class SecretsManager {
   private static instance: SecretsManager;
   private rootSecret: string | null = null;
   private derivedKeys: Map<string, Buffer> = new Map();
-  private secretsFilePath: string;
+  private dataDir: string;
+  private systemDataDir?: string;
 
   private constructor(dataDir: string, systemDataDir?: string) {
-    // secrets.yml lives in `.system-data`, anchored to the project root by
-    // resolveSystemDataDir — the same place the DB and storage credentials
-    // resolve to, rather than each stripping a segment off dataDir.
-    this.secretsFilePath = path.join(
-      resolveSystemDataDir({ dataDir, systemDataDir }),
+    this.dataDir = dataDir;
+    this.systemDataDir = systemDataDir;
+  }
+
+  /**
+   * Where `secrets.yml` lives, resolved PER USE rather than once in the
+   * constructor.
+   *
+   * `.system-data` is anchored to the project root by `resolveSystemDataDir` —
+   * the same place the DB and storage credentials resolve to, rather than each
+   * stripping a segment off dataDir.
+   */
+  private get secretsFilePath(): string {
+    return path.join(
+      resolveSystemDataDir({
+        dataDir: this.dataDir,
+        systemDataDir: this.systemDataDir,
+      }),
       'secrets.yml'
     );
   }
 
+  /**
+   * The per-process secrets manager.
+   *
+   * ## Why this re-points instead of ignoring its arguments
+   *
+   * This is a singleton, and it used to compute `secretsFilePath` once, in the
+   * constructor, from the FIRST caller's `dataDir` — so every later
+   * `getInstance(otherDataDir)` silently returned a manager still pointed at the
+   * first instance. Harmless in a server process that serves one instance;
+   * destructive anywhere a process moves between instances.
+   *
+   * The test suite is exactly that. Each API test builds an instance in a temp
+   * directory and deletes it on teardown, so from the second test onward
+   * `initialize()` looked for the secret at the FIRST test's path, found nothing
+   * (that tree was deleted), generated a fresh secret, and
+   * `generateAndSaveSecret`'s `mkdir(recursive)` **re-created the deleted
+   * directory** just to hold the file. 1186 stray `/tmp/api-test-*` directories
+   * had accumulated since 2026-07-20, each containing nothing but
+   * `.system-data/secrets.yml`, and a signing secret was being minted and
+   * written outside the lifecycle of any live instance.
+   *
+   * Asking for a different location now actually moves the manager there, and
+   * drops the cached secret and derived keys with it — they belonged to the
+   * previous instance and must not leak into the next one.
+   */
   static getInstance(dataDir: string, systemDataDir?: string): SecretsManager {
     if (!SecretsManager.instance) {
       SecretsManager.instance = new SecretsManager(dataDir, systemDataDir);
+      return SecretsManager.instance;
     }
+    SecretsManager.instance.repointTo(dataDir, systemDataDir);
     return SecretsManager.instance;
+  }
+
+  /** Drop the process-wide instance (tests). */
+  static resetInstance(): void {
+    SecretsManager.instance = undefined as unknown as SecretsManager;
+  }
+
+  private repointTo(dataDir: string, systemDataDir?: string): void {
+    const next = path.join(
+      resolveSystemDataDir({ dataDir, systemDataDir }),
+      'secrets.yml'
+    );
+    if (next === this.secretsFilePath) return;
+    this.dataDir = dataDir;
+    this.systemDataDir = systemDataDir;
+    // A secret is scoped to the instance that holds it. Carrying it across
+    // would sign the new instance's sessions with the old instance's key.
+    this.rootSecret = null;
+    this.derivedKeys.clear();
   }
 
   /**
@@ -91,7 +151,7 @@ export class SecretsManager {
       const secretData = await this.loadSecretFromFile();
       if (secretData) {
         this.rootSecret = secretData.secret;
-        logger.info('Loaded secret from file');
+        logger.debug('Loaded secret from file');
         return;
       }
     } catch {
@@ -289,9 +349,7 @@ export class SecretsManager {
   } | null> {
     try {
       const content = await fs.readFile(this.secretsFilePath, 'utf-8');
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const yaml = await import('js-yaml');
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
       const data = yaml.load(content) as
         | { secret?: string; created?: string }
         | null
@@ -322,7 +380,6 @@ export class SecretsManager {
       const secretsDir = path.dirname(this.secretsFilePath);
       await fs.mkdir(secretsDir, { recursive: true });
 
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const yaml = await import('js-yaml');
       const secretData = {
         secret: this.rootSecret,
@@ -330,7 +387,6 @@ export class SecretsManager {
         warning: 'DO NOT COMMIT THIS FILE - It contains sensitive secrets',
       };
 
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
       await fs.writeFile(
         this.secretsFilePath,
         yaml.dump(secretData),

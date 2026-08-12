@@ -21,6 +21,7 @@ import yaml from 'yaml';
 import { TemplateEngine } from '../utils/template-engine.js';
 import { TemplateCacheAdapter } from './template-cache-adapter.js';
 import { TemplateValidator } from './template-validator.js';
+import { getInstanceContext } from '../config/instance-context.js';
 import { Logger } from '../utils/logger.js';
 import { UnifiedCacheManager } from '../cache/unified-cache-manager.js';
 import {
@@ -531,7 +532,8 @@ export class TemplateService implements ITemplateService {
     const types: string[] = [];
     const typeDirs = [
       this.customTemplatePath,
-      path.join(process.cwd(), '.system-data', 'templates'),
+      // Base templates: the INSTANCE's `.system-data`, not the process's cwd.
+      path.join(getInstanceContext().systemDataDir, 'templates'),
     ];
 
     for (const typeDir of typeDirs) {
@@ -577,10 +579,9 @@ export class TemplateService implements ITemplateService {
       };
     }
 
-    // Try base template
+    // Try base template (instance `.system-data`, not the process's cwd)
     const basePath = path.join(
-      process.cwd(),
-      '.system-data',
+      getInstanceContext().systemDataDir,
       'templates',
       type,
       `${name}.md`
