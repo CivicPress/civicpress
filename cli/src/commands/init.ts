@@ -294,15 +294,6 @@ export const initCommand = (cli: CAC) => {
                 record_types_config: INIT_RECORD_TYPES_CONFIG,
                 record_statuses_config: INIT_RECORD_STATUSES_CONFIG,
                 default_role: 'clerk',
-                hooks: {
-                  enabled: true,
-                },
-                workflows: {
-                  enabled: true,
-                },
-                audit: {
-                  enabled: true,
-                },
                 database: {
                   type: 'sqlite',
                   sqlite: {
@@ -1165,15 +1156,6 @@ async function setupCivicrcNonInteractive(
     version: '1.0.0',
     dataDir: dataDir,
     default_role: 'clerk',
-    hooks: {
-      enabled: true,
-    },
-    workflows: {
-      enabled: true,
-    },
-    audit: {
-      enabled: true,
-    },
     database: {
       type: 'sqlite',
       sqlite: {
@@ -1485,15 +1467,6 @@ async function setupCivicrc(
     version: '1.0.0',
     dataDir: dataDir,
     default_role: 'clerk',
-    hooks: {
-      enabled: true,
-    },
-    workflows: {
-      enabled: true,
-    },
-    audit: {
-      enabled: true,
-    },
     database: {
       type: answers.database_type,
       sqlite:

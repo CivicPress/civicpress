@@ -260,7 +260,10 @@ database guarantee rather than a convention.
     and read by **nothing**. They are removed rather than implemented — for a
     system of record, making the audit trail switchable from configuration is a
     capability to add deliberately, not to inherit from a template. Existing
-    `.civicrc` files keep their copies: still inert, and safe to delete.
+    `.civicrc` files keep their copies: still inert, and safe to delete. The two
+    shipped demo profiles are cleaned too — they additionally carried
+    `pre_commit`, `post_commit`, `auto_index`, `approval_process` and
+    `log_changes`, none of which appear in the config type at all.
   - `can_edit`, `can_delete` and `can_view` are gone from the shipped
     `workflows.yml` defaults, and **`roles.yml` is documented as the authority**
     for record permissions. Their only reader had a single call site that asks

@@ -1949,7 +1949,23 @@ something is audited.
       keep theirs, still inert and now harmless to delete by hand. The comment
       at the write site records what reintroducing any of them would require,
       and flags that making the audit trail switchable from config is a decision
-      to take deliberately rather than inherit from a template. `civic init`
+      to take deliberately rather than inherit from a template.
+
+      ⚠️ **The first pass fixed ONE of four write sites**, and the miss is worth
+      recording because it is the same shape as the bugs this sweep exists to
+      find. `civic init` builds `.civicrc` on several paths — from-file,
+      `--data-dir`, defaults, and interactive — each with its own object
+      literal, and only the from-file one was patched. Caught by grepping
+      `audit:` again after the merge, purely because the count looked wrong;
+      nothing failed, because inert keys cannot fail. Two shipped **demo
+      profiles** (`cli/src/demo-data/config/*.yml`) carried them too, plus
+      `pre_commit` / `post_commit` / `auto_index` / `approval_process` /
+      `log_changes`, none of which appear in `CentralConfig` at all. All now
+      removed. **Lesson: for "stop emitting X", grep for X repo-wide after the
+      edit — finding the reader is not the same as finding every writer.**
+      Test fixtures keep their copies on purpose: they exercise the loader's
+      tolerance of a pre-existing `.civicrc` that still has the keys, which is
+      exactly the upgrade case. `civic init`
       writes all three into `.civicrc` (`cli/src/commands/init.ts`, `?? true`),
       and a whole-repo grep finds **no reader** — not under those names, not as
       `hooksEnabled` / `auditEnabled`, nowhere. They read as feature switches
