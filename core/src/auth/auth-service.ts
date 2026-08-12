@@ -244,11 +244,10 @@ export class AuthService {
   async userCan(
     user: AuthUser,
     permission: string | string[],
+    // No status-transition context: `workflows.yml` governs transitions.
     context?: {
       recordType?: string;
       action?: 'create' | 'edit' | 'delete' | 'view';
-      fromStatus?: string;
-      toStatus?: string;
     }
   ): Promise<boolean> {
     return this.roleManager.userCan(user, permission, context);
@@ -638,7 +637,9 @@ export class AuthService {
   // to a structural type so callers holding a UserRow (whose created_at is a
   // string, not a Date as AuthUser declares) don't need a full row → AuthUser
   // mapping just to ask "is this an external-auth user?".
-  canSetPassword(user: Pick<AuthUser, 'auth_provider'> | null | undefined): boolean {
+  canSetPassword(
+    user: Pick<AuthUser, 'auth_provider'> | null | undefined
+  ): boolean {
     if (!user) return false; // Handle null user gracefully
     // Only allow password setting for password auth users or legacy users (no auth_provider)
     return user.auth_provider === 'password' || !user.auth_provider;

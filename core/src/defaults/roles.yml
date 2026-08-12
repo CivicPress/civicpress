@@ -39,16 +39,6 @@ roles:
       type: 'array'
       description: 'List of permissions granted to this role'
       required: true
-    status_transitions:
-      value:
-        - 'draft'
-        - 'review'
-        - 'approved'
-        - 'rejected'
-        - 'archived'
-      type: 'array'
-      description: 'Record statuses this role can transition to'
-      required: true
 
   clerk:
     name:
@@ -80,13 +70,6 @@ roles:
       type: 'array'
       description: 'List of permissions granted to this role'
       required: true
-    status_transitions:
-      value:
-        - 'draft'
-        - 'review'
-      type: 'array'
-      description: 'Record statuses this role can transition to'
-      required: true
 
   public:
     name:
@@ -106,11 +89,6 @@ roles:
         - 'storage:download'
       type: 'array'
       description: 'List of permissions granted to this role'
-      required: true
-    status_transitions:
-      value: []
-      type: 'array'
-      description: 'Record statuses this role can transition to'
       required: true
 
 # Role Hierarchy (who can manage whom)

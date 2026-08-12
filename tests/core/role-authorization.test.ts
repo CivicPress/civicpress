@@ -93,13 +93,14 @@ describe('Role-Based Authorization System', () => {
         })
       ).toBe(true);
 
-      // Test status transitions
-      expect(
-        await userCan(adminUser, 'workflows:manage', {
-          fromStatus: 'draft',
-          toStatus: 'proposed',
-        })
-      ).toBe(true);
+      // `workflows:manage` is a plain permission here. Status TRANSITIONS are
+      // not roles.yml's business — they are governed by workflows.yml
+      // (`can_transition`) through WorkflowConfigManager, which is covered by
+      // core/src/__tests__/workflow-per-record-type.test.ts. This assertion
+      // used to pass a fromStatus/toStatus context that only worked because
+      // the fixture wrote a `status_transitions` shape the shipped roles.yml
+      // never had; see the 2026-08-12 removal.
+      expect(await userCan(adminUser, 'workflows:manage')).toBe(true);
     });
 
     it('should allow clerk to perform limited actions', async () => {
@@ -431,12 +432,6 @@ describe('Role-Based Authorization System', () => {
           type: 'array',
           description: 'All permissions',
           required: true,
-        },
-        status_transitions: {
-          value: {},
-          type: 'object',
-          description: 'None',
-          required: false,
         },
       };
 
