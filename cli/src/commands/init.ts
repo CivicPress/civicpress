@@ -1774,11 +1774,10 @@ async function setupStorage(
           },
         },
         active_provider: 'local',
-        global: {
-          max_file_size: '100MB',
-          cross_provider_backup: false,
-          backup_providers: [],
-        },
+        // No `global` block: the three keys that used to be written here
+        // (max_file_size, cross_provider_backup, backup_providers) were read by
+        // nothing. Upload limits come from each folder's `max_size`.
+
         folders: {
           public: {
             path: 'public',

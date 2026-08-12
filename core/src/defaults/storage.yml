@@ -61,10 +61,13 @@ providers:
 active_provider: local
 
 # Global Storage Settings
-global:
-  max_file_size: 100MB
-  cross_provider_backup: false
-  backup_providers: []
+# Global storage tuning. Only keys that are actually read belong here.
+#
+# `max_file_size`, `cross_provider_backup` and `backup_providers` were removed
+# 2026-08-12 — nothing read them. `max_file_size` was the misleading one: it
+# looked like a platform-wide upload ceiling, but the enforced limit is the
+# per-folder `max_size` below.
+global: {}
 
 # Storage Folders Configuration
 folders:
