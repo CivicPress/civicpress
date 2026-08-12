@@ -36,6 +36,14 @@ workflow was therefore writable by any role with the transition check never
 running. That surfaced while fixing the reason per-type workflows existed on
 paper but not in practice.
 
+**And a permission check that could never pass.** `RoleManager` read `roles.yml`
+`status_transitions` expecting an object map while the shipped file declared an
+array — a shape it explicitly rejects — so on a real instance that check denied
+every role, admin included. The suite stayed green because the test fixture
+wrote the working shape. Latent rather than live (its only caller was uncalled
+and unexported), and now removed rather than repaired, leaving `workflows.yml`
+as the single transition authority.
+
 **Legal document numbering is the other thing to read.** In a civic register the
 document number IS the citable identity of a record, and all three ways of
 getting one were broken: records published from a draft — the primary editor
