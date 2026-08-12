@@ -252,6 +252,27 @@ database guarantee rather than a convention.
 
 ### Changed
 
+- **Configuration that did nothing is no longer shipped.** A deliberate sweep
+  for declared-but-unread config keys, run after the same class turned up three
+  times by accident, found two:
+  - `civic init` no longer writes `hooks.enabled`, `workflows.enabled` or
+    `audit.enabled` into `.civicrc`. All three were emitted into every instance
+    and read by **nothing**. They are removed rather than implemented — for a
+    system of record, making the audit trail switchable from configuration is a
+    capability to add deliberately, not to inherit from a template. Existing
+    `.civicrc` files keep their copies: still inert, and safe to delete. The two
+    shipped demo profiles are cleaned too — they additionally carried
+    `pre_commit`, `post_commit`, `auto_index`, `approval_process` and
+    `log_changes`, none of which appear in the config type at all.
+  - `can_edit`, `can_delete` and `can_view` are gone from the shipped
+    `workflows.yml` defaults, and **`roles.yml` is documented as the authority**
+    for record permissions. Their only reader had a single call site that asks
+    exclusively about `create`, so the other three were dead everywhere. ⚠️
+    `can_view` was the misleading one: it reads as though it controls what the
+    public may see, while anonymous visibility is actually decided by the
+    `public` flag on each record status — fail-closed and independent of that
+    file. Nothing was over-exposed; the belief would simply have been wrong.
+    `workflows.yml` now states that it governs status transitions only.
 - **Configuring a `document_number_format` now enables numbering for that
   type.** Which types got an official number was a hard-coded list, so an
   instance could define a perfectly good format for `meeting` or `permit` and

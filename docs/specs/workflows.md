@@ -142,7 +142,12 @@ This creates a simple workflow:
 1. Records start as `draft`
 2. Clerks can approve drafts
 3. Anyone can archive approved records
-4. Public can view all record types
+
+⚠️ The `can_view` line in that example is **inert** — it does not grant or
+restrict public visibility. It is left in the examples because existing
+`workflows.yml` files contain it, but see "Role Permissions" below: anonymous
+visibility comes from the `public` flag on each record status, and record
+permissions come from `roles.yml`.
 
 ### Advanced Examples
 
@@ -331,13 +336,33 @@ Notes:
 
 ### Role Permissions
 
-Each role can have these permissions:
+⚠️ **Only `can_transition` is enforced everywhere. `roles.yml` is the authority
+for everything else** — read this before configuring the keys below.
 
-- `can_transition`: What status changes they can make
-- `can_create`: What record types they can create
-- `can_edit`: What record types they can edit
-- `can_delete`: What record types they can delete
-- `can_view`: What record types they can view
+| Key              | Status                                                                     |
+| ---------------- | -------------------------------------------------------------------------- |
+| `can_transition` | **Enforced.** API and CLI both honour it.                                  |
+| `can_create`     | **CLI only** — `civic create`. The API gates creation through `roles.yml`. |
+| `can_edit`       | **Not enforced anywhere.** Use `roles.yml`.                                |
+| `can_delete`     | **Not enforced anywhere.** Use `roles.yml`.                                |
+| `can_view`       | **Not enforced anywhere, and easy to misread.** See below.                 |
+
+Verified by sweep on 2026-08-11: the only reader of these four is
+`WorkflowConfigManager.validateAction`, which has exactly one call site
+(`cli/src/commands/create.ts`) and passes the literal `'create'`. The three
+unenforced keys were removed from the shipped `workflows.yml` defaults so
+instances stop being seeded with configuration that does nothing.
+
+⚠️ **`can_view` does NOT control public visibility.** The example elsewhere in
+this spec (`public: can_view: [bylaw, policy, resolution]`) reads as though it
+decides what anonymous visitors may see. It does not. Public read access is
+governed by the **`public` flag on each record status** (added 2026-08-09,
+fail-closed — a status is private unless it says otherwise), applied at every
+anonymous read path. Setting `can_view` here restricts nothing; nothing is
+over-exposed as a result, but do not rely on it as an access control.
+
+Permissions the API actually enforces live in `roles.yml` and are checked via
+`userCan` at ~59 `requirePermission` sites.
 
 ### Special Keywords
 

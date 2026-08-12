@@ -7,12 +7,6 @@ repo_url: null
 modules: ['legal-register']
 record_types: ['bylaw', 'policy', 'resolution']
 default_role: 'clerk'
-hooks:
-  enabled: true
-workflows:
-  enabled: true
-audit:
-  enabled: true
 demo_data:
   name: 'richmond-quebec'
   description: 'Richmond, Quebec - Bilingual civic records'

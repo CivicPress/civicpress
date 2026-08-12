@@ -7,17 +7,6 @@ repo_url: 'https://github.com/springfield-va/civic-records'
 modules: ['legal-register', 'planning', 'finance']
 record_types: ['bylaw', 'policy', 'resolution', 'ordinance', 'proclamation']
 default_role: 'clerk'
-hooks:
-  enabled: true
-  pre_commit: true
-  post_commit: true
-workflows:
-  enabled: true
-  auto_index: true
-  approval_process: true
-audit:
-  enabled: true
-  log_changes: true
 demo_data:
   name: 'springfield-usa'
   description: 'Springfield, Virginia - Comprehensive civic records'
