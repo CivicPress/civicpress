@@ -2033,3 +2033,82 @@ This pass covered `core/src/config`, `core/src/defaults` and the workflow spec.
 Not yet examined: `roles.yml`'s own permission keys, `storage.yml`'s `global.*`
 tuning block, `notifications.yml` channel options, and the `module.json`
 manifest schema.
+
+## Config sweep, pass 2 (2026-08-12)
+
+The surfaces pass 1 left unswept. Same method: enumerate declared keys, grep for
+a reader, report the orphans. Five findings; three fixed here, two need a
+decision. ⚠️ Process correction carried over from pass 1: after removing a key,
+grep it repo-wide AGAIN — finding the reader is not the same as finding every
+writer.
+
+### Fixed
+
+- [x] **`storage.yml` `global.max_file_size`, `global.cross_provider_backup`,
+      `global.backup_providers` — declared and written, read by nothing.**
+      Present in `GlobalStorageSettings` and written by `civic init`; no reader
+      anywhere. Removed from the type, the shipped defaults and `init`. The
+      sibling keys in that block (`max_concurrent_uploads`,
+      `circuit_breaker_enabled`, …) were checked and ARE read — they stay.
+
+      ⚠️ `max_file_size` was the one that mattered. It reads as a
+      platform-wide upload ceiling, but the only enforced limit is the
+      **per-folder `max_size`** (`cloud-uuid-storage/validation.ts`), which
+      reaches **4096MB** in the shipped folders. An operator setting a global
+      100MB cap was capping nothing — the same false-belief shape as pass 1's
+      `can_view`, and this one concerns resource exhaustion.
+
+### Needs a decision
+
+- [ ] **🔴 `roles.yml` `status_transitions` ships in a format the code rejects —
+      and the test fixture hides it.** `RoleManager` reads this key when a
+      permission check carries `fromStatus`/`toStatus`, and requires an OBJECT
+      map (`{ draft: ['proposed'], any: ['archived'] }`). It explicitly bails on
+      the other shape:
+
+      ```ts
+      if (Array.isArray(statusTransitions)) {
+        // If it's an array, it's the old format - no status-specific transitions
+        return false;
+      }
+      ```
+
+      The shipped `core/src/defaults/roles.yml` declares it as an **array**
+      (`['draft','review','approved','rejected','archived']`) for all three
+      roles. So on a real instance this check denies **every role, including
+      admin**. The suite does not catch it because
+      `tests/fixtures/test-setup.ts` builds its own roles config using the
+      OBJECT form — tests prove the feature works against configuration no
+      instance ever has.
+
+      **No live impact today**, and worth saying so plainly: the only function
+      that supplies that context is `userCanTransition`, which has **zero call
+      sites** and is not exported from `core/src/index.ts`. The hazard is
+      latent — the moment anything calls `userCan(u, p, {fromStatus, toStatus})`
+      (and `userCan` IS public), real instances deny what tests permit.
+
+      Decision needed, because the options differ in kind:
+      - **Remove** `status_transitions` from the shipped defaults, plus the dead
+        `userCanTransition`. Consistent with 2026-08-11: `workflows.yml`
+        `can_transition` is THE transition authority, and this would be a third.
+      - **Fix the format** in the defaults so the mechanism works — but that
+        deliberately creates a second enforced transition system.
+      - **Delete the branch entirely** from `RoleManager`, and the test with it.
+
+      ⚠️ Whichever is chosen, the fixture/default divergence is the real lesson:
+      a fixture that does not mirror the shipped config can turn a green suite
+      into evidence of nothing.
+
+- [ ] **`module.json` capability flags `routes`, `audit`, `cli`, `lifecycle`
+      have no readers.** `ModuleCapabilities` declares five; only
+      `schemaExtensions` is consumed (`record-schema-builder.ts`,
+      `module-resolver.ts`). A module author setting `capabilities.routes: true`
+      gets nothing — and unlike the other findings this one is a promise made to
+      third-party module authors, so removing it from the type is a published-
+      surface change rather than housekeeping. Either implement the dispatch or
+      drop the flags and say the manifest describes schema extensions only.
+
+### Still not swept
+
+`notifications.yml` channel options (large, and channel wiring changed recently
+— worth its own pass).

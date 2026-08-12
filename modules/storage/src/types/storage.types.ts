@@ -40,10 +40,18 @@ export interface StorageProvider {
   options?: Record<string, any>;
 }
 
+/**
+ * Global storage tuning. Every field here is READ — that is the point of the
+ * list, and it stopped being true once.
+ *
+ * Removed 2026-08-12 as unread (config sweep): `max_file_size`,
+ * `cross_provider_backup`, `backup_providers`. The first was the dangerous
+ * one — it looked like a platform-wide upload ceiling, but the only enforced
+ * limit is the PER-FOLDER `max_size` (see cloud-uuid-storage/validation.ts),
+ * which reaches 4096MB in the shipped folders. An operator setting a global
+ * 100MB cap was capping nothing.
+ */
 export interface GlobalStorageSettings {
-  max_file_size: string;
-  cross_provider_backup: boolean;
-  backup_providers: string[];
   max_concurrent_uploads?: number;
   max_concurrent_downloads?: number;
   max_concurrent_deletes?: number;
