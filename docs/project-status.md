@@ -105,6 +105,29 @@ named gaps. **Stub/Planned**: advertised but not yet functional.
   only through a record type's own graph was writable by any role, with the
   transition check never running. Both are closed; the second is pinned by a
   test that fails if the per-type union is removed.
+- **Configuration honesty (2026-08-11/12).** After the same defect shape turned
+  up three times by accident — a documented setting that nothing reads — a
+  deliberate sweep went looking. It found `hooks.enabled` / `workflows.enabled`
+  / `audit.enabled` written into every instance and read by nothing; three
+  `storage.yml` `global.*` keys likewise, including a `max_file_size` that
+  looked like a platform-wide upload ceiling while the only enforced limit is
+  the per-folder one (up to 4096MB); and `workflows.yml` `can_edit` /
+  `can_delete` / `can_view`, of which `can_view` reads as public-visibility
+  control and is not — that is the record status `public` flag. All are removed
+  or documented; `roles.yml` is now stated as the authority for record
+  permissions and `workflows.yml` for status transitions.
+
+  ⚠️ **The sharpest one was a permission check that could not pass.**
+  `RoleManager` read `roles.yml` `status_transitions` expecting an object map,
+  and the shipped file declared an array — which it explicitly rejects — so on a
+  real instance that check denied **every role, admin included**. The suite
+  stayed green because the test fixture wrote the working shape: tests
+  certifying behaviour no instance could get. Nothing reached the code path (its
+  only caller was uncalled and unexported), so it was latent rather than live,
+  and it is now removed entirely rather than repaired. The lesson is recorded in
+  the backlog: a fixture that does not mirror the shipped configuration turns a
+  green suite into evidence of nothing.
+
 - **Supply chain:** osv-scanner (PR diff-gate + weekly) and CodeQL SAST
   (report-only) run in CI; dependency advisories were remediated 94 → 2 (the
   residual two are a brace-expansion DoS not reachable from the request
