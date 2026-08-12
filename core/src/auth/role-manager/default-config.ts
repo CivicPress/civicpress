@@ -65,13 +65,6 @@ export function getDefaultRolesConfig(): RolesConfig {
             'ordinance',
           ],
         },
-        status_transitions: {
-          draft: ['proposed', 'archived'],
-          proposed: ['reviewed', 'archived'],
-          reviewed: ['approved', 'archived'],
-          approved: ['archived'],
-          any: ['archived'],
-        },
       },
       mayor: {
         name: 'Mayor',
@@ -95,11 +88,6 @@ export function getDefaultRolesConfig(): RolesConfig {
             'ordinance',
           ],
         },
-        status_transitions: {
-          reviewed: ['approved'],
-          approved: ['archived'],
-          any: ['archived'],
-        },
       },
       council: {
         name: 'City Council',
@@ -122,12 +110,6 @@ export function getDefaultRolesConfig(): RolesConfig {
             'proclamation',
             'ordinance',
           ],
-        },
-        status_transitions: {
-          proposed: ['reviewed'],
-          reviewed: ['approved'],
-          approved: ['archived'],
-          any: ['archived'],
         },
       },
       clerk: {
@@ -155,9 +137,6 @@ export function getDefaultRolesConfig(): RolesConfig {
             'ordinance',
           ],
         },
-        status_transitions: {
-          draft: ['proposed'],
-        },
       },
       legal_dept: {
         name: 'Legal Department',
@@ -178,9 +157,6 @@ export function getDefaultRolesConfig(): RolesConfig {
             'ordinance',
           ],
         },
-        status_transitions: {
-          proposed: ['reviewed'],
-        },
       },
       public: {
         name: 'Public',
@@ -195,7 +171,6 @@ export function getDefaultRolesConfig(): RolesConfig {
             'ordinance',
           ],
         },
-        status_transitions: {},
       },
     },
     permissions: {

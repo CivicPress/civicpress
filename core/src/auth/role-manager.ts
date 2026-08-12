@@ -24,9 +24,9 @@ export interface RoleConfig {
     can_delete?: string[];
     can_view?: string[];
   };
-  status_transitions?:
-    | Record<string, string[]>
-    | { value: string[]; type: string; description: string; required: boolean };
+  // No `status_transitions`. Status changes are governed by `workflows.yml`
+  // (`roles.<role>.can_transition`, via WorkflowConfigManager) — see the note
+  // in role-utils.ts for why the roles.yml version was removed.
 }
 
 export interface RolesConfig {
@@ -78,8 +78,6 @@ export class RoleManager {
     context?: {
       recordType?: string;
       action?: 'create' | 'edit' | 'delete' | 'view';
-      fromStatus?: string;
-      toStatus?: string;
     }
   ): Promise<boolean> {
     try {
@@ -299,73 +297,11 @@ export class RoleManager {
     context?: {
       recordType?: string;
       action?: 'create' | 'edit' | 'delete' | 'view';
-      fromStatus?: string;
-      toStatus?: string;
     }
   ): Promise<boolean> {
     logger.info(
       `[RoleManager] Checking permission '${permission}' for role '${userRole}'`
     );
-
-    // If status transition context is present, only check status_transitions
-    if (context?.fromStatus && context?.toStatus) {
-      const roleConfig = config.roles[userRole];
-      if (roleConfig) {
-        if (roleConfig.status_transitions) {
-          // Handle both old format (direct array) and new format (metadata with value)
-          const statusTransitions = Array.isArray(roleConfig.status_transitions)
-            ? roleConfig.status_transitions
-            : roleConfig.status_transitions.value;
-
-          // statusTransitions should be an object with status keys, not an array
-          if (Array.isArray(statusTransitions)) {
-            // If it's an array, it's the old format - no status-specific transitions
-            return false;
-          }
-
-          const allowedTransitions =
-            statusTransitions[context.fromStatus] ||
-            statusTransitions['any'] ||
-            [];
-          if (
-            Array.isArray(allowedTransitions) &&
-            (allowedTransitions as string[]).includes(context.toStatus)
-          ) {
-            return true;
-          }
-        }
-        // Role exists but does not allow this transition
-        return false;
-      }
-      // If role doesn't exist, check public role for status transitions
-      const publicRole = config.roles['public'];
-      if (publicRole?.status_transitions) {
-        // Handle both old format (direct array) and new format (metadata with value)
-        const publicStatusTransitions = Array.isArray(
-          publicRole.status_transitions
-        )
-          ? publicRole.status_transitions
-          : publicRole.status_transitions.value;
-
-        // publicStatusTransitions should be an object with status keys, not an array
-        if (Array.isArray(publicStatusTransitions)) {
-          // If it's an array, it's the old format - no status-specific transitions
-          return false;
-        }
-
-        const publicAllowedTransitions =
-          publicStatusTransitions[context.fromStatus] ||
-          publicStatusTransitions['any'] ||
-          [];
-        if (
-          Array.isArray(publicAllowedTransitions) &&
-          (publicAllowedTransitions as string[]).includes(context.toStatus)
-        ) {
-          return true;
-        }
-      }
-      return false;
-    }
 
     // Get all permissions for the user role (including inherited permissions)
     const userPermissions = await this.getRolePermissions(userRole, config);
@@ -562,9 +498,7 @@ export class RoleManager {
     // intentionally given no permissions (e.g. a locked-down 'suspended' role)
     // must resolve to zero permissions, not silently inherit public read.
     if (!roleConfig) {
-      logger.warn(
-        `Role '${role}' not found, falling back to public role`
-      );
+      logger.warn(`Role '${role}' not found, falling back to public role`);
       try {
         const publicRole = config.roles['public'];
         logger.output(`Public role exists: ${!!publicRole}`);
@@ -608,9 +542,7 @@ export class RoleManager {
     try {
       const finalPermissions = Array.from(permissions);
 
-      logger.debug(
-        `[RoleManager] Final permissions for role ${role}`
-      );
+      logger.debug(`[RoleManager] Final permissions for role ${role}`);
 
       // Backtrack: leave the DFS path so a sibling branch that reaches this
       // same role (a legal diamond) is not mistaken for a cycle.

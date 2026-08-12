@@ -952,15 +952,6 @@ export function createRolesConfig(config: TestConfig) {
           description: 'List of permissions granted to this role',
           required: true,
         },
-        status_transitions: {
-          value: {
-            draft: ['proposed'],
-            any: ['archived'],
-          },
-          type: 'object',
-          description: 'Status transitions this role can perform',
-          required: true,
-        },
       },
       clerk: {
         name: {
@@ -988,14 +979,6 @@ export function createRolesConfig(config: TestConfig) {
           description: 'List of permissions granted to this role',
           required: true,
         },
-        status_transitions: {
-          value: {
-            draft: ['proposed'],
-          },
-          type: 'object',
-          description: 'Status transitions this role can perform',
-          required: true,
-        },
       },
       public: {
         name: {
@@ -1014,12 +997,6 @@ export function createRolesConfig(config: TestConfig) {
           value: ['records:view'],
           type: 'array',
           description: 'List of permissions granted to this role',
-          required: true,
-        },
-        status_transitions: {
-          value: {},
-          type: 'object',
-          description: 'Status transitions this role can perform',
           required: true,
         },
       },

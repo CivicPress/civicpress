@@ -39,11 +39,13 @@ export function getRoleManager(): RoleManager {
 export async function userCan(
   user: AuthUser,
   permission: string | string[],
+  // NOTE: no `fromStatus` / `toStatus`. Status transitions are governed by
+  // `workflows.yml` (`roles.<role>.can_transition`, enforced through
+  // WorkflowConfigManager), NOT by roles.yml. Accepting them here would offer
+  // a second, silently-ignored way to ask the same question.
   context?: {
     recordType?: string;
     action?: 'create' | 'edit' | 'delete' | 'view';
-    fromStatus?: string;
-    toStatus?: string;
   }
 ): Promise<boolean> {
   return getRoleManager().userCan(user, permission, context);
@@ -148,20 +150,22 @@ export async function userCanView(
   return userCan(user, 'records:view', { recordType, action: 'view' });
 }
 
-/**
- * Check if user can transition a record from one status to another
- * @param user - The authenticated user
- * @param fromStatus - The current status
- * @param toStatus - The target status
- * @returns boolean indicating if the user can perform this transition
+/*
+ * `userCanTransition` was removed on 2026-08-12. It asked roles.yml
+ * `status_transitions` whether a status change was allowed — a second
+ * transition authority alongside `workflows.yml` `can_transition`, which is
+ * the one the API and CLI actually enforce.
+ *
+ * It had zero call sites and was never exported from the package index, and
+ * the config it consulted could not work: the shipped roles.yml declared
+ * `status_transitions` as an ARRAY while RoleManager required an object map
+ * and returned false for arrays, so on any real instance it denied every role
+ * including admin. The suite passed only because the test fixture wrote the
+ * object form — green tests against configuration no instance had.
+ *
+ * To check a transition, use `WorkflowConfigManager.validateTransition`
+ * (which takes the record type, so per-type workflows apply).
  */
-export async function userCanTransition(
-  user: AuthUser,
-  fromStatus: string,
-  toStatus: string
-): Promise<boolean> {
-  return userCan(user, 'workflows:manage', { fromStatus, toStatus });
-}
 
 /**
  * Check if user has admin privileges

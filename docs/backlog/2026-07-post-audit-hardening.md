@@ -2060,6 +2060,32 @@ writer.
 
 ### Needs a decision
 
+- [x] **🔴 FIXED 2026-08-12 — removed, leaving ONE transition authority.**
+      Maintainer chose removal over fixing the format, consistent with the
+      2026-08-11 decision that `workflows.yml` `can_transition` governs
+      transitions and `roles.yml` governs record permissions; fixing the format
+      would have created a second enforced system with no precedence rule.
+
+      Removed: `status_transitions` from the shipped `roles.yml` (3 roles) and
+      from the programmatic fallback `role-manager/default-config.ts` (**6**
+      roles — the compiler found the extra three after the type field went,
+      which is why the type was deleted first); the `RoleConfig.status_transitions`
+      field; the 60-line `fromStatus`/`toStatus` branch in
+      `RoleManager.checkPermission`; the dead, unexported `userCanTransition`;
+      and `fromStatus`/`toStatus` from the `userCan` context type in
+      `role-utils.ts`, `role-manager.ts` and `auth-service.ts` — leaving them
+      would have kept a silently-ignored way to ask the question, which is the
+      very defect this sweep exists to remove.
+
+      Test fixtures were the point of the finding, so they were fixed too:
+      `test-setup.ts` (3 roles) and `role-authorization.test.ts` no longer write
+      a `status_transitions` shape no instance had, and the assertion that
+      depended on it now checks the plain permission.
+
+      ⚠️ Kept as the durable lesson: **a fixture that does not mirror the
+      shipped configuration turns a green suite into evidence of nothing.** The
+      original entry follows.
+
 - [ ] **🔴 `roles.yml` `status_transitions` ships in a format the code rejects —
       and the test fixture hides it.** `RoleManager` reads this key when a
       permission check carries `fromStatus`/`toStatus`, and requires an OBJECT

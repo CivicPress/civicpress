@@ -67,6 +67,25 @@ database guarantee rather than a convention.
 
 ### Fixed
 
+- **🔴 `roles.yml` shipped a permission check that could never pass — and the
+  test fixture hid it.** `RoleManager` consulted `status_transitions` whenever a
+  permission check carried a from/to status, and required an object map,
+  explicitly returning `false` for the other shape. The shipped `roles.yml`
+  declared it as an **array** for every role, so on a real instance that check
+  denied **everyone, including admin**. The suite never caught it because the
+  test fixture wrote the object form: the tests proved the feature against
+  configuration no instance had.
+
+  Nothing reached it in practice — the only caller, `userCanTransition`, had
+  zero call sites and was never exported — so this was latent rather than live.
+  It is now **removed rather than repaired**: status transitions are governed by
+  `workflows.yml` `can_transition` (via `WorkflowConfigManager`, which also
+  honours per-record-type workflows), and making `roles.yml` a second authority
+  would have needed a precedence rule that does not exist. Gone with it: the
+  `RoleConfig.status_transitions` field, the branch in `RoleManager`, the dead
+  helper, and `fromStatus`/`toStatus` from the `userCan` context — keeping those
+  would have left a silently-ignored way to ask the question.
+
 - **Per-record-type workflows were silently ignored.** `docs/specs/workflows.md`
   documents "Department-Specific Workflows" — a bylaw and a policy having
   different lifecycles via `recordTypes.<type>.transitions` — and
