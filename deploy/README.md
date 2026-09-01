@@ -19,11 +19,11 @@ through the same verified CLI commands (`civic init` → `civic doctor` →
 
 `docs/specs/deployment.md`'s port table is inverted. The real model:
 
-| Component | Port | Notes |
-| --------- | ---- | ----- |
-| API (+ broadcast-box routes) | **3000** | `$PORT` |
+| Component                     | Port     | Notes                                |
+| ----------------------------- | -------- | ------------------------------------ |
+| API (+ broadcast-box routes)  | **3000** | `$PORT`                              |
 | Realtime WS (collab + device) | **3001** | path `/realtime`, in the API process |
-| UI (Nuxt SPA) | **3030** | `nuxt preview` |
+| UI (Nuxt SPA)                 | **3030** | `nuxt preview`                       |
 
 nginx maps `/` → UI, `/api/` → API, `/realtime` → the WS.
 
@@ -53,8 +53,8 @@ docker compose restart nginx
 docker compose exec api node /app/cli/dist/index.js doctor
 ```
 
-On first boot the entrypoint runs `civic init --yes --profile demo` (creating the
-admin from `CIVIC_ADMIN_PASSWORD_FILE`), so the instance is loginable
+On first boot the entrypoint runs `civic init --yes --profile demo` (creating
+the admin from `CIVIC_ADMIN_PASSWORD_FILE`), so the instance is loginable
 immediately. The instance persists in the `civic-instance` volume.
 
 ---
@@ -98,9 +98,11 @@ Front both with nginx (`deploy/nginx/civicpress.conf`) and certbot for TLS.
 
 ## Seeding curated content
 
-Public reads are gated only by `workflow_state != 'internal_only'` — **not by
-`status`** — and indexing publishes **every** on-disk record. So place only
-records that are safe to be public:
+Anonymous reads are gated on record **status** (since 2026-08-09): a status is
+public only if its config says `public: true`, fail-closed — by default
+`published`, `archived` and `expired`. A `workflow_state` of `internal_only` is
+additionally excluded. But indexing still publishes **every** on-disk record
+whose status qualifies, so place only records that are safe to be public:
 
 ```bash
 deploy/seed-demo.sh /path/to/instance   # copies a curated subset + index --sync-db
@@ -118,12 +120,21 @@ The broadcast-box **pipeline** (record → upload → verified redaction → pub
 transcript) is ready, but a session record needs **real A/V** — so it is created
 by recording a meeting on the running instance, not seeded:
 
-1. In CivicPress, register a device and mint a one-time enrollment code
-   (`POST /api/v1/broadcast-box/devices`).
-2. Point a device at the deployed HTTPS host and enroll (the device refuses
-   cleartext to a non-loopback host, so real TLS is required). The device can be
-   the appliance, a **laptop webcam**, or a **synthetic** source
-   (`SYNTHETIC_CAPTURE_SOURCE=testsrc`) — see the `CivicPress/BroadcastBox` repo.
+1. In CivicPress, mint a device UUID + one-time enrollment code:
+   `POST /api/v1/broadcast-box/devices/enroll` with
+   `{"name": "...", "roomLocation": "..."}` (needs
+   `broadcast-box:devices:enroll`). The response is **top-level**
+   `{success, enrollment:{deviceUuid, enrollmentCode, expiresAt}}` — not wrapped
+   in `data` — and the code **expires in 15 minutes**, so mint it right before
+   enrolling. (`POST .../devices` is the device's own self-registration with a
+   code it already has, not this.)
+2. Point a device at the deployed HTTPS host and enroll. The device refuses to
+   send credentials over cleartext to a non-loopback host, so a public
+   deployment needs real TLS; on a **trusted LAN / lab** set
+   `ALLOW_INSECURE_TRANSPORT=true` on the device instead (loopback is always
+   allowed). The device can be the appliance, a **laptop webcam**, or a
+   **synthetic** source (`SYNTHETIC_CAPTURE_SOURCE=testsrc`) — see the
+   `CivicPress/BroadcastBox` repo.
 3. Start a session, record with an in-camera (redacted) window, stop.
 4. Watch it upload → redact → (optionally) transcribe, then open the published
    session record: the redacted video plays and the in-camera window is black +
@@ -140,21 +151,23 @@ setting `transcription.enabled/engine/whisper_cpp.*` in
 
 Run `civic doctor` — it fails (exit 1) on the hard ones. Before exposing:
 
-- [ ] **Secret pinned** — `CIVICPRESS_SECRET` (≥64 hex) or `CIVICPRESS_SECRET_FILE`.
+- [ ] **Secret pinned** — `CIVICPRESS_SECRET` (≥64 hex) or
+      `CIVICPRESS_SECRET_FILE`.
 - [ ] **Admin password set** — a fresh instance's `admin` has no password until
       you set one (done by `init --admin-*` / `users:bootstrap-admin`).
 - [ ] **`NODE_ENV=production` and `CIVIC_ALLOW_SIMULATED_AUTH` unset** — the
       simulated-auth backdoor must be off (doctor fails if it is on).
 - [ ] **`TRUST_PROXY=true`** behind nginx (correct client IPs + `req.secure`).
-- [ ] **Index only public records** — "public = indexed"; curate the seed.
+- [ ] **Index only public records** — indexing publishes every on-disk record
+      whose status is `public: true`; curate the seed.
 - [ ] **Raw recordings stay private** — `recordings_raw` is fail-closed
       (admin-only); only redacted variants are ever published.
 - [ ] **Editor attachments follow their record** — uploads from the record
       editor land in the `attachments` folder (`access: authenticated`), so a
       DRAFT's attachments are staff-only. They open to citizens automatically
-      once a record referencing the file is `published`. Files a user picks
-      from the `public` folder are public immediately, as before — check the
-      folder before attaching something that should wait for publication.
+      once a record referencing the file is `published`. Files a user picks from
+      the `public` folder are public immediately, as before — check the folder
+      before attaching something that should wait for publication.
 - [ ] **UI security headers at nginx** — the API ships helmet; the UI (Nitro)
       does not. `civicpress.conf` adds them for the UI origin.
 - [ ] **No stray cloud keys** in `.system-data/` (e.g. a GCS service-account

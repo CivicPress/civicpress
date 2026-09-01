@@ -1,11 +1,14 @@
 #!/usr/bin/env bash
 # Seed a CivicPress instance with a small, CURATED set of public civic records.
 #
-# Why curated: public reads are gated only by `workflow_state != 'internal_only'`
-# (NOT by `status`), and indexing publishes EVERY on-disk record. So on a public
-# demo you must place ONLY records that are safe to be public. This copies a
-# hand-picked subset of the bundled demo records — all inherently-public civic
-# documents — and syncs them into the queryable index (`index --sync-db`).
+# Why curated: anonymous reads are gated on record STATUS (since 2026-08-09) — a
+# status is public only if its config says `public: true`, fail-closed, which by
+# default means `published` / `archived` / `expired`; `workflow_state ==
+# 'internal_only'` is additionally excluded. Indexing still publishes EVERY
+# on-disk record whose status qualifies, so on a public demo you must place ONLY
+# records that are safe to be public. This copies a hand-picked subset of the
+# bundled demo records — all inherently-public civic documents — and syncs them
+# into the queryable index (`index --sync-db`).
 #
 # A broadcast SESSION is deliberately NOT seeded here: it needs real A/V + a
 # redacted recording + a transcript, produced by recording a meeting on the
