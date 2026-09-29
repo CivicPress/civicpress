@@ -2138,3 +2138,154 @@ writer.
 
 `notifications.yml` channel options (large, and channel wiring changed recently
 — worth its own pass).
+
+## Release-readiness review (2026-09-29)
+
+Run to answer "what is left before v0.4.x is cut?". The trackers were read
+first, then each claim was checked against source — and, for the first time,
+against the repository's **code-scanning alert list**
+(`gh api repos/CivicPress/civicpress/code-scanning/alerts`), which no document
+in this repo had ever referenced. Most of this section comes from that list: 249
+alerts were open on `main`, and none of them was recorded anywhere.
+
+The roadmap-level answer — what the milestone still needs decided — is in
+`docs/plans/2026-08-11-v04x-scoping.md` ("Release-readiness review"). This
+section tracks the work.
+
+⚠️ **Why nobody had looked.** Both scanners were introduced as _report-only_, so
+they can never turn a build red, and the pull-request gate only reports alerts a
+change **introduces**. A finding that was already there when the scanner was
+switched on, or an advisory published against a dependency that has not moved,
+is therefore invisible to every check the project runs. Green CI says nothing
+about either.
+
+### Security
+
+- [ ] **🔴 A record file can execute code.** `gray-matter` 4.0.3 ships three
+      front-matter engines — YAML, JSON and **JavaScript** — and picks one from
+      the text that follows the opening delimiter. A file that begins `---js` or
+      `---javascript` is handed to `eval`. Measured on the installed version
+      rather than read off the documentation:
+      `matter('---js\n{ probe: 6 * 7 }\n---')` returns `{ probe: 42 }`, with
+      `process` in scope.
+
+      There are 24 `matter()` call sites across `core`, `modules/api` and `cli`,
+      plus two `matter.stringify()` calls — which parse their string argument
+      before serializing it, so they are call sites too. None passes `engines`.
+
+      **Reachability, stated carefully.** Every writer the API owns — the three
+      record sagas, geography, templates — serializes with a header the server
+      builds itself (`---\n` followed by YAML), so a request body cannot choose
+      the engine; those paths were traced and no HTTP-reachable route to the
+      evaluator was found. The exposure is a file that reaches the data
+      directory **any other way**: `civic import` (which parses the file
+      immediately), a restored backup, or a data repository edited or merged
+      through Git. The indexer then parses it at API startup. For a platform
+      whose stated archive format is Markdown-in-Git, "a contributor's file runs
+      as the server" is the wrong property to have.
+
+      This is CodeQL alert #118 (`js/code-injection`, critical), open since the
+      scanner was enabled on 2026-07-30.
+
+      A second defect rides along. Called **without** options, `matter()` stores
+      every distinct input in a process-wide cache keyed by the entire file
+      content, never evicts it, and returns the cached `data` object by
+      reference — unbounded growth in a long-running API, and a mutation made by
+      one caller is seen by the next caller that parses the same text.
+
+- [ ] **Dependency advisories have drifted: 54 open across 25 package
+      versions.** The 2026-07-25 remediation took the tree from 94 to 2. Nothing
+      in the lockfile has moved since, but the advisory database has: 26 alerts
+      were opened in August and 28 in September. Several are on the request path
+      — `multer` (uploads, 3 High), `qs`, `fast-uri` (5 High, reached through
+      `ajv`), `undici`, `nodemailer`, `js-yaml`, and `dompurify`, which is the
+      XSS sanitizer. `nuxt` carries 7. The one Critical is in `@nuxt/devtools`,
+      a development-only tool. Reachability of each advisory has **not** been
+      assessed; the count is what the scanner reports.
+
+      ⚠️ The pull-request gate will not catch this. It fails on advisories a
+      change introduces, and the lockfile is byte-identical on `main` and
+      `develop`.
+
+- [ ] **The CodeQL baseline was never triaged: 195 alerts, all dated
+      2026-07-30.** They are the findings that already existed on the day the
+      scanner was switched on. 116 are in tests and scripts — 111 of those are a
+      single rule, `js/shell-command-injection-from-environment`, fired by CLI
+      tests that build a shell command from a temp-directory path. 79 are in
+      production source: 43 `js/path-injection`, 12 `js/polynomial-redos`, 15
+      across the hand-rolled HTML sanitizers, and a tail of nine.
+
+      Many of the path-injection alerts are expected to be false positives
+      against the containment helpers the `FA-*` audit added
+      (`resolveInsideRecordsRoot`, `resolveLocalStoragePath`), which a static
+      analyser does not always recognise. That is an expectation, not a result:
+      the same rule caught a real defect on PR #23. Each needs a verdict.
+
+- [ ] **`notifications.yml` privacy settings do nothing (needs a decision).**
+      `security.filter_pii`, `security.encrypt_sensitive_data` and
+      `security.audit_all_notifications` ship as `true`, are written into every
+      instance by `civic init`, and are read by nothing —
+      `NotificationConfig.getSecuritySettings()` has no caller. The functions
+      they would control, `NotificationSecurity.sanitizeContent()` and
+      `encryptSensitiveData()`, have no callers either, so the behaviour is
+      absent rather than merely unconditional.
+
+      Same defect class as the two config sweeps above, with a sharper edge: an
+      operator reading `filter_pii: true` believes personal data is being
+      filtered out of outgoing notifications. Removing a key from generated
+      instances is a maintainer decision, so this is recorded, not changed.
+      `notifications.yml` is the one configuration surface neither sweep
+      covered; the full pass is recorded under "Notification configuration
+      sweep" at the end of this section.
+
+### Correctness and honesty
+
+- [ ] **`EditorHeader.vue` still decides for itself what "published" means.**
+      The v0.4.x scoping document lists this as gap 4 and its outcome note says
+      shape A — which included it — "is done". Half of A is:
+      `modules/ui/app/components/editor/EditorHeader.vue` still hardcodes
+      `['published', 'active', 'approved']` in two places. Since 2026-08-09 the
+      authority is the `public` flag on each record status, and the two
+      disagree: `approved` is not public, but the editor treats an approved
+      record as published.
+
+- [ ] **Two routers promise the milestone that is about to ship (needs a
+      decision).** `/api/v1/workflows` and `/api/v1/hooks` answer every request
+      with `501` and the message "planned for v0.4.x"
+      (`retry_after_milestone: 'v0.4.x'`); the OpenAPI description in
+      `modules/api/src/routes/docs.ts` repeats it. Tagging 0.4.0 with these
+      unchanged makes the API state something false about itself. The options
+      differ in kind — implement read-only views over `workflows.yml` and
+      `hooks.yml`, re-point the milestone, or delete the routers.
+
+- [ ] **The audit trail: what "comprehensive" would have to mean (needs a
+      decision).** Scoping question 4 asked whether the audit log is a gap at
+      all, and said it could not be closed without a statement of what is
+      missing. This is that statement, verified from source:
+  - `GET /api/v1/audit` — and therefore the Settings → Activity page — reads
+    only the JSONL file, and only its newest 5,000 entries
+    (`AuditLogger.tail(5000)`).
+  - That file **deletes** its oldest entries. Past 10,000 lines `rotateIfNeeded`
+    rewrites it keeping the newest 8,000. Nothing is archived, so the trail has
+    a fixed horizon measured in events, not time.
+  - The `audit_logs` database table is written by `AuditChannel` and read by
+    nothing outside a test (`getAuditLogs` has no production caller).
+  - Events raised in the API layer — configuration, users, record status and
+    draft writes — go to the file only. Events raised in core go to both. So the
+    file is complete but lossy, and the table is durable but partial.
+  - Geography, templates, file upload and delete, indexing and record locks
+    write no audit entry in either layer.
+
+### Tracker corrections
+
+Recorded because "the tracker said so" is how each of these survived:
+
+- The scoping document's outcome note says shape A is done. Per-record-type
+  transitions are; the hardcoded status list is not (above).
+- The same document offers `routes/hooks.ts` as evidence that the hooks system
+  "exists". That file is one of the two `501` stubs.
+- `docs/project-status.md` listed the editor's activity feed as a stub. It has
+  been real since 2026-08-03 (`EditorActivity.vue`, backed by Git history).
+- The `[ ]` under "Needs a decision" in the 2026-08-12 sweep —
+  `roles.yml status_transitions` — is the original text of an entry that was
+  fixed the same day and kept for the record. It is not open work.
