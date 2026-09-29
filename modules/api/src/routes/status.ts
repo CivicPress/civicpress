@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { HttpError } from '../utils/http-error.js';
 import { query, validationResult } from 'express-validator';
+import { isName } from '../utils/name-validators.js';
 import {
   Logger,
   listRecordFilesSync,
@@ -113,7 +114,11 @@ export function createStatusRouter() {
 
       const gitEngine = civicPress.getGitEngine();
       if (!gitEngine) {
-        throw new HttpError(503, 'Git engine not available', 'GIT_ENGINE_UNAVAILABLE');
+        throw new HttpError(
+          503,
+          'Git engine not available',
+          'GIT_ENGINE_UNAVAILABLE'
+        );
       }
 
       const gitStatus = await gitEngine.status();
@@ -175,7 +180,7 @@ export function createStatusRouter() {
   // GET /api/status/records - Get detailed record statistics
   router.get(
     '/records',
-    [query('type').optional().isString().withMessage('Type must be a string')],
+    [isName(query('type').optional(), 'Type')],
     async (req: Request, res: Response) => {
       logApiRequest(req, { operation: 'get_record_status' });
 
@@ -230,7 +235,7 @@ export function createStatusRouter() {
 async function getRecordStatistics(
   dataDir: string,
   filterType?: string
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): Promise<any> {
   const recordsDir = path.join(dataDir, 'records');
   if (!fs.existsSync(recordsDir)) {

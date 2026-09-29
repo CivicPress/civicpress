@@ -12,6 +12,7 @@
  */
 
 import { readFileSync } from 'fs';
+import { isSafeSegment, resolveInside } from '../utils/path-containment.js';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { CentralConfigManager } from '../config/central-config.js';
@@ -248,11 +249,17 @@ export class RecordSchemaBuilder {
     schema: JsonSchemaObject,
     recordType: string
   ): void {
-    const typeSchemaPath = join(
-      __dirname,
-      '../schemas/record-type-schemas',
-      `${recordType}-schema.json`
-    );
+    // The record type comes from the record being validated — a draft's
+    // `type` is caller-supplied — and was interpolated into this path
+    // unchecked, so a type of `../../x/evil` read `evil-schema.json` from
+    // wherever it pointed and merged it into the schema.
+    const typeSchemaPath = isSafeSegment(recordType)
+      ? resolveInside(
+          join(__dirname, '../schemas/record-type-schemas'),
+          `${recordType}-schema.json`
+        )
+      : null;
+    if (!typeSchemaPath) return;
 
     try {
       const typeSchemaContent = readFileSync(typeSchemaPath, 'utf-8');

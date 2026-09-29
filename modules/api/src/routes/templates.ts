@@ -7,6 +7,7 @@
 import { Router, Response } from 'express';
 import { HttpError } from '../utils/http-error.js';
 import { body, param, query, validationResult } from 'express-validator';
+import { isName } from '../utils/name-validators.js';
 import {
   TemplateService,
   type TemplateId,
@@ -83,7 +84,7 @@ export function createTemplatesRouter() {
   router.get(
     '/',
     [
-      query('type').optional().isString().withMessage('Type must be a string'),
+      isName(query('type').optional(), 'Type'),
       query('search')
         .optional()
         .isString()
@@ -185,8 +186,13 @@ export function createTemplatesRouter() {
         const template = await templateService.getTemplate(id as TemplateId);
 
         if (!template) {
-          const error = new HttpError(404, `Template not found: ${id}`, 'TEMPLATE_NOT_FOUND', { details: { templateId: id } });
-    return handleApiError('get_template', error, req, res);
+          const error = new HttpError(
+            404,
+            `Template not found: ${id}`,
+            'TEMPLATE_NOT_FOUND',
+            { details: { templateId: id } }
+          );
+          return handleApiError('get_template', error, req, res);
         }
 
         sendSuccess({ template }, req, res, { operation: 'get_template' });
@@ -312,11 +318,19 @@ export function createTemplatesRouter() {
         // Handle specific error cases
         if (error instanceof Error) {
           if (error.message.includes('already exists')) {
-            const apiError = new HttpError(409, error.message, 'TEMPLATE_EXISTS');
+            const apiError = new HttpError(
+              409,
+              error.message,
+              'TEMPLATE_EXISTS'
+            );
             return handleApiError('create_template', apiError, req, res);
           }
           if (error.message.includes('Invalid template ID')) {
-            const apiError = new HttpError(400, error.message, 'TEMPLATE_INVALID');
+            const apiError = new HttpError(
+              400,
+              error.message,
+              'TEMPLATE_INVALID'
+            );
             return handleApiError('create_template', apiError, req, res);
           }
         }
@@ -372,9 +386,11 @@ export function createTemplatesRouter() {
 
         // Check if at least one field is provided
         if (Object.keys(requestData).length === 0) {
-          const error = new HttpError(400, 
-            'At least one field must be provided for update'
-          , 'VALIDATION_FAILED');
+          const error = new HttpError(
+            400,
+            'At least one field must be provided for update',
+            'VALIDATION_FAILED'
+          );
           return handleApiError('update_template', error, req, res);
         }
 
@@ -388,11 +404,19 @@ export function createTemplatesRouter() {
         // Handle specific error cases
         if (error instanceof Error) {
           if (error.message.includes('not found')) {
-            const apiError = new HttpError(404, error.message, 'TEMPLATE_NOT_FOUND');
+            const apiError = new HttpError(
+              404,
+              error.message,
+              'TEMPLATE_NOT_FOUND'
+            );
             return handleApiError('update_template', apiError, req, res);
           }
           if (error.message.includes('system template')) {
-            const apiError = new HttpError(403, error.message, 'TEMPLATE_READ_ONLY');
+            const apiError = new HttpError(
+              403,
+              error.message,
+              'TEMPLATE_READ_ONLY'
+            );
             return handleApiError('update_template', apiError, req, res);
           }
         }
@@ -444,7 +468,11 @@ export function createTemplatesRouter() {
         // Handle specific error cases
         if (error instanceof Error) {
           if (error.message.includes('not found')) {
-            const apiError = new HttpError(404, error.message, 'TEMPLATE_NOT_FOUND');
+            const apiError = new HttpError(
+              404,
+              error.message,
+              'TEMPLATE_NOT_FOUND'
+            );
             return handleApiError('delete_template', apiError, req, res);
           }
         }
@@ -491,7 +519,11 @@ export function createTemplatesRouter() {
         // Handle specific error cases
         if (error instanceof Error) {
           if (error.message.includes('not found')) {
-            const apiError = new HttpError(404, error.message, 'TEMPLATE_NOT_FOUND');
+            const apiError = new HttpError(
+              404,
+              error.message,
+              'TEMPLATE_NOT_FOUND'
+            );
             return handleApiError('validate_template', apiError, req, res);
           }
         }

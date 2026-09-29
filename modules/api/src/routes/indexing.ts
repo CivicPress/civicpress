@@ -1,6 +1,6 @@
 import { Router, Response } from 'express';
 import { HttpError } from '../utils/http-error.js';
-import { body, validationResult } from 'express-validator';
+import { body, query, validationResult } from 'express-validator';
 import { join } from 'path';
 import { AuthenticatedRequest, requirePermission } from '../middleware/auth.js';
 import { Logger } from '@civicpress/core';
@@ -77,7 +77,11 @@ export function createIndexingRouter() {
           logger.error('CivicPress instance not available', {
             requestId: req.requestId,
           });
-          throw new HttpError(500, 'CivicPress instance not available', 'CIVICPRESS_NOT_AVAILABLE');
+          throw new HttpError(
+            500,
+            'CivicPress instance not available',
+            'CIVICPRESS_NOT_AVAILABLE'
+          );
         }
 
         const indexingService = civicPress.getIndexingService();
@@ -90,7 +94,11 @@ export function createIndexingRouter() {
           logger.error('Indexing service not available', {
             requestId: req.requestId,
           });
-          throw new HttpError(500, 'Indexing service not available', 'INDEXING_SERVICE_NOT_AVAILABLE');
+          throw new HttpError(
+            500,
+            'Indexing service not available',
+            'INDEXING_SERVICE_NOT_AVAILABLE'
+          );
         }
 
         const options = {
@@ -158,7 +166,11 @@ export function createIndexingRouter() {
 
         const civicPress = req.civicPress;
         if (!civicPress) {
-          throw new HttpError(500, 'CivicPress instance not available', 'CIVICPRESS_NOT_AVAILABLE');
+          throw new HttpError(
+            500,
+            'CivicPress instance not available',
+            'CIVICPRESS_NOT_AVAILABLE'
+          );
         }
 
         logger.debug('CivicPress instance available', {
@@ -168,7 +180,11 @@ export function createIndexingRouter() {
 
         const indexingService = civicPress.getIndexingService();
         if (!indexingService) {
-          throw new HttpError(500, 'Indexing service not available', 'INDEXING_SERVICE_NOT_AVAILABLE');
+          throw new HttpError(
+            500,
+            'Indexing service not available',
+            'INDEXING_SERVICE_NOT_AVAILABLE'
+          );
         }
 
         // Load the current index
@@ -252,12 +268,20 @@ export function createIndexingRouter() {
 
         const civicPress = req.civicPress;
         if (!civicPress) {
-          throw new HttpError(500, 'CivicPress instance not available', 'CIVICPRESS_NOT_AVAILABLE');
+          throw new HttpError(
+            500,
+            'CivicPress instance not available',
+            'CIVICPRESS_NOT_AVAILABLE'
+          );
         }
 
         const indexingService = civicPress.getIndexingService();
         if (!indexingService) {
-          throw new HttpError(500, 'Indexing service not available', 'INDEXING_SERVICE_NOT_AVAILABLE');
+          throw new HttpError(
+            500,
+            'Indexing service not available',
+            'INDEXING_SERVICE_NOT_AVAILABLE'
+          );
         }
 
         // Generate indexes with sync enabled
@@ -301,10 +325,39 @@ export function createIndexingRouter() {
   router.get(
     '/search',
     requirePermission('records:view'),
+    // This route had no validation. `q` sent twice arrived as an array and
+    // threw at `.toLowerCase()`; `tags` sent twice threw at `.split(',')`.
+    [
+      query('q')
+        .isString()
+        .withMessage('Query parameter "q" must be a string')
+        .bail()
+        .isLength({ min: 1, max: 512 })
+        .withMessage('Query parameter "q" must be 1 to 512 characters'),
+      ...['type', 'status', 'module', 'tags'].map((name) =>
+        query(name)
+          .optional()
+          .isString()
+          .withMessage(`${name} must be a string`)
+          .bail()
+          .isLength({ max: 512 })
+          .withMessage(`${name} must be at most 512 characters`)
+      ),
+    ],
     async (req: AuthenticatedRequest, res: Response) => {
       logApiRequest(req, { operation: 'search_index' });
 
       try {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+          return handleValidationError(
+            'search_index',
+            errors.array(),
+            req,
+            res
+          );
+        }
+
         const { q: query, type, status, module, tags } = req.query;
 
         if (!query) {
@@ -325,12 +378,20 @@ export function createIndexingRouter() {
 
         const civicPress = req.civicPress;
         if (!civicPress) {
-          throw new HttpError(500, 'CivicPress instance not available', 'CIVICPRESS_NOT_AVAILABLE');
+          throw new HttpError(
+            500,
+            'CivicPress instance not available',
+            'CIVICPRESS_NOT_AVAILABLE'
+          );
         }
 
         const indexingService = civicPress.getIndexingService();
         if (!indexingService) {
-          throw new HttpError(500, 'Indexing service not available', 'INDEXING_SERVICE_NOT_AVAILABLE');
+          throw new HttpError(
+            500,
+            'Indexing service not available',
+            'INDEXING_SERVICE_NOT_AVAILABLE'
+          );
         }
 
         // Load the current index
@@ -407,59 +468,75 @@ export function createIndexingRouter() {
    * GET /api/indexing/stats
    * Get indexing statistics
    */
-  router.get('/stats', requirePermission('records:view'), async (req: AuthenticatedRequest, res: Response) => {
-    logApiRequest(req, { operation: 'get_indexing_stats' });
+  router.get(
+    '/stats',
+    requirePermission('records:view'),
+    async (req: AuthenticatedRequest, res: Response) => {
+      logApiRequest(req, { operation: 'get_indexing_stats' });
 
-    try {
-      const civicPress = req.civicPress;
-      if (!civicPress) {
-        throw new HttpError(500, 'CivicPress instance not available', 'CIVICPRESS_NOT_AVAILABLE');
+      try {
+        const civicPress = req.civicPress;
+        if (!civicPress) {
+          throw new HttpError(
+            500,
+            'CivicPress instance not available',
+            'CIVICPRESS_NOT_AVAILABLE'
+          );
+        }
+
+        const indexingService = civicPress.getIndexingService();
+        const stats = await indexingService.getIndexingStats();
+
+        sendSuccess(
+          {
+            stats,
+          },
+          req,
+          res,
+          { operation: 'get_indexing_stats' }
+        );
+      } catch (error) {
+        handleApiError('get_indexing_stats', error, req, res);
       }
-
-      const indexingService = civicPress.getIndexingService();
-      const stats = await indexingService.getIndexingStats();
-
-      sendSuccess(
-        {
-          stats,
-        },
-        req,
-        res,
-        { operation: 'get_indexing_stats' }
-      );
-    } catch (error) {
-      handleApiError('get_indexing_stats', error, req, res);
     }
-  });
+  );
 
   /**
    * GET /api/indexing/validate
    * Validate all indexes
    */
-  router.get('/validate', requirePermission('records:import'), async (req: AuthenticatedRequest, res: Response) => {
-    logApiRequest(req, { operation: 'validate_indexes' });
+  router.get(
+    '/validate',
+    requirePermission('records:import'),
+    async (req: AuthenticatedRequest, res: Response) => {
+      logApiRequest(req, { operation: 'validate_indexes' });
 
-    try {
-      const civicPress = req.civicPress;
-      if (!civicPress) {
-        throw new HttpError(500, 'CivicPress instance not available', 'CIVICPRESS_NOT_AVAILABLE');
+      try {
+        const civicPress = req.civicPress;
+        if (!civicPress) {
+          throw new HttpError(
+            500,
+            'CivicPress instance not available',
+            'CIVICPRESS_NOT_AVAILABLE'
+          );
+        }
+
+        const indexingService = civicPress.getIndexingService();
+        const validation = await indexingService.validateIndexes();
+
+        sendSuccess(
+          {
+            validation,
+          },
+          req,
+          res,
+          { operation: 'validate_indexes' }
+        );
+      } catch (error) {
+        handleApiError('validate_indexes', error, req, res);
       }
-
-      const indexingService = civicPress.getIndexingService();
-      const validation = await indexingService.validateIndexes();
-
-      sendSuccess(
-        {
-          validation,
-        },
-        req,
-        res,
-        { operation: 'validate_indexes' }
-      );
-    } catch (error) {
-      handleApiError('validate_indexes', error, req, res);
     }
-  });
+  );
 
   return router;
 }

@@ -1,4 +1,5 @@
 import { readFile, writeFile, access, mkdir } from 'fs/promises';
+import { resolveInside } from '../utils/path-containment.js';
 import {
   errorMessage,
   errorStack,
@@ -101,12 +102,17 @@ export class ConfigurationService {
       throw new Error(`Invalid config type: ${configType}`);
     }
 
-    const userPath =
-      canonical === 'notifications'
-        ? join(this.systemDataPath, `${canonical}.yml`)
-        : join(this.dataPath, `${canonical}.yml`);
-
-    const defaultPath = join(this.defaultsPath, `${canonical}.yml`);
+    // The test above already reduces the name to `[a-z0-9-]+`. Resolving it
+    // INSIDE its directory states the same guarantee in the terms the
+    // filesystem call cares about, where it cannot drift from the join.
+    const userPath = resolveInside(
+      canonical === 'notifications' ? this.systemDataPath : this.dataPath,
+      `${canonical}.yml`
+    );
+    const defaultPath = resolveInside(this.defaultsPath, `${canonical}.yml`);
+    if (!userPath || !defaultPath) {
+      throw new Error(`Invalid config type: ${configType}`);
+    }
     return { userPath, defaultPath };
   }
 

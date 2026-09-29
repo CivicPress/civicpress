@@ -1,5 +1,6 @@
 import { Router, Response } from 'express';
 import { body, param, query, validationResult } from 'express-validator';
+import { isName } from '../utils/name-validators.js';
 import { AuthenticatedRequest, requirePermission } from '../middleware/auth.js';
 import {
   Logger,
@@ -72,7 +73,7 @@ export function createValidationRouter() {
         .isString()
         .notEmpty()
         .withMessage('Record ID is required'),
-      body('type').optional().isString().withMessage('Type must be a string'),
+      isName(body('type').optional(), 'Type'),
     ],
     async (req: AuthenticatedRequest, res: Response) => {
       logApiRequest(req, { operation: 'validate_record' });
@@ -129,8 +130,23 @@ export function createValidationRouter() {
     '/bulk',
     requirePermission('records:view'),
     [
-      body('recordIds').isArray().withMessage('Record IDs must be an array'),
-      body('types').optional().isArray().withMessage('Types must be an array'),
+      // Each entry starts a synchronous search of the records tree, so the
+      // list is bounded, and its entries are checked: `isArray()` alone said
+      // nothing about what was in it.
+      body('recordIds')
+        .isArray({ min: 1, max: 100 })
+        .withMessage('Record IDs must be an array of 1 to 100 entries'),
+      body('recordIds.*')
+        .isString()
+        .withMessage('Each record ID must be a string')
+        .bail()
+        .isLength({ min: 1, max: 300 })
+        .withMessage('Each record ID must be between 1 and 300 characters'),
+      body('types')
+        .optional()
+        .isArray({ max: 100 })
+        .withMessage('Types must be an array of at most 100 entries'),
+      isName(body('types.*'), 'Each type'),
       body('includeContent')
         .optional()
         .isBoolean()
@@ -197,7 +213,7 @@ export function createValidationRouter() {
     '/status',
     requirePermission('records:view'),
     [
-      query('type').optional().isString().withMessage('Type must be a string'),
+      isName(query('type').optional(), 'Type'),
       query('severity')
         .optional()
         .isIn(['error', 'warning', 'info'])
@@ -268,7 +284,7 @@ export function createValidationRouter() {
         .isString()
         .notEmpty()
         .withMessage('Record ID is required'),
-      query('type').optional().isString().withMessage('Type must be a string'),
+      isName(query('type').optional(), 'Type'),
     ],
     async (req: AuthenticatedRequest, res: Response) => {
       logApiRequest(req, { operation: 'get_record_validation' });

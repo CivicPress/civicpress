@@ -6,6 +6,7 @@
  */
 
 import { promises as fs } from 'fs';
+import { resolveChild } from '../utils/path-containment.js';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import {
@@ -105,11 +106,16 @@ export class GeographyManager {
         !SAFE_SEGMENT.test(request.type ?? '') ||
         !SAFE_SEGMENT.test(request.category ?? '')
       ) {
-        throw new GeographyValidationError('Invalid geography type or category', {
-          valid: false,
-          errors: ['type and category must be bare names matching [a-z0-9-]+'],
-          warnings: [],
-        });
+        throw new GeographyValidationError(
+          'Invalid geography type or category',
+          {
+            valid: false,
+            errors: [
+              'type and category must be bare names matching [a-z0-9-]+',
+            ],
+            warnings: [],
+          }
+        );
       }
 
       // Validate the content
@@ -453,7 +459,13 @@ export class GeographyManager {
       const types = type ? [type] : ['geojson', 'kml', 'gpx', 'shp'];
 
       for (const fileType of types) {
-        const typeDir = path.join(this.geographyDir, fileType);
+        // `type` and `category` are names. The route allowlists both, and that
+        // was the ONLY thing between an anonymous request and this readdir +
+        // readFile: called with `category: '../../x'` this function read
+        // whatever `.md` files it found there. createGeographyFile has guarded
+        // its own since FA-API-003; listing did not.
+        const typeDir = resolveChild(this.geographyDir, fileType);
+        if (!typeDir) continue;
 
         try {
           const typeExists = await fs
@@ -468,7 +480,8 @@ export class GeographyManager {
             : ['zone', 'boundary', 'district', 'facility', 'route'];
 
           for (const cat of categories) {
-            const categoryDir = path.join(typeDir, cat);
+            const categoryDir = resolveChild(typeDir, cat);
+            if (!categoryDir) continue;
 
             try {
               const categoryExists = await fs
@@ -649,15 +662,16 @@ export class GeographyManager {
         };
         parsedContent = parsed;
 
-        if (parsed.type === 'FeatureCollection' && Array.isArray(parsed.features)) {
+        if (
+          parsed.type === 'FeatureCollection' &&
+          Array.isArray(parsed.features)
+        ) {
           featureCount = parsed.features.length;
 
           // Extract geometry types
           geometryTypes = [
             ...new Set(
-              parsed.features
-                .map((f) => f.geometry?.type)
-                .filter(Boolean)
+              parsed.features.map((f) => f.geometry?.type).filter(Boolean)
             ),
           ] as string[];
 
@@ -691,7 +705,9 @@ export class GeographyManager {
   /**
    * Calculate bounding box from features
    */
-  private calculateBounds(features: Array<{ geometry?: { type?: string; coordinates?: unknown } }>): BoundingBox {
+  private calculateBounds(
+    features: Array<{ geometry?: { type?: string; coordinates?: unknown } }>
+  ): BoundingBox {
     let minLon = Infinity;
     let minLat = Infinity;
     let maxLon = -Infinity;
