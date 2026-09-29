@@ -153,23 +153,76 @@ export function getErrorMessage(code: BroadcastBoxErrorCode): string {
 }
 
 /**
- * Infer error code from common error message text (e.g. from device or thrown Error).
+ * The most of a message that inference will read. Far longer than anything a
+ * device sends; short enough that the work below is bounded whatever arrives.
  */
-export function inferErrorCode(message: string): BroadcastBoxErrorCode {
-  const m = message.toLowerCase();
+const MAX_INFERRED_MESSAGE = 2048;
+
+const LINE_BREAK = /[\n\r\u2028\u2029]/;
+
+/**
+ * Does `first` occur in `message`, with `second` later on the same line?
+ *
+ * What `/first.*second/` tested, without the backtracking: that pattern is
+ * quadratic on a message that repeats `first` and never reaches `second`.
+ */
+function inOrder(message: string, first: string, second: string): boolean {
+  if (!message.includes(first) || !message.includes(second)) return false;
+  return message.split(LINE_BREAK).some((line) => {
+    const at = line.indexOf(first);
+    return at !== -1 && line.indexOf(second, at + first.length) !== -1;
+  });
+}
+
+/**
+ * Infer error code from common error message text (e.g. from device or thrown Error).
+ *
+ * The message can come from a DEVICE: an ack that fails without an `errorCode`
+ * has its `error` text classified here, and the only limit on that text was the
+ * 10 MiB WebSocket frame. Five of these tests were `/a.*b/` patterns, which
+ * are quadratic — 1.9 s for 200 KB, measured, run synchronously in the process
+ * that also serves the API. So the message is cut to a bounded length and the
+ * five are substring checks.
+ *
+ * Order matters: the first test that matches wins, so a specific message has
+ * to be tested before the general one that also matches it.
+ */
+export function inferErrorCode(message: unknown): BroadcastBoxErrorCode {
+  // Not every caller has a string: a device frame is not schema-checked, and
+  // `error` in it may be an object.
+  const text =
+    typeof message === 'string'
+      ? message
+      : message instanceof Error
+        ? message.message
+        : String(message ?? '');
+  const m = text.slice(0, MAX_INFERRED_MESSAGE).toLowerCase();
+
   if (/not configured|configure first|stream\.configure/.test(m))
     return BroadcastBoxErrorCode.ERR_STREAMING_NOT_CONFIGURED;
+
+  // Before "already active": that test matches both of these too, which made
+  // their codes unreachable.
+  if (/capture already active|already capturing/.test(m))
+    return BroadcastBoxErrorCode.ERR_CAPTURE_ALREADY_ACTIVE;
+  if (inOrder(m, 'preview', 'already'))
+    return BroadcastBoxErrorCode.ERR_PREVIEW_ALREADY_ACTIVE;
   if (/already active|already in progress|already streaming/.test(m))
     return BroadcastBoxErrorCode.ERR_SESSION_ALREADY_ACTIVE;
-  if (/streaming.*not active|not streaming/.test(m))
+
+  if (inOrder(m, 'streaming', 'not active') || m.includes('not streaming'))
     return BroadcastBoxErrorCode.ERR_STREAMING_NOT_ACTIVE;
   if (/connection failed|connection refused|connection error/.test(m))
     return BroadcastBoxErrorCode.ERR_STREAMING_CONNECTION_FAILED;
-  if (/device not found|device.*not found/.test(m))
+  if (inOrder(m, 'device', 'not found'))
     return BroadcastBoxErrorCode.ERR_DEVICE_NOT_FOUND;
-  if (/source not found|source.*not found/.test(m))
+  if (inOrder(m, 'source', 'not found'))
     return BroadcastBoxErrorCode.ERR_SOURCE_NOT_FOUND;
-  if (/not found/.test(m)) return BroadcastBoxErrorCode.ERR_SOURCE_NOT_FOUND;
+  // Before the bare "not found", which matched it and answered SOURCE.
+  if (m.includes('file not found'))
+    return BroadcastBoxErrorCode.ERR_FILE_NOT_FOUND;
+  if (m.includes('not found'))
+    return BroadcastBoxErrorCode.ERR_SOURCE_NOT_FOUND;
   if (/timeout|timed out/.test(m)) return BroadcastBoxErrorCode.TIMEOUT;
   if (/not connected|disconnected/.test(m))
     return BroadcastBoxErrorCode.DEVICE_NOT_CONNECTED;
@@ -177,25 +230,22 @@ export function inferErrorCode(message: string): BroadcastBoxErrorCode {
     return BroadcastBoxErrorCode.ERR_INVALID_COMMAND;
   if (/required|missing parameter/.test(m))
     return BroadcastBoxErrorCode.ERR_MISSING_PARAMETER;
-  if (/webrtc|offer|answer|ice/.test(m))
+  // Whole words. Unanchored, `ice` matched inside "device" and "service", so
+  // "Device is busy" and "Device is already enrolled" were WebRTC failures.
+  if (/\b(?:webrtc|offer|answer|ice)\b/.test(m))
     return BroadcastBoxErrorCode.ERR_WEBRTC_FAILED;
   if (/storage full|disk full/.test(m))
     return BroadcastBoxErrorCode.ERR_STORAGE_FULL;
-  if (/file not found/.test(m)) return BroadcastBoxErrorCode.ERR_FILE_NOT_FOUND;
   if (/invalid payload|bad payload/.test(m))
     return BroadcastBoxErrorCode.ERR_INVALID_PAYLOAD;
   if (/device busy|device is busy/.test(m))
     return BroadcastBoxErrorCode.ERR_DEVICE_BUSY;
   if (/capture not active|not capturing/.test(m))
     return BroadcastBoxErrorCode.ERR_CAPTURE_NOT_ACTIVE;
-  if (/capture already active|already capturing/.test(m))
-    return BroadcastBoxErrorCode.ERR_CAPTURE_ALREADY_ACTIVE;
   if (/capture failed|capture error/.test(m))
     return BroadcastBoxErrorCode.ERR_CAPTURE_FAILED;
-  if (/invalid.*url|invalid streaming url/.test(m))
+  if (inOrder(m, 'invalid', 'url'))
     return BroadcastBoxErrorCode.ERR_STREAMING_INVALID_URL;
-  if (/preview already active|preview.*already/.test(m))
-    return BroadcastBoxErrorCode.ERR_PREVIEW_ALREADY_ACTIVE;
   if (/storage write|write failed/.test(m))
     return BroadcastBoxErrorCode.ERR_STORAGE_WRITE_FAILED;
   if (/invalid enrollment|enrollment code/.test(m))
