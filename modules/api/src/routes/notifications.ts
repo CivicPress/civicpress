@@ -83,7 +83,9 @@ router.post('/test', async (req, res) => {
           auth: credentials.auth as { user: string; pass: string } | undefined,
           // FA-API-017: validate the SMTP server cert by default. Only an
           // explicit tls block may opt out (e.g. a self-signed test relay).
-          tls: (credentials.tls as { rejectUnauthorized: boolean } | undefined) || {
+          tls: (credentials.tls as
+            | { rejectUnauthorized: boolean }
+            | undefined) || {
             rejectUnauthorized: true,
           },
         },
@@ -111,7 +113,12 @@ router.post('/test', async (req, res) => {
         return true;
       },
       async send(request: {
-        content?: { subject?: string; text?: string; body?: string; html?: string };
+        content?: {
+          subject?: string;
+          text?: string;
+          body?: string;
+          html?: string;
+        };
       }) {
         const subj =
           request?.content?.subject || subject || 'CivicPress Notification';
@@ -158,6 +165,21 @@ router.post('/test', async (req, res) => {
       outcome: result.success ? 'success' : 'failure',
       metadata: { provider: effectiveProvider, to },
     });
+
+    // A send the channel reported as failed is a failure. This used to answer
+    // `{ success: true, data: result }` whatever `result.success` said, so the
+    // settings page showed "Test email sent" for mail that never left — and
+    // `result.errors`, the raw channel errors, went out on the wire, which is
+    // what the catch block below is careful not to do.
+    if (!result.success) {
+      return res.status(500).json({
+        success: false,
+        error: {
+          message: 'Failed to send test email',
+          code: 'NOTIFICATION_SEND_FAILED',
+        },
+      });
+    }
 
     return res.json({ success: true, data: result });
   } catch (error: unknown) {

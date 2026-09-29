@@ -2289,3 +2289,93 @@ Recorded because "the tracker said so" is how each of these survived:
 - The `[ ]` under "Needs a decision" in the 2026-08-12 sweep —
   `roles.yml status_transitions` — is the original text of an entry that was
   fixed the same day and kept for the record. It is not open work.
+
+### Notification configuration sweep
+
+The pass the two config sweeps left undone. Same method — enumerate the declared
+keys, find a reader for each — with one addition that turned out to matter more
+than the method: the file was loaded through the real reader, in the shape an
+instance actually has, and the result was looked at.
+
+- [x] **🔴 No notification could be sent on an instance created by
+      `civic     init`. FIXED 2026-09-29.** Every writer the project owns
+      produces `notifications.yml` in the _field_ shape
+      (`enabled: { value: false, type: 'boolean', … }`): `civic init`, which
+      copies the shipped defaults byte for byte; the config editor;
+      reset-to-defaults; the migration. `NotificationConfig.loadConfig()` cast
+      the parsed file to its typed plain shape without unwrapping it.
+
+      Measured, on the shipped file:
+
+  | Read                         | Got                       | Consequence                                  |
+  | ---------------------------- | ------------------------- | -------------------------------------------- |
+  | `isChannelEnabled('email')`  | the field object (truthy) | a channel switched **off** reads as on       |
+  | `rate_limits.email_per_hour` | the field object          | `limit - count` is `NaN`; `NaN > 0` is false |
+  | `checkRateLimit(['email'])`  | `allowed: false`          | **every send refused** as rate-limited       |
+
+  It made no difference what the operator configured: with email switched on and
+  SMTP details entered, the send was still refused. And because "off" read as
+  on, a forgot-password request **minted a reset token that nothing could
+  deliver**, against the documented rule that a token is minted only when a
+  channel can reach the user.
+
+  The reader now unwraps once, at load (`core/src/config/config-values.ts`), and
+  accepts either shape or a mix. Pinned by tests that load the **shipped** file;
+  against the old reader 10 of 11 fail, including the one that shows the token
+  being minted.
+
+  ⚠️ **This is the fixture lesson a third time, and the costliest.** Every
+  notification test loads `tests/fixtures/notifications.yml`, which is written
+  in the plain shape — a shape no tool in the project produces. The suite
+  certified a feature that did not work on any instance. The rate-limit tests
+  additionally mock `checkRateLimit`, so nothing pinned the path from a number
+  in the file to a decision.
+
+- [x] **A failed test email was reported as sent. FIXED 2026-09-29.**
+      `POST     /api/v1/notifications/test` answered
+      `{ success: true, data: result }` whatever `result.success` said, so the
+      settings page showed "Test email sent" for mail that never left, and the
+      raw channel errors went out in `data.errors`. Now a `500` with the generic
+      message.
+
+- [ ] **Settings that are written, documented, and read by nothing (needs a
+      decision).** Each was checked by searching every spelling repo-wide and
+      reading what came back. "Implement or remove" is the same call as in the
+      two earlier sweeps, so none was changed.
+
+  | Setting                                      | An operator would believe                     | What happens                                                                        |
+  | -------------------------------------------- | --------------------------------------------- | ----------------------------------------------------------------------------------- |
+  | `security.filter_pii`                        | personal data is filtered                     | nothing is filtered; `sanitizeContent()` has no caller                              |
+  | `security.encrypt_sensitive_data`            | credentials or payloads are encrypted         | nothing is encrypted; `encryptSensitiveData()` has no caller                        |
+  | `security.audit_all_notifications`           | it switches auditing on                       | auditing is unconditional                                                           |
+  | `rules.retry_attempts`, `rules.retry_delay`  | a failed send is retried 3 times              | nothing retries; the queue is constructed and never used                            |
+  | `auth_templates.*` (four templates)          | editing the subject or body changes the email | the text is hard-coded at the call site                                             |
+  | `auth_templates.two_factor_auth`             | a verification-code email exists              | there is no two-factor feature                                                      |
+  | `auth_templates.security_alert`              | the account owner is emailed                  | no email path; an operator-inbox row is written                                     |
+  | `channels.email.provider`                    | it selects the provider                       | real mail always uses the `smtp` block; the setting is consulted by test sends only |
+  | `channels.email.ses.*`                       | AWS SES is supported                          | there is no SES transport                                                           |
+  | `channels.email.replyTo`                     | replies go to that address                    | never passed to the mailer                                                          |
+  | `channels.email.sendgrid.sandboxMode`        | test sends do not deliver                     | no reader                                                                           |
+  | `SMTP_*`, `SENDGRID_*`, `AWS_SES_*` env vars | the "preferred" way to supply credentials     | no code reads any of them; `docs/notifications.md` recommends them                  |
+
+  ⚠️ The ones that misstate a protection are `security.*`, `two_factor_auth` and
+  `security_alert`. `provider` is the one that misleads in practice: with
+  `provider: sendgrid` and an untouched `smtp` block, a test email succeeds
+  through SendGrid while real mail goes to `localhost:587`.
+
+  `channels.sms.*` and `channels.slack.*` are not findings: they do nothing, and
+  `docs/project-status.md` and the notifications spec say so.
+
+#### Checked and NOT findings
+
+Recorded so they are not re-investigated:
+
+- The limiter looks up `<channel>_per_hour`, which matches the key names in the
+  file, and it is consulted on the send path. It was the **shape** that broke
+  it, not the wiring.
+- `channels.email.smtp.*`, including `tls.rejectUnauthorized`, is read and
+  unwrapped correctly by the production wiring.
+- No public or non-admin route serves the notification configuration. The three
+  that return it are behind `config:manage` plus `system:admin`, and
+  configuration export excludes it.
+- Notification audit rows carry no recipient and no template data.
