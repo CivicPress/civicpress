@@ -6,7 +6,7 @@
  */
 
 import * as fs from 'fs';
-import matter from 'gray-matter';
+import { parseFrontmatter } from '../frontmatter.js';
 import type {
   Template,
   ValidationResult,
@@ -34,7 +34,7 @@ export class TemplateRecordValidator {
 
     const recordFileContent = fs.readFileSync(recordPath, 'utf8');
     const { data: recordFrontmatter, content: recordContent } =
-      matter(recordFileContent);
+      parseFrontmatter(recordFileContent);
 
     // Required fields
     for (const field of template.validation.required_fields || []) {
@@ -132,7 +132,10 @@ export class TemplateRecordValidator {
 
   // ----- rule helpers -----
 
-  private validateBusinessRule(_rule: string, _frontmatter: Record<string, unknown>): boolean {
+  private validateBusinessRule(
+    _rule: string,
+    _frontmatter: Record<string, unknown>
+  ): boolean {
     // Placeholder — in a real implementation, more sophisticated parsing.
     return true;
   }
@@ -141,7 +144,10 @@ export class TemplateRecordValidator {
     rule: AdvancedValidationRule,
     frontmatter: Record<string, unknown>
   ): { valid: boolean } {
-    if (rule.condition && !this.evaluateCondition(rule.condition, frontmatter)) {
+    if (
+      rule.condition &&
+      !this.evaluateCondition(rule.condition, frontmatter)
+    ) {
       return { valid: true };
     }
 

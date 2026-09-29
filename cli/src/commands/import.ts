@@ -3,7 +3,7 @@ import { CAC } from 'cac';
 import { readFile, writeFile, mkdir } from 'fs/promises';
 import { join, dirname } from 'path';
 import * as fs from 'fs';
-import matter from 'gray-matter';
+import { parseFrontmatter, stringifyFrontmatter } from '@civicpress/core';
 import { glob } from 'glob';
 import { userCan } from '@civicpress/core';
 import { withCli } from '../utils/with-cli.js';
@@ -331,7 +331,8 @@ function parseMarkdownImport(
   options: ImportOptions
 ): ImportRecord[] {
   // For markdown, we expect a single record per file
-  const { data: metadata, content: markdownContent } = matter(content);
+  const { data: metadata, content: markdownContent } =
+    parseFrontmatter(content);
 
   const record: ImportRecord = {
     type: metadata.type || options.type || 'document',
@@ -445,7 +446,7 @@ async function performImport(
       };
 
       // Create markdown content with frontmatter
-      const content = matter.stringify(record.content || '', metadata);
+      const content = stringifyFrontmatter(record.content || '', metadata);
       await writeFile(fullPath, content);
 
       logger.success(`✅ Imported: ${path}`);

@@ -22,7 +22,7 @@ import {
   buildRecordRelativePath,
   ensureDirectoryForRecordPath,
 } from '../utils/record-paths.js';
-import matter from 'gray-matter';
+import { parseFrontmatter } from '../utils/frontmatter.js';
 import { RecordValidationError } from '../errors/domain-errors.js';
 import { resolveDocumentNumber } from '../records/document-numbering.js';
 
@@ -282,7 +282,7 @@ class CreateFileStep extends BaseSagaStep<CreateRecordContext, string> {
       const content = this.createMarkdownContent(normalizedRecord);
 
       // Validate schema
-      const { data: frontmatter } = matter(content);
+      const { data: frontmatter } = parseFrontmatter(content);
       const normalizedFrontmatter =
         this.normalizeFrontmatterForValidation(frontmatter);
 

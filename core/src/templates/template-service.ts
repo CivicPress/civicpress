@@ -16,7 +16,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import matter from 'gray-matter';
+import { parseFrontmatter } from '../utils/frontmatter.js';
 import yaml from 'yaml';
 import { TemplateEngine } from '../utils/template-engine.js';
 import { TemplateCacheAdapter } from './template-cache-adapter.js';
@@ -193,7 +193,7 @@ export class TemplateService implements ITemplateService {
 
     // Extract description from frontmatter
     try {
-      const { data: frontmatter } = matter(template.rawContent);
+      const { data: frontmatter } = parseFrontmatter(template.rawContent);
       if (frontmatter.description) {
         response.description = frontmatter.description;
       }
@@ -359,7 +359,7 @@ export class TemplateService implements ITemplateService {
     // Load existing template
     const existingContent = await fs.promises.readFile(templatePath, 'utf8');
     const { data: frontmatter, content: markdownContent } =
-      matter(existingContent);
+      parseFrontmatter(existingContent);
 
     // Update fields
     if (data.description !== undefined)

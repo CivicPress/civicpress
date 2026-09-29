@@ -12,7 +12,7 @@
  * @module geography/geography-parser
  */
 
-import matter from 'gray-matter';
+import { parseFrontmatter } from '../utils/frontmatter.js';
 import { stringify } from 'yaml';
 import {
   GeographyFile,
@@ -38,7 +38,8 @@ export class GeographyParser {
    */
   static parseFromMarkdown(content: string, filePath?: string): GeographyFile {
     try {
-      const { data: frontmatter, content: markdownContent } = matter(content);
+      const { data: frontmatter, content: markdownContent } =
+        parseFrontmatter(content);
 
       if (!frontmatter || typeof frontmatter !== 'object') {
         throw new Error('Invalid or missing frontmatter');
