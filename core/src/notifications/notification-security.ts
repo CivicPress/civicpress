@@ -40,20 +40,22 @@ export class NotificationSecurity {
       errors.push('Data object is required');
     }
 
-    // Check for suspicious patterns
-    const dataString = JSON.stringify(request.data);
-    if (this.containsSuspiciousPatterns(dataString)) {
-      warnings.push('Request contains potentially suspicious patterns');
-    }
+    // `JSON.stringify(undefined)` is undefined, not a string: a request with
+    // no data used to throw at `.length` below instead of being refused.
+    const dataString = JSON.stringify(request.data) ?? '';
 
     // Check rate limits (basic validation)
     if (Array.isArray(request.channels) && request.channels.length > 10) {
       errors.push('Too many channels specified (max 10)');
     }
 
-    // Check content length
+    // Check content length — BEFORE anything reads the content. The scan
+    // below is quadratic in the worst case, and it used to run first, on data
+    // of any size.
     if (dataString.length > 10000) {
       errors.push('Request data too large (max 10KB)');
+    } else if (this.containsSuspiciousPatterns(dataString)) {
+      warnings.push('Request contains potentially suspicious patterns');
     }
 
     return {

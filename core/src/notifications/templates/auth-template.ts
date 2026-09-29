@@ -4,6 +4,19 @@ import {
   ProcessedTemplate,
 } from '../notification-template.js';
 
+const HTML_ENTITIES: Record<string, string> = {
+  '&': '&amp;',
+  '<': '&lt;',
+  '>': '&gt;',
+  '"': '&quot;',
+  "'": '&#39;',
+};
+
+/** `text` as it must be written to appear, unchanged, in an HTML document. */
+function escapeHtml(text: string): string {
+  return text.replace(/[&<>"']/g, (character) => HTML_ENTITIES[character]);
+}
+
 export class AuthTemplate extends NotificationTemplate {
   private subjectTemplate?: string;
 
@@ -31,27 +44,40 @@ export class AuthTemplate extends NotificationTemplate {
       );
     }
 
-    // Process the template
+    // The message, as text.
     const processedBody = this.replaceVariables(this.template, data);
-
-    // Create HTML version if needed
-    const htmlBody = this.createHtmlVersion(processedBody, data);
 
     return {
       subject: this.subjectTemplate
         ? this.replaceVariables(this.subjectTemplate, data)
         : undefined,
       body: processedBody,
-      html: htmlBody,
-      text: this.htmlToText(htmlBody),
+      html: this.createHtmlVersion(processedBody),
+      // The text part IS the message. It used to be derived from the HTML
+      // part by deleting the tags, which left the contents of <title> and
+      // <style> at the top of every email and, with each <br> gone, ran the
+      // link into the sentence after it.
+      text: processedBody,
     };
   }
 
   /**
-   * Create HTML version of the template
+   * The message as an HTML document.
+   *
+   * `body` is TEXT — a template with its values filled in — so it is encoded
+   * on the way into the markup. It used to be dropped in as written, and the
+   * values are not the application's: the password-reset email carries the
+   * account's username, which registration accepts from anyone. A username of
+   * `<a href="https://…">sign in here</a>`, registered against someone else's
+   * address, arrived in that person's inbox as a link, in an email from the
+   * municipality.
+   *
+   * The assembled document also went through variable replacement a second
+   * time, so a value containing `{{reset_url}}` was expanded — and one
+   * containing any other `{{…}}` threw, and no email was sent at all.
    */
-  private createHtmlVersion(body: string, data: TemplateData): string {
-    const htmlTemplate = `
+  private createHtmlVersion(body: string): string {
+    return `
       <!DOCTYPE html>
       <html>
       <head>
@@ -74,7 +100,7 @@ export class AuthTemplate extends NotificationTemplate {
             <h2>CivicPress</h2>
           </div>
           <div class="content">
-            ${body.replace(/\n/g, '<br>')}
+            ${escapeHtml(body).replace(/\n/g, '<br>')}
           </div>
           <div class="footer">
             <p>This is an automated message from CivicPress. Please do not reply to this email.</p>
@@ -83,7 +109,5 @@ export class AuthTemplate extends NotificationTemplate {
       </body>
       </html>
     `;
-
-    return this.replaceVariables(htmlTemplate, data);
   }
 }
