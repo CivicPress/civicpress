@@ -394,7 +394,11 @@ export class TemplateRecordValidator {
     condition: string,
     variables: Record<string, unknown>
   ): boolean {
-    const parts = condition.trim().split(/\s*(==|!=)\s*/);
+    // Split on the operator, then trim — see generator.ts.
+    const parts = condition
+      .trim()
+      .split(/(==|!=)/)
+      .map((part) => part.trim());
 
     if (parts.length === 1) {
       const field = parts[0].replace(/^!/, '');
