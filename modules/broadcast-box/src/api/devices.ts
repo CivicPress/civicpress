@@ -29,22 +29,9 @@ import type {
   DeviceStatus,
 } from '../types/index.js';
 import { BroadcastBoxErrorCode } from '../types/errors.js';
+import { clientIp } from '../utils/client-ip.js';
 
-// Helper to get client IP
-function getClientIp(req: Request): string {
-  const forwarded = req.headers['x-forwarded-for'];
-  if (forwarded) {
-    const ips = Array.isArray(forwarded)
-      ? forwarded[0]
-      : forwarded.split(',')[0];
-    return ips.trim();
-  }
-  const realIp = req.headers['x-real-ip'];
-  if (realIp) {
-    return Array.isArray(realIp) ? realIp[0] : realIp;
-  }
-  return req.socket.remoteAddress || 'unknown';
-}
+const getClientIp = clientIp;
 
 export function createDevicesRouter(
   deviceManager: DeviceManager,
