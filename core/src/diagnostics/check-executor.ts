@@ -14,6 +14,7 @@ import { errorMessage, errorStack, errorCode } from '../utils/error-narrow.js';
 import { DiagnosticCircuitBreaker } from './circuit-breaker.js';
 import { ResourceMonitor } from './resource-monitor.js';
 import { Logger } from '../utils/logger.js';
+import { boundedTimeout, withDeadline } from './timeout.js';
 
 export interface CheckExecutorOptions {
   maxConcurrency?: number; // Default: 5
@@ -104,7 +105,10 @@ export class CheckExecutor {
     options?: DiagnosticOptions
   ): Promise<CheckResult> {
     const startTime = Date.now();
-    const timeout = checker.timeout || options?.timeout || this.defaultTimeout;
+    const timeout = boundedTimeout(
+      checker.timeout || options?.timeout,
+      this.defaultTimeout
+    );
     const checkName = `${checker.component}:${checker.name}`;
 
     try {
@@ -123,10 +127,9 @@ export class CheckExecutor {
         );
       } else {
         // Execute with timeout
-        result = await Promise.race([
-          checker.check(options),
-          this.createTimeout(timeout, checkName),
-        ]);
+        result = await withDeadline(checker.check(options), timeout, () =>
+          this.timeoutError(timeout, checkName)
+        );
       }
 
       // Add duration
@@ -143,7 +146,8 @@ export class CheckExecutor {
 
       // Determine if it's a timeout
       const isTimeout =
-        errorCode(error) === 'CHECK_TIMEOUT' || errorMessage(error)?.includes('timed out');
+        errorCode(error) === 'CHECK_TIMEOUT' ||
+        errorMessage(error)?.includes('timed out');
 
       const result: CheckResult = {
         name: checker.name,
@@ -173,17 +177,12 @@ export class CheckExecutor {
   }
 
   /**
-   * Create a timeout promise
+   * What a check that overran its deadline is rejected with
    */
-  private createTimeout(ms: number, checkName: string): Promise<never> {
-    return new Promise((_, reject) => {
-      setTimeout(() => {
-        const error: Error & { code: string } = Object.assign(
-          new Error(`Check ${checkName} timed out after ${ms}ms`),
-          { code: 'CHECK_TIMEOUT' as const }
-        );
-        reject(error);
-      }, ms);
-    });
+  private timeoutError(ms: number, checkName: string): Error {
+    return Object.assign(
+      new Error(`Check ${checkName} timed out after ${ms}ms`),
+      { code: 'CHECK_TIMEOUT' as const }
+    );
   }
 }

@@ -2,11 +2,11 @@ import {
   defaultMarkdownSerializer,
   MarkdownSerializer,
   MarkdownSerializerState,
-} from 'prosemirror-markdown'
-import type { Node as ProseMirrorNode } from 'prosemirror-model'
-import { editorSchema, isCellAlign } from './schema.js'
-import type { CellAlign } from './schema.js'
-import type { CivicRefAttrs } from './civic-ref-nodes.js'
+} from 'prosemirror-markdown';
+import type { Node as ProseMirrorNode } from 'prosemirror-model';
+import { editorSchema, isCellAlign } from './schema.js';
+import type { CellAlign } from './schema.js';
+import type { CivicRefAttrs } from './civic-ref-nodes.js';
 
 /**
  * Escape an attribute value so it can't break out of the HTML-comment civic-ref
@@ -14,18 +14,18 @@ import type { CivicRefAttrs } from './civic-ref-nodes.js'
  * comment. Both are encoded with HTML entities the parser reverses on read.
  */
 const escapeAttr = (s: string): string =>
-  s.replace(/"/g, '&quot;').replace(/--/g, '&#45;&#45;')
+  s.replace(/"/g, '&quot;').replace(/--/g, '&#45;&#45;');
 
 /** Serialize the `civicRef` inline atom as its human-readable HTML comment. */
 const serializeCivicRef = (
   state: MarkdownSerializerState,
-  node: ProseMirrorNode,
+  node: ProseMirrorNode
 ): void => {
-  const { refType, id, label } = node.attrs as CivicRefAttrs
+  const { refType, id, label } = node.attrs as CivicRefAttrs;
   state.write(
-    `<!--civic-ref type="${escapeAttr(refType)}" id="${escapeAttr(id)}" label="${escapeAttr(label)}"-->`,
-  )
-}
+    `<!--civic-ref type="${escapeAttr(refType)}" id="${escapeAttr(id)}" label="${escapeAttr(label)}"-->`
+  );
+};
 
 /**
  * GFM delimiter-row glyph for a column alignment. The 3-char minimum forms are
@@ -35,15 +35,15 @@ const serializeCivicRef = (
 const alignDelimiter = (align: CellAlign): string => {
   switch (align) {
     case 'left':
-      return ':--'
+      return ':--';
     case 'center':
-      return ':-:'
+      return ':-:';
     case 'right':
-      return '--:'
+      return '--:';
     default:
-      return '---'
+      return '---';
   }
-}
+};
 
 /**
  * Dedicated serializer for the inline content of a single table cell.
@@ -62,27 +62,37 @@ const cellInlineSerializer = new MarkdownSerializer(
     ...defaultMarkdownSerializer.nodes,
     civicRef: serializeCivicRef,
     paragraph(state, node) {
-      state.renderInline(node)
+      state.renderInline(node);
     },
     hard_break(state) {
-      state.write('<br>')
+      state.write('<br>');
     },
   },
-  defaultMarkdownSerializer.marks,
-)
+  defaultMarkdownSerializer.marks
+);
 
 /**
  * Render one table cell to a single GFM-cell string: its inline Markdown with
- * any newline collapsed to a space (multi-paragraph cells, soft breaks) and
+ * any line break collapsed to a space (multi-paragraph cells, soft breaks) and
  * literal pipes backslash-escaped so they don't split the row.
+ *
+ * A carriage return is a line break too. Only `\n` was collapsed, so cell text
+ * containing a bare `\r` kept it, and what was written as one row was read
+ * back as a table, then whatever followed the break — a heading, a paragraph.
+ *
+ * Backslashes are deliberately NOT escaped, though a static analyser will say
+ * they should be. `inline` is already-serialized Markdown, in which a
+ * backslash means something; and markdown-it reads `\|` by removing exactly
+ * that backslash — the precise inverse of the replacement below. Doubling
+ * them would corrupt every escape the serializer has just written.
  */
 const renderCell = (cell: ProseMirrorNode): string => {
-  const inline = cellInlineSerializer.serialize(cell, { tightLists: true })
+  const inline = cellInlineSerializer.serialize(cell, { tightLists: true });
   return inline
-    .replace(/\n+/g, ' ')
+    .replace(/[\r\n]+/g, ' ')
     .trim()
-    .replace(/\|/g, '\\|')
-}
+    .replace(/\|/g, '\\|');
+};
 
 /**
  * Serialize a `table` node to a GFM pipe table:
@@ -99,40 +109,40 @@ const renderCell = (cell: ProseMirrorNode): string => {
  */
 const serializeTable = (
   state: MarkdownSerializerState,
-  node: ProseMirrorNode,
+  node: ProseMirrorNode
 ): void => {
-  const rows: string[][] = []
-  const aligns: CellAlign[] = []
+  const rows: string[][] = [];
+  const aligns: CellAlign[] = [];
   node.forEach((row, _rowOffset, rowIndex) => {
-    const cells: string[] = []
+    const cells: string[] = [];
     row.forEach((cell, _cellOffset, colIndex) => {
-      cells.push(renderCell(cell))
+      cells.push(renderCell(cell));
       if (rowIndex === 0) {
-        const a = cell.attrs.align
-        aligns[colIndex] = isCellAlign(a) ? a : null
+        const a = cell.attrs.align;
+        aligns[colIndex] = isCellAlign(a) ? a : null;
       }
-    })
-    rows.push(cells)
-  })
+    });
+    rows.push(cells);
+  });
 
-  if (rows.length === 0) return
+  if (rows.length === 0) return;
 
-  const renderRow = (cells: string[]): string => `| ${cells.join(' | ')} |`
-  const lines: string[] = []
-  lines.push(renderRow(rows[0]))
+  const renderRow = (cells: string[]): string => `| ${cells.join(' | ')} |`;
+  const lines: string[] = [];
+  lines.push(renderRow(rows[0]));
   lines.push(
-    `| ${rows[0].map((_, i) => alignDelimiter(aligns[i] ?? null)).join(' | ')} |`,
-  )
-  for (let i = 1; i < rows.length; i++) lines.push(renderRow(rows[i]))
+    `| ${rows[0].map((_, i) => alignDelimiter(aligns[i] ?? null)).join(' | ')} |`
+  );
+  for (let i = 1; i < rows.length; i++) lines.push(renderRow(rows[i]));
 
   // Emit via `state.text(..., false)` (escape off — the GFM pipe/delimiter
   // syntax and the already-pipe-escaped cells must not be re-escaped). `text`
   // calls `write` per line, which prepends the active block delimiter (e.g. a
   // blockquote's `> `) to every continuation line; a single multi-line `write`
   // would only prefix the first line.
-  state.text(lines.join('\n'), false)
-  state.closeBlock(node)
-}
+  state.text(lines.join('\n'), false);
+  state.closeBlock(node);
+};
 
 /**
  * Markdown serializer for CivicPress editor schema.
@@ -152,15 +162,15 @@ export const civicMarkdownSerializer = new MarkdownSerializer(
     table_cell() {},
     table_header() {},
   },
-  defaultMarkdownSerializer.marks,
-)
+  defaultMarkdownSerializer.marks
+);
 
 /**
  * Serialize a ProseMirror document (built against `editorSchema`) to Markdown.
  */
 export function serializeDocToMarkdown(doc: ProseMirrorNode): string {
-  return civicMarkdownSerializer.serialize(doc)
+  return civicMarkdownSerializer.serialize(doc);
 }
 
 // Re-export for tests that want the schema reference.
-export { editorSchema }
+export { editorSchema };

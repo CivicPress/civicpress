@@ -213,6 +213,12 @@ export class GitEngine {
    */
   async getDiff(commitHash: string): Promise<string> {
     try {
+      // Git reads an argument that begins with `-` as an option, and
+      // `--output=<path>` makes `diff` write to a file. Nothing passes this a
+      // caller's text today; it should not depend on that.
+      if (typeof commitHash !== 'string' || !/^[A-Za-z0-9]/.test(commitHash)) {
+        throw new Error('not a commit reference');
+      }
       const git = this.getGit();
       const diff = await git.diff([commitHash]);
       return diff;

@@ -5,7 +5,13 @@
  */
 
 import type { Logger, HookSystem } from '@civicpress/core';
-import { coreInfo, coreWarn, coreError } from '@civicpress/core';
+import {
+  coreInfo,
+  coreWarn,
+  coreError,
+  resolveChild,
+  resolveInside,
+} from '@civicpress/core';
 import * as fs from 'fs/promises';
 import { createReadStream } from 'fs';
 import * as path from 'path';
@@ -78,6 +84,31 @@ export class UploadProcessor {
    * (config/hook overwrite → plausible RCE). Only a plain basename is
    * accepted; anything else fails the upload up front.
    */
+  /**
+   * `<uploadsDir>/<uploadId>` — the directory of ONE upload.
+   *
+   * The id reaches here validated as a UUID by the route and matched to a row
+   * the device owns, so this cannot fail in practice. It is here because the
+   * last call in this file that uses the directory is a recursive delete, and
+   * that should not rest on a check made somewhere else.
+   */
+  private uploadDirFor(uploadId: string): string {
+    const dir = resolveChild(this.uploadsDir, uploadId);
+    if (!dir) {
+      throw new Error('Invalid upload id');
+    }
+    return dir;
+  }
+
+  /** `name` inside `uploadDir`, where `name` is a chunk or the final file. */
+  private fileIn(uploadDir: string, name: string): string {
+    const file = resolveInside(uploadDir, name);
+    if (!file || path.dirname(file) !== uploadDir) {
+      throw new Error('Invalid fileName: must be a plain file name');
+    }
+    return file;
+  }
+
   private assertSafeFileName(fileName: string): void {
     if (
       typeof fileName !== 'string' ||
@@ -131,21 +162,24 @@ export class UploadProcessor {
     // create uploads for a session it owns. A missing session resolves to no
     // device and so also fails closed. We don't distinguish "not found" from
     // "not yours", to avoid leaking which sessions exist.
-    if (expectedDeviceId !== undefined && sessionDeviceId !== expectedDeviceId) {
+    if (
+      expectedDeviceId !== undefined &&
+      sessionDeviceId !== expectedDeviceId
+    ) {
       throw new Error(
         `Forbidden: device does not own session ${request.sessionId}`
       );
     }
 
     // Create upload directory for chunks
-    const uploadDir = path.join(this.uploadsDir, uploadId);
+    const uploadDir = this.uploadDirFor(uploadId);
     await fs.mkdir(uploadDir, { recursive: true });
 
     const upload: Omit<UploadJob, 'createdAt' | 'updatedAt'> = {
       id: uploadId,
       sessionId: request.sessionId,
       deviceId: sessionDeviceId,
-      filePath: path.join(uploadDir, request.fileName),
+      filePath: this.fileIn(uploadDir, request.fileName),
       fileName: request.fileName,
       fileSize: declaredSize,
       fileHash: request.fileHash,
@@ -181,7 +215,10 @@ export class UploadProcessor {
     }
 
     // Authorization: a device may only upload chunks to its own upload job.
-    if (expectedDeviceId !== undefined && upload.deviceId !== expectedDeviceId) {
+    if (
+      expectedDeviceId !== undefined &&
+      upload.deviceId !== expectedDeviceId
+    ) {
       throw new Error(`Forbidden: device does not own upload ${uploadId}`);
     }
 
@@ -203,12 +240,12 @@ export class UploadProcessor {
     // already on disk (excluding a chunk being re-sent under the same number,
     // which overwrites) and reject when this chunk would exceed it — without
     // this, a device could stream unlimited chunks regardless of fileSize.
-    const uploadDir = path.join(this.uploadsDir, uploadId);
+    const uploadDir = this.uploadDirFor(uploadId);
     const chunkName = `chunk-${chunkNumber}`;
     let bytesOnDisk = 0;
     for (const f of await fs.readdir(uploadDir)) {
       if (f.startsWith('chunk-') && f !== chunkName) {
-        bytesOnDisk += (await fs.stat(path.join(uploadDir, f))).size;
+        bytesOnDisk += (await fs.stat(this.fileIn(uploadDir, f))).size;
       }
     }
     if (bytesOnDisk + chunk.length > upload.fileSize) {
@@ -231,7 +268,7 @@ export class UploadProcessor {
     }
 
     // Write chunk to temporary file
-    const chunkPath = path.join(uploadDir, chunkName);
+    const chunkPath = this.fileIn(uploadDir, chunkName);
     await fs.writeFile(chunkPath, chunk);
 
     // Calculate progress (approximate, based on chunks received)
@@ -263,7 +300,10 @@ export class UploadProcessor {
     }
 
     // Authorization: a device may only finalize its own upload job.
-    if (expectedDeviceId !== undefined && upload.deviceId !== expectedDeviceId) {
+    if (
+      expectedDeviceId !== undefined &&
+      upload.deviceId !== expectedDeviceId
+    ) {
       throw new Error(`Forbidden: device does not own upload ${uploadId}`);
     }
 
@@ -280,7 +320,7 @@ export class UploadProcessor {
 
     try {
       // Combine chunks
-      const uploadDir = path.join(this.uploadsDir, uploadId);
+      const uploadDir = this.uploadDirFor(uploadId);
       const chunkFiles = await fs.readdir(uploadDir);
       const chunkPaths = chunkFiles
         .filter((f) => f.startsWith('chunk-'))
@@ -290,7 +330,9 @@ export class UploadProcessor {
           return numA - numB;
         });
 
-      const combinedPath = path.join(uploadDir, upload.fileName);
+      // The name comes back from the database here, checked when the row was
+      // written. `fileIn` checks it where it is used.
+      const combinedPath = this.fileIn(uploadDir, upload.fileName);
       // FA-BB-012: the 'w' handle opened here was previously never used (the
       // loop re-opened the file via fs.appendFile) and never closed — a leaked
       // FileHandle on every finalize. Write the chunks THROUGH this handle
@@ -298,7 +340,7 @@ export class UploadProcessor {
       const fileHandle = await fs.open(combinedPath, 'w');
       try {
         for (const chunkFile of chunkPaths) {
-          const chunkPath = path.join(uploadDir, chunkFile);
+          const chunkPath = this.fileIn(uploadDir, chunkFile);
           const chunkData = await fs.readFile(chunkPath);
           await fileHandle.write(chunkData);
         }
@@ -439,7 +481,7 @@ export class UploadProcessor {
    */
   private async cleanupUpload(uploadId: string): Promise<void> {
     try {
-      const uploadDir = path.join(this.uploadsDir, uploadId);
+      const uploadDir = this.uploadDirFor(uploadId);
       await fs.rm(uploadDir, { recursive: true, force: true });
     } catch (error) {
       coreWarn('Failed to cleanup upload directory', {

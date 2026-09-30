@@ -45,13 +45,22 @@ export function parseSearchQuery(query: string): ParsedQuery {
     cleanedQuery = cleanedQuery.replace(match[0], ' ');
   }
 
-  // Check for explicit OR operator
-  const hasExplicitOR = /\s+(OR|or)\s+/.test(cleanedQuery);
-  const hasExplicitAND = /\s+(AND|and)\s+/.test(cleanedQuery);
+  // Check for explicit OR operator.
+  //
+  // One `\s` on each side, not `\s+`: an operator has whitespace around it
+  // whether the pattern asks for one character or many, and `\s+` is what made
+  // these quadratic in a long run of spaces. The route caps `q` at 512
+  // characters, so that was bounded — but this function is exported, and the
+  // next caller may not be.
+  const hasExplicitOR = /\s(?:OR|or)\s/.test(cleanedQuery);
+  const hasExplicitAND = /\s(?:AND|and)\s/.test(cleanedQuery);
 
-  // Remove AND/OR operators from cleaned query for word extraction
+  // Remove AND/OR operators from cleaned query for word extraction. The
+  // lookbehind makes a match begin at the START of a run of whitespace, which
+  // is where the leftmost match began anyway; it stops the engine retrying
+  // from every position inside the run.
   const operatorFreeQuery = cleanedQuery
-    .replace(/\s+(OR|or|AND|and)\s+/gi, ' ')
+    .replace(/(?<!\s)\s+(?:OR|or|AND|and)\s+/gi, ' ')
     .trim();
 
   // Extract words (excluding phrases and operators)
