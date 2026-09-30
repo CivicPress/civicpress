@@ -362,6 +362,20 @@ database guarantee rather than a convention.
   machine that wrote it, so the suite was green there and red on a clean clone
   the moment the tree moved. The alias now resolves through `modules/ui` like
   its neighbours.
+- **Manifests declare what actually runs.** Seventeen `package.json` lines named
+  a version the root overrides do not install — `multer` 1.4.5 in three packages
+  while 2.4.0 runs, `tar` ^6 while 7.5.21 runs, `vitest` 3.2.4 vs 3.2.6, and
+  patch-level drift on `happy-dom`, `ajv`, `diff`, `uuid`. Each now names the
+  version that resolves, and `@types/multer` follows multer to 2.x. `yaml` is
+  the one whose running version moved: four packages declare `^2.9.0`, but the
+  July override had pinned `yaml@2` to 2.8.3 — below the declared range, and a
+  downgrade, since 2.9.0 predates the pin and was never in the advisory's range.
+  The override is now 2.9.1.
+- **The pre-commit hook lints `.mjs` and `.cjs` files.** The lint-staged pattern
+  named `ts,tsx,js,jsx,vue`, so those files got neither Prettier nor ESLint at
+  commit time — which is how the hard-coded store path above got in. The 25 such
+  files that had never been formatted are formatted once, in a commit of their
+  own, so the hook does not do it piecemeal inside unrelated changes.
 
 ## [0.3.1] - 2026-08-06
 
