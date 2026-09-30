@@ -91,6 +91,15 @@ through these. What leaked was existence.
 | `js/resource-exhaustion` `check-executor.ts:186`, `circuit-breaker.ts:218` (#189, #190) | Defence in depth — admin-only and route-validated, but the timer was never cleared and the clamp lived only in the route                                  | Timer cleared; capped in core |
 | `js/missing-rate-limiting` `broadcast-box/src/api/index.ts:282` (#192)                  | False positive — the sink is the device-token middleware; the application-level limiter runs before it, in another package, which the analyser cannot see | Dismiss                       |
 
+⚠️ **The shape of a bound matters to the analyser.** The first version of the
+cap above was `Math.min(requested, MAX)`, and the pull request's own scan
+re-raised the alert against it (#276): `js/resource-exhaustion` traces taint
+straight through `Math.min` and recognises only a relational guard —
+`if (requested > MAX) return MAX` — as an upper bound. Likewise
+`js/incomplete-sanitization` reads a single-occurrence `.replace('&', …)` in a
+_test's expected string_ as a sanitizer (#275). Both are written the way the
+queries expect now; when a later change trips one of these, this is why.
+
 ## What was beside the alerts
 
 Found while establishing whether an alert was right. None is an alert. Each is
