@@ -40,7 +40,7 @@
     "helmet": "^7.2.0",
     "js-yaml": "4.3.2",
     "morgan": "^1.10.1",
-    "multer": "1.4.5-lts.2",
+    "multer": "2.4.0",
     "simple-git": "^3.36.0",
     "swagger-ui-express": "5.0.1",
     "yaml": "^2.9.0"
@@ -52,7 +52,7 @@
     "@types/express-serve-static-core": "^4.19.8",
     "@types/js-yaml": "4.0.9",
     "@types/morgan": "^1.9.10",
-    "@types/multer": "^1.4.13",
+    "@types/multer": "^2.3.0",
     "@types/node": "^20.19.41",
     "@types/supertest": "^6.0.3",
     "@typescript-eslint/eslint-plugin": "^8.59.3",

@@ -72,7 +72,7 @@
     "@types/bcrypt": "5.0.2",
     "@vitejs/plugin-vue": "6.0.3",
     "@vitest/coverage-v8": "3.2.4",
-    "@vitest/ui": "3.2.4",
+    "@vitest/ui": "3.2.6",
     "@vue/test-utils": "2.4.6",
     "bcrypt": "6.0.0",
     "change-case": "5.4.4",
@@ -91,10 +91,10 @@
     "prettier": "^3.8.3",
     "simple-git": "^3.36.0",
     "supertest": "6.3.4",
-    "vitest": "3.2.4",
+    "vitest": "3.2.6",
     "vue": "^3.5.34",
     "ws": "^8.18.0",
-    "yaml": "2.8.1"
+    "yaml": "2.9.1"
   },
   "lint-staged": {
     "*.{ts,tsx,js,jsx,vue}": [
@@ -145,7 +145,7 @@
       "undici@7": "7.29.1",
       "uuid": "11.1.1",
       "valibot@1": "1.4.2",
-      "yaml@2": "2.8.3",
+      "yaml@2": "2.9.1",
       "js-yaml@4": "4.3.2",
       "browserslist@4": "4.28.7",
       "baseline-browser-mapping@2": "2.11.0",

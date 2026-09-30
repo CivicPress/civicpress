@@ -57,7 +57,7 @@
     "@vitejs/plugin-vue": "6.0.3",
     "@vue/test-utils": "2.4.6",
     "autoprefixer": "^10.5.0",
-    "happy-dom": "20.0.11",
+    "happy-dom": "20.8.9",
     "postcss": "^8.5.14",
     "tailwindcss": "^4.3.0",
     "unplugin-auto-import": "20.3.0",

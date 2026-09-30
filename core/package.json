@@ -35,7 +35,7 @@
     "@octokit/rest": "^21.1.1",
     "@sendgrid/mail": "8.1.5",
     "@types/jsonwebtoken": "9.0.10",
-    "ajv": "8.17.1",
+    "ajv": "8.18.0",
     "ajv-formats": "3.0.1",
     "bcrypt": "6.0.0",
     "chalk": "^5.6.2",
@@ -48,7 +48,7 @@
     "octokit": "^5.0.5",
     "simple-git": "^3.36.0",
     "sqlite3": "5.1.7",
-    "tar": "^6.2.1",
+    "tar": "^7.5.21",
     "uuid": "^11.1.0",
     "yaml": "^2.9.0"
   },

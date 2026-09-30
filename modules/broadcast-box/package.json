@@ -40,13 +40,13 @@
     "bcrypt": "^5.1.1",
     "express": "^4.22.2",
     "express-validator": "^7.3.2",
-    "multer": "^1.4.5-lts.1",
-    "uuid": "11.1.0"
+    "multer": "^2.4.0",
+    "uuid": "11.1.1"
   },
   "devDependencies": {
     "@types/bcrypt": "^5.0.2",
     "@types/express": "^4.17.25",
-    "@types/multer": "^1.4.11",
+    "@types/multer": "^2.3.0",
     "@types/node": "^20.19.0",
     "@types/uuid": "10.0.0",
     "@typescript-eslint/eslint-plugin": "^8.36.0",
