@@ -334,6 +334,32 @@ database guarantee rather than a convention.
 - **Two duplicate `.civicrc` walk-ups removed** (the diagnostics one silently
   gave up after 10 levels, so it could report on a different config file than
   the one actually loaded); one implementation remains.
+- **`module.json` no longer advertises capabilities that do not exist.** The
+  manifest's `routes`, `audit`, `cli` and `lifecycle` flags were declared in the
+  public `ModuleCapabilities` type, documented in the module contract, and read
+  by nothing — no dispatch for any of them was ever built. They are removed from
+  the type, the JSON schema and the contract; a manifest describes schema
+  extensions only. ⚠️ **A manifest that still sets one of the four now fails
+  validation** (`ModuleManifestInvalid`, naming the key) instead of being
+  silently ignored — delete the line. Neither shipped manifest set any. The
+  contract also now says that a module's `entry` is declared, not loaded:
+  nothing in core, the API or the CLI imports it, and the `ModuleEntry`
+  interface that described a call order is withdrawn until module loading is
+  designed with a threat model.
+- **The `/api/v1/workflows` and `/api/v1/hooks` stubs stop naming a release.**
+  Both still answer `501 NOT_IMPLEMENTED`, but the message no longer says
+  "planned for v0.4.x" and the `retry_after_milestone` detail is gone — the
+  programmable workflow engine they would manage was split out of v0.4.x into
+  its own, unscheduled milestone on 2026-09-30 (`docs/roadmap.md` §5a). The
+  OpenAPI text says the same.
+- **CodeQL no longer scans tests.** `.github/codeql/codeql-config.yml` excludes
+  `tests/`, `e2e/`, `__tests__/` and `*.test.ts`; `scripts/` stays scanned
+  because it runs with repository privileges. 116 of the 195 baseline alerts
+  were in test code, 111 of them one rule fired by CLI tests building a shell
+  command from a temp path; they close on the next default-branch scan rather
+  than being dismissed by hand forever. The workflow's header comment also stops
+  calling the analysis "report-only": GitHub's per-PR "CodeQL" status check goes
+  red on any new alert, and has caught real defects twice.
 - **Hermetic test harness.** `createTestInstance()` builds an isolated instance
   and installs it, replacing fixtures that had to `process.chdir()` into their
   own directory to be discovered. Test runs no longer write a stray

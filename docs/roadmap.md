@@ -23,8 +23,9 @@ alpha toward a stable, production-grade civic infrastructure platform._
 > **deployment & onboarding layer** (one-command `civic init` / `serve` /
 > `doctor` + a Docker/compose/nginx stack + a curated demo seed) and a thin
 > **BroadcastBox operator UI**, plus record round-trip and CLI `--json`
-> correctness fixes. **The active milestone is now v0.4.x — Workflow Engine +
-> Permissions** (§5).
+> correctness fixes. **The active milestone is now v0.4.x — Workflows,
+> Permissions & Hardening** (§5; renamed 2026-09-30 when the programmable
+> workflow engine was split out into its own, unscheduled milestone, §5a).
 >
 > **Still open / needs scoping:** public-read prerender (SSG — static public
 > record pages; live SSR is decided against); signed appliance image; broader
@@ -130,7 +131,10 @@ The development path is organized into the following major phases:
 - **v0.2.x — Core Maturity and Stability** — ✅ shipped
 - **v0.3.x — Editor, Attachments, and Civic UX** — ✅ complete (released 0.2.1 →
   0.3.0)
-- **v0.4.x — Workflow Engine + Permissions** — ⏭️ active milestone
+- **v0.4.x — Workflows, Permissions & Hardening** — ⏭️ active milestone (renamed
+  2026-09-30; the engine is out)
+- **Programmable Workflow Engine** — split out of v0.4.x on 2026-09-30; its own
+  milestone, unscheduled, threat model first (§5a)
 - **v0.5–0.8 — Municipal Pilot Readiness** — deployment/onboarding groundwork
   pulled forward in v0.3.1 (one-command deploy + operator UI)
 - **v0.9 — Production Candidate**
@@ -237,12 +241,21 @@ focuses on UX enhancements.
 
 ---
 
-# 5. v0.4.x — Workflow Engine + Permissions ⏭️ ACTIVE MILESTONE
+# 5. v0.4.x — Workflows, Permissions & Hardening ⏭️ ACTIVE MILESTONE
 
-**Status:** Next up — not yet started. This is the current development frontier.
+**Status (2026-09-30):** in progress and scoped. Renamed from "Workflow Engine +
+Permissions" the day the programmable engine was split out (§5a). What the
+milestone actually contains is what landed since 0.3.1 — the publication gate on
+anonymous reads, per-record-type transitions honoured, legal document numbering,
+the config sweeps, the security hardening from the CodeQL baseline triage, the
+dependency refresh — plus the decisions recorded in
+`docs/plans/2026-08-11-v04x-scoping.md` ("Decisions (2026-09-30)"): a dedicated
+permission for seeing unpublished records and a registration switch, a walkable
+shipped review chain that ends on `published`, full audit coverage, and the
+notification privacy settings implemented rather than shipped inert.
 
-**Focus:** Enhance workflows and permissions with advanced features and UI
-integration.
+**Focus:** make the workflows and permissions that exist correct, complete and
+honest — not add an engine.
 
 ### Goals
 
@@ -340,10 +353,31 @@ of record is a security-sensitive design problem, not a detail.
 `Workflow _engine_ (programmable)` is listed as **Partial** in
 `docs/project-status.md`, which was accurate while this note was not.
 
-**Scope this milestone before starting it.** The shape is a real decision —
-UI-only on the validation that already works, declarative config-driven
-transitions, or the spec'd sandboxed loader — and they differ by a large factor
-in cost and risk.
+**Scoped 2026-09-30.** Of the three shapes — UI-only on the validation that
+already works, declarative config-driven transitions, or the spec'd sandboxed
+loader — v0.4.x takes the first two and the third became §5a.
+
+---
+
+# 5a. Programmable Workflow Engine — own milestone, unscheduled
+
+**Split out of v0.4.x on 2026-09-30.** The spec (`docs/specs/workflows.md`)
+describes sandboxed user `.js` files in `data/.civic/workflows/`; no loader and
+no sandbox executor exist, and the API's `/api/v1/workflows` and `/api/v1/hooks`
+routers answer `501` and say so without naming a release.
+
+**Why it is not a v0.4.x item.** Executing operator-supplied code inside a
+system of record is a trust-boundary change, not a feature increment: it needs a
+threat model (what a workflow may read, write, call and how long it may run), an
+isolation choice, and a story for auditing what a workflow did — before the
+first line of the loader. None of that exists, and the milestone that contains
+it should be the one that starts with it.
+
+**Starting point when it opens:** the scoping analysis in
+`docs/plans/2026-08-11-v04x-scoping.md` (question 3 and the "groundwork for that
+revisit" notes above), and the module-loading question in
+`docs/specs/module-contract.md` §5, which is the same trust boundary by another
+door.
 
 ---
 

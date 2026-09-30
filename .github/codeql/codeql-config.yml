@@ -1,0 +1,18 @@
+# CodeQL scope for this repository.
+#
+# Tests, fixtures and test harnesses are excluded from the scan. Decided
+# 2026-09-30 after the baseline triage (docs/audits/2026-09-29-codeql-baseline-
+# triage.md): 116 of the 195 baseline alerts sat in test code, 111 of them one
+# rule fired by CLI tests that build a shell command from a temp-directory path.
+# None was a defect in anything that ships; each would have needed a dismissal
+# by hand, forever, as tests are added.
+#
+# `scripts/` is deliberately NOT excluded — those run with repository
+# privileges in hooks and CI, so they stay scanned.
+name: civicpress
+paths-ignore:
+  - tests # root suite, its fixtures and the browser e2e specs
+  - e2e # live-hardware harnesses
+  - '**/__tests__' # per-package unit tests (30 directories)
+  - '**/*.test.ts'
+  - '**/*.spec.ts'

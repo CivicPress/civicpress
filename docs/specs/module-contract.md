@@ -48,11 +48,7 @@ following shape:
   "description": "<one-line summary>",
   "license": "<SPDX-license-expression>",
   "capabilities": {
-    "schemaExtensions": ["<record-type>", "..."],
-    "routes": false,
-    "audit": false,
-    "cli": false,
-    "lifecycle": false
+    "schemaExtensions": ["<record-type>", "..."]
   },
   "entry": "./index.ts",
   "dependencies": []
@@ -84,9 +80,8 @@ against it on load; invalid manifests fail fast with
 
 ## 3. Capabilities
 
-The `capabilities` object declares what the module contributes. Each capability
-is **opt-in** — a `schema-extension` typically has only `schemaExtensions` set;
-a full `module` may set multiple.
+The `capabilities` object declares what the module contributes. Today there is
+exactly one capability CivicCore acts on.
 
 ### `schemaExtensions: string[]`
 
@@ -99,32 +94,20 @@ keyword.
 `["bylaw", "ordinance", "policy", "proclamation", "resolution"]` — every record
 of those types gets the legal fragment applied.
 
-### `routes: boolean`
+### Removed: `routes`, `audit`, `cli`, `lifecycle` (2026-09-30)
 
-If `true`, the module's entry exports a `registerRoutes(app: Express)` function
-that mounts route handlers. CivicCore calls it after core routes are registered.
+Earlier revisions of this contract declared four boolean flags under which a
+module's entry would export `registerRoutes`, `registerAuditConsumers`,
+`registerCliCommands` and `init`/`shutdown`. **No dispatch for any of them was
+ever built** — the flags were read by nothing, so a manifest setting one was
+making a promise the runtime did not keep. They are removed from the TypeScript
+type and from `module.schema.json`, whose `capabilities` object rejects unknown
+keys: a manifest that still sets one now **fails validation** with
+`ModuleManifestInvalid` naming the key, rather than being silently ignored.
 
-### `audit: boolean`
-
-If `true`, the module's entry exports a
-`registerAuditConsumers(channel: AuditChannel)` function that subscribes to
-relevant audit events.
-
-### `cli: boolean`
-
-If `true`, the module's entry exports a
-`registerCliCommands(program: Commander)` function that adds subcommands to the
-`civic` CLI.
-
-### `lifecycle: boolean`
-
-If `true`, the module's entry exports
-`init(services: CivicCoreServices): Promise<void>` and/or
-`shutdown(): Promise<void>` functions that CivicCore calls at startup and
-shutdown.
-
-A `kind: "schema-extension"` module has all capabilities except
-`schemaExtensions` set to `false` (or omitted) by convention.
+The capability returns when the code that honours it exists. Until then a module
+contributes schema fragments, and anything else it does is wired explicitly (see
+§5).
 
 ---
 
@@ -152,23 +135,20 @@ declarative.
 
 ## 5. Full modules (for `kind: "module"`)
 
-A full module has executable code. Its `entry` file MUST export an object
-matching the `ModuleEntry` interface:
+A full module has executable code, and `entry` says where it lives. **CivicCore
+does not load `entry`** (verified 2026-09-30: nothing in `core`, the API or the
+CLI imports a manifest's entry file). The field is a declaration for readers and
+tooling; the module's routes, commands and services are wired explicitly by the
+package that hosts them. BroadcastBox is the reference: its manifest declares
+`kind: "module"` and `entry: "dist/index.js"`, its schema fragment is merged
+through `schemaExtensions`, and the API mounts its routers itself.
 
-```ts
-export interface ModuleEntry {
-  registerRoutes?(app: Express): void;
-  registerAuditConsumers?(channel: AuditChannel): void;
-  registerCliCommands?(program: Commander): void;
-  init?(services: CivicCoreServices): Promise<void>;
-  shutdown?(): Promise<void>;
-}
-```
-
-Only the capabilities the module declares `true` for need to export the
-corresponding function. CivicCore calls them in the order: `init` →
-`registerRoutes` → `registerAuditConsumers` → `registerCliCommands`; `shutdown`
-runs in reverse on shutdown.
+An earlier revision specified a `ModuleEntry` interface (`registerRoutes`,
+`registerAuditConsumers`, `registerCliCommands`, `init`, `shutdown`) and a call
+order. It described dispatch that was never built and is withdrawn with the
+capability flags (§3). When module loading is designed for real, it will need a
+threat model first — a manifest that makes CivicCore execute a directory's code
+is a different trust boundary from one that contributes a schema fragment.
 
 ---
 

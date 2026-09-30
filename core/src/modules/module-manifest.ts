@@ -11,6 +11,15 @@
 
 export type ModuleKind = 'module' | 'schema-extension';
 
+/**
+ * What a module contributes. Today that is one thing: record-schema fragments.
+ *
+ * Until 2026-09-30 this also declared `routes`, `audit`, `cli` and
+ * `lifecycle` flags. Nothing ever read them — no dispatch existed for any of
+ * the four — so a manifest setting one was making a promise the runtime did
+ * not keep. They were removed rather than left advertised; a flag returns when
+ * the code that honours it does (docs/specs/module-contract.md §3).
+ */
 export interface ModuleCapabilities {
   /**
    * Record types this module contributes a JSON Schema fragment to.
@@ -18,18 +27,6 @@ export interface ModuleCapabilities {
    * Used by RecordSchemaBuilder.mergeModuleExtensions.
    */
   schemaExtensions?: string[];
-
-  /** If true, entry exports `registerRoutes(app)`. */
-  routes?: boolean;
-
-  /** If true, entry exports `registerAuditConsumers(channel)`. */
-  audit?: boolean;
-
-  /** If true, entry exports `registerCliCommands(program)`. */
-  cli?: boolean;
-
-  /** If true, entry exports `init(services)` and/or `shutdown()`. */
-  lifecycle?: boolean;
 }
 
 export interface ModuleManifest {

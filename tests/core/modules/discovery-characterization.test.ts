@@ -157,6 +157,47 @@ describe('ModuleResolver — discovery characterization (Phase 2d W1-T2)', () =>
     expect(() => resolver.discoverAll()).toThrow(ModuleManifestInvalid);
   });
 
+  // The `routes` / `audit` / `cli` / `lifecycle` capability flags were removed
+  // on 2026-09-30: nothing ever dispatched on them. A manifest that still sets
+  // one must be refused, naming the key — not accepted and silently ignored,
+  // which is what it amounted to before.
+  it.each(['routes', 'audit', 'cli', 'lifecycle'])(
+    'refuses a manifest that still sets the withdrawn `%s` capability, naming it',
+    (flag) => {
+      writeManifest(join(root, 'stale-flags'), {
+        name: 'stale-flags',
+        version: '1.0.0',
+        kind: 'schema-extension',
+        capabilities: { schemaExtensions: ['bylaw'], [flag]: true },
+      });
+
+      const resolver = new ModuleResolver(root);
+      let caught: unknown;
+      try {
+        resolver.discoverAll();
+      } catch (err) {
+        caught = err;
+      }
+      expect(caught).toBeInstanceOf(ModuleManifestInvalid);
+      const details = (caught as ModuleManifestInvalid).context?.details as {
+        validationErrors?: Array<{
+          keyword: string;
+          instancePath: string;
+          params: Record<string, unknown>;
+        }>;
+      };
+      expect(details.validationErrors).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            keyword: 'additionalProperties',
+            instancePath: '/capabilities',
+            params: { additionalProperty: flag },
+          }),
+        ])
+      );
+    }
+  );
+
   it('sets schemaPath only when the fragment file exists', () => {
     writeManifest(join(root, 'with-fragment'), {
       name: 'with-fragment',

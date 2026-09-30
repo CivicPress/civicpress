@@ -6,17 +6,16 @@ import { logApiRequest } from '../utils/api-logger.js';
 export const hooksRouter = Router();
 
 // api-004 (Critical) — was returning fake 200 OK while looking live to
-// callers. Now returns 501 Not Implemented with a clear message and
-// planned milestone. Auth gates retained so the surface stays bounded.
+// callers. Now returns 501 Not Implemented with a clear message. Auth gates
+// retained so the surface stays bounded. The message named v0.4.x until
+// 2026-09-30, when the programmable engine this would manage was split into
+// its own, unscheduled milestone — so it names no release now.
 const NOT_IMPLEMENTED = {
   success: false,
   error: {
     message:
-      'Hook management is planned for v0.4.x. See docs/audits/2026-05-16-manifesto-fit-findings.md (api-004).',
+      'Hook management is not implemented. It belongs to the programmable workflow engine, which is its own milestone with no release assigned (docs/plans/2026-08-11-v04x-scoping.md). See also docs/audits/2026-05-16-manifesto-fit-findings.md (api-004).',
     code: 'NOT_IMPLEMENTED',
-    details: {
-      retry_after_milestone: 'v0.4.x',
-    },
   },
 };
 

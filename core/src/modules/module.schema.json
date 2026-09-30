@@ -39,7 +39,7 @@
     },
     "capabilities": {
       "type": "object",
-      "description": "What this module contributes. Each capability is opt-in.",
+      "description": "What this module contributes. Today: record-schema fragments only. The routes/audit/cli/lifecycle flags were removed on 2026-09-30 because nothing dispatched on them; a manifest that still sets one fails validation here so the promise is not silently ignored.",
       "additionalProperties": false,
       "properties": {
         "schemaExtensions": {
@@ -50,22 +50,6 @@
             "minLength": 1
           },
           "uniqueItems": true
-        },
-        "routes": {
-          "type": "boolean",
-          "description": "If true, entry must export registerRoutes(app: Express)."
-        },
-        "audit": {
-          "type": "boolean",
-          "description": "If true, entry must export registerAuditConsumers(channel: AuditChannel)."
-        },
-        "cli": {
-          "type": "boolean",
-          "description": "If true, entry must export registerCliCommands(program: Commander)."
-        },
-        "lifecycle": {
-          "type": "boolean",
-          "description": "If true, entry must export init(services) and/or shutdown()."
         }
       }
     },
@@ -85,7 +69,11 @@
   "allOf": [
     {
       "if": {
-        "properties": { "kind": { "const": "module" } }
+        "properties": {
+          "kind": {
+            "const": "module"
+          }
+        }
       },
       "then": {
         "required": ["entry"],
