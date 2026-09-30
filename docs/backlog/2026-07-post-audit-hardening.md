@@ -2222,11 +2222,17 @@ about either.
       `prosemirror-model/-view`, which is what broke `nuxt typecheck`; `pnpm
       dedupe` fixed it and should follow any future refresh. `@nuxt/scripts`
       (never registered or imported) and `@types/nodemailer` (nodemailer 10
-      ships types) removed. `scripts/audit-package-imports.mjs` still reports
-      three pre-existing undeclared imports outside this change: `vue-i18n` in
-      `modules/ui` (reaches the app through `@nuxtjs/i18n`), and
-      `@civicpress/editor-schema`, `@tiptap/core`, `yjs` in root `tests/`.
-      Refreshed, deduplicated and verified in the dependency PR.
+      ships types) removed. (3) `scripts/audit-package-imports.mjs` reported
+      `vue-i18n` as imported-but-undeclared in `modules/ui`, and it was
+      dismissed as pre-existing — then CI failed on a clean clone: the UI test
+      config aliased it to a hard-coded `.pnpm/vue-i18n@…_vue@3.5.35_…`
+      directory that survived locally as a leftover and vanished once the tree
+      moved. ⚠️ **An undeclared import that "works" is working through an
+      accident; treat the audit script's `✗` lines as failures.** `vue-i18n` is
+      now declared and the alias resolves through `modules/ui/node_modules`.
+      Still reported, still pre-existing: `@civicpress/editor-schema`,
+      `@tiptap/core`, `yjs` imported by root `tests/`. Refreshed, deduplicated
+      and verified in the dependency PR.
 
 - [ ] **The CodeQL baseline was never triaged: 195 alerts, all dated
       2026-07-30.** They are the findings that already existed on the day the

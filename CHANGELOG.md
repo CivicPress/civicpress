@@ -356,7 +356,12 @@ database guarantee rather than a convention.
   conflict. `@types/nodemailer` is removed because nodemailer 10 ships its own
   types. `useCivicApi` now types its options as `UseFetchOptions<T>` (Nuxt's own
   recipe) instead of `Parameters<typeof useFetch<T>>[1]`, which picked whichever
-  overload Nuxt happened to list last.
+  overload Nuxt happened to list last. ⚠️ `vue-i18n` is now declared by
+  `modules/ui`, which imports it directly: the UI test config had aliased it to
+  a hard-coded pnpm virtual-store directory that only still existed on the
+  machine that wrote it, so the suite was green there and red on a clean clone
+  the moment the tree moved. The alias now resolves through `modules/ui` like
+  its neighbours.
 
 ## [0.3.1] - 2026-08-06
 
