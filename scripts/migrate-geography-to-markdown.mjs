@@ -59,7 +59,7 @@ function extractNameFromFilename(filename) {
   const slug = parts.join('-');
   return slug
     .split('-')
-    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
     .join(' ');
 }
 
@@ -211,7 +211,10 @@ function generateMarkdown(geographyFile) {
     sortKeys: false,
   });
 
-  const codeBlockLang = geographyFile.type === 'kml' || geographyFile.type === 'gpx' ? 'xml' : 'json';
+  const codeBlockLang =
+    geographyFile.type === 'kml' || geographyFile.type === 'gpx'
+      ? 'xml'
+      : 'json';
 
   return `---
 ${yamlContent}---
@@ -287,7 +290,9 @@ async function migrateFile(filePath, stats) {
     const markdownContent = generateMarkdown(geographyFile);
 
     if (dryRun) {
-      console.log(`[DRY RUN] Would migrate: ${relativePath} -> ${path.join(dir, newFilename)}`);
+      console.log(
+        `[DRY RUN] Would migrate: ${relativePath} -> ${path.join(dir, newFilename)}`
+      );
       return { migrated: false, dryRun: true };
     }
 
@@ -297,7 +302,11 @@ async function migrateFile(filePath, stats) {
     // Delete old file
     await fs.unlink(filePath);
 
-    return { migrated: true, oldPath: relativePath, newPath: path.join(dir, newFilename) };
+    return {
+      migrated: true,
+      oldPath: relativePath,
+      newPath: path.join(dir, newFilename),
+    };
   } catch (error) {
     return { error: error.message, file: filePath };
   }
@@ -394,7 +403,9 @@ async function main() {
   console.log('==========================================\n');
 
   if (dryRun) {
-    console.log('⚠️  This was a dry run. Run without --dry-run to apply changes.');
+    console.log(
+      '⚠️  This was a dry run. Run without --dry-run to apply changes.'
+    );
   } else {
     console.log('✅ Migration complete!');
   }
@@ -405,4 +416,3 @@ main().catch((error) => {
   console.error('Fatal error:', error);
   process.exit(1);
 });
-

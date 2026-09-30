@@ -13,7 +13,6 @@ export default defineConfig({
     }),
   ],
   test: {
-
     globals: true,
     environment: 'node',
     // Rebuild core/cli dist iff their source is newer (see the file) — keeps
@@ -82,26 +81,26 @@ export default defineConfig({
     },
     // ONLY run CivicPress tests, exclude everything else
     include: [
-      'tests/**/*.test.ts',        // Our test files
-      'tests/**/*.spec.ts',        // Alternative test naming
-      'core/src/**/__tests__/**/*.test.ts',  // Core unit tests
-      'core/src/**/__tests__/**/*.spec.ts',  // Core unit tests (spec naming)
-      'cli/src/**/__tests__/**/*.test.ts',   // CLI unit tests
-      'cli/src/**/__tests__/**/*.spec.ts',   // CLI unit tests (spec naming)
-      'modules/api/src/**/__tests__/**/*.test.ts',  // API unit tests
-      'modules/api/src/**/__tests__/**/*.spec.ts',  // API unit tests (spec naming)
-      'modules/ui/app/**/__tests__/**/*.test.ts',   // UI composable/util unit tests (pure logic; no DOM needed)
-      'modules/ui/app/**/__tests__/**/*.spec.ts'    // UI composable/util unit tests (spec naming)
+      'tests/**/*.test.ts', // Our test files
+      'tests/**/*.spec.ts', // Alternative test naming
+      'core/src/**/__tests__/**/*.test.ts', // Core unit tests
+      'core/src/**/__tests__/**/*.spec.ts', // Core unit tests (spec naming)
+      'cli/src/**/__tests__/**/*.test.ts', // CLI unit tests
+      'cli/src/**/__tests__/**/*.spec.ts', // CLI unit tests (spec naming)
+      'modules/api/src/**/__tests__/**/*.test.ts', // API unit tests
+      'modules/api/src/**/__tests__/**/*.spec.ts', // API unit tests (spec naming)
+      'modules/ui/app/**/__tests__/**/*.test.ts', // UI composable/util unit tests (pure logic; no DOM needed)
+      'modules/ui/app/**/__tests__/**/*.spec.ts', // UI composable/util unit tests (spec naming)
     ],
     exclude: [
-      '**/node_modules/**',        // Skip all dependency tests
-      '**/dist/**',                // Skip built files
-      '**/build/**',               // Skip build artifacts
+      '**/node_modules/**', // Skip all dependency tests
+      '**/dist/**', // Skip built files
+      '**/build/**', // Skip build artifacts
       '**/modules/**/node_modules/**', // Skip UI module dependencies
-      '**/cli/node_modules/**',    // Skip CLI dependencies
-      '**/core/node_modules/**',   // Skip core dependencies
-      'tests/ui/**',               // Exclude UI tests (use vitest.config.ui.mjs with happy-dom)
-      'tests/e2e-browser/**',      // Playwright browser specs — run via `pnpm e2e`, not vitest
+      '**/cli/node_modules/**', // Skip CLI dependencies
+      '**/core/node_modules/**', // Skip core dependencies
+      'tests/ui/**', // Exclude UI tests (use vitest.config.ui.mjs with happy-dom)
+      'tests/e2e-browser/**', // Playwright browser specs — run via `pnpm e2e`, not vitest
       // QUARANTINE — BURNED DOWN 2026-07-17 (phase-7e test-health). The 5 files
       // that formerly failed deterministically from a clean checkout are fixed
       // and now pass individually AND together from clean; they run in CI again.

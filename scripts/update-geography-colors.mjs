@@ -7,7 +7,9 @@ import fs from 'fs';
 import matter from 'gray-matter';
 import { stringify } from 'yaml';
 
-const filePath = process.argv[2] || 'data/geography/geojson/zone/grandes-affectations-du-territoire-1763321502869.md';
+const filePath =
+  process.argv[2] ||
+  'data/geography/geojson/zone/grandes-affectations-du-territoire-1763321502869.md';
 
 if (!fs.existsSync(filePath)) {
   console.error(`File not found: ${filePath}`);
@@ -92,4 +94,3 @@ ${JSON.stringify(geoJson, null, 2)}
 fs.writeFileSync(filePath, newContent, 'utf8');
 console.log('✅ Updated geography file with color mapping');
 console.log('Color assignments:', colors);
-

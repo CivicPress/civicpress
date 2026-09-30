@@ -2,7 +2,10 @@
 import withNuxt from './.nuxt/eslint.config.mjs';
 import pluginTs from '@typescript-eslint/eslint-plugin';
 
-const unusedVarsRule = ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }];
+const unusedVarsRule = [
+  'error',
+  { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
+];
 
 // Tier A: safety / correctness — `error`-enforced, all sites cleaned in
 // lint-rollout followup #4 (spec
@@ -36,18 +39,33 @@ const STYLE_RULES_TIER_B = {
   // file-pattern override that disables the rule under `pages/`, `layouts/`,
   // and for `error.vue` automatically; for now, the static list is the
   // simplest correct fix.
-  'vue/multi-word-component-names': ['warn', {
-    ignores: [
-      // Nuxt root special names
-      'error', 'default', 'index',
-      // Nuxt page filenames (single-word route segments)
-      'login', 'logout', 'register', 'edit', 'new', 'raw', 'create',
-      'activity', 'diagnostics', 'notifications', 'profile', 'setup',
-      'drafts',
-      // Single-word brand component (explicit allow)
-      'Logo',
-    ],
-  }],
+  'vue/multi-word-component-names': [
+    'warn',
+    {
+      ignores: [
+        // Nuxt root special names
+        'error',
+        'default',
+        'index',
+        // Nuxt page filenames (single-word route segments)
+        'login',
+        'logout',
+        'register',
+        'edit',
+        'new',
+        'raw',
+        'create',
+        'activity',
+        'diagnostics',
+        'notifications',
+        'profile',
+        'setup',
+        'drafts',
+        // Single-word brand component (explicit allow)
+        'Logo',
+      ],
+    },
+  ],
 };
 
 // Tier D: kept off — Prettier owns formatting; outdated for Vue 3; low
@@ -99,5 +117,5 @@ export default withNuxt(
       // `Record<string, any>` themselves, so flagging it in tests is pure noise.
       '@typescript-eslint/no-explicit-any': 'off',
     },
-  },
+  }
 );

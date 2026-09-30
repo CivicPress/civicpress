@@ -5,18 +5,18 @@ module.exports = {
     'eslint:recommended',
     'plugin:@typescript-eslint/recommended',
     'plugin:vue/vue3-recommended',
-    'prettier'
+    'prettier',
   ],
   parser: 'vue-eslint-parser',
   parserOptions: {
     parser: '@typescript-eslint/parser',
     ecmaVersion: 'latest',
     sourceType: 'module',
-    extraFileExtensions: ['.vue']
+    extraFileExtensions: ['.vue'],
   },
   rules: {
     'vue/multi-word-component-names': 'off',
-    '@typescript-eslint/explicit-module-boundary-types': 'off'
+    '@typescript-eslint/explicit-module-boundary-types': 'off',
   },
-  ignorePatterns: ['node_modules/', 'dist/', '.nuxt/', '.output/']
-}
+  ignorePatterns: ['node_modules/', 'dist/', '.nuxt/', '.output/'],
+};
