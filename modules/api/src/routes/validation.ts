@@ -6,8 +6,6 @@ import {
   RecordValidator,
   RecordSchemaValidator,
   findRecordFileSync,
-  parseRecordRelativePath,
-  listRecordFilesSync,
 } from '@civicpress/core';
 import {
   sendSuccess,
@@ -366,30 +364,13 @@ async function validateSingleRecord(
   }
 
   if (!recordRelativePath) {
-    const availableRecords = listRecordFilesSync(dataDir).reduce(
-      (acc, relPath) => {
-        const parsed = parseRecordRelativePath(relPath);
-        if (!parsed.type) {
-          return acc;
-        }
-        if (!acc[parsed.type]) {
-          acc[parsed.type] = [];
-        }
-        const name = parsed.year ? `${parsed.year}/${parsed.id}` : parsed.id;
-        acc[parsed.type].push(name);
-        return acc;
-      },
-      {} as Record<string, string[]>
-    );
-
+    // No `availableRecords` here either: it enumerated every record file on
+    // disk, in every status, to any caller with records:view.
     issues.push({
       severity: 'error' as Severity,
       code: 'RECORD_NOT_FOUND',
       message: `Record '${recordId}' not found`,
       field: 'recordId',
-      metadata: {
-        availableRecords,
-      },
     });
     return {
       recordId,
@@ -458,7 +439,7 @@ async function validateSingleRecord(
 async function validateRecordContent(
   content: string,
   recordId: string
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): Promise<any> {
   try {
     // Extract frontmatter for schema validation
@@ -573,7 +554,7 @@ async function validateBulkRecords(
   recordIds: string[],
   types?: string[],
   includeContent = false
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): Promise<any> {
   const results = [];
   const summary = {
@@ -629,7 +610,7 @@ async function getValidationStatus(
     severity?: string;
     limit?: number;
   }
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): Promise<any> {
   const recordsDir = path.join(dataDir, 'records');
   const allIssues: Array<

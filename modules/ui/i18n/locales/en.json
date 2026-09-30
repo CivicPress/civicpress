@@ -135,6 +135,8 @@
     "createAccountDesc": "Join CivicPress to manage your records and workflows.",
     "dontHaveAccount": "Don't have an account?",
     "createOne": "Create one",
+    "registrationClosed": "Registration is closed",
+    "registrationClosedDesc": "This CivicPress instance does not accept self-service accounts. Ask an administrator to create one for you.",
     "forgotPassword": "Forgot your password?",
     "forgotPasswordTitle": "Reset your password",
     "forgotPasswordDesc": "Enter your username or email and we'll start a password reset.",

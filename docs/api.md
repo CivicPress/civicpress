@@ -31,6 +31,12 @@ initial configuration:
 - `GET /api/v1/records/:id` - Get specific record (read-only)
 - `GET /api/v1/search` - Search records (read-only)
 
+The read-only record endpoints show a caller **without**
+`records:view_unpublished` — anonymous or logged in as `public` — only records
+whose status is declared public (`published`, `archived`, `expired` by default).
+A non-public record answers 404 by id, and naming a non-public status in a
+filter yields nothing rather than more.
+
 #### **Protected Endpoints** (Authentication Required)
 
 These endpoints require valid authentication and appropriate permissions:
@@ -89,7 +95,14 @@ Authenticate user and receive JWT token.
 
 #### POST /auth/register
 
-Register a new user account (public endpoint).
+Register a new user account (public endpoint). Accounts created here always get
+the `public` role, which sees only records in a public status — sight of drafts
+and the review chain is the separate `records:view_unpublished` permission.
+
+An operator can close self-service registration with
+`auth.registration.enabled: false` in `.civicrc`; the endpoint then answers
+`403 REGISTRATION_DISABLED` before reading the body, and `GET /auth/providers`
+reports `registration.enabled: false` so the UI hides the link.
 
 **Request Body:**
 
@@ -118,6 +131,21 @@ Register a new user account (public endpoint).
       "created_at": "2025-07-30T21:33:40.000Z"
     },
     "message": "User registered successfully"
+  }
+}
+```
+
+#### GET /auth/providers
+
+What the instance offers on its sign-in surface (public endpoint): the OAuth
+providers that are configured, and whether self-registration is open.
+
+```json
+{
+  "success": true,
+  "data": {
+    "providers": ["github"],
+    "registration": { "enabled": true }
   }
 }
 ```

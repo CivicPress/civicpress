@@ -2,6 +2,26 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { mount, flushPromises } from '@vue/test-utils';
 import Login from '~/pages/auth/login.vue';
 
+// `auth.registration.enabled` reaches the page through useAuthOptions; mock
+// the module so each test decides whether the instance takes registrations.
+const registrationEnabled = vi.hoisted(() => ({ value: true }));
+vi.mock('~/composables/useAuthOptions', async () => {
+  const { ref, computed } = await import('vue');
+  return {
+    useAuthOptions: () => {
+      const flag = ref(registrationEnabled.value);
+      return {
+        options: ref({ providers: [], registrationEnabled: flag.value }),
+        registrationEnabled: computed(() => flag.value),
+        load: vi.fn(async () => ({
+          providers: [],
+          registrationEnabled: flag.value,
+        })),
+      };
+    },
+  };
+});
+
 // login.vue drives auth through the store; override the setup.ts shim with
 // controllable login / loginWithToken mocks.
 const login = vi.fn();
@@ -27,18 +47,24 @@ const stubs = {
   // this simple stub can't supply, and the login handlers are exercised
   // directly via wrapper.vm rather than through the rendered forms.
   UTabs: { template: '<div />' },
-  UForm: { template: "<form @submit=\"$emit('submit', $event)\"><slot /></form>" },
+  UForm: {
+    template: '<form @submit="$emit(\'submit\', $event)"><slot /></form>',
+  },
   UFormField: { template: '<div><slot /></div>' },
   UInput: { template: '<input />' },
   UButton: { template: '<button><slot /></button>' },
   UIcon: true,
-  UAlert: { template: '<div class="alert">{{ title }}</div>', props: ['title'] },
+  UAlert: {
+    template: '<div class="alert">{{ title }}</div>',
+    props: ['title'],
+  },
   NuxtLink: { template: '<a><slot /></a>' },
 };
 
 const mountOptions = { global: { stubs } };
 
 beforeEach(() => {
+  registrationEnabled.value = true;
   login.mockReset();
   login.mockResolvedValue(undefined);
   loginWithToken.mockReset();
@@ -86,5 +112,17 @@ describe('login page', () => {
 
     expect(loginWithToken).toHaveBeenCalledWith('gho_xxx');
     expect(navigateTo).toHaveBeenCalledWith('/');
+  });
+
+  it('offers "create one" while registration is open', () => {
+    const wrapper = mount(Login, mountOptions);
+    expect(wrapper.text()).toContain('auth.createOne');
+  });
+
+  it('hides "create one" when the instance has closed registration', () => {
+    registrationEnabled.value = false;
+    const wrapper = mount(Login, mountOptions);
+    expect(wrapper.text()).not.toContain('auth.createOne');
+    expect(wrapper.text()).not.toContain('auth.dontHaveAccount');
   });
 });

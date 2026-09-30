@@ -64,6 +64,9 @@ describe('API Diff Integration', () => {
 
       expect(response.status).toBe(404);
       expect(response.body.success).toBe(false);
+      // The body used to carry `availableRecords`: every record file on disk,
+      // in every status, to anyone with records:view. It must not.
+      expect(JSON.stringify(response.body)).not.toContain('availableRecords');
     });
   });
 

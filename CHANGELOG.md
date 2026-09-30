@@ -73,6 +73,32 @@ database guarantee rather than a convention.
   table needs no backfill. Saga compensation hands a number back rather than
   burning it.
 
+### Security
+
+- **Being logged in no longer counts as clearance to read unpublished records.**
+  The published-only gate on anonymous reads asked one question — "is there a
+  user?" — while `POST /users/register` hands anyone a `public` account with no
+  verification and no switch. Measured before the fix: a self-registered account
+  listed every status, read a draft's full body where the anonymous request got
+  a 404, and got the same set back from search and the summary histogram. The
+  line is now a permission, **`records:view_unpublished`**, granted to `admin`
+  and `clerk` in the shipped roles and held by nobody else; every read path
+  (list, by id, frontmatter, search, summary, linked records) asks it through
+  one function, and the realtime handshake asks the same question: joining a
+  draft's collaboration room by id used to need only `records:view`. ⚠️ **An
+  instance with its own `roles.yml`** keeps working, but its reviewer roles see
+  only public statuses until the line is added — that is the fail-closed side of
+  the change, and the intended one.
+- **Self-registration has a switch.** `auth.registration.enabled: false` in
+  `.civicrc` closes `POST /users/register` (`403 REGISTRATION_DISABLED`, before
+  the body is read), `GET /auth/providers` says so, and the web UI hides the
+  link and the form. On by default, so an upgrade changes nothing; `civic init`
+  writes the key so it can be found.
+- **A 404 no longer lists the record tree.** The not-found bodies of `/diff/*`
+  and `/validation/record/*` carried `availableRecords`: every record file on
+  disk, in every status, to any caller with `records:view` — the published-only
+  gate defeated by an error message. Removed.
+
 ### Fixed
 
 - **🔴 `roles.yml` shipped a permission check that could never pass — and the

@@ -294,6 +294,12 @@ export const initCommand = (cli: CAC) => {
                 record_types_config: INIT_RECORD_TYPES_CONFIG,
                 record_statuses_config: INIT_RECORD_STATUSES_CONFIG,
                 default_role: 'clerk',
+                // Self-service accounts. Written explicitly so the switch is
+                // discoverable; set `enabled: false` to close registration and
+                // have administrators create accounts instead.
+                auth: {
+                  registration: { enabled: true },
+                },
                 database: {
                   type: 'sqlite',
                   sqlite: {
