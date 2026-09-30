@@ -74,7 +74,7 @@ describe('AuthTemplate', () => {
       });
 
       expect(html).toContain(
-        `Reset your password here:<br>${URL.replace('&', '&amp;')}<br>`
+        `Reset your password here:<br>${URL.replaceAll('&', '&amp;')}<br>`
       );
     });
 

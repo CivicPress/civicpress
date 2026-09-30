@@ -20,7 +20,11 @@ export function boundedTimeout(requested: unknown, fallback: number): number {
     return fallback;
   }
   if (requested <= 0) return fallback;
-  return Math.min(requested, MAX_CHECK_TIMEOUT_MS);
+  // A comparison rather than Math.min: CodeQL's resource-exhaustion query
+  // recognises the former as an upper bound and treats the latter as a
+  // pass-through, so this shape is what keeps the timer below off its list.
+  if (requested > MAX_CHECK_TIMEOUT_MS) return MAX_CHECK_TIMEOUT_MS;
+  return requested;
 }
 
 /**
