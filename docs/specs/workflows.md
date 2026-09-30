@@ -229,8 +229,12 @@ statuses:
   - proposed
   - reviewed
   - approved
+  - published
   - archived
 ```
+
+Every status named here must also be a record status (`record_statuses_config`
+in `config.yml`), or records cannot be saved in it.
 
 #### Transitions
 
@@ -238,12 +242,17 @@ Define which status changes are allowed:
 
 ```yaml
 transitions:
-  draft: [proposed]                        # draft can become proposed
+  draft: [proposed, published, archived]  # propose, or publish directly
   proposed: [reviewed, archived]          # proposed can become reviewed or archived
   reviewed: [approved, archived]          # reviewed can become approved or archived
-  approved: [archived]                     # approved can become archived
-  archived: []                             # archived is final state
+  approved: [published, archived]         # approval is not publication
+  published: [archived]                   # a published record can be retired
+  archived: []                            # archived is final state
 ```
+
+A status that appears as a target anywhere in this map is **controlled**: moving
+a record into it is validated against the map and the role's `can_transition`,
+on every write path. A status that appears nowhere as a target is not.
 
 #### Roles
 
@@ -251,9 +260,17 @@ Define who can do what:
 
 ```yaml
 roles:
+  admin:
+    can_transition:
+      draft: [proposed, published, archived]
+      proposed: [reviewed, archived]
+      reviewed: [approved, archived]
+      approved: [published, archived]      # the chain ends on a public status
+      published: [archived]
+      any: [archived]
   clerk:
     can_transition:
-      draft: [proposed]                    # clerk can move draft → proposed
+      draft: [proposed, published]         # propose, or publish directly
       proposed: [reviewed]                 # clerk can move proposed → reviewed
     can_create: [bylaw, policy, resolution]
     can_edit: [bylaw, policy, resolution]
@@ -371,11 +388,30 @@ Permissions the API actually enforces live in `roles.yml` and are checked via
 
 ### Default Configuration
 
-If no `workflows.yml` file exists, CivicPress uses these defaults:
+The shipped `workflows.yml` (copied into every new instance by `civic init`) and
+the built-in default used when the file is absent describe the same chain:
 
-- **Statuses**: draft, proposed, reviewed, approved, archived
-- **Transitions**: Simple linear progression
-- **Roles**: clerk, council, public with basic permissions
+- **Statuses**: draft, proposed, reviewed, approved, published, archived
+- **Transitions**: draft → proposed → reviewed → approved → published →
+  archived, plus draft → published for roles allowed to publish directly and →
+  archived from most statuses
+- **Roles**: admin walks the whole chain and publishes; clerk proposes and may
+  publish a draft directly; council (built-in default only) approves; public
+  makes no transitions
+
+⚠️ Two things changed on 2026-09-30, and an instance that copied the file before
+then keeps its own copy:
+
+- `proposed` and `reviewed` are now record statuses (neither is public). Before,
+  the chain's second step failed schema validation — the workflow's vocabulary
+  and the record schema's disagreed, so the shipped chain could not be walked.
+- `published` is a transition **target**, which makes it a workflow-controlled
+  status: every write that lands a record at `published` is checked against the
+  graph and the role's `can_transition`. The chain ends on a public status
+  instead of beside one. A status the graph never names (`pending_review`,
+  `under_review`, `rejected`, `expired` in the default schema) is still writable
+  directly, but a record in one of them cannot be published until the graph says
+  how — that is what "controlled" means.
 
 ---
 

@@ -55,6 +55,8 @@ describe('Record Statuses API Endpoints', () => {
       // Check that all expected statuses are present (new standardized format)
       const expectedStatuses = [
         'draft',
+        'proposed',
+        'reviewed',
         'pending_review',
         'under_review',
         'approved',

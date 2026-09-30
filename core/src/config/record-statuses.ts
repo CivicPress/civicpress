@@ -36,6 +36,19 @@ export const DEFAULT_RECORD_STATUSES: RecordStatusesConfig = {
     source: 'core',
     priority: 1,
   },
+  // `proposed` and `reviewed` are the first two steps of the shipped
+  // workflows.yml chain. Until 2026-09-30 they were not record statuses at
+  // all, so the shipped chain 500'd on its second step. Fractional priorities
+  // slot them in order without renumbering the rest: mergeRecordStatuses lets
+  // a user entry win only when its priority is >= the default's, so moving
+  // `published` from 5 to 7 would have silently overridden a customised
+  // label in every existing config.yml.
+  proposed: {
+    label: 'Proposed',
+    description: 'Put forward for review; the first step of the review chain',
+    source: 'core',
+    priority: 1.5,
+  },
   pending_review: {
     label: 'Pending Review',
     description: 'Submitted for review and awaiting approval',
@@ -47,6 +60,12 @@ export const DEFAULT_RECORD_STATUSES: RecordStatusesConfig = {
     description: 'Currently under active review by authorized personnel',
     source: 'core',
     priority: 3,
+  },
+  reviewed: {
+    label: 'Reviewed',
+    description: 'Review complete and awaiting approval',
+    source: 'core',
+    priority: 3.5,
   },
   approved: {
     label: 'Approved',

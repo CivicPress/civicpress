@@ -1,15 +1,20 @@
 import { describe, it, expect } from 'vitest';
 
 // Import from the source directly to avoid build issues
-const { DEFAULT_RECORD_STATUSES } = await import(
-  '../../core/src/config/record-statuses.js'
-);
+const { DEFAULT_RECORD_STATUSES } =
+  await import('../../core/src/config/record-statuses.js');
 
 describe('Record Statuses Configuration - Simple Tests', () => {
   describe('DEFAULT_RECORD_STATUSES', () => {
     it('should contain all expected record statuses', () => {
       expect(DEFAULT_RECORD_STATUSES).toHaveProperty('draft');
       expect(DEFAULT_RECORD_STATUSES).toHaveProperty('pending_review');
+      // The shipped review chain's own steps are record statuses too, and
+      // neither is public.
+      expect(DEFAULT_RECORD_STATUSES).toHaveProperty('proposed');
+      expect(DEFAULT_RECORD_STATUSES).toHaveProperty('reviewed');
+      expect(DEFAULT_RECORD_STATUSES.proposed.public).not.toBe(true);
+      expect(DEFAULT_RECORD_STATUSES.reviewed.public).not.toBe(true);
       expect(DEFAULT_RECORD_STATUSES).toHaveProperty('under_review');
       expect(DEFAULT_RECORD_STATUSES).toHaveProperty('approved');
       expect(DEFAULT_RECORD_STATUSES).toHaveProperty('published');

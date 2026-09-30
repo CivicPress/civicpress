@@ -24,7 +24,7 @@ const config = createTestDirectory('api-test');
 ├── test.db                     # SQLite database (in-memory for tests)
 └── data/
     ├── .civic/
-    │   └── workflow.yml        # Workflow configuration
+    │   └── workflows.yml        # Workflow configuration
     └── records/
         ├── bylaw-noise-restrictions.md
         ├── policy-data-privacy.md
@@ -105,7 +105,7 @@ interfering with each other or the working directory.
 │   └── icons/
 └── data/
     ├── .civic/
-    │   ├── workflow.yml
+    │   ├── workflows.yml
     │   └── storage.yml          # Storage configuration
     └── records/
         ├── bylaw-noise-restrictions.md
@@ -182,7 +182,7 @@ auth:
   sessionTimeout: 24
 ```
 
-### `workflow.yml` Configuration
+### `workflows.yml` Configuration
 
 ```yaml
 statuses: [draft, proposed, reviewed, approved, archived]
@@ -275,7 +275,7 @@ describe('API Test', () => {
 
   beforeEach(async () => {
     // 1. Creates: /tmp/civicpress-test-1703123456789-abc123def-12345/
-    // 2. Generates: .civicrc, workflow.yml, sample records
+    // 2. Generates: .civicrc, workflows.yml, sample records
     // 3. Starts: API server on port 3002
     // 4. Sets up: Mock authentication
     context = await createAPITestContext();

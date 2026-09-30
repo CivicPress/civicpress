@@ -89,8 +89,10 @@ export class RecordValidator {
       // Fallback to core statuses if config not available
       return [
         'draft',
+        'proposed',
         'pending_review',
         'under_review',
+        'reviewed',
         'approved',
         'published',
         'rejected',

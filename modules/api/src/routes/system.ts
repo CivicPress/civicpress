@@ -25,8 +25,21 @@ router.get('/record-types', (req, res) => {
       description: type.description,
       source: type.source,
       priority: type.priority,
-      fields: ['id', 'title', 'content', 'status', 'author', 'created', 'updated'],
-      validation: ['required_title', 'required_type', 'required_status', 'required_author'],
+      fields: [
+        'id',
+        'title',
+        'content',
+        'status',
+        'author',
+        'created',
+        'updated',
+      ],
+      validation: [
+        'required_title',
+        'required_type',
+        'required_status',
+        'required_author',
+      ],
     }));
 
     res.json({
@@ -56,7 +69,8 @@ router.get('/record-statuses', (req, res) => {
   try {
     // Load record statuses dynamically from configuration
     const recordStatusesConfig = CentralConfigManager.getRecordStatusesConfig();
-    const recordStatusesMetadata = getRecordStatusesWithMetadata(recordStatusesConfig);
+    const recordStatusesMetadata =
+      getRecordStatusesWithMetadata(recordStatusesConfig);
 
     // Transform to API response format with additional metadata
     const recordStatuses = recordStatusesMetadata.map((status) => ({
@@ -97,8 +111,10 @@ router.get('/record-statuses', (req, res) => {
 function getStatusColor(statusKey: string): string {
   const colorMap: Record<string, string> = {
     draft: 'gray',
+    proposed: 'blue',
     pending_review: 'blue',
     under_review: 'yellow',
+    reviewed: 'yellow',
     approved: 'green',
     published: 'green',
     rejected: 'red',

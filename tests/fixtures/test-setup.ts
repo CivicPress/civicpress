@@ -890,8 +890,11 @@ export function createWorkflowConfig(config: TestConfig) {
     },
   };
 
+  // `workflows.yml` — plural — is the file WorkflowConfigManager reads. This
+  // wrote `workflow.yml` for its whole life, so every API test ran on the
+  // manager's inline default instead of on this configuration.
   writeFileSync(
-    join(config.civicDir, 'workflow.yml'),
+    join(config.civicDir, 'workflows.yml'),
     yaml.dump(workflowConfig)
   );
 }
@@ -1473,12 +1476,37 @@ export function cleanupCLITestContext(context: CLITestContext) {
 }
 
 // API test helpers
-export async function createAPITestContext(): Promise<APITestContext> {
+export async function createAPITestContext(
+  options: {
+    /**
+     * Run this instance on the SHIPPED `workflows.yml`, `roles.yml` and
+     * `config.yml` (copied from core/src/defaults) instead of the fixture's
+     * hand-written ones. The fixture's configuration is what most tests need;
+     * it is also how a shipped review chain that could not be walked stayed
+     * green for months — nothing exercised the files an instance is born with.
+     */
+    shippedDefaults?: boolean;
+  } = {}
+): Promise<APITestContext> {
   // One hermetic instance (directory + every config file + both git repos),
   // installed as the process's current instance.
   const { createTestInstance } = await import('./test-instance.js');
-  const instance = createTestInstance({ prefix: 'api-test', records: true });
+  const instance = createTestInstance({
+    prefix: 'api-test',
+    records: true,
+    workflows: !options.shippedDefaults,
+    roles: !options.shippedDefaults,
+  });
   const config = instance.config;
+  if (options.shippedDefaults) {
+    const defaultsDir = join(process.cwd(), 'core', 'src', 'defaults');
+    for (const file of ['workflows.yml', 'roles.yml', 'config.yml']) {
+      writeFileSync(
+        join(config.civicDir, file),
+        readFileSync(join(defaultsDir, file), 'utf-8')
+      );
+    }
+  }
   const port = getRandomPort();
 
   const { simpleGit } = await import('simple-git');

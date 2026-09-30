@@ -56,6 +56,11 @@ record_statuses_config:
     description: 'Initial working version, not yet ready for review'
     source: 'core'
     priority: 1
+  proposed:
+    label: 'Proposed'
+    description: 'Put forward for review; the first step of the review chain'
+    source: 'core'
+    priority: 1.5
   pending_review:
     label: 'Pending Review'
     description: 'Submitted for review and awaiting approval'
@@ -66,6 +71,11 @@ record_statuses_config:
     description: 'Currently under active review by authorized personnel'
     source: 'core'
     priority: 3
+  reviewed:
+    label: 'Reviewed'
+    description: 'Review complete and awaiting approval'
+    source: 'core'
+    priority: 3.5
   approved:
     label: 'Approved'
     description: 'Approved and currently in effect'
@@ -97,9 +107,9 @@ record_statuses_config:
 document_number_formats:
   bylaw:
     prefix: 'BYL'
-    year_format: 'full'  # 'full' (2024) or 'short' (24)
+    year_format: 'full' # 'full' (2024) or 'short' (24)
     separator: '-'
-    sequence_padding: 3  # Number of digits for sequence (e.g., 001)
+    sequence_padding: 3 # Number of digits for sequence (e.g., 001)
   ordinance:
     prefix: 'ORD'
     year_format: 'full'

@@ -223,14 +223,18 @@ export class RecordsListing {
    * Get allowed transitions for a record based on current status and user role
    */
   async getAllowedTransitions(id: string, user: AuthUser): Promise<string[]> {
-    // Get the current record
-    const record = await this.deps.recordManager.getRecord(id);
+    // A record still moving through review usually exists ONLY in
+    // record_drafts, so looking in `records` alone answered [] for exactly the
+    // records whose status menu matters. Fall back to the draft row.
+    const published = await this.deps.recordManager.getRecord(id);
+    const draft = published ? null : await this.deps.db.getDraft(id);
+    const record = published ?? draft;
     if (!record) {
       return [];
     }
 
     // Compute transitions for the user's role
-    const fromStatus = record.status;
+    const fromStatus = record.status || 'draft';
     const role = user?.role;
     const allowed = await this.deps.workflowManager.getAvailableTransitions(
       fromStatus,
