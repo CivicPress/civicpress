@@ -49,7 +49,10 @@ if (!fs.existsSync(gitDir)) {
   try {
     execSync('git init', { cwd: dataDir, stdio: 'ignore' });
   } catch (error) {
-    console.warn('⚠️  Warning: Failed to initialize git repository:', error.message);
+    console.warn(
+      '⚠️  Warning: Failed to initialize git repository:',
+      error.message
+    );
   }
 }
 
@@ -69,39 +72,53 @@ process.env.CIVIC_REALTIME_ENABLED = 'true';
 
 // Initialize CivicPress (this will also initialize realtime server)
 let isShuttingDown = false;
-let isInitialized = false;
 
 civicPress
   .initialize()
   .then(async () => {
-    isInitialized = true;
-    
     // After initialization, ensure broadcast-box device authentication dependencies are set
     // This is needed because the realtime server might be initialized before broadcast-box services
     try {
       // Access the container directly (it's a private property, but we need it)
-      const container = civicPress.container || civicPress.getService('container');
+      const container =
+        civicPress.container || civicPress.getService('container');
       if (container) {
         const realtimeServer = container.resolve('realtimeServer');
         const deviceAuth = container.resolve('broadcastBoxDeviceAuth');
         const deviceManager = container.resolve('broadcastBoxDeviceManager');
-        const connectionTracker = container.resolve('broadcastBoxConnectionTracker');
-        const deviceCommandService = container.resolve('broadcastBoxDeviceCommandService');
-        
+        const connectionTracker = container.resolve(
+          'broadcastBoxConnectionTracker'
+        );
+        const deviceCommandService = container.resolve(
+          'broadcastBoxDeviceCommandService'
+        );
+
         if (realtimeServer && deviceAuth && deviceManager) {
           if (typeof realtimeServer.setDeviceAuthDependencies === 'function') {
             realtimeServer.setDeviceAuthDependencies(deviceAuth, deviceManager);
-            console.log('✅ Broadcast Box device authentication dependencies set on realtime server');
+            console.log(
+              '✅ Broadcast Box device authentication dependencies set on realtime server'
+            );
           }
-          
-          if (connectionTracker && typeof realtimeServer.setDeviceConnectionTracker === 'function') {
+
+          if (
+            connectionTracker &&
+            typeof realtimeServer.setDeviceConnectionTracker === 'function'
+          ) {
             realtimeServer.setDeviceConnectionTracker(connectionTracker);
-            console.log('✅ Broadcast Box device connection tracker set on realtime server');
+            console.log(
+              '✅ Broadcast Box device connection tracker set on realtime server'
+            );
           }
-          
-          if (deviceCommandService && typeof realtimeServer.setDeviceCommandService === 'function') {
+
+          if (
+            deviceCommandService &&
+            typeof realtimeServer.setDeviceCommandService === 'function'
+          ) {
             realtimeServer.setDeviceCommandService(deviceCommandService);
-            console.log('✅ Broadcast Box device command service set on realtime server');
+            console.log(
+              '✅ Broadcast Box device command service set on realtime server'
+            );
           }
         } else {
           console.log('ℹ️  Broadcast Box module not available (optional)');
@@ -110,48 +127,67 @@ civicPress
     } catch (error) {
       // Broadcast-box module not available - that's okay, it's optional
       // Only log if verbose mode or if it's not a "service not found" error
-      if (error?.code !== 'SERVICE_NOT_FOUND' && error?.message?.includes('not found')) {
+      if (
+        error?.code !== 'SERVICE_NOT_FOUND' &&
+        error?.message?.includes('not found')
+      ) {
         console.log('ℹ️  Broadcast Box module not available (optional)');
       }
     }
-    
+
     console.log('');
     console.log('✅ CivicPress initialized');
     console.log('✅ Realtime WebSocket server should be running on port 3001');
     console.log('');
-    console.log('📡 Connect to: ws://localhost:3001/realtime/records/:recordId');
+    console.log(
+      '📡 Connect to: ws://localhost:3001/realtime/records/:recordId'
+    );
     console.log('   Secure methods (recommended):');
     console.log('   - Subprotocol: new WebSocket(url, [`auth.${token}`])');
-    console.log('   - Header: new WebSocket(url, { headers: { Authorization: `Bearer ${token}` } })');
-    console.log('   Deprecated: ?token=... (query string - kept for backward compatibility)');
+    console.log(
+      '   - Header: new WebSocket(url, { headers: { Authorization: `Bearer ${token}` } })'
+    );
+    console.log(
+      '   Deprecated: ?token=... (query string - kept for backward compatibility)'
+    );
     console.log('');
     console.log('Press Ctrl+C to stop...');
     console.log('');
-    
+
     // Verify server is actually running (wait longer for initialization)
     setTimeout(async () => {
       try {
         const net = await import('net');
-        const client = net.createConnection({ port: 3001, host: 'localhost' }, () => {
-          console.log('✅ Verified: WebSocket server is listening on port 3001');
-          client.destroy();
-        });
+        const client = net.createConnection(
+          { port: 3001, host: 'localhost' },
+          () => {
+            console.log(
+              '✅ Verified: WebSocket server is listening on port 3001'
+            );
+            client.destroy();
+          }
+        );
         client.on('error', (err) => {
-          console.error('❌ Warning: Cannot connect to port 3001:', err.message);
+          console.error(
+            '❌ Warning: Cannot connect to port 3001:',
+            err.message
+          );
           console.error('   The server may not be running properly');
           console.error('   Check logs above for initialization errors');
         });
         // Set timeout for connection attempt
         client.setTimeout(2000);
         client.on('timeout', () => {
-          console.error('❌ Warning: Connection timeout - server may not be listening');
+          console.error(
+            '❌ Warning: Connection timeout - server may not be listening'
+          );
           client.destroy();
         });
       } catch (error) {
         console.warn('⚠️  Could not verify server connection:', error.message);
       }
     }, 2000); // Wait 2 seconds for server to fully initialize
-    
+
     // Keep process alive - prevent premature exit
     // The WebSocket server should keep the process alive, but we add this as a safeguard
     setInterval(() => {
@@ -178,7 +214,7 @@ const shutdown = async (signal) => {
     return;
   }
   isShuttingDown = true;
-  
+
   console.log('');
   console.log(`👋 Received ${signal}, shutting down...`);
   try {
@@ -206,4 +242,3 @@ process.on('unhandledRejection', (reason, promise) => {
   // Don't exit on unhandled rejection - let the process continue
   // This prevents nodemon from restarting unnecessarily
 });
-
