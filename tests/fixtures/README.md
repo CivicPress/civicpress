@@ -83,8 +83,8 @@ await api.initialize(config.testDir);
 - No interference between tests
 - Automatic cleanup after each test
 - Unique timestamps prevent conflicts
-- Isolated storage directories - each test gets its own storage folder
-  with absolute paths
+- Isolated storage directories - each test gets its own storage folder with
+  absolute paths
 
 **Storage Isolation:**
 
