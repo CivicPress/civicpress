@@ -21,6 +21,11 @@ export interface ParsedQuery {
  * Parse a search query into structured components
  */
 export function parseSearchQuery(query: string): ParsedQuery {
+  // A query parameter sent twice arrives as an array. The route refuses that
+  // before it gets here; this function is exported and has other callers.
+  if (typeof query !== 'string') {
+    throw new TypeError('A search query must be a string');
+  }
   const original = query.trim();
 
   if (!original) {

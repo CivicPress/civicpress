@@ -328,12 +328,15 @@ export function createIndexingRouter() {
     // This route had no validation. `q` sent twice arrived as an array and
     // threw at `.toLowerCase()`; `tags` sent twice threw at `.split(',')`.
     [
+      // Optional HERE: a missing `q` is refused below, with the message
+      // callers already know.
       query('q')
+        .optional()
         .isString()
         .withMessage('Query parameter "q" must be a string')
         .bail()
-        .isLength({ min: 1, max: 512 })
-        .withMessage('Query parameter "q" must be 1 to 512 characters'),
+        .isLength({ max: 512 })
+        .withMessage('Query parameter "q" must be at most 512 characters'),
       ...['type', 'status', 'module', 'tags'].map((name) =>
         query(name)
           .optional()

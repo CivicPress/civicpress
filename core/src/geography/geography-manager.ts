@@ -6,7 +6,7 @@
  */
 
 import { promises as fs } from 'fs';
-import { resolveChild } from '../utils/path-containment.js';
+import { resolveChild, resolveInside } from '../utils/path-containment.js';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import {
@@ -139,12 +139,24 @@ export class GeographyManager {
       // Generate unique ID and filename
       const id = uuidv4();
       const filename = this.generateFilename(request.name, id, request.type);
-      const categoryDir = path.join(
+      // Confined where the path is built, as well as by the test of the
+      // segments above: the two cannot then drift apart.
+      const categoryDir = resolveInside(
         this.geographyDir,
         request.type,
         request.category
       );
-      const filePath = path.join(categoryDir, filename);
+      const filePath = categoryDir && resolveInside(categoryDir, filename);
+      if (!categoryDir || !filePath) {
+        throw new GeographyValidationError(
+          'Invalid geography type or category',
+          {
+            valid: false,
+            errors: ['type and category must be bare names'],
+            warnings: [],
+          }
+        );
+      }
 
       // Ensure directory exists
       await fs.mkdir(categoryDir, { recursive: true });

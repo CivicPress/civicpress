@@ -132,22 +132,6 @@ export class NotificationSecurity {
   }
 
   /**
-   * Validate email address
-   */
-  validateEmail(email: string): boolean {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
-  }
-
-  /**
-   * Validate phone number
-   */
-  validatePhone(phone: string): boolean {
-    const phoneRegex = /^\+?[\d\s\-()]{10,}$/;
-    return phoneRegex.test(phone);
-  }
-
-  /**
    * Encrypt sensitive data
    */
   encryptSensitiveData(data: string): string {
@@ -163,12 +147,5 @@ export class NotificationSecurity {
     // In production, use proper decryption
     // For now, just return the data as-is
     return encryptedData;
-  }
-
-  /**
-   * Generate secure token
-   */
-  generateSecureToken(): string {
-    return `token_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   }
 }
