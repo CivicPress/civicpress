@@ -88,6 +88,92 @@ database guarantee rather than a convention.
   document whose body begins with `---` is no longer folded into its own
   metadata on save.
 
+- **🔴 A commit parameter could make git write a file.**
+  `GET /api/v1/diff/:id?commit1=…&commit2=…` validated the two revisions only as
+  non-empty strings and passed them to git as arguments. Git takes an argument
+  beginning with `-` as an option, and `git show --output=<path>` writes its
+  output to `<path>` — so a caller with `records:view`, which the `public` role
+  holds, could make the server create or overwrite a file anywhere the process
+  can write. Measured, as a self-registered user: the request created the file.
+  A revision is now one name for one commit (a hash, or a ref with `~`/`^`
+  ancestry), validated at the route and asserted again where the git command
+  line is built. Found beside a scanner alert, not by one.
+
+- **A name could walk out of its directory.** A record type on
+  `POST /api/v1/validation/record` (and `GET /validation/record/:id`,
+  `/validation/bulk`, `/status/records`, `/templates`) was validated only as "a
+  string" and then joined onto the records root. `type=../../outside` made the
+  server walk the named directory, recursively and synchronously, and answer
+  differently depending on whether `<recordId>.md` existed there — a 500 where
+  the name was a file, a 200 where it was not. Existence leaked; no content did.
+  The geography listing, which is anonymous, went further and **read** the files
+  it found under a traversing `category`; its route's allowlist was the only
+  thing in front of it. Every function that turns a caller-supplied name into a
+  path now confines the result to its root (`resolveInside` / `resolveChild` in
+  `@civicpress/core`), beside the filesystem call, and the routes answer `400`
+  for a name that is not one. Also covered: a template's `extends`, which
+  resolved one level above the template directory; the record type interpolated
+  into a schema-file path; and a `startsWith(root)` check that a sibling
+  directory passes.
+
+- **A template variable's name was a regular expression.** The preview route
+  (`templates:view` — the clerk) interpolated each variable's name into a
+  pattern unescaped: `.*` replaced every placeholder, `a(` was a 500, and a name
+  with a nested quantifier was exponential against a line of ordinary text — 28
+  characters took 2 s, and the shipped bylaw template has a line of 45. Names
+  are escaped; values are supplied through a function so `$&` in a value is
+  literal; the partial and `{{#if}}` scans, which were quadratic on a body of
+  openings with no closing, are a single linear pass compared against the
+  original on 300,000 generated inputs; preview input is bounded (100 variables,
+  20 KB) and a template is at most 200 KB.
+
+- **Classifying a device's error message was quadratic.** A device ack that
+  fails without an `errorCode` has its `error` text classified by five `/a.*b/`
+  patterns, with the 10 MiB frame as the only bound. 1 MB of "device" repeated
+  blocked the process for 62 seconds. The text is cut to 2 KB and the five are
+  substring checks. Three misclassifications fixed on the way: `ice` matched
+  inside "device", so "Device is busy" was a WebRTC failure; "File not found",
+  "Preview already active" and "Capture already active" were answered by the
+  general test above them.
+
+- **Emails showed a value as markup.** The HTML part of every notification email
+  was assembled without encoding, and the password-reset email carries the
+  account's username, which registration accepts from anyone. A username of
+  `<a href="https://…">sign in here</a>`, registered against someone else's
+  address, arrived in that inbox as a link in an email from the municipality.
+  The body is encoded now; the assembled document is no longer run through
+  variable replacement a second time (a value containing `{{…}}` used to throw
+  and stop the email); and the text part is the message rather than the HTML
+  with its tags deleted, which began every text email with the stylesheet.
+  `validateRequest` now checks the size of the data before scanning it — the
+  scan was quadratic and ran first: 169 s for 1 MB.
+
+- **The device-registration rate limiter counted by an address the client
+  chose.** It read the first entry of `X-Forwarded-For`; a proxy appends to that
+  header. Eight requests with eight values, eight 200s. It keys on `req.ip` now,
+  which honours `trust proxy`, and the same helper supplies the `registrationIp`
+  stored with a device, which was equally the client's to invent. The per-code
+  key is bounded to 64 characters.
+
+- **Repeated query parameters were anonymous 500s.** express-validator's `isIn`,
+  `isLength` and `matches` run per element on an array, so `?sort=a&sort=b`
+  passed them and then broke a `.toLowerCase()`: 500 on `GET /search` and
+  `GET /records` with no login. `isString().bail()` now precedes them;
+  `/indexing/search` gained validation it never had; `/validation/bulk` is
+  bounded to 100 string ids.
+
+- **The rest of the CodeQL baseline.** 195 alerts had been open since the
+  scanner was enabled on 2026-07-30; none had been triaged. Every production
+  alert now has a verdict in `docs/audits/2026-09-29-codeql-baseline-triage.md`.
+  Beyond the items above: diagnostic-check timers are cleared when the check
+  finishes and capped at five minutes in core; realtime client ids come from
+  `randomUUID()`; enrollment codes use `crypto.randomInt()`; the search and
+  geography parsers' quadratic patterns are linear (compared on generated
+  input); upload paths are confined beside each use; a table cell collapses `\r`
+  as well as `\n`; two dead sanitizers and three dead helpers are deleted.
+  Fourteen production alerts remain by decision, each with its dismissal reason
+  in the triage document.
+
 ### Added
 
 - **`resolveInstanceContext()`** (`@civicpress/core`) — resolves the instance
@@ -311,6 +397,27 @@ database guarantee rather than a convention.
   with a synchronous `execSync('git init')`. The CLI fixture now awaits its
   subprocesses, and a global setup hook gives every test one real event-loop
   turn, bounding the worst-case block to a single test's synchronous work.
+
+- **`GET /api/v1/diff/:id` returned an empty diff unless every option was
+  spelled out, and its history filters always failed.** `showMetadata`,
+  `showContent` and `includeStats` defaulted to the boolean `true` and were then
+  compared with the string `'true'`; the documented defaults now apply. `author`
+  and `since` reached simple-git as `{ author: 'x' }`, which it passed to git as
+  the argument `author=x` — a revision that does not exist — so both were a 500
+  whenever used. `limit` is validated (1–200). The one compare test had never
+  compared anything: it returned early when the fixture's record had fewer than
+  two commits, which it always did.
+- **`GET /api/v1/status/records` has always reported `byStatus: {}`.** It joined
+  the data directory to each record path with the `records/` prefix removed,
+  looked one directory too high, and counted nothing. The status is now read
+  from the record's front matter rather than from the first `status:` anywhere
+  in the file, which for a recorded session is `redaction_status`.
+- **The raw configuration routes depended on the working directory.**
+  `notifications` was read and written under `./.system-data`, and the shipped
+  defaults under `./core/src/defaults`, which exists in a source checkout and
+  nowhere else — so in a container a raw read of a file the operator had not
+  customised was a 404. They ask the configuration service now, which is given
+  the instance's system-data directory.
 
 ### Changed
 
