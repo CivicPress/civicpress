@@ -5,6 +5,7 @@ import { isName } from '../utils/name-validators.js';
 import {
   Logger,
   listRecordFilesSync,
+  parseFrontmatter,
   parseRecordRelativePath,
 } from '@civicpress/core';
 import {
@@ -282,15 +283,22 @@ async function getRecordStatistics(
     stats.byType[typeKey].files.push(displayName);
     stats.totalRecords += 1;
 
-    const absolutePath = path.join(
-      dataDir,
-      ...relPath.replace(/^records\//, '').split('/')
-    );
+    // `relPath` is relative to the data directory and begins `records/`. This
+    // used to strip that prefix before joining, so it looked for every record
+    // one directory too high, found none of them, and `byStatus` has always
+    // come back empty.
+    const absolutePath = path.join(dataDir, ...relPath.split('/'));
 
     try {
       const content = fs.readFileSync(absolutePath, 'utf-8');
-      const statusMatch = content.match(/status:\s*(\w+)/i);
-      const status = statusMatch ? statusMatch[1].toLowerCase() : 'unknown';
+      // The record's own status, from its front matter. The first `status:`
+      // anywhere in the file is not that: `redaction_status:` comes first in
+      // a recorded session, and a body may mention the word.
+      const declared = parseFrontmatter(content).data?.status;
+      const status =
+        typeof declared === 'string' && declared
+          ? declared.toLowerCase()
+          : 'unknown';
 
       stats.byStatus[status] = (stats.byStatus[status] || 0) + 1;
     } catch (error) {

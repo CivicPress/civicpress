@@ -35,6 +35,10 @@ const audit = new AuditLogger();
 function getConfigurationService(): ConfigurationService {
   return new ConfigurationService({
     dataPath: join(CentralConfigManager.getDataDir(), '.civic'),
+    // `notifications` lives here. Left to its default this was the relative
+    // string `.system-data`, so that one file was read and written under
+    // whatever directory the process was started from.
+    systemDataPath: CentralConfigManager.getSystemDataDir(),
   });
 }
 
@@ -283,22 +287,23 @@ router.get('/metadata/:type', guardSecretConfig, async (req, res) => {
 // FA-API-012: raised when the caller-supplied config type is not a bare name.
 class InvalidConfigTypeError extends Error {}
 
+/**
+ * Where the raw routes read and write a configuration type.
+ *
+ * The service's answer, so that a raw read and a structured read are the same
+ * file. This used to work the paths out again, and two of the three were
+ * relative to the working directory: `notifications` under `.system-data`, and
+ * the shipped defaults under `core/src/defaults` — a directory that exists in
+ * a source checkout and nowhere else, so on an installed or containerised
+ * instance a raw read of a file the operator had not yet customised was a 404.
+ */
 function resolveRawPaths(type: string) {
-  const key = (type || '').toLowerCase().trim();
-  const canonical = key.startsWith('notif') ? 'notifications' : key;
-  // FA-API-012: the canonical name becomes a filesystem segment; reject anything
-  // that is not a bare config name so `../`, path separators, NUL, and absolute
-  // segments cannot escape the intended config directories.
-  if (!/^[a-z0-9-]+$/.test(canonical)) {
+  try {
+    return getConfigurationService().resolveConfigPaths(type);
+  } catch {
+    // FA-API-012: not a bare config name.
     throw new InvalidConfigTypeError(`Invalid config type: ${type}`);
   }
-  const dataDir = CentralConfigManager.getDataDir();
-  const userPath =
-    canonical === 'notifications'
-      ? join('.system-data', `${canonical}.yml`)
-      : join(dataDir, '.civic', `${canonical}.yml`);
-  const defaultPath = join('core', 'src', 'defaults', `${canonical}.yml`);
-  return { userPath, defaultPath };
 }
 
 /**

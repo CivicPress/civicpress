@@ -84,6 +84,18 @@ export class ConfigurationService {
   }
 
   /**
+   * Where a configuration type lives: the instance's own file, and the
+   * shipped default it falls back to. For a caller that reads or writes the
+   * file itself and needs the same answer this service would use.
+   */
+  resolveConfigPaths(configType: string): {
+    userPath: string;
+    defaultPath: string;
+  } {
+    return this.resolvePaths(configType);
+  }
+
+  /**
    * Resolve user and default paths for a given configuration type.
    * Notifications are sensitive and should live under .system-data.
    */
