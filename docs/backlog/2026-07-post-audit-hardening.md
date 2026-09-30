@@ -2193,19 +2193,40 @@ about either.
       reference — unbounded growth in a long-running API, and a mutation made by
       one caller is seen by the next caller that parses the same text.
 
-- [ ] **Dependency advisories have drifted: 54 open across 25 package
-      versions.** The 2026-07-25 remediation took the tree from 94 to 2. Nothing
-      in the lockfile has moved since, but the advisory database has: 26 alerts
-      were opened in August and 28 in September. Several are on the request path
-      — `multer` (uploads, 3 High), `qs`, `fast-uri` (5 High, reached through
-      `ajv`), `undici`, `nodemailer`, `js-yaml`, and `dompurify`, which is the
-      XSS sanitizer. `nuxt` carries 7. The one Critical is in `@nuxt/devtools`,
-      a development-only tool. Reachability of each advisory has **not** been
-      assessed; the count is what the scanner reports.
+- [x] **Dependency advisories have drifted: 54 open across 25 package versions —
+      CLOSED 2026-09-30 (87 → 1).** The 2026-07-25 remediation took the tree
+      from 94 to 2. Nothing in the lockfile has moved since, but the advisory
+      database has: 26 alerts were opened in August and 28 in September. Several
+      are on the request path — `multer` (uploads, 3 High), `qs`, `fast-uri` (5
+      High, reached through `ajv`), `undici`, `nodemailer`, `js-yaml`, and
+      `dompurify`, which is the XSS sanitizer. `nuxt` carries 7. The one
+      Critical is in `@nuxt/devtools`, a development-only tool. Reachability of
+      each advisory has **not** been assessed; the count is what the scanner
+      reports.
 
       ⚠️ The pull-request gate will not catch this. It fails on advisories a
       change introduces, and the lockfile is byte-identical on `main` and
       `develop`.
+
+      **Outcome.** Scanned the lockfile directly against OSV rather than
+      trusting the dashboard count: 26 package versions, 87 advisory hits.
+      Patch/minor bumps close all but GHSA-82fw-gwwq-j7x9 on `vitest` 3.2.6
+      (dev-only; fix is vitest 4, a separate migration — **needs a decision**).
+      Two gotchas worth keeping: (1) advisories published the same day the
+      refresh was done made four already-chosen "clean" targets vulnerable
+      (`brace-expansion`, `fast-uri`, `ip-address`, `markdown-it`) — rescan the
+      lockfile right before opening the PR, not after choosing versions;
+      (2) `pnpm -r update "@tiptap/*"` does not touch the transitive copies
+      @nuxt/ui pins, so tiptap is held at one version by seventeen overrides.
+      The tree also carried two copies each of `vue`, `vue-router` and
+      `prosemirror-model/-view`, which is what broke `nuxt typecheck`; `pnpm
+      dedupe` fixed it and should follow any future refresh. `@nuxt/scripts`
+      (never registered or imported) and `@types/nodemailer` (nodemailer 10
+      ships types) removed. `scripts/audit-package-imports.mjs` still reports
+      three pre-existing undeclared imports outside this change: `vue-i18n` in
+      `modules/ui` (reaches the app through `@nuxtjs/i18n`), and
+      `@civicpress/editor-schema`, `@tiptap/core`, `yjs` in root `tests/`.
+      Refreshed, deduplicated and verified in the dependency PR.
 
 - [ ] **The CodeQL baseline was never triaged: 195 alerts, all dated
       2026-07-30.** They are the findings that already existed on the day the

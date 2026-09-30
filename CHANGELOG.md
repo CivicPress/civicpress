@@ -338,6 +338,25 @@ database guarantee rather than a convention.
   and installs it, replacing fixtures that had to `process.chdir()` into their
   own directory to be discovered. Test runs no longer write a stray
   `.system-data` into the repository checkout.
+- **Dependency advisories refreshed: 87 → 1.** An OSV scan of the lockfile found
+  26 package versions carrying 87 advisory hits, accumulated since the last
+  override sweep. Every one is closed by a patch or minor bump except
+  GHSA-82fw-gwwq-j7x9 on `vitest` 3.2.6 and its `@vitest/mocker` (dev-only; the
+  fix is vitest 4, which is its own migration). Notable moves: `nodemailer` 7 →
+  10 (Node ≥ 20, an error code renamed, remote-content TLS validated — none used
+  by `EmailChannel`, which was also driven end-to-end against a live SMTP
+  server), `nuxt` 4.4.7 → 4.5.2, `@nuxtjs/i18n` 10.2 → 10.6, every `@tiptap/*`
+  package to 3.31.3 (pinned by override so @nuxt/ui's seventeen copies match the
+  editor's), `markdown-it`, `multer`, `postcss`, `undici`, `js-yaml`, `qs`,
+  `nanoid`, `devalue`, `brace-expansion`, `fast-uri`, `ip-address`. The tree was
+  then deduplicated: it had been carrying two copies each of `vue`,
+  `vue-router`, `prosemirror-model` and `prosemirror-view`, which is what broke
+  `nuxt typecheck`. `@nuxt/scripts` is removed — a `nuxi init` leftover that was
+  never registered as a module or imported, and the source of the only peer
+  conflict. `@types/nodemailer` is removed because nodemailer 10 ships its own
+  types. `useCivicApi` now types its options as `UseFetchOptions<T>` (Nuxt's own
+  recipe) instead of `Parameters<typeof useFetch<T>>[1]`, which picked whichever
+  overload Nuxt happened to list last.
 
 ## [0.3.1] - 2026-08-06
 
