@@ -1,9 +1,11 @@
 name: codeql
 
 # Static analysis (SAST) of the JS/TS code via GitHub CodeQL. Findings surface
-# in Security > Code scanning; the analysis is REPORT-ONLY — the workflow
-# succeeds even when CodeQL raises alerts, so it never gates CI (only
-# build-test + audit-truth-check are required checks). JS/TS needs no
+# in Security > Code scanning. This WORKFLOW never fails on findings, but do
+# not read that as "report-only": GitHub adds a separate "CodeQL" status check
+# to every pull request that goes RED when the change introduces a new alert
+# (it caught a real path injection on PR #23 and two on PR #42). Only
+# build-test + audit-truth-check are *required* checks. JS/TS needs no
 # compilation, so `build-mode: none` analyzes the source directly — no monorepo
 # build wiring, no dependency install. node_modules and (gitignored) dist are
 # not present in a fresh checkout, so only first-party source is scanned.
@@ -38,6 +40,8 @@ jobs:
         with:
           languages: javascript-typescript
           build-mode: none
+          # Scope: tests/fixtures/harnesses out, scripts/ in — see the file.
+          config-file: ./.github/codeql/codeql-config.yml
       - name: Perform CodeQL analysis
         uses: github/codeql-action/analyze@4187e74d05793876e9989daffde9c3e66b4acd07 # v3
         with:

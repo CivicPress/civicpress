@@ -411,11 +411,12 @@ const swaggerSpec = {
       get: {
         summary: 'List Workflows (NOT IMPLEMENTED)',
         description:
-          'Planned for v0.4.x. Currently returns 501 Not Implemented with a planning notice. See docs/audits/2026-05-16-manifesto-fit-findings.md (api-004).',
+          'Not implemented; returns 501. Workflow management belongs to the programmable workflow engine, which is its own milestone with no release assigned (docs/plans/2026-08-11-v04x-scoping.md). See docs/audits/2026-05-16-manifesto-fit-findings.md (api-004).',
         tags: ['Workflows'],
         responses: {
           '501': {
-            description: 'Not implemented (planned milestone surfaced honestly)',
+            description:
+              'Not implemented (surfaced honestly, no milestone claimed)',
             content: {
               'application/json': {
                 schema: {
@@ -424,7 +425,6 @@ const swaggerSpec = {
                     error: { type: 'string', example: 'not_implemented' },
                     code: { type: 'string', example: 'NOT_IMPLEMENTED' },
                     message: { type: 'string' },
-                    retry_after_milestone: { type: 'string', example: 'v0.4.x' },
                   },
                 },
               },

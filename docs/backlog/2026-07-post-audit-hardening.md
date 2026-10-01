@@ -2125,14 +2125,19 @@ writer.
       a fixture that does not mirror the shipped config can turn a green suite
       into evidence of nothing.
 
-- [ ] **`module.json` capability flags `routes`, `audit`, `cli`, `lifecycle`
-      have no readers.** `ModuleCapabilities` declares five; only
-      `schemaExtensions` is consumed (`record-schema-builder.ts`,
-      `module-resolver.ts`). A module author setting `capabilities.routes: true`
-      gets nothing — and unlike the other findings this one is a promise made to
-      third-party module authors, so removing it from the type is a published-
-      surface change rather than housekeeping. Either implement the dispatch or
-      drop the flags and say the manifest describes schema extensions only.
+- [x] **`module.json` capability flags `routes`, `audit`, `cli`, `lifecycle`
+      have no readers — DROPPED 2026-09-30 (maintainer decision).**
+      `ModuleCapabilities` declared five; only `schemaExtensions` is consumed
+      (`record-schema-builder.ts`, `module-resolver.ts`). A module author
+      setting `capabilities.routes: true` got nothing — and unlike the other
+      findings this one was a promise made to third-party module authors, so
+      removing it from the type is a published-surface change rather than
+      housekeeping. Removed from the type, from `module.schema.json` (whose
+      `capabilities` rejects unknown keys, so a manifest still setting one fails
+      validation naming the key rather than being ignored) and from the
+      contract. Found on the way: **nothing loads a manifest's `entry` either**
+      — `docs/specs/module-contract.md` §5 now says so, and withdraws the
+      `ModuleEntry` interface that described dispatch that was never built.
 
 ### Still not swept
 
