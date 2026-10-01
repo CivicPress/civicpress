@@ -2224,93 +2224,60 @@ about either.
       through the wrapper fixes this too, because passing options bypasses the
       cache.
 
-- [ ] **Dependency advisories have drifted: 54 open across 25 package
-      versions.** The 2026-07-25 remediation took the tree from 94 to 2. Nothing
-      in the lockfile has moved since, but the advisory database has: 26 alerts
-      were opened in August and 28 in September. Several are on the request path
-      — `multer` (uploads, 3 High), `qs`, `fast-uri` (5 High, reached through
-      `ajv`), `undici`, `nodemailer`, `js-yaml`, and `dompurify`, which is the
-      XSS sanitizer. `nuxt` carries 7. The one Critical is in `@nuxt/devtools`,
-      a development-only tool. Reachability of each advisory has **not** been
-      assessed; the count is what the scanner reports.
+- [x] **Dependency advisories have drifted: 54 open across 25 package versions —
+      CLOSED 2026-09-30 (87 → 1).** The 2026-07-25 remediation took the tree
+      from 94 to 2. Nothing in the lockfile has moved since, but the advisory
+      database has: 26 alerts were opened in August and 28 in September. Several
+      are on the request path — `multer` (uploads, 3 High), `qs`, `fast-uri` (5
+      High, reached through `ajv`), `undici`, `nodemailer`, `js-yaml`, and
+      `dompurify`, which is the XSS sanitizer. `nuxt` carries 7. The one
+      Critical is in `@nuxt/devtools`, a development-only tool. Reachability of
+      each advisory has **not** been assessed; the count is what the scanner
+      reports.
 
       ⚠️ The pull-request gate will not catch this. It fails on advisories a
       change introduces, and the lockfile is byte-identical on `main` and
       `develop`.
 
-- [x] **The CodeQL baseline was never triaged: 195 alerts. TRIAGED 2026-09-29**
-      — `docs/audits/2026-09-29-codeql-baseline-triage.md` has a verdict for
-      every production alert, what was fixed, and the dismissal reason for the
-      fourteen that remain. Of the 79 in production source, one described
-      something exploitable as the scanner described it (#118, the `gray-matter`
-      engine); three groups were real but blind (a type walked out of the
-      records root, the template root, the geography root); the rest were
-      guarded, dead, or false positives — and are now confined where the
-      filesystem call is, so the guarantee no longer depends on a validator
-      elsewhere.
+      **Outcome.** Scanned the lockfile directly against OSV rather than
+      trusting the dashboard count: 26 package versions, 87 advisory hits.
+      Patch/minor bumps close all but GHSA-82fw-gwwq-j7x9 on `vitest` 3.2.6
+      (dev-only; fix is vitest 4, a separate migration — **needs a decision**).
+      Two gotchas worth keeping: (1) advisories published the same day the
+      refresh was done made four already-chosen "clean" targets vulnerable
+      (`brace-expansion`, `fast-uri`, `ip-address`, `markdown-it`) — rescan the
+      lockfile right before opening the PR, not after choosing versions;
+      (2) `pnpm -r update "@tiptap/*"` does not touch the transitive copies
+      @nuxt/ui pins, so tiptap is held at one version by seventeen overrides.
+      The tree also carried two copies each of `vue`, `vue-router` and
+      `prosemirror-model/-view`, which is what broke `nuxt typecheck`; `pnpm
+      dedupe` fixed it and should follow any future refresh. `@nuxt/scripts`
+      (never registered or imported) and `@types/nodemailer` (nodemailer 10
+      ships types) removed. (3) `scripts/audit-package-imports.mjs` reported
+      `vue-i18n` as imported-but-undeclared in `modules/ui`, and it was
+      dismissed as pre-existing — then CI failed on a clean clone: the UI test
+      config aliased it to a hard-coded `.pnpm/vue-i18n@…_vue@3.5.35_…`
+      directory that survived locally as a leftover and vanished once the tree
+      moved. ⚠️ **An undeclared import that "works" is working through an
+      accident; treat the audit script's `✗` lines as failures.** `vue-i18n` is
+      now declared and the alias resolves through `modules/ui/node_modules`.
+      Still reported, still pre-existing: `@civicpress/editor-schema`,
+      `@tiptap/core`, `yjs` imported by root `tests/`. Refreshed, deduplicated
+      and verified in the dependency PR.
 
-      ⚠️ **The findings that mattered were beside the alerts, not in them.**
-      Each was found while checking whether an alert was right:
+- [ ] **The CodeQL baseline was never triaged: 195 alerts, all dated
+      2026-07-30.** They are the findings that already existed on the day the
+      scanner was switched on. 116 are in tests and scripts — 111 of those are a
+      single rule, `js/shell-command-injection-from-environment`, fired by CLI
+      tests that build a shell command from a temp-directory path. 79 are in
+      production source: 43 `js/path-injection`, 12 `js/polynomial-redos`, 15
+      across the hand-rolled HTML sanitizers, and a tail of nine.
 
-  - 🔴 `commit1`/`commit2` on `GET /diff/:id` were passed to git as arguments;
-    `--output=<path>` wrote a file. **Measured as a self-registered user.**
-    Fixed.
-  - 🔴 Registering an account bypasses the published-only gate — below.
-  - Template preview interpolated variable NAMES into a `RegExp`: exponential,
-    from `templates:view`. Fixed.
-  - Every email's HTML part was assembled without encoding; the reset email
-    carries the username. Fixed.
-  - The device-registration limiter keyed on the client's own `X-Forwarded-For`.
-    Fixed.
-  - `validateRequest` scanned notification data before checking its size: 169 s
-    for 1 MB. Fixed.
-  - `/diff/:id`'s filters always 500'd and its compare returned an empty diff by
-    default; `/status/records` never counted a status; the raw config routes
-    resolved paths against the working directory. Fixed.
-
-  The 116 alerts in tests and scripts are not triaged individually; the document
-  offers two ways to make that count honest, both a maintainer's call.
-
-- [ ] **🔴 Registering an account bypasses the published-only gate (needs a
-      decision).** The gate added on 2026-08-09 asks one question:
-      `if (user) return { visible: 'all' }`
-      (`modules/api/src/services/records-service/listing.ts`). Any authenticated
-      user sees every status. `POST /api/v1/users/register` needs no
-      authentication, no email verification and no switch to turn it off, and
-      gives the `public` role.
-
-      **Measured:** registered `passerby`, logged in, and as that user listed
-      records in every status (`approved`, `draft`, `pending_review`,
-      `rejected`, …), read a draft's body in full with a 200 where the anonymous
-      request got a 404, and got the same set back from search. The gate
-      protects against exactly one thing — not being logged in — and logging in
-      is free.
-
-      Not changed here, because the fix is an authorization-model choice: which
-      permission grants sight of unpublished records? Using `records:edit` as
-      the line matches the shipped roles (admin and clerk have it; `public`
-      does not) but would hide unpublished records from a custom reviewer role
-      that has `records:view` only. A dedicated permission is cleaner and
-      changes `roles.yml`. Closing registration by default is a third shape.
-      The 404 bodies of `/diff/*` and `/validation/*`, which list every record
-      file on disk as `availableRecords`, are the same gap by another door.
-
-- [ ] **`sanitizeVariableValue` in the template generator (needs a decision).**
-      Five CodeQL alerts. It strips `<script>`, `<iframe>`, `javascript:` and
-      `on\w+=` from values substituted into a **Markdown** template. It is
-      bypassable (`<scr<script>ipt>` reassembles) and it **corrupts text**: "The
-      condition = approved" becomes "The c approved", because `ondition =`
-      matches. Every in-repo HTML render runs DOMPurify, so no active payload
-      survives today. The choices: remove it and rely on output encoding at
-      render (two characterization tests assert the current stripping); or keep
-      it and accept both defects. Input to it is now bounded (20 KB per preview)
-      so the quadratic patterns cannot stall the process meanwhile.
-
-- [ ] **A username has no length limit at registration.** `POST /users/register`
-      requires a username and checks nothing else about it. It is stored, it is
-      interpolated into the password-reset email (now encoded), and it is
-      scanned by `validateRequest` (now after the size check). A bound is not
-      controversial; what the bound and the character set should be is a call.
+      Many of the path-injection alerts are expected to be false positives
+      against the containment helpers the `FA-*` audit added
+      (`resolveInsideRecordsRoot`, `resolveLocalStoragePath`), which a static
+      analyser does not always recognise. That is an expectation, not a result:
+      the same rule caught a real defect on PR #23. Each needs a verdict.
 
 - [ ] **`notifications.yml` privacy settings do nothing (needs a decision).**
       `security.filter_pii`, `security.encrypt_sensitive_data` and

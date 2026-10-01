@@ -52,7 +52,8 @@ async function testSearchV2() {
         id: 'test-budget-2024',
         type: 'bylaw',
         title: 'Budget 2024',
-        content: 'This is the municipal budget for fiscal year 2024. It includes allocations for parks, roads, and public safety.',
+        content:
+          'This is the municipal budget for fiscal year 2024. It includes allocations for parks, roads, and public safety.',
         tags: 'budget,finance,2024',
         status: 'published',
       },
@@ -60,7 +61,8 @@ async function testSearchV2() {
         id: 'test-noise-ordinance',
         type: 'bylaw',
         title: 'Noise Ordinance',
-        content: 'Regulations governing noise levels in residential and commercial areas during specified hours.',
+        content:
+          'Regulations governing noise levels in residential and commercial areas during specified hours.',
         tags: 'noise,safety,residential',
         status: 'published',
       },
@@ -68,7 +70,8 @@ async function testSearchV2() {
         id: 'test-budget-2025',
         type: 'article',
         title: 'Budget 2025 Preliminary',
-        content: 'Preliminary budget estimates for fiscal year 2025. Subject to city council approval.',
+        content:
+          'Preliminary budget estimates for fiscal year 2025. Subject to city council approval.',
         tags: 'budget,finance,2025',
         status: 'draft',
       },
@@ -76,7 +79,8 @@ async function testSearchV2() {
         id: 'test-parks',
         type: 'resolution',
         title: 'Parks Improvement Resolution',
-        content: 'Resolution to improve city parks with new playground equipment and landscaping.',
+        content:
+          'Resolution to improve city parks with new playground equipment and landscaping.',
         tags: 'parks,recreation,improvements',
         status: 'approved',
       },
@@ -110,18 +114,24 @@ async function testSearchV2() {
     // Test 1: Basic Search
     console.log('🔍 Test 1: Basic Search');
     console.log('────────────────────────────────────────');
-    const basicResults = await recordManager.searchRecords('budget', { limit: 10 });
+    const basicResults = await recordManager.searchRecords('budget', {
+      limit: 10,
+    });
     console.log(`Query: "budget"`);
     console.log(`Results: ${basicResults.records.length}`);
     basicResults.records.forEach((r, i) => {
-      console.log(`  ${i + 1}. ${r.title} (${r.type}) - Score: ${r._search?.relevance_score?.toFixed(3) || 'N/A'}`);
+      console.log(
+        `  ${i + 1}. ${r.title} (${r.type}) - Score: ${r._search?.relevance_score?.toFixed(3) || 'N/A'}`
+      );
     });
     console.log();
 
     // Test 2: Multi-word Search
     console.log('🔍 Test 2: Multi-word Search');
     console.log('────────────────────────────────────────');
-    const multiWordResults = await recordManager.searchRecords('budget 2024', { limit: 10 });
+    const multiWordResults = await recordManager.searchRecords('budget 2024', {
+      limit: 10,
+    });
     console.log(`Query: "budget 2024"`);
     console.log(`Results: ${multiWordResults.records.length}`);
     multiWordResults.records.forEach((r, i) => {
@@ -132,7 +142,10 @@ async function testSearchV2() {
     // Test 3: Phrase Search
     console.log('🔍 Test 3: Phrase Search');
     console.log('────────────────────────────────────────');
-    const phraseResults = await recordManager.searchRecords('"noise ordinance"', { limit: 10 });
+    const phraseResults = await recordManager.searchRecords(
+      '"noise ordinance"',
+      { limit: 10 }
+    );
     console.log(`Query: "noise ordinance"`);
     console.log(`Results: ${phraseResults.records.length}`);
     phraseResults.records.forEach((r, i) => {
@@ -143,7 +156,9 @@ async function testSearchV2() {
     // Test 4: Suggestions with Typo Tolerance
     console.log('🔍 Test 4: Suggestions with Typo Tolerance');
     console.log('────────────────────────────────────────');
-    const suggestions = await recordManager.getSearchSuggestions('budjet', { limit: 5 });
+    const suggestions = await recordManager.getSearchSuggestions('budjet', {
+      limit: 5,
+    });
     console.log(`Query: "budjet" (typo for "budget")`);
     console.log(`Suggestions: ${suggestions.length}`);
     suggestions.forEach((s, i) => {
@@ -189,7 +204,9 @@ async function testSearchV2() {
     }
     const elapsed = Date.now() - start;
     const avgTime = elapsed / iterations;
-    console.log(`Average search time (${iterations} iterations): ${avgTime.toFixed(2)}ms`);
+    console.log(
+      `Average search time (${iterations} iterations): ${avgTime.toFixed(2)}ms`
+    );
     console.log(`Total time: ${elapsed}ms`);
     console.log();
 
@@ -214,7 +231,6 @@ async function testSearchV2() {
     // Cleanup
     await civic.close();
     console.log('🧹 Cleaned up test database');
-
   } catch (error) {
     console.error('\n❌ Test failed:', error);
     console.error(error.stack);

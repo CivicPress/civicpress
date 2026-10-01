@@ -61,7 +61,9 @@ export function checkSpecsDir(dir) {
 if (import.meta.url === `file://${process.argv[1]}`) {
   const problems = checkSpecsDir('docs/specs');
   if (problems.length === 0) {
-    console.log('spec-frontmatter OK — all frontmatter parses with a known status.');
+    console.log(
+      'spec-frontmatter OK — all frontmatter parses with a known status.'
+    );
     process.exit(0);
   }
   for (const p of problems) console.error(`  ${p.file}: ${p.error}`);

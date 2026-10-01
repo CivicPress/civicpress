@@ -163,19 +163,12 @@ export default defineConfig({
         '@tiptap',
         'y-tiptap'
       ),
-      // vue-i18n is a transitive dep of @nuxtjs/i18n (not a direct dep), so it
-      // is unresolvable from the root test context. Aliasing it fixes the D3
-      // hazard: tests that transitively import app/composables/useTypedI18n.ts
-      // (RecordForm.test.ts, EditorHeader.test.ts) previously failed to
-      // transform on `Failed to resolve import "vue-i18n"`.
-      'vue-i18n': join(
-        __dirname,
-        'node_modules',
-        '.pnpm',
-        'vue-i18n@11.4.4_vue@3.5.35_typescript@5.9.3_',
-        'node_modules',
-        'vue-i18n'
-      ),
+      // vue-i18n is imported directly by app/composables/useTypedI18n.ts, so
+      // modules/ui declares it and it resolves like the packages above. It used
+      // to be aliased to a hard-coded pnpm virtual-store directory
+      // (`.pnpm/vue-i18n@11.4.4_vue@3.5.35_…`), which survived locally as a
+      // leftover long after the tree had moved on and failed on a clean clone.
+      'vue-i18n': join(__dirname, 'modules', 'ui', 'node_modules', 'vue-i18n'),
       // vue-router is a transitive dep (via Nuxt) and unresolvable from the root
       // test context — same hoisting issue as vue-i18n above. Point it at the
       // modules/ui resolution so a component importing `useRoute`/`useRouter`

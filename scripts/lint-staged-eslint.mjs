@@ -20,51 +20,51 @@
  * 0 errors and currently carries 8 known warnings.
  */
 
-import { existsSync } from 'fs'
-import path from 'path'
-import { spawnSync } from 'child_process'
+import { existsSync } from 'fs';
+import path from 'path';
+import { spawnSync } from 'child_process';
 
 const CONFIG_NAMES = [
   'eslint.config.cjs',
   'eslint.config.mjs',
   'eslint.config.js',
-]
+];
 
-const repoRoot = process.cwd()
+const repoRoot = process.cwd();
 
 /** Nearest ancestor of `file` that can lint it, or null. */
 function owningPackage(file) {
-  let dir = path.dirname(path.resolve(file))
+  let dir = path.dirname(path.resolve(file));
 
   while (dir.startsWith(repoRoot)) {
     const hasConfig = CONFIG_NAMES.some((name) =>
       existsSync(path.join(dir, name))
-    )
-    const hasBinary = existsSync(path.join(dir, 'node_modules/.bin/eslint'))
-    if (hasConfig && hasBinary) return dir
+    );
+    const hasBinary = existsSync(path.join(dir, 'node_modules/.bin/eslint'));
+    if (hasConfig && hasBinary) return dir;
 
-    const parent = path.dirname(dir)
-    if (parent === dir) break
-    dir = parent
+    const parent = path.dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
   }
 
-  return null
+  return null;
 }
 
-const files = process.argv.slice(2)
-if (files.length === 0) process.exit(0)
+const files = process.argv.slice(2);
+if (files.length === 0) process.exit(0);
 
-const byPackage = new Map()
-const unowned = []
+const byPackage = new Map();
+const unowned = [];
 
 for (const file of files) {
-  const pkg = owningPackage(file)
+  const pkg = owningPackage(file);
   if (!pkg) {
-    unowned.push(path.relative(repoRoot, path.resolve(file)))
-    continue
+    unowned.push(path.relative(repoRoot, path.resolve(file)));
+    continue;
   }
-  if (!byPackage.has(pkg)) byPackage.set(pkg, [])
-  byPackage.get(pkg).push(path.resolve(file))
+  if (!byPackage.has(pkg)) byPackage.set(pkg, []);
+  byPackage.get(pkg).push(path.resolve(file));
 }
 
 // Say what was NOT linted. A file in a directory with no ESLint setup (root
@@ -73,21 +73,21 @@ for (const file of files) {
 if (unowned.length > 0) {
   console.log(
     `ℹ️  ESLint skipped ${unowned.length} file(s) in directories with no ESLint config: ${unowned.join(', ')}`
-  )
+  );
 }
 
-let failed = false
+let failed = false;
 
 for (const [pkg, pkgFiles] of byPackage) {
   const result = spawnSync(
     path.join(pkg, 'node_modules/.bin/eslint'),
     pkgFiles.map((file) => path.relative(pkg, file)),
     { cwd: pkg, stdio: 'inherit' }
-  )
+  );
 
   // A signal or a missing binary leaves status null — treat anything that is
   // not a clean 0 as a failure rather than assuming success.
-  if (result.status !== 0) failed = true
+  if (result.status !== 0) failed = true;
 }
 
-process.exit(failed ? 1 : 0)
+process.exit(failed ? 1 : 0);

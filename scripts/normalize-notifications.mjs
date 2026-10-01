@@ -1,11 +1,23 @@
 #!/usr/bin/env node
-import { readFileSync, writeFileSync, copyFileSync, existsSync, mkdirSync } from 'fs';
+import {
+  readFileSync,
+  writeFileSync,
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+} from 'fs';
 import { dirname, join } from 'path';
 import yaml from 'js-yaml';
 
 const projectRoot = process.cwd();
 const sysPath = join(projectRoot, '.system-data', 'notifications.yml');
-const defPath = join(projectRoot, 'core', 'src', 'defaults', 'notifications.yml');
+const defPath = join(
+  projectRoot,
+  'core',
+  'src',
+  'defaults',
+  'notifications.yml'
+);
 
 function loadYaml(path) {
   return yaml.load(readFileSync(path, 'utf8'));
@@ -13,20 +25,36 @@ function loadYaml(path) {
 
 function normalize(schemaNode, currentNode) {
   // If schema leaf with value, keep shape and fill value from current
-  if (schemaNode && typeof schemaNode === 'object' && !Array.isArray(schemaNode) && Object.prototype.hasOwnProperty.call(schemaNode, 'value')) {
+  if (
+    schemaNode &&
+    typeof schemaNode === 'object' &&
+    !Array.isArray(schemaNode) &&
+    Object.prototype.hasOwnProperty.call(schemaNode, 'value')
+  ) {
     const next = { ...schemaNode };
-    const currentValue = (currentNode && typeof currentNode === 'object' && Object.prototype.hasOwnProperty.call(currentNode, 'value'))
-      ? currentNode.value
-      : currentNode;
-    next.value = currentValue !== undefined ? currentValue : next.value ?? null;
+    const currentValue =
+      currentNode &&
+      typeof currentNode === 'object' &&
+      Object.prototype.hasOwnProperty.call(currentNode, 'value')
+        ? currentNode.value
+        : currentNode;
+    next.value =
+      currentValue !== undefined ? currentValue : (next.value ?? null);
     return next;
   }
 
   // Recurse objects
-  if (schemaNode && typeof schemaNode === 'object' && !Array.isArray(schemaNode)) {
+  if (
+    schemaNode &&
+    typeof schemaNode === 'object' &&
+    !Array.isArray(schemaNode)
+  ) {
     const out = {};
     for (const key of Object.keys(schemaNode)) {
-      out[key] = normalize(schemaNode[key], currentNode ? currentNode[key] : undefined);
+      out[key] = normalize(
+        schemaNode[key],
+        currentNode ? currentNode[key] : undefined
+      );
     }
     return out;
   }
@@ -64,10 +92,12 @@ function main() {
     copyFileSync(sysPath, backup);
     console.log('Backup written to', backup);
   }
-  writeFileSync(sysPath, yaml.dump(merged, { noRefs: true, lineWidth: 0 }), 'utf8');
+  writeFileSync(
+    sysPath,
+    yaml.dump(merged, { noRefs: true, lineWidth: 0 }),
+    'utf8'
+  );
   console.log('Normalized', sysPath);
 }
 
 main();
-
-

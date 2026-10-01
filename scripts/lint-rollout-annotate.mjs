@@ -22,7 +22,8 @@ import { readFileSync, writeFileSync } from 'node:fs';
 
 const APPLY = process.argv.includes('--apply');
 const MANIFEST = 'docs/audits/lint-allowlist-2026-05-28.json';
-const DISABLE = '// eslint-disable-next-line @typescript-eslint/no-explicit-any';
+const DISABLE =
+  '// eslint-disable-next-line @typescript-eslint/no-explicit-any';
 
 // Files to skip per-line because they get a file-level disable instead.
 // Populate this list AFTER the hot-spot decision in Step 3 below.
@@ -38,12 +39,18 @@ const sites = JSON.parse(readFileSync(MANIFEST, 'utf8'));
 function isCommentOnly(line) {
   const trimmed = line.trim();
   if (trimmed.startsWith('//')) return true;
-  if (trimmed.startsWith('/*') || trimmed.startsWith('*/') || trimmed.startsWith('*')) return true;
+  if (
+    trimmed.startsWith('/*') ||
+    trimmed.startsWith('*/') ||
+    trimmed.startsWith('*')
+  )
+    return true;
   // Heuristic for inline comment after //: if `as any` appears only after //, it's comment-mention.
   const commentStart = line.indexOf('//');
   if (commentStart >= 0) {
     const beforeComment = line.slice(0, commentStart);
-    const hasCastOutsideComment = /\bas any\b/.test(beforeComment) || /: any\b/.test(beforeComment);
+    const hasCastOutsideComment =
+      /\bas any\b/.test(beforeComment) || /: any\b/.test(beforeComment);
     if (!hasCastOutsideComment) return true;
   }
   return false;
@@ -78,7 +85,10 @@ for (const [file, arr] of byFile) {
       continue;
     }
     const prev = (lines[targetIdx - 1] || '').trim();
-    if (prev.includes('eslint-disable-next-line') && prev.includes('no-explicit-any')) {
+    if (
+      prev.includes('eslint-disable-next-line') &&
+      prev.includes('no-explicit-any')
+    ) {
       skippedAlreadyDisabled++;
       continue;
     }

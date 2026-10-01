@@ -19,14 +19,15 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { execSync } from 'node:child_process';
 
 const APPLY = process.argv.includes('--apply');
-const PATTERN_JS = '// eslint-disable-next-line @typescript-eslint/no-explicit-any';
-const PATTERN_HTML = '<!-- eslint-disable-next-line @typescript-eslint/no-explicit-any -->';
+const PATTERN_JS =
+  '// eslint-disable-next-line @typescript-eslint/no-explicit-any';
+const PATTERN_HTML =
+  '<!-- eslint-disable-next-line @typescript-eslint/no-explicit-any -->';
 
 // Find all .vue files with the JS pattern (candidates).
-const out = execSync(
-  `git grep -ln "${PATTERN_JS}" -- '*.vue' || true`,
-  { encoding: 'utf8' }
-).trim();
+const out = execSync(`git grep -ln "${PATTERN_JS}" -- '*.vue' || true`, {
+  encoding: 'utf8',
+}).trim();
 const files = out ? out.split('\n') : [];
 
 let converted = 0;

@@ -32,7 +32,10 @@ import { startInProcessRealtime } from '../../modules/api/src/realtime-bootstrap
 import { startInProcessBroadcastBox } from '../../modules/api/src/broadcast-box-bootstrap.js';
 import { startInProcessTranscription } from '../../modules/api/src/transcription-bootstrap.js';
 
-const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), '../..');
+const ROOT = path.resolve(
+  path.dirname(new URL(import.meta.url).pathname),
+  '../..'
+);
 const E2E_DIR = process.env.E2E_DIR || path.join(ROOT, '.e2e-live');
 const dataDir = path.join(E2E_DIR, 'data');
 const systemDataDir = path.join(E2E_DIR, '.system-data');
@@ -40,8 +43,12 @@ const BOOTSTRAP_JSON = path.join(E2E_DIR, 'bootstrap.json');
 const HTTP_PORT = Number(process.env.E2E_HTTP_PORT || 3000);
 const RT_PORT = Number(process.env.E2E_RT_PORT || 3001);
 // whisper.cpp (language=en for the JFK sample clip; prod default is fr-CA).
-const WHISPER_BIN = process.env.WHISPER_CPP_BIN || '/home/claude/whisper.cpp/build/bin/whisper-cli';
-const WHISPER_MODEL = process.env.WHISPER_CPP_MODEL || '/home/claude/whisper.cpp/models/ggml-base.bin';
+const WHISPER_BIN =
+  process.env.WHISPER_CPP_BIN ||
+  '/home/claude/whisper.cpp/build/bin/whisper-cli';
+const WHISPER_MODEL =
+  process.env.WHISPER_CPP_MODEL ||
+  '/home/claude/whisper.cpp/models/ggml-base.bin';
 
 const log = (...a) => console.log(new Date().toISOString(), ...a);
 const logger = { info: log, warn: log, error: log, debug: () => {} };
@@ -52,14 +59,22 @@ fs.rmSync(E2E_DIR, { recursive: true, force: true });
 fs.mkdirSync(path.join(dataDir, '.civic'), { recursive: true });
 fs.mkdirSync(path.join(dataDir, 'records'), { recursive: true });
 fs.mkdirSync(systemDataDir, { recursive: true });
-execSync('git init -q && git config user.name T && git config user.email t@e.com', {
-  cwd: dataDir,
-  shell: '/bin/bash',
-});
+execSync(
+  'git init -q && git config user.name T && git config user.email t@e.com',
+  {
+    cwd: dataDir,
+    shell: '/bin/bash',
+  }
+);
 fs.writeFileSync(
   path.join(systemDataDir, 'realtime.yml'),
   yaml.dump({
-    realtime: { enabled: true, port: RT_PORT, host: '127.0.0.1', path: '/realtime' },
+    realtime: {
+      enabled: true,
+      port: RT_PORT,
+      host: '127.0.0.1',
+      path: '/realtime',
+    },
   })
 );
 fs.writeFileSync(
@@ -68,7 +83,12 @@ fs.writeFileSync(
     modules: ['broadcast-box'],
     default_role: 'clerk',
     record_types_config: {
-      session: { label: 'Session', description: 'Meeting sessions', source: 'core', priority: 1 },
+      session: {
+        label: 'Session',
+        description: 'Meeting sessions',
+        source: 'core',
+        priority: 1,
+      },
     },
   })
 );
@@ -76,7 +96,10 @@ fs.writeFileSync(
 // ── core init + module gating ───────────────────────────────────────────────
 const civic = new CivicPress({
   dataDir,
-  database: { type: 'sqlite', sqlite: { file: path.join(systemDataDir, 'civic.db') } },
+  database: {
+    type: 'sqlite',
+    sqlite: { file: path.join(systemDataDir, 'civic.db') },
+  },
 });
 await civic.initialize();
 const recordManager = civic.getRecordManager();
@@ -113,23 +136,43 @@ log('transcription worker started:', tr.started);
 
 // ── seed a session record + enroll a device ─────────────────────────────────
 await recordManager.createRecord(
-  { title: 'Live E2E Council Meeting', type: 'session', content: '# Meeting', status: 'published', metadata: {} },
+  {
+    title: 'Live E2E Council Meeting',
+    type: 'session',
+    content: '# Meeting',
+    status: 'published',
+    metadata: {},
+  },
   SYSTEM_USER
 );
 const { records } = await recordManager.listRecords({ type: 'session' });
 const recordId = records[0].id;
 
 const deviceManager = container.resolve('broadcastBoxDeviceManager');
-const deviceCommandService = container.resolve('broadcastBoxDeviceCommandService');
+const deviceCommandService = container.resolve(
+  'broadcastBoxDeviceCommandService'
+);
 const sessionController = container.resolve('broadcastBoxSessionController');
 
-const enrollment = await deviceManager.enrollDevice({ name: 'Live E2E Camera' });
-log('enrolled device uuid:', enrollment.deviceUuid, 'code:', enrollment.enrollmentCode);
+const enrollment = await deviceManager.enrollDevice({
+  name: 'Live E2E Camera',
+});
+log(
+  'enrolled device uuid:',
+  enrollment.deviceUuid,
+  'code:',
+  enrollment.enrollmentCode
+);
 
 fs.writeFileSync(
   BOOTSTRAP_JSON,
   JSON.stringify(
-    { recordId, deviceUuid: enrollment.deviceUuid, enrollmentCode: enrollment.enrollmentCode, dataDir },
+    {
+      recordId,
+      deviceUuid: enrollment.deviceUuid,
+      enrollmentCode: enrollment.enrollmentCode,
+      dataDir,
+    },
     null,
     2
   )
@@ -199,7 +242,16 @@ app.get('/control/record/:id', async (req, res) => {
 });
 
 app.get('/control/health', (_req, res) =>
-  res.json({ ok: true, bb: bb.started, realtime: realtime.started, transcription: tr.started, recordId, deviceUuid: enrollment.deviceUuid })
+  res.json({
+    ok: true,
+    bb: bb.started,
+    realtime: realtime.started,
+    transcription: tr.started,
+    recordId,
+    deviceUuid: enrollment.deviceUuid,
+  })
 );
 
-app.listen(HTTP_PORT, () => log(`LIVE SERVER READY http://127.0.0.1:${HTTP_PORT} (realtime :${RT_PORT})`));
+app.listen(HTTP_PORT, () =>
+  log(`LIVE SERVER READY http://127.0.0.1:${HTTP_PORT} (realtime :${RT_PORT})`)
+);

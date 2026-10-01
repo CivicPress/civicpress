@@ -58,7 +58,10 @@ module.exports = [
     },
     rules: {
       'no-unused-vars': 'off',
-      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
+      ],
       // Test files use `any` freely for mocks/fixtures, and several source types are
       // `Record<string, any>` themselves, so flagging it in tests is pure noise.
       '@typescript-eslint/no-explicit-any': 'off',
@@ -80,7 +83,10 @@ module.exports = [
     },
     rules: {
       'no-unused-vars': 'off',
-      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
+      ],
       '@typescript-eslint/no-explicit-any': 'error',
       // A bare gray-matter call EXECUTES front matter tagged `---js`. The
       // wrapper refuses that engine; nothing else may import the library.
@@ -112,4 +118,4 @@ module.exports = [
       globals: NODE_GLOBALS,
     },
   },
-]; 
+];
