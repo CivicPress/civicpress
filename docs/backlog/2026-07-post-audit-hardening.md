@@ -2271,14 +2271,92 @@ about either.
 
 ### Correctness and honesty
 
-- [ ] **`EditorHeader.vue` still decides for itself what "published" means.**
-      The v0.4.x scoping document lists this as gap 4 and its outcome note says
-      shape A — which included it — "is done". Half of A is:
-      `modules/ui/app/components/editor/EditorHeader.vue` still hardcodes
-      `['published', 'active', 'approved']` in two places. Since 2026-08-09 the
-      authority is the `public` flag on each record status, and the two
-      disagree: `approved` is not public, but the editor treats an approved
-      record as published.
+- [x] **`EditorHeader.vue` still decides for itself what "published" means.
+      FIXED 2026-09-29.** `GET /api/v1/system/record-statuses` now serves the
+      `public` flag for every status, `useRecordStatuses` exposes
+      `isPublicStatus()`, and the editor asks instead of keeping a list. Unknown
+      or not-yet-loaded statuses answer "not public", the same fail-closed
+      default as the read gate.
+
+      The list turned out to be the smaller half of the problem. Three dialogs
+      **stated** things about public visibility that configuration did not back:
+      publish promised "will become publicly accessible" for any status; archive
+      said archived records are "not publicly accessible", which has been false
+      by default since 2026-08-09; unpublish warned about leaving public view
+      for records that were never in it. All three now follow the flag.
+
+      Behaviour changes, stated rather than buried: "Return to draft" is offered
+      from any status the workflow allows it from (it was offered for the
+      hardcoded statuses only, and `draft` was also filtered out of the generic
+      list, so other statuses had no route back from this menu); and the menu
+      lists every transition the workflow allows except `draft` and `archived`,
+      which have their own items — so a reviewed record now shows "Change
+      status to Approved".
+
+      Pinned by 17 component tests that read the real menu and the real dialog
+      text, against a status table the test can reconfigure. Run against the old
+      component, 9 of them fail. The 8 tests that existed before only asserted
+      that the component rendered.
+
+      The original entry follows. The v0.4.x scoping document lists this as gap
+      4 and its outcome note says shape A — which included it — "is done". Half
+      of A is: `modules/ui/app/components/editor/EditorHeader.vue` still
+      hardcodes `['published', 'active', 'approved']` in two places. Since
+      2026-08-09 the authority is the `public` flag on each record status, and
+      the two disagree: `approved` is not public, but the editor treats an
+      approved record as published.
+
+- [ ] **🔴 The shipped review chain cannot be walked (needs a decision).** Found
+      while checking the fix above against a default instance, and **measured**
+      on one built from the shipped `workflows.yml` and `roles.yml`. The project
+      ships two status vocabularies and they do not agree:
+
+  | Source                                   | Statuses                                                                                              |
+  | ---------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+  | `workflows.yml` (transitions)            | `draft`, `proposed`, `reviewed`, `approved`, `archived`                                               |
+  | `record_statuses_config` (record schema) | `draft`, `pending_review`, `under_review`, `approved`, `published`, `rejected`, `archived`, `expired` |
+
+  `proposed` and `reviewed` — the first two steps of the shipped workflow — are
+  not valid record statuses. Walking the chain as an admin, and again as a
+  clerk:
+  - A draft saved with `status: proposed` is accepted (200).
+  - Publishing it answers **500**:
+    `Schema validation failed: /status must be one of: draft, pending_review, under_review, approved, published, …`.
+  - Publishing straight to `approved` is refused (403): "Allowed transitions:
+    proposed, archived". The guard insists on the step that cannot be taken.
+  - Publishing as `published` succeeds (201), and the record is then readable
+    anonymously. `published` is not a workflow-controlled status, so this needs
+    only `records:edit`.
+
+  So in a default instance the review chain is unreachable **and** unnecessary:
+  the one route to a public record goes around it. `approved`, where the shipped
+  workflow ends, is not public.
+
+  Which vocabulary wins is a product decision and it changes shipped defaults,
+  so nothing was changed. The shapes: rename the workflow's steps to statuses
+  the schema accepts; add `proposed` / `reviewed` to the record statuses; or
+  make `published` a workflow target so publication is reached through the chain
+  rather than beside it.
+
+  ⚠️ The suite could not have caught this. The API fixture's `workflows.yml`
+  does not define the `admin` role at all — the same probe against the fixture
+  stops at "Role 'admin' not found in configuration" — so no test exercises the
+  shipped chain. It is the fixture-versus-shipped-configuration lesson from the
+  2026-08-12 sweep, again.
+
+- [ ] **A draft that was never published has no transitions.**
+      `GET /api/v1/records/:id/transitions` returns `[]` for it, for every role:
+      `getAllowedTransitions` looks the record up in the `records` table, and a
+      never-published draft is only in `record_drafts`. The editor's status menu
+      is therefore empty for exactly the records that are still moving through
+      review. Measured alongside the entry above.
+
+- [ ] **"Change status to …" answers 500 when there is nothing to publish.** The
+      editor's generic status items go through `POST /records/:id/publish`,
+      which requires a draft. For a record with no draft it throws a plain
+      `Error('Draft not found')`, which surfaces as `500 INTERNAL_ERROR`
+      ("Failed to publish record") rather than a 4xx. Return-to-draft and
+      archive do not have this problem: they use `POST /records/:id/status`.
 
 - [ ] **Two routers promise the milestone that is about to ship (needs a
       decision).** `/api/v1/workflows` and `/api/v1/hooks` answer every request
