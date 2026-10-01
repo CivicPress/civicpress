@@ -891,8 +891,11 @@ export function createWorkflowConfig(config: TestConfig) {
     },
   };
 
+  // `workflows.yml` — plural — is the file WorkflowConfigManager reads. This
+  // wrote `workflow.yml` for its whole life, so every API test ran on the
+  // manager's inline default instead of on this configuration.
   writeFileSync(
-    join(config.civicDir, 'workflow.yml'),
+    join(config.civicDir, 'workflows.yml'),
     yaml.dump(workflowConfig)
   );
 }
@@ -1495,6 +1498,15 @@ export async function createAPITestContext(
     civicrc: options.civicrc,
   });
   const config = instance.config;
+  if (options.shippedDefaults) {
+    const defaultsDir = join(process.cwd(), 'core', 'src', 'defaults');
+    for (const file of ['workflows.yml', 'roles.yml', 'config.yml']) {
+      writeFileSync(
+        join(config.civicDir, file),
+        readFileSync(join(defaultsDir, file), 'utf-8')
+      );
+    }
+  }
   const port = getRandomPort();
 
   const { simpleGit } = await import('simple-git');

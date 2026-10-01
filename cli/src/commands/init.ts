@@ -61,6 +61,12 @@ const INIT_RECORD_STATUSES_CONFIG = {
     source: 'core',
     priority: 1,
   },
+  proposed: {
+    label: 'Proposed',
+    description: 'Put forward for review; the first step of the review chain',
+    source: 'core',
+    priority: 1.5,
+  },
   pending_review: {
     label: 'Pending Review',
     description: 'Submitted for review and awaiting approval',
@@ -72,6 +78,12 @@ const INIT_RECORD_STATUSES_CONFIG = {
     description: 'Currently under active review by authorized personnel',
     source: 'core',
     priority: 3,
+  },
+  reviewed: {
+    label: 'Reviewed',
+    description: 'Review complete and awaiting approval',
+    source: 'core',
+    priority: 3.5,
   },
   approved: {
     label: 'Approved',

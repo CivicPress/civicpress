@@ -30,9 +30,13 @@ describe('WorkflowConfigManager', () => {
         'proposed',
         'reviewed',
         'approved',
+        'published',
         'archived',
       ]);
       expect(config.transitions).toHaveProperty('draft');
+      // The default graph reaches a public status, and knows the admin role.
+      expect(config.transitions.approved).toContain('published');
+      expect(config.roles).toHaveProperty('admin');
       expect(config.roles).toHaveProperty('clerk');
     });
 

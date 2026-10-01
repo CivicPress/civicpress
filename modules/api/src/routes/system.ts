@@ -123,8 +123,10 @@ router.get('/record-statuses', (req, res) => {
 function getStatusColor(statusKey: string): string {
   const colorMap: Record<string, string> = {
     draft: 'gray',
+    proposed: 'blue',
     pending_review: 'blue',
     under_review: 'yellow',
+    reviewed: 'yellow',
     approved: 'green',
     published: 'green',
     rejected: 'red',

@@ -57,20 +57,57 @@ export class WorkflowConfigManager {
     }
   }
 
+  // Mirrors core/src/defaults/workflows.yml. Keep the two in step: an
+  // instance without the file (or a test that never wrote one) runs on this.
+  // Until 2026-09-30 this copy had no `admin` role at all, so a default
+  // instance answered "Role 'admin' not found" to every admin transition, and
+  // `published` was outside the graph.
   private getDefaultConfig(): WorkflowConfig {
     return {
-      statuses: ['draft', 'proposed', 'reviewed', 'approved', 'archived'],
+      statuses: [
+        'draft',
+        'proposed',
+        'reviewed',
+        'approved',
+        'published',
+        'archived',
+      ],
       transitions: {
-        draft: ['proposed'],
+        draft: ['proposed', 'published', 'archived'],
         proposed: ['reviewed', 'archived'],
         reviewed: ['approved', 'archived'],
-        approved: ['archived'],
+        approved: ['published', 'archived'],
+        published: ['archived'],
         archived: [],
       },
       roles: {
+        admin: {
+          can_transition: {
+            draft: ['proposed', 'published', 'archived'],
+            proposed: ['reviewed', 'archived'],
+            reviewed: ['approved', 'archived'],
+            approved: ['published', 'archived'],
+            published: ['archived'],
+            any: ['archived'],
+          },
+          can_create: [
+            'bylaw',
+            'policy',
+            'resolution',
+            'proclamation',
+            'ordinance',
+          ],
+          can_edit: [
+            'bylaw',
+            'policy',
+            'resolution',
+            'proclamation',
+            'ordinance',
+          ],
+        },
         clerk: {
           can_transition: {
-            draft: ['proposed'],
+            draft: ['proposed', 'published'],
             proposed: ['reviewed'],
           },
           can_create: ['bylaw', 'policy', 'resolution'],

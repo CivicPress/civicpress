@@ -222,39 +222,18 @@ database guarantee rather than a convention.
 
 ### Fixed
 
-- **The editor decided for itself what "published" means.** `EditorHeader` kept
-  its own list — `['published', 'active', 'approved']` — while the authority
-  since 2026-08-09 has been the `public` flag on each record status, which is
-  what the read gate enforces. They disagreed: `approved` is not public, but the
-  editor called an approved record published, offered to "unpublish" it, and
-  warned that it would "no longer be publicly accessible". It also could not
-  know about a status a municipality had declared public itself.
-
-  `GET /api/v1/system/record-statuses` now serves `public` for every status, and
-  the editor asks. Three dialogs made claims about public visibility that the
-  configuration did not back, and now follow it:
-  - **Publish** promised the record "will become publicly accessible" whatever
-    status it was being published in. For a status that is not public it now
-    says so, and names the status.
-  - **Archive** said archived records are "not publicly accessible". They have
-    been public by default since 2026-08-09 — a repealed bylaw stays part of the
-    public record — so the dialog said the opposite of what happens.
-  - **Unpublish** is worded as unpublishing only when the record is public;
-    otherwise it is "Return to draft".
-
-  ⚠️ **Two changes to what the status menu offers.** "Return to draft" is now
-  offered from any status the workflow allows it from; it used to appear for the
-  hardcoded statuses only, while `draft` was also filtered out of the generic
-  list, so other statuses had no way back from this menu. And the menu no longer
-  hides a transition for looking "published-like": it lists what the workflow
-  allows, leaving out only `draft` and `archived`, which have their own items.
-  In a default instance that adds "Change status to Approved" for a reviewed
-  record.
-
-  The same endpoint's `editable` field was computed from a literal
-  `['published', 'archived', 'expired']` — the default public set, written out a
-  second time. It now follows the configuration; a default instance sees no
-  difference.
+- **The built-in workflow default had no `admin` role.** `WorkflowConfigManager`
+  falls back to an inline configuration when `workflows.yml` is absent — and
+  that copy knew clerk, council and public only, so a default instance answered
+  "Role 'admin' not found" to every admin transition. It now mirrors the shipped
+  file. The API test fixture, meanwhile, had written `workflow.yml` (singular)
+  for its whole life, so every API test ran on that inline default rather than
+  on the fixture's own configuration; it writes the file core reads now.
+- **A draft that was never published had no transitions.**
+  `GET /records/:id/transitions` looked the record up in `records` only, and a
+  record still in review exists only in `record_drafts` — so the editor's status
+  menu was empty for exactly the records that were moving. It falls back to the
+  draft row.
 
 - **🔴 `roles.yml` shipped a permission check that could never pass — and the
   test fixture hid it.** `RoleManager` consulted `status_transitions` whenever a
@@ -480,6 +459,26 @@ database guarantee rather than a convention.
   the instance's system-data directory.
 
 ### Changed
+
+- **The shipped review chain can be walked, and it ends on a public status.**
+  The project shipped two status vocabularies that did not agree: the workflow's
+  `draft → proposed → reviewed → approved → archived` and the record schema's
+  `draft, pending_review, under_review, approved, published, …`. On a default
+  instance a record saved as `proposed` was accepted and then **500'd on
+  publish** (`/status must be one of …`), publishing straight to `approved` was
+  refused ("Allowed transitions: proposed"), and the one route to a public
+  record — `published` — lay outside the workflow entirely, reachable by anyone
+  with `records:edit`. Now `proposed` and `reviewed` are record statuses
+  (non-public), and the shipped `workflows.yml` adds `approved → published`
+  (plus `draft → published` for admin and clerk, so direct publishing keeps
+  working, and `published → archived`). ⚠️ **Behaviour change on new
+  instances:** `published` is now a transition _target_, which makes it
+  workflow-controlled — a role may publish only where its `can_transition` says
+  so, and a record sitting in a status the graph never names (`pending_review`,
+  `under_review`, `rejected`, `expired`) cannot be published until the graph is
+  edited to say how. An existing instance keeps the `workflows.yml` it copied at
+  init and is unaffected until it adopts the new file; the two new statuses
+  reach it through the defaults merge.
 
 - **Configuration that did nothing is no longer shipped.** A deliberate sweep
   for declared-but-unread config keys, run after the same class turned up three

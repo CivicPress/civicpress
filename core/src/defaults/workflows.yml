@@ -29,16 +29,24 @@ statuses:
     - proposed
     - reviewed
     - approved
+    - published
     - archived
   type: 'array'
   description: 'Available record statuses in the system'
   required: true
 
 # Status Transitions (what statuses can transition to what)
+# `published` is a transition target (approved → published, and draft →
+# published for roles allowed to publish directly), which makes it a
+# workflow-CONTROLLED status: every write that lands a record at `published`
+# is checked against this graph and the role's can_transition. Before
+# 2026-09-30 it was outside the graph, so the chain below ended at `approved`
+# — not a public status — while publication happened beside it.
 transitions:
   draft:
     value:
       - proposed
+      - published
       - archived
     type: 'array'
     description: 'Statuses that draft can transition to'
@@ -59,9 +67,16 @@ transitions:
     required: true
   approved:
     value:
+      - published
       - archived
     type: 'array'
     description: 'Statuses that approved can transition to'
+    required: true
+  published:
+    value:
+      - archived
+    type: 'array'
+    description: 'Statuses that published can transition to'
     required: true
   archived:
     value: []
@@ -84,7 +99,7 @@ roles:
       required: true
     can_transition:
       draft:
-        value: [proposed, archived]
+        value: [proposed, published, archived]
         type: 'array'
         description: 'Statuses admin can transition draft records to'
         required: true
@@ -99,9 +114,14 @@ roles:
         description: 'Statuses admin can transition reviewed records to'
         required: true
       approved:
-        value: [archived]
+        value: [published, archived]
         type: 'array'
         description: 'Statuses admin can transition approved records to'
+        required: true
+      published:
+        value: [archived]
+        type: 'array'
+        description: 'Statuses admin can transition published records to'
         required: true
       any:
         value: [archived]
@@ -120,7 +140,7 @@ roles:
       required: true
     can_transition:
       draft:
-        value: [proposed]
+        value: [proposed, published]
         type: 'array'
         description: 'Statuses clerk can transition draft records to'
         required: true
