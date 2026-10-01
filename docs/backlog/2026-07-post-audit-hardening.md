@@ -2270,19 +2270,89 @@ about either.
       `@tiptap/core`, `yjs` imported by root `tests/`. Refreshed, deduplicated
       and verified in the dependency PR.
 
-- [ ] **The CodeQL baseline was never triaged: 195 alerts, all dated
-      2026-07-30.** They are the findings that already existed on the day the
-      scanner was switched on. 116 are in tests and scripts — 111 of those are a
-      single rule, `js/shell-command-injection-from-environment`, fired by CLI
-      tests that build a shell command from a temp-directory path. 79 are in
-      production source: 43 `js/path-injection`, 12 `js/polynomial-redos`, 15
-      across the hand-rolled HTML sanitizers, and a tail of nine.
+- [x] **The CodeQL baseline was never triaged: 195 alerts. TRIAGED 2026-09-29**
+      — `docs/audits/2026-09-29-codeql-baseline-triage.md` has a verdict for
+      every production alert, what was fixed, and the dismissal reason for the
+      fourteen that remain. Of the 79 in production source, one described
+      something exploitable as the scanner described it (#118, the `gray-matter`
+      engine); three groups were real but blind (a type walked out of the
+      records root, the template root, the geography root); the rest were
+      guarded, dead, or false positives — and are now confined where the
+      filesystem call is, so the guarantee no longer depends on a validator
+      elsewhere.
 
-      Many of the path-injection alerts are expected to be false positives
-      against the containment helpers the `FA-*` audit added
-      (`resolveInsideRecordsRoot`, `resolveLocalStoragePath`), which a static
-      analyser does not always recognise. That is an expectation, not a result:
-      the same rule caught a real defect on PR #23. Each needs a verdict.
+      ⚠️ **The findings that mattered were beside the alerts, not in them.**
+      Each was found while checking whether an alert was right:
+
+  - 🔴 `commit1`/`commit2` on `GET /diff/:id` were passed to git as arguments;
+    `--output=<path>` wrote a file. **Measured as a self-registered user.**
+    Fixed.
+  - 🔴 Registering an account bypasses the published-only gate — below.
+  - Template preview interpolated variable NAMES into a `RegExp`: exponential,
+    from `templates:view`. Fixed.
+  - Every email's HTML part was assembled without encoding; the reset email
+    carries the username. Fixed.
+  - The device-registration limiter keyed on the client's own `X-Forwarded-For`.
+    Fixed.
+  - `validateRequest` scanned notification data before checking its size: 169 s
+    for 1 MB. Fixed.
+  - `/diff/:id`'s filters always 500'd and its compare returned an empty diff by
+    default; `/status/records` never counted a status; the raw config routes
+    resolved paths against the working directory. Fixed.
+
+  The 116 alerts in tests and scripts are not triaged individually; the document
+  offers two ways to make that count honest, both a maintainer's call.
+
+- [x] **🔴 Registering an account bypasses the published-only gate. FIXED
+      2026-10-01 (PR #45).** The gate added on 2026-08-09 asks one question:
+      `if (user) return { visible: 'all' }`
+      (`modules/api/src/services/records-service/listing.ts`). Any authenticated
+      user sees every status. `POST /api/v1/users/register` needs no
+      authentication, no email verification and no switch to turn it off, and
+      gives the `public` role.
+
+      **Measured:** registered `passerby`, logged in, and as that user listed
+      records in every status (`approved`, `draft`, `pending_review`,
+      `rejected`, …), read a draft's body in full with a 200 where the anonymous
+      request got a 404, and got the same set back from search. The gate
+      protects against exactly one thing — not being logged in — and logging in
+      is free.
+
+      Not changed here, because the fix is an authorization-model choice: which
+      permission grants sight of unpublished records? Using `records:edit` as
+      the line matches the shipped roles (admin and clerk have it; `public`
+      does not) but would hide unpublished records from a custom reviewer role
+      that has `records:view` only. A dedicated permission is cleaner and
+      changes `roles.yml`. Closing registration by default is a third shape.
+      The 404 bodies of `/diff/*` and `/validation/*`, which list every record
+      file on disk as `availableRecords`, are the same gap by another door.
+
+      **Outcome.** Decided 2026-09-30 and landed in PR #45: a dedicated
+      `records:view_unpublished` permission (granted to admin, clerk and
+      council in the shipped `roles.yml`, not to `public`), an
+      `auth.registration.enabled` switch in `.civicrc` (default on), and the
+      404 bodies of `/diff/*` and `/validation/*` no longer list the record
+      tree.
+
+- [ ] **`sanitizeVariableValue` in the template generator (needs a decision).**
+      Five CodeQL alerts. It strips `<script>`, `<iframe>`, `javascript:` and
+      `on\w+=` from values substituted into a **Markdown** template. It is
+      bypassable (`<scr<script>ipt>` reassembles) and it **corrupts text**: "The
+      condition = approved" becomes "The c approved", because `ondition =`
+      matches. Every in-repo HTML render runs DOMPurify, so no active payload
+      survives today. The choices: remove it and rely on output encoding at
+      render (two characterization tests assert the current stripping); or keep
+      it and accept both defects. Input to it is now bounded (20 KB per preview)
+      so the quadratic patterns cannot stall the process meanwhile.
+
+      **Decision 2026-09-30:** remove it (`docs/plans/2026-08-11-v04x-scoping.md`,
+      decision 8). Not done yet — it follows the merged develop.
+
+- [ ] **A username has no length limit at registration.** `POST /users/register`
+      requires a username and checks nothing else about it. It is stored, it is
+      interpolated into the password-reset email (now encoded), and it is
+      scanned by `validateRequest` (now after the size check). A bound is not
+      controversial; what the bound and the character set should be is a call.
 
 - [ ] **`notifications.yml` privacy settings do nothing (needs a decision).**
       `security.filter_pii`, `security.encrypt_sensitive_data` and
