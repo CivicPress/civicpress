@@ -1485,6 +1485,14 @@ export function cleanupCLITestContext(context: CLITestContext) {
 // API test helpers
 export async function createAPITestContext(
   options: {
+    /**
+     * Run this instance on the SHIPPED `workflows.yml`, `roles.yml` and
+     * `config.yml` (copied from core/src/defaults) instead of the fixture's
+     * hand-written ones. The fixture's configuration is what most tests need;
+     * it is also how a shipped review chain that could not be walked stayed
+     * green for months — nothing exercised the files an instance is born with.
+     */
+    shippedDefaults?: boolean;
     /** Extra `.civicrc` fields for this instance (e.g. `auth.registration`). */
     civicrc?: Record<string, unknown>;
   } = {}
@@ -1495,6 +1503,8 @@ export async function createAPITestContext(
   const instance = createTestInstance({
     prefix: 'api-test',
     records: true,
+    workflows: !options.shippedDefaults,
+    roles: !options.shippedDefaults,
     civicrc: options.civicrc,
   });
   const config = instance.config;
