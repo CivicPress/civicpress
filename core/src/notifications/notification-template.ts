@@ -90,31 +90,4 @@ export abstract class NotificationTemplate {
       return String(value);
     });
   }
-
-  /**
-   * Sanitize HTML content
-   */
-  protected sanitizeHtml(html: string): string {
-    // Basic HTML sanitization - in production, use a proper HTML sanitizer
-    return html
-      .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-      .replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, '')
-      .replace(/javascript:/gi, '')
-      .replace(/on\w+\s*=/gi, '');
-  }
-
-  /**
-   * Convert HTML to plain text
-   */
-  protected htmlToText(html: string): string {
-    return html
-      .replace(/<[^>]*>/g, '') // Remove HTML tags
-      .replace(/&nbsp;/g, ' ') // Replace &nbsp; with space
-      .replace(/&amp;/g, '&') // Replace &amp; with &
-      .replace(/&lt;/g, '<') // Replace &lt; with <
-      .replace(/&gt;/g, '>') // Replace &gt; with >
-      .replace(/&quot;/g, '"') // Replace &quot; with "
-      .replace(/\s+/g, ' ') // Normalize whitespace
-      .trim();
-  }
 }

@@ -233,7 +233,8 @@ export class DeviceManager {
         coreWarn(
           'Device re-registration failed: enrollment code already used',
           {
-            operation: 'broadcast-box:device:registration:already-used-existing',
+            operation:
+              'broadcast-box:device:registration:already-used-existing',
             deviceId: existing.id,
             deviceUuid: existing.deviceUuid,
             registrationIp: data.registrationIp || 'unknown',
@@ -837,12 +838,13 @@ export class DeviceManager {
     const codeLength = 12;
 
     // Use crypto.randomBytes for secure random generation
-    const randomBytes = crypto.randomBytes(codeLength);
     let code = '';
 
+    // `randomInt` is uniform for any alphabet. `randomBytes(n)[i] % length`
+    // is uniform only when the length divides 256 — which 32 does, so this
+    // was never biased, but only by the accident of the alphabet's size.
     for (let i = 0; i < codeLength; i++) {
-      const randomIndex = randomBytes[i] % chars.length;
-      code += chars[randomIndex];
+      code += chars[crypto.randomInt(chars.length)];
     }
 
     // Format as XXXX-XXXX-XXXX for readability

@@ -183,13 +183,23 @@ ${rawContent}
       return null;
     }
 
-    // Try to find code block with common languages
-    const codeBlockPattern =
-      /```(?:json|geojson|kml|gpx|xml)?\s*\n([\s\S]*?)```/;
-    const match = markdownContent.match(codeBlockPattern);
+    // Try to find code block with common languages.
+    //
+    // The opening fence is followed by spaces and tabs, then ONE newline —
+    // `[^\S\n]*\n`, not `\s*\n`. `\s` matches a newline too, so the old form
+    // could end its whitespace run at any newline in a blank stretch, and on a
+    // fence that is never closed it tried them all: 2 s for 300 KB. Blank
+    // lines after the fence are dropped below instead, which is what `\s*\n`
+    // did with them.
+    const match = markdownContent.match(
+      /```(?:json|geojson|kml|gpx|xml)?[^\S\n]*\n([\s\S]*?)```/
+    );
 
-    if (match && match[1]) {
-      return match[1].trim();
+    if (match) {
+      const inner = match[1].replace(/^\s*\n/, '');
+      if (inner) {
+        return inner.trim();
+      }
     }
 
     // If no code block found, return the content as-is (might be raw content)

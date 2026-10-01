@@ -1,5 +1,6 @@
 import * as fs from 'fs';
 import path from 'path';
+import { resolveChild, resolveInside } from './path-containment.js';
 
 export interface RecordPathInfo {
   kind: 'records' | 'archive' | 'unknown';
@@ -185,8 +186,10 @@ export function listRecordFilesSync(
           .map((dirent) => dirent.name);
 
     for (const type of types) {
-      const typeDir = path.join(recordsDir, type);
-      if (!fs.existsSync(typeDir)) continue;
+      // A caller-supplied type is a NAME. Joined on unchecked, `../..` made
+      // this walk — recursively — whatever directory it pointed at.
+      const typeDir = resolveChild(recordsDir, type);
+      if (!typeDir || !fs.existsSync(typeDir)) continue;
 
       const files = listMarkdownFilesRecursive(typeDir);
       for (const file of files) {
@@ -204,8 +207,8 @@ export function listRecordFilesSync(
           .map((dirent) => dirent.name);
 
     for (const type of types) {
-      const typeDir = path.join(archiveDir, type);
-      if (!fs.existsSync(typeDir)) continue;
+      const typeDir = resolveChild(archiveDir, type);
+      if (!typeDir || !fs.existsSync(typeDir)) continue;
 
       const files = listMarkdownFilesRecursive(typeDir);
       for (const file of files) {
@@ -243,8 +246,10 @@ export function findRecordFileSync(
   ): string | null => {
     const types = searchTypes(baseDir);
     for (const type of types) {
-      const typeDir = path.join(baseDir, type);
-      if (!fs.existsSync(typeDir)) continue;
+      // Same guard as listRecordFilesSync: the type names a directory directly
+      // under the records root, and nothing else.
+      const typeDir = resolveChild(baseDir, type);
+      if (!typeDir || !fs.existsSync(typeDir)) continue;
 
       const stack: Array<{ dir: string; relative: string[] }> = [
         { dir: typeDir, relative: [type] },
@@ -269,9 +274,10 @@ export function findRecordFileSync(
           }
         }
 
-        // Legacy flat files inside type directory
-        const legacyFilePath = path.join(current.dir, targetFileName);
-        if (fs.existsSync(legacyFilePath)) {
+        // Legacy flat files inside type directory. The id is caller-supplied
+        // too, so the probe is confined to the directory being searched.
+        const legacyFilePath = resolveInside(current.dir, targetFileName);
+        if (legacyFilePath && fs.existsSync(legacyFilePath)) {
           return path
             .join(prefix, ...current.relative, targetFileName)
             .replace(/\\/g, '/');

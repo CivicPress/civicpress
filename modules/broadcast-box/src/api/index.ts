@@ -15,6 +15,7 @@ import { createDevicesRouter } from './devices.js';
 import { createSessionsRouter } from './sessions.js';
 import { createUploadsRouter } from './uploads.js';
 import { DeviceRegistrationRateLimiter } from '../middleware/rate-limiter.js';
+import { clientIp } from '../utils/client-ip.js';
 import { deviceAuthMiddleware } from '../middleware/device-auth.js';
 import { isValidEd25519PublicKeyPem } from '../services/manifest-signature.js';
 import { requirePermission } from '../middleware/require-permission.js';
@@ -122,21 +123,7 @@ export async function registerBroadcastBoxRoutes(
     // We'll import the validation and handler logic
     const { body, validationResult } = await import('express-validator');
 
-    // Helper to get client IP
-    const getClientIp = (req: any): string => {
-      const forwarded = req.headers['x-forwarded-for'];
-      if (forwarded) {
-        const ips = Array.isArray(forwarded)
-          ? forwarded[0]
-          : forwarded.split(',')[0];
-        return ips.trim();
-      }
-      const realIp = req.headers['x-real-ip'];
-      if (realIp) {
-        return Array.isArray(realIp) ? realIp[0] : realIp;
-      }
-      return req.socket.remoteAddress || 'unknown';
-    };
+    const getClientIp = clientIp;
 
     // Apply rate limiting ONLY to the POST registration endpoint
     publicRouter.post(
@@ -181,8 +168,7 @@ export async function registerBroadcastBoxRoutes(
             return res.status(400).json({
               success: false,
               error: {
-                message:
-                  'publicKey must be a PEM (SPKI) Ed25519 public key',
+                message: 'publicKey must be a PEM (SPKI) Ed25519 public key',
               },
             });
           }

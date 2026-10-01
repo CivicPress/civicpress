@@ -1,4 +1,5 @@
 import { readFile, writeFile, access, mkdir } from 'fs/promises';
+import { resolveInside } from '../utils/path-containment.js';
 import {
   errorMessage,
   errorStack,
@@ -83,6 +84,18 @@ export class ConfigurationService {
   }
 
   /**
+   * Where a configuration type lives: the instance's own file, and the
+   * shipped default it falls back to. For a caller that reads or writes the
+   * file itself and needs the same answer this service would use.
+   */
+  resolveConfigPaths(configType: string): {
+    userPath: string;
+    defaultPath: string;
+  } {
+    return this.resolvePaths(configType);
+  }
+
+  /**
    * Resolve user and default paths for a given configuration type.
    * Notifications are sensitive and should live under .system-data.
    */
@@ -101,12 +114,17 @@ export class ConfigurationService {
       throw new Error(`Invalid config type: ${configType}`);
     }
 
-    const userPath =
-      canonical === 'notifications'
-        ? join(this.systemDataPath, `${canonical}.yml`)
-        : join(this.dataPath, `${canonical}.yml`);
-
-    const defaultPath = join(this.defaultsPath, `${canonical}.yml`);
+    // The test above already reduces the name to `[a-z0-9-]+`. Resolving it
+    // INSIDE its directory states the same guarantee in the terms the
+    // filesystem call cares about, where it cannot drift from the join.
+    const userPath = resolveInside(
+      canonical === 'notifications' ? this.systemDataPath : this.dataPath,
+      `${canonical}.yml`
+    );
+    const defaultPath = resolveInside(this.defaultsPath, `${canonical}.yml`);
+    if (!userPath || !defaultPath) {
+      throw new Error(`Invalid config type: ${configType}`);
+    }
     return { userPath, defaultPath };
   }
 

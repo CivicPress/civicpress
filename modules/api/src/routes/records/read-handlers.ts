@@ -31,6 +31,11 @@ export function registerReadRoutes(
         .withMessage('Page must be a positive integer'),
       query('sort')
         .optional()
+        // `isString().bail()` first — see routes/search.ts. A `sort` sent
+        // twice was an anonymous 500.
+        .isString()
+        .withMessage('Sort must be a string')
+        .bail()
         .isIn(['updated_desc', 'created_desc', 'title_asc', 'title_desc'])
         .withMessage(
           'Sort must be one of: updated_desc, created_desc, title_asc, title_desc'

@@ -10,6 +10,7 @@ import {
   DiagnosticError,
 } from './types.js';
 import { Logger } from '../utils/logger.js';
+import { boundedTimeout, withDeadline } from './timeout.js';
 
 export interface CircuitBreakerOptions {
   failureThreshold?: number; // Number of failures before opening (default: 3)
@@ -117,8 +118,11 @@ export class DiagnosticCircuitBreaker {
 
     try {
       // Execute with optional timeout
-      const result = timeout
-        ? await Promise.race([fn(), this.createTimeout(timeout, checkName)])
+      const deadline = timeout ? boundedTimeout(timeout, 0) : 0;
+      const result = deadline
+        ? await withDeadline(fn(), deadline, () =>
+            this.timeoutError(deadline, checkName)
+          )
         : await fn();
 
       // Record success
@@ -196,27 +200,22 @@ export class DiagnosticCircuitBreaker {
   }
 
   /**
-   * Create a timeout promise
+   * What a check that overran its deadline is rejected with
    */
-  private createTimeout(ms: number, checkName: string): Promise<never> {
-    return new Promise((_, reject) => {
-      setTimeout(() => {
-        const error: DiagnosticError = {
-          category: 'system',
-          severity: 'medium',
-          actionable: false,
-          recoverable: true,
-          retryable: true,
-          message: `Check ${checkName} timed out after ${ms}ms`,
-          code: 'CHECK_TIMEOUT',
-          details: {
-            checkName,
-            timeout: ms,
-          },
-        };
-        reject(error);
-      }, ms);
-    });
+  private timeoutError(ms: number, checkName: string): DiagnosticError {
+    return {
+      category: 'system',
+      severity: 'medium',
+      actionable: false,
+      recoverable: true,
+      retryable: true,
+      message: `Check ${checkName} timed out after ${ms}ms`,
+      code: 'CHECK_TIMEOUT',
+      details: {
+        checkName,
+        timeout: ms,
+      },
+    };
   }
 
   /**
