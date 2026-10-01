@@ -17,7 +17,7 @@ import {
 } from '../utils/api-logger.js';
 import * as fs from 'fs';
 import * as path from 'path';
-import matter from 'gray-matter';
+import { parseFrontmatter } from '@civicpress/core';
 import { resolveInsideRecordsRoot } from '../utils/record-path-guard.js';
 
 type Severity = 'error' | 'warning' | 'info';
@@ -458,11 +458,11 @@ async function validateSingleRecord(
 async function validateRecordContent(
   content: string,
   recordId: string
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): Promise<any> {
   try {
     // Extract frontmatter for schema validation
-    const { data: frontmatter } = matter(content);
+    const { data: frontmatter } = parseFrontmatter(content);
     const recordType = frontmatter?.type;
 
     // STEP 1: Schema validation (fail fast)
@@ -573,7 +573,7 @@ async function validateBulkRecords(
   recordIds: string[],
   types?: string[],
   includeContent = false
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): Promise<any> {
   const results = [];
   const summary = {
@@ -629,7 +629,7 @@ async function getValidationStatus(
     severity?: string;
     limit?: number;
   }
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): Promise<any> {
   const recordsDir = path.join(dataDir, 'records');
   const allIssues: Array<

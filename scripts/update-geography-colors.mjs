@@ -15,7 +15,18 @@ if (!fs.existsSync(filePath)) {
 }
 
 const content = fs.readFileSync(filePath, 'utf8');
-const { data: frontmatter, content: markdownContent } = matter(content);
+// A bare matter() call EXECUTES front matter tagged `---js`. Refuse that
+// engine, as core/src/utils/frontmatter.ts does — this script runs unbuilt
+// and so cannot import the wrapper.
+const refuseExecutableFrontmatter = () => {
+  throw new Error('Front matter declared as JavaScript is not accepted');
+};
+const { data: frontmatter, content: markdownContent } = matter(content, {
+  engines: {
+    js: refuseExecutableFrontmatter,
+    javascript: refuseExecutableFrontmatter,
+  },
+});
 
 // Extract GeoJSON from code block
 const geoJsonMatch = markdownContent.match(/```json\s*\n([\s\S]*?)\n```/);

@@ -2,7 +2,7 @@
 import { CAC } from 'cac';
 import * as fs from 'fs';
 import * as path from 'path';
-import matter = require('gray-matter');
+import { parseFrontmatter } from '@civicpress/core';
 import {
   listRecordFilesSync,
   parseRecordRelativePath,
@@ -108,7 +108,7 @@ export const listCommand = (cli: CAC) => {
 
             try {
               const content = fs.readFileSync(filePath, 'utf8');
-              const { data: frontmatter } = matter(content);
+              const { data: frontmatter } = parseFrontmatter(content);
 
               const title = frontmatter.title || path.basename(filePath, '.md');
               const status = frontmatter.status || 'draft';

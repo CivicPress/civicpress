@@ -8,7 +8,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import matter from 'gray-matter';
+import { parseFrontmatter } from '../frontmatter.js';
 import { getInstanceContext } from '../../config/instance-context.js';
 import type {
   Template,
@@ -69,7 +69,8 @@ export class TemplateLoader {
     name: string
   ): Promise<Template> {
     const content = fs.readFileSync(filePath, 'utf8');
-    const { data: frontmatter, content: markdownContent } = matter(content);
+    const { data: frontmatter, content: markdownContent } =
+      parseFrontmatter(content);
 
     const template: Template = {
       name,
@@ -226,7 +227,8 @@ export class TemplateLoader {
       );
       if (fs.existsSync(customPartialPath)) {
         const content = fs.readFileSync(customPartialPath, 'utf8');
-        const { data: frontmatter, content: markdownContent } = matter(content);
+        const { data: frontmatter, content: markdownContent } =
+          parseFrontmatter(content);
         return {
           name: partialName,
           content: markdownContent,
@@ -242,7 +244,8 @@ export class TemplateLoader {
       );
       if (fs.existsSync(basePartialPath)) {
         const content = fs.readFileSync(basePartialPath, 'utf8');
-        const { data: frontmatter, content: markdownContent } = matter(content);
+        const { data: frontmatter, content: markdownContent } =
+          parseFrontmatter(content);
         return {
           name: partialName,
           content: markdownContent,

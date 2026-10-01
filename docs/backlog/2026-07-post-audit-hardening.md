@@ -2161,17 +2161,46 @@ about either.
 
 ### Security
 
-- [ ] **🔴 A record file can execute code.** `gray-matter` 4.0.3 ships three
-      front-matter engines — YAML, JSON and **JavaScript** — and picks one from
-      the text that follows the opening delimiter. A file that begins `---js` or
-      `---javascript` is handed to `eval`. Measured on the installed version
-      rather than read off the documentation:
-      `matter('---js\n{ probe: 6 * 7 }\n---')` returns `{ probe: 42 }`, with
-      `process` in scope.
+- [x] **🔴 A record file can execute code. FIXED 2026-09-29.** Front matter is
+      now read and written through `parseFrontmatter` / `stringifyFrontmatter`
+      (`core/src/utils/frontmatter.ts`, exported from `@civicpress/core`), which
+      replace the JavaScript engine with one that refuses. The `language` option
+      cannot do this — an inline tag overrides it — so the engine itself is
+      swapped. A refused file raises `ValidationError`, the indexer logs it and
+      skips that file, and the rest of the index is built.
 
-      There are 24 `matter()` call sites across `core`, `modules/api` and `cli`,
-      plus two `matter.stringify()` calls — which parse their string argument
-      before serializing it, so they are call sites too. None passes `engines`.
+      Pinned three ways. A unit suite whose payload sets a global, with a
+      **control test** that runs the payload through the unguarded library to
+      prove the probe detects execution — without it, "was not executed" could
+      pass vacuously. An integration test that plants a hostile record in a real
+      instance and runs the indexer and the database sync, with a payload that
+      writes a marker file, so the filesystem answers the question rather than
+      the parser. And `@typescript-eslint/no-restricted-imports` in the core,
+      cli and api lint configs, so a new direct import is an error.
+
+      ⚠️ **The integration test was run against the old behaviour first, and it
+      failed** — the marker file was written. So "the indexer executes a planted
+      file" is a measurement, not an inference from reading the library.
+
+      Correcting the count given when this was recorded: 24 call sites is the
+      total — **22** `matter()` calls plus the **two** `matter.stringify()`
+      calls — not 24 plus two. A 25th, `scripts/update-geography-colors.mjs`,
+      runs unbuilt and cannot import the wrapper, so it passes the same
+      `engines` option inline.
+
+      `stringifyFrontmatter` deliberately does **not** re-parse the body.
+      `matter.stringify(body, data)` does, which is both what made it a parse
+      site and a bug of its own: a body beginning with `---` was read as front
+      matter and folded into the record's metadata. The body is now opaque.
+
+      The original entry follows.
+
+      `gray-matter` 4.0.3 ships three front-matter engines — YAML, JSON and
+      **JavaScript** — and picks one from the text that follows the opening
+      delimiter. A file that begins `---js` or `---javascript` is handed to
+      `eval`. Measured on the installed version rather than read off the
+      documentation: `matter('---js\n{ probe: 6 * 7 }\n---')` returns
+      `{ probe: 42 }`, with `process` in scope.
 
       **Reachability, stated carefully.** Every writer the API owns — the three
       record sagas, geography, templates — serializes with a header the server
@@ -2191,7 +2220,9 @@ about either.
       every distinct input in a process-wide cache keyed by the entire file
       content, never evicts it, and returns the cached `data` object by
       reference — unbounded growth in a long-running API, and a mutation made by
-      one caller is seen by the next caller that parses the same text.
+      one caller is seen by the next caller that parses the same text. Going
+      through the wrapper fixes this too, because passing options bypasses the
+      cache.
 
 - [ ] **Dependency advisories have drifted: 54 open across 25 package
       versions.** The 2026-07-25 remediation took the tree from 94 to 2. Nothing

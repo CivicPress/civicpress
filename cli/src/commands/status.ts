@@ -3,7 +3,7 @@ import { CAC } from 'cac';
 import { CivicPress, WorkflowConfigManager } from '@civicpress/core';
 import * as fs from 'fs';
 import * as path from 'path';
-import matter = require('gray-matter');
+import { parseFrontmatter, stringifyFrontmatter } from '@civicpress/core';
 import { withCli } from '../utils/with-cli.js';
 import {
   getAvailableRecords,
@@ -136,7 +136,7 @@ export function statusCommand(cli: CAC) {
             // Read current record
             const content = fs.readFileSync(recordPath, 'utf8');
             const { data: frontmatter, content: markdownContent } =
-              matter(content);
+              parseFrontmatter(content);
 
             // Get current status
             const currentStatus = frontmatter.status || 'draft';
@@ -203,7 +203,7 @@ export function statusCommand(cli: CAC) {
               : [];
 
             // Write updated record
-            const updatedContent = matter.stringify(
+            const updatedContent = stringifyFrontmatter(
               markdownContent,
               updatedFrontmatter
             );

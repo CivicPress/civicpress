@@ -53,6 +53,41 @@ could issue one number twice. Numbering now happens on every create path,
 through a single authority, against a reservation table that makes uniqueness a
 database guarantee rather than a convention.
 
+### Security
+
+- **A record file could execute code.** `gray-matter` ships a JavaScript
+  front-matter engine and selects it from the text that follows the opening
+  delimiter, so a file beginning `---js` was passed to `eval` by whatever parsed
+  it — which includes the indexer, at API startup. Every writer the API owns
+  emits a YAML header it builds itself, so this was **not** reachable from a
+  request body. It was reachable by a file that arrived in the data directory
+  any other way: `civic import`, a restored backup, or a data repository edited
+  or merged through Git. Planting such a file and running the indexer against it
+  executed the payload; that is now a regression test.
+
+  Front matter is read and written through `parseFrontmatter` /
+  `stringifyFrontmatter` (`@civicpress/core`), which refuse that engine instead
+  of running it. All 24 call sites were moved — 22 parses, and the two
+  `matter.stringify` calls, which parse their argument before serializing it and
+  were therefore parse sites too. A refused file is reported as invalid and
+  skipped; the rest of the index is unaffected. Importing `gray-matter` anywhere
+  else is now a lint error, so the guarantee cannot quietly lapse.
+
+  ⚠️ **If you have ever imported records from a source you do not control, or
+  accept contributions to your data repository, check it:**
+  `grep -rliE '^---[[:space:]]*(js|javascript)[[:space:]]*$' data/`. A match on
+  a file's **first line** is the one that matters. YAML and JSON front matter
+  are unaffected.
+
+  The same change fixes a second defect. Called without options, `gray-matter`
+  kept every distinct input in a process-wide cache keyed by the whole file
+  content, never evicted it, and handed the cached object back by reference: a
+  long-running API grew without bound, and a caller that modified the front
+  matter it received changed what the next caller got for the same text.
+  `stringifyFrontmatter` also stops re-parsing the body it is given, so a
+  document whose body begins with `---` is no longer folded into its own
+  metadata on save.
+
 ### Added
 
 - **`resolveInstanceContext()`** (`@civicpress/core`) — resolves the instance
