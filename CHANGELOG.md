@@ -346,6 +346,44 @@ database guarantee rather than a convention.
   subprocesses, and a global setup hook gives every test one real event-loop
   turn, bounding the worst-case block to a single test's synchronous work.
 
+- **🔴 No notification could be sent on an instance created by `civic init`.**
+  Every writer the project owns produces `notifications.yml` in the _field_
+  shape, where a setting is `enabled: { value: false, type: 'boolean', … }` so
+  the settings page can render a form from the file: the shipped defaults that
+  `civic init` copies in, the config editor, reset-to-defaults, and the
+  migration. The reader cast the parsed file straight to its typed plain shape.
+  Nothing failed. It was simply wrong wherever a scalar was declared:
+  - `isChannelEnabled('email')` returned the field object, which is truthy — so
+    a channel that was switched **off** read as on.
+  - The hourly limit was an object, `limit - count` was `NaN`, and `NaN > 0` is
+    false — so **every send was refused as rate-limited**, with an error
+    advising a retry in an hour.
+
+  Verification emails and password-reset emails therefore never left, whatever
+  the file said and whatever the operator configured. And because "off" read as
+  on, a forgot-password request **minted a reset token that nothing could
+  deliver** — the opposite of the documented rule that a token is minted only
+  when a channel can reach the user. The token was not exposed; it should not
+  have existed.
+
+  The reader now unwraps the file once, at load, and accepts either shape. On a
+  default instance email reads as off, as the file says, and a forgot-password
+  request files an operator task without minting anything. With email switched
+  on, mail is sent and the configured limit applies.
+
+  The suite could not see any of this: every notification test loads
+  `tests/fixtures/notifications.yml`, which is written in the plain shape no
+  tool produces. The new tests load the shipped file byte for byte. Against the
+  old reader, 10 of 11 fail.
+
+- **A failed test email was reported as sent.**
+  `POST /api/v1/notifications/test` answered `{ success: true, data: result }`
+  whatever `result.success` said, so the settings page showed "Test email sent"
+  for mail that never left. The raw channel errors — which carry hosts, ports
+  and credential hints — also went out in `data.errors`, which is what the
+  handler's own error path is careful not to do. A failed send is now a `500`
+  with the generic message; the detail stays in the audit log.
+
 ### Changed
 
 - **Configuration that did nothing is no longer shipped.** A deliberate sweep

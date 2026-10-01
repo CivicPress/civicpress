@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as yaml from 'js-yaml';
 import { getInstanceContext } from '../config/instance-context.js';
+import { unwrapConfigValues } from '../config/config-values.js';
 
 export interface NotificationConfigData {
   channels: {
@@ -128,7 +129,24 @@ export class NotificationConfig {
       }
 
       const configFile = fs.readFileSync(this.configPath, 'utf8');
-      const config = yaml.load(configFile) as NotificationConfigData;
+
+      // Unwrap BEFORE the cast. Every writer the project owns — `civic init`,
+      // the config editor, reset-to-defaults, the migration — produces the
+      // field shape (`enabled: { value: false, type: 'boolean', … }`), and this
+      // loader used to cast that straight to the typed plain shape. Nothing
+      // failed; it was simply wrong everywhere a scalar was declared:
+      //
+      //   - `isChannelEnabled()` returned the field object, which is truthy, so
+      //     a channel switched OFF read as on;
+      //   - the hourly limit was an object, `limit - count` was NaN, and
+      //     `NaN > 0` is false — so every send was refused as rate-limited.
+      //
+      // Together: on an instance created by `civic init`, no notification could
+      // be sent, whatever the file said. The test fixture is written in the
+      // plain shape, so the suite never saw it.
+      const config = unwrapConfigValues<NotificationConfigData>(
+        yaml.load(configFile)
+      );
 
       // Merge with defaults to ensure all required fields exist
       return this.mergeWithDefaults(config);
