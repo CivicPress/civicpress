@@ -1,8 +1,4 @@
-import {
-  findRecordFileSync,
-  listRecordFilesSync,
-  parseRecordRelativePath,
-} from '@civicpress/core';
+import { findRecordFileSync } from '@civicpress/core';
 import { HttpError } from '../../utils/http-error.js';
 import { resolveInsideRecordsRoot } from '../../utils/record-path-guard.js';
 import * as fs from 'fs';
@@ -40,28 +36,6 @@ export function resolveRecordPath(
   return recordRelativePath;
 }
 
-export function getAvailableRecords(
-  dataDir: string
-): Record<string, string[]> {
-  return listRecordFilesSync(dataDir).reduce(
-    (acc, relPath) => {
-      const parsed = parseRecordRelativePath(relPath);
-      if (!parsed.type) {
-        return acc;
-      }
-      if (!acc[parsed.type]) {
-        acc[parsed.type] = [];
-      }
-      const displayName = parsed.year
-        ? `${parsed.year}/${parsed.id}`
-        : parsed.id;
-      acc[parsed.type].push(displayName);
-      return acc;
-    },
-    {} as Record<string, string[]>
-  );
-}
-
 export function requireRecordPath(
   dataDir: string,
   recordRef: string,
@@ -72,12 +46,13 @@ export function requireRecordPath(
     return resolved;
   }
 
-  const availableRecords = getAvailableRecords(dataDir);
+  // No `availableRecords` in the body. It listed every record file on disk,
+  // in every status, to any caller with records:view — a self-registered
+  // account included — which was the published-only gate defeated by a 404.
   throw new HttpError(
     404,
     `Record not found: ${recordRef}`,
-    'RECORD_NOT_FOUND',
-    { details: { availableRecords } }
+    'RECORD_NOT_FOUND'
   );
 }
 

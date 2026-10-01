@@ -133,6 +133,9 @@ describe('API Validation Integration', () => {
       expect(response.body.data.isValid).toBe(false);
       const codes = response.body.data.issues.map((i: any) => i.code);
       expect(codes).toContain('RECORD_NOT_FOUND');
+      // The issue used to carry `availableRecords`: every record file on
+      // disk, in every status, to anyone with records:view. It must not.
+      expect(JSON.stringify(response.body)).not.toContain('availableRecords');
     });
   });
 });

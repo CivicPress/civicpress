@@ -3,7 +3,8 @@ import { HttpError } from '../../utils/http-error.js';
 import { param, query, validationResult } from 'express-validator';
 import { optionalAuth } from '../../middleware/auth.js';
 import { RecordsService } from '../../services/records-service.js';
-import { userCan, CentralConfigManager } from '@civicpress/core';
+import { userCan } from '@civicpress/core';
+import { canSeeStatus } from '../../services/records-service/visibility.js';
 import {
   sendSuccess,
   handleApiError,
@@ -366,17 +367,13 @@ export function registerReadRoutes(
           throw new HttpError(404, 'Record not found', 'RECORD_NOT_FOUND');
         }
 
-        // PUBLISHED-ONLY GATE. The list path filters by status for anonymous
-        // callers; fetching by id has to agree, or the gate is just an
-        // enumeration speed bump — before this, GET on a draft's id returned
-        // 200 with the full body. 404 rather than 403: whether an unpublished
-        // record exists at a given id is itself not public.
-        if (
-          !isAuthenticated &&
-          !CentralConfigManager.getPublicRecordStatuses().includes(
-            String(record.status)
-          )
-        ) {
+        // PUBLISHED-ONLY GATE. The list path filters by status for callers
+        // without `records:view_unpublished`; fetching by id has to agree, or
+        // the gate is just an enumeration speed bump — before this, GET on a
+        // draft's id returned 200 with the full body, and until 2026-09-30
+        // any login at all was enough. 404 rather than 403: whether an
+        // unpublished record exists at a given id is itself not public.
+        if (!(await canSeeStatus(user, record.status))) {
           throw new HttpError(404, 'Record not found', 'RECORD_NOT_FOUND');
         }
 

@@ -56,6 +56,10 @@ roles:
         - 'records:create'
         - 'records:edit'
         - 'records:view'
+        # Records in a non-public status (drafts, the review chain). Kept apart
+        # from records:view, which the public role also holds — a login alone
+        # must not reveal unpublished work.
+        - 'records:view_unpublished'
         - 'records:list'
         - 'users:view'
         - 'users:edit'

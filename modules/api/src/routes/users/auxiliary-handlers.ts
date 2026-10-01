@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { HttpError } from '../../utils/http-error.js';
-import { CivicPress } from '@civicpress/core';
+import { AuthConfigManager, CivicPress } from '@civicpress/core';
 import {
   logApiRequest,
   sendSuccess,
@@ -25,13 +25,26 @@ export function registerRegistrationRoutes(router: Router): void {
     logApiRequest(req, { operation: 'register_user' });
 
     try {
+      // Operator switch (`auth.registration.enabled` in .civicrc). Checked
+      // before the body is looked at, so a closed instance reveals nothing
+      // about which usernames or emails exist.
+      if (!AuthConfigManager.getInstance().isRegistrationEnabled()) {
+        const error = new HttpError(
+          403,
+          'Self-registration is disabled on this instance. Ask an administrator for an account.',
+          'REGISTRATION_DISABLED'
+        );
+        return handleApiError('register_user', error, req, res);
+      }
+
       const userData: CreateUserRequest = req.body;
 
       // Validate required fields
       if (!userData.username) {
         const error = new HttpError(400, 'Username is required');
         return handleApiError(
-          'register_user', error,
+          'register_user',
+          error,
           req,
           res,
           'Username is required'
@@ -41,7 +54,8 @@ export function registerRegistrationRoutes(router: Router): void {
       if (!userData.password) {
         const error = new HttpError(400, 'Password is required');
         return handleApiError(
-          'register_user', error,
+          'register_user',
+          error,
           req,
           res,
           'Password is required'
@@ -51,7 +65,8 @@ export function registerRegistrationRoutes(router: Router): void {
       if (!userData.email) {
         const error = new HttpError(400, 'Email is required');
         return handleApiError(
-          'register_user', error,
+          'register_user',
+          error,
           req,
           res,
           'Email is required'
@@ -84,21 +99,35 @@ export function registerRegistrationRoutes(router: Router): void {
 
       // Validate email format
       if (!authService.isValidEmailFormat(normalizedEmail)) {
-        const error = new HttpError(400, 'Invalid email format', 'INVALID_EMAIL_FORMAT');
+        const error = new HttpError(
+          400,
+          'Invalid email format',
+          'INVALID_EMAIL_FORMAT'
+        );
         return handleApiError('register_user', error, req, res);
       }
 
       // Check if username already exists
-      const existingUser = await authService.getUserByUsername(userData.username);
+      const existingUser = await authService.getUserByUsername(
+        userData.username
+      );
       if (existingUser) {
-        const error = new HttpError(409, 'Username already exists', 'USERNAME_EXISTS');
+        const error = new HttpError(
+          409,
+          'Username already exists',
+          'USERNAME_EXISTS'
+        );
         return handleApiError('register_user', error, req, res);
       }
 
       // Check if email is already in use
       const emailInUse = await authService.isEmailInUse(normalizedEmail);
       if (emailInUse) {
-        const error = new HttpError(409, 'Email address is already registered', 'EMAIL_EXISTS');
+        const error = new HttpError(
+          409,
+          'Email address is already registered',
+          'EMAIL_EXISTS'
+        );
         return handleApiError('register_user', error, req, res);
       }
 
@@ -139,7 +168,13 @@ export function registerRegistrationRoutes(router: Router): void {
         { operation: 'register_user' }
       );
     } catch (error) {
-      handleApiError('register_user', error, req, res, 'Failed to register user');
+      handleApiError(
+        'register_user',
+        error,
+        req,
+        res,
+        'Failed to register user'
+      );
     }
   });
 }
@@ -162,7 +197,8 @@ export function registerAuthenticationRoutes(router: Router): void {
       if (!username || !password) {
         const error = new HttpError(400, 'Username and password are required');
         return handleApiError(
-          'password_auth', error,
+          'password_auth',
+          error,
           req,
           res,
           'Username and password are required'
@@ -195,7 +231,9 @@ export function registerAuthenticationRoutes(router: Router): void {
       // Set 401 status code for authentication failures
       const authError = new HttpError(
         401,
-        error instanceof Error ? error.message : 'Password authentication failed'
+        error instanceof Error
+          ? error.message
+          : 'Password authentication failed'
       );
       handleApiError(
         'password_auth',
@@ -226,7 +264,8 @@ export function registerPublicEmailChangeRoutes(router: Router): void {
       if (!token) {
         const error = new HttpError(400, 'Verification token is required');
         return handleApiError(
-          'verify_email_change', error,
+          'verify_email_change',
+          error,
           req,
           res,
           'Verification token is required'
@@ -241,7 +280,8 @@ export function registerPublicEmailChangeRoutes(router: Router): void {
       if (!result.success) {
         const error = new HttpError(400, result.message);
         return handleApiError(
-          'verify_email_change', error,
+          'verify_email_change',
+          error,
           req,
           res,
           result.message
@@ -289,7 +329,8 @@ export function registerEmailVerificationRoutes(router: Router): void {
       if (!token) {
         const error = new HttpError(400, 'Verification token is required');
         return handleApiError(
-          'verify_current_email', error,
+          'verify_current_email',
+          error,
           req,
           res,
           'Verification token is required'
@@ -304,7 +345,8 @@ export function registerEmailVerificationRoutes(router: Router): void {
       if (!result.success) {
         const error = new HttpError(400, result.message);
         return handleApiError(
-          'verify_current_email', error,
+          'verify_current_email',
+          error,
           req,
           res,
           result.message

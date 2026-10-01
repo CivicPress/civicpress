@@ -135,6 +135,8 @@
     "createAccountDesc": "Rejoignez CivicPress pour gérer vos registres et flux de travail.",
     "dontHaveAccount": "Vous n'avez pas de compte ?",
     "createOne": "En créer un",
+    "registrationClosed": "Les inscriptions sont fermées",
+    "registrationClosedDesc": "Cette instance de CivicPress n\u2019accepte pas la création de compte en libre-service. Demandez à un administrateur de vous en créer un.",
     "forgotPassword": "Mot de passe oublié ?",
     "forgotPasswordTitle": "Réinitialiser votre mot de passe",
     "forgotPasswordDesc": "Saisissez votre nom d'utilisateur ou votre courriel et nous lancerons une réinitialisation du mot de passe.",

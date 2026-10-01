@@ -7,8 +7,6 @@ import {
   RecordValidator,
   RecordSchemaValidator,
   findRecordFileSync,
-  parseRecordRelativePath,
-  listRecordFilesSync,
 } from '@civicpress/core';
 import {
   sendSuccess,
@@ -382,30 +380,13 @@ async function validateSingleRecord(
   }
 
   if (!recordRelativePath) {
-    const availableRecords = listRecordFilesSync(dataDir).reduce(
-      (acc, relPath) => {
-        const parsed = parseRecordRelativePath(relPath);
-        if (!parsed.type) {
-          return acc;
-        }
-        if (!acc[parsed.type]) {
-          acc[parsed.type] = [];
-        }
-        const name = parsed.year ? `${parsed.year}/${parsed.id}` : parsed.id;
-        acc[parsed.type].push(name);
-        return acc;
-      },
-      {} as Record<string, string[]>
-    );
-
+    // No `availableRecords` here either: it enumerated every record file on
+    // disk, in every status, to any caller with records:view.
     issues.push({
       severity: 'error' as Severity,
       code: 'RECORD_NOT_FOUND',
       message: `Record '${recordId}' not found`,
       field: 'recordId',
-      metadata: {
-        availableRecords,
-      },
     });
     return {
       recordId,

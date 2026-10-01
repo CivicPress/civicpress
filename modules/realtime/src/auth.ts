@@ -11,7 +11,7 @@ import type {
   RecordManager,
   DatabaseService,
 } from '@civicpress/core';
-import { coreWarn, coreInfo } from '@civicpress/core';
+import { coreWarn, coreInfo, CentralConfigManager } from '@civicpress/core';
 import {
   AuthenticationFailedError,
   PermissionDeniedError,
@@ -53,10 +53,13 @@ export async function authenticateConnection(
   // Check if record exists (published records or drafts). Only `type` is read
   // downstream, and a published record and a draft row expose it differently,
   // so the lookup is narrowed to the shared shape.
-  let record: { type: string } | null = await recordManager.getRecord(recordId);
+  let record: { type: string; status?: string } | null =
+    await recordManager.getRecord(recordId);
+  let isDraft = false;
   if (!record && databaseService?.getDraft) {
     // Record may be a draft that hasn't been published yet
     record = await databaseService.getDraft(recordId);
+    isDraft = record !== null;
   }
   if (!record) {
     coreWarn('WebSocket connection failed: record not found', {
@@ -89,6 +92,35 @@ export async function authenticateConnection(
       recordId,
     });
     throw new PermissionDeniedError(recordId, { userId: user.id, recordId });
+  }
+
+  // The same line the API's read paths draw (2026-09-30): a draft, or a record
+  // in a status that is not public, is visible only with
+  // `records:view_unpublished`. `records:view` alone — which every
+  // self-registered `public` account holds — used to be enough to join a
+  // draft's collaboration room by id.
+  const unpublished =
+    isDraft ||
+    !CentralConfigManager.getPublicRecordStatuses().includes(
+      String(record.status ?? '')
+    );
+  if (unpublished) {
+    const canSeeUnpublished = await authService.userCan(
+      user,
+      'records:view_unpublished'
+    );
+    if (!canSeeUnpublished) {
+      coreWarn('WebSocket permission denied: record is not public', {
+        operation: 'realtime:auth',
+        userId: user.id,
+        recordId,
+      });
+      throw new PermissionDeniedError(recordId, {
+        userId: user.id,
+        recordId,
+        reason: 'unpublished',
+      });
+    }
   }
 
   coreInfo('WebSocket connection authenticated', {

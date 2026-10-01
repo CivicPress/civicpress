@@ -16,11 +16,11 @@ import {
   userCan,
   DatabaseService,
   Logger,
-  CentralConfigManager,
 } from '@civicpress/core';
 import type { AuthUser, Geography, TableInfoRow } from '@civicpress/core';
 import { normalizeDateString } from './helpers.js';
 import { assertStatusWritableByRole } from './status-transition-guard.js';
+import { canSeeStatus } from './visibility.js';
 
 /** Hybrid envelope returned by getDraftOrRecord — covers both draft + record paths. */
 interface DraftOrRecord {
@@ -116,12 +116,7 @@ export class RecordsFrontmatterAndPublish {
     // by-id reads — otherwise it is the way around them. Null becomes a 404 in
     // the handler, which is the right answer: the existence of an unpublished
     // record at a given id is not public either.
-    if (
-      !user &&
-      !CentralConfigManager.getPublicRecordStatuses().includes(
-        String(recordData.status)
-      )
-    ) {
+    if (!(await canSeeStatus(user, recordData.status))) {
       return null;
     }
 

@@ -37,6 +37,15 @@ export interface AuthConfig {
     maxConcurrentSessions: number;
     requireHttps: boolean;
   };
+  /**
+   * Self-service account creation (`POST /api/v1/users/register`). On by
+   * default so an upgrade changes nothing; an operator closes it with
+   * `auth.registration.enabled: false` in `.civicrc`. Accounts are then
+   * created by an administrator only.
+   */
+  registration: {
+    enabled: boolean;
+  };
 }
 
 export interface OAuthProviderConfig {
@@ -50,11 +59,12 @@ export interface OAuthProviderConfig {
  * Deep-partial helper for mergeWithDefaults: callers may supply any subset
  * of `AuthConfig` (loaded from civic.yml); defaults fill the rest.
  */
-type DeepPartial<T> = T extends Array<infer _U>
-  ? T
-  : T extends object
-    ? { [K in keyof T]?: DeepPartial<T[K]> }
-    : T;
+type DeepPartial<T> =
+  T extends Array<infer _U>
+    ? T
+    : T extends object
+      ? { [K in keyof T]?: DeepPartial<T[K]> }
+      : T;
 
 export class AuthConfigManager {
   private static instance: AuthConfigManager;
@@ -164,6 +174,9 @@ export class AuthConfigManager {
         maxConcurrentSessions: 5,
         requireHttps: false,
       },
+      registration: {
+        enabled: true,
+      },
     };
   }
 
@@ -190,6 +203,7 @@ export class AuthConfigManager {
       },
       email: { ...defaults.email, ...userConfig.email },
       security: { ...defaults.security, ...userConfig.security },
+      registration: { ...defaults.registration, ...userConfig.registration },
     };
   }
 
@@ -255,6 +269,20 @@ export class AuthConfigManager {
 
   getSecuritySettings() {
     return this.getConfig().security;
+  }
+
+  /** Whether `POST /users/register` accepts new accounts on this instance. */
+  isRegistrationEnabled(): boolean {
+    return this.getConfig().registration.enabled;
+  }
+
+  /**
+   * Forget the loaded configuration so the next `loadConfig()` re-reads it.
+   * For tests that boot several instances in one process; production loads
+   * once at API start.
+   */
+  reset(): void {
+    this.config = null;
   }
 
   validateEmailDomain(email: string): boolean {

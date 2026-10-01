@@ -1,8 +1,15 @@
 <script setup lang="ts">
 import type { TabsItem } from '@nuxt/ui';
+import { useAuthOptions } from '~/composables/useAuthOptions';
 
 const authStore = useAuthStore();
 const { t } = useI18n();
+// Whether this instance lets visitors create their own account
+// (`auth.registration.enabled`); the "create one" link goes away when not.
+const { registrationEnabled, load: loadAuthOptions } = useAuthOptions();
+onMounted(() => {
+  void loadAuthOptions();
+});
 
 const items = computed(
   () =>
@@ -50,7 +57,8 @@ const handleCredentialsLogin = async () => {
     // Redirect to dashboard on success
     await navigateTo('/');
   } catch (err: unknown) {
-    error.value = (err instanceof Error ? err.message : '') || t('auth.loginFailed');
+    error.value =
+      (err instanceof Error ? err.message : '') || t('auth.loginFailed');
   } finally {
     loading.value = false;
   }
@@ -65,7 +73,8 @@ const handleTokenLogin = async () => {
     // Redirect to dashboard on success
     await navigateTo('/');
   } catch (err: unknown) {
-    error.value = (err instanceof Error ? err.message : '') || t('auth.loginFailed');
+    error.value =
+      (err instanceof Error ? err.message : '') || t('auth.loginFailed');
   } finally {
     loading.value = false;
   }
@@ -205,7 +214,7 @@ watch(
           <!-- Footer Links -->
           <template #footer>
             <div class="text-center space-y-2">
-              <p class="text-sm text-gray-600">
+              <p v-if="registrationEnabled" class="text-sm text-gray-600">
                 {{ t('auth.dontHaveAccount') }}
                 <NuxtLink
                   to="/auth/register"
