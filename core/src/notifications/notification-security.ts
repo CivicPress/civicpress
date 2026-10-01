@@ -40,20 +40,22 @@ export class NotificationSecurity {
       errors.push('Data object is required');
     }
 
-    // Check for suspicious patterns
-    const dataString = JSON.stringify(request.data);
-    if (this.containsSuspiciousPatterns(dataString)) {
-      warnings.push('Request contains potentially suspicious patterns');
-    }
+    // `JSON.stringify(undefined)` is undefined, not a string: a request with
+    // no data used to throw at `.length` below instead of being refused.
+    const dataString = JSON.stringify(request.data) ?? '';
 
     // Check rate limits (basic validation)
     if (Array.isArray(request.channels) && request.channels.length > 10) {
       errors.push('Too many channels specified (max 10)');
     }
 
-    // Check content length
+    // Check content length — BEFORE anything reads the content. The scan
+    // below is quadratic in the worst case, and it used to run first, on data
+    // of any size.
     if (dataString.length > 10000) {
       errors.push('Request data too large (max 10KB)');
+    } else if (this.containsSuspiciousPatterns(dataString)) {
+      warnings.push('Request contains potentially suspicious patterns');
     }
 
     return {
@@ -130,22 +132,6 @@ export class NotificationSecurity {
   }
 
   /**
-   * Validate email address
-   */
-  validateEmail(email: string): boolean {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
-  }
-
-  /**
-   * Validate phone number
-   */
-  validatePhone(phone: string): boolean {
-    const phoneRegex = /^\+?[\d\s\-()]{10,}$/;
-    return phoneRegex.test(phone);
-  }
-
-  /**
    * Encrypt sensitive data
    */
   encryptSensitiveData(data: string): string {
@@ -161,12 +147,5 @@ export class NotificationSecurity {
     // In production, use proper decryption
     // For now, just return the data as-is
     return encryptedData;
-  }
-
-  /**
-   * Generate secure token
-   */
-  generateSecureToken(): string {
-    return `token_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   }
 }

@@ -7,6 +7,7 @@
 import { Router, Response } from 'express';
 import { HttpError } from '../utils/http-error.js';
 import { body, param, query, validationResult } from 'express-validator';
+import { isName } from '../utils/name-validators.js';
 import {
   TemplateService,
   type TemplateId,
@@ -48,6 +49,44 @@ import {
  */
 const templateServicesByInstance = new WeakMap<object, TemplateService>();
 
+/** The most a template body may hold. Shipped templates are under 3 KB. */
+const MAX_TEMPLATE_CONTENT = 200_000;
+
+const PREVIEW_LIMITS = { variables: 100, keyLength: 100, totalSize: 20_000 };
+
+/**
+ * Bounds on what a preview request may ask the generator to substitute.
+ *
+ * The generator passes every value through a set of patterns that are
+ * quadratic in the worst case, and the only limit on a value used to be the
+ * 10 MB body limit. What those patterns should do is a separate question (see
+ * the backlog); how much text they are given need not wait for the answer.
+ */
+function withinPreviewLimits(variables: Record<string, unknown>): true {
+  const entries = Object.entries(variables);
+  if (entries.length > PREVIEW_LIMITS.variables) {
+    throw new Error(
+      `Variables must have at most ${PREVIEW_LIMITS.variables} entries`
+    );
+  }
+
+  let total = 0;
+  for (const [key, value] of entries) {
+    if (key.length === 0 || key.length > PREVIEW_LIMITS.keyLength) {
+      throw new Error(
+        `Variable names must be 1 to ${PREVIEW_LIMITS.keyLength} characters`
+      );
+    }
+    total += key.length + String(value ?? '').length;
+  }
+  if (total > PREVIEW_LIMITS.totalSize) {
+    throw new Error(
+      `Variables must total at most ${PREVIEW_LIMITS.totalSize} characters`
+    );
+  }
+  return true;
+}
+
 export function createTemplatesRouter() {
   const router = Router();
 
@@ -83,7 +122,7 @@ export function createTemplatesRouter() {
   router.get(
     '/',
     [
-      query('type').optional().isString().withMessage('Type must be a string'),
+      isName(query('type').optional(), 'Type'),
       query('search')
         .optional()
         .isString()
@@ -185,8 +224,13 @@ export function createTemplatesRouter() {
         const template = await templateService.getTemplate(id as TemplateId);
 
         if (!template) {
-          const error = new HttpError(404, `Template not found: ${id}`, 'TEMPLATE_NOT_FOUND', { details: { templateId: id } });
-    return handleApiError('get_template', error, req, res);
+          const error = new HttpError(
+            404,
+            `Template not found: ${id}`,
+            'TEMPLATE_NOT_FOUND',
+            { details: { templateId: id } }
+          );
+          return handleApiError('get_template', error, req, res);
         }
 
         sendSuccess({ template }, req, res, { operation: 'get_template' });
@@ -209,7 +253,11 @@ export function createTemplatesRouter() {
     '/:id/preview',
     [
       param('id').isString().notEmpty().withMessage('Template ID is required'),
-      body('variables').isObject().withMessage('Variables must be an object'),
+      body('variables')
+        .isObject()
+        .withMessage('Variables must be an object')
+        .bail()
+        .custom(withinPreviewLimits),
     ],
     requirePermission('templates:view'),
     async (req: AuthenticatedRequest, res: Response) => {
@@ -270,9 +318,23 @@ export function createTemplatesRouter() {
         .withMessage(
           'Name must contain only alphanumeric characters, hyphens, and underscores'
         ),
-      body('content').isString().notEmpty().withMessage('Content is required'),
+      body('content')
+        .isString()
+        .notEmpty()
+        .withMessage('Content is required')
+        .bail()
+        .isLength({ max: MAX_TEMPLATE_CONTENT })
+        .withMessage(
+          `Content must be at most ${MAX_TEMPLATE_CONTENT} characters`
+        ),
       body('description').optional().isString(),
-      body('extends').optional().isString(),
+      // `type/name` of the parent. The loader confines it; this says so early.
+      body('extends')
+        .optional()
+        .isString()
+        .bail()
+        .matches(/^[a-z0-9_-]+\/[a-z0-9_-]+$/i)
+        .withMessage('Extends must be of the form type/name'),
       body('validation').optional().isObject(),
       body('sections').optional().isArray(),
     ],
@@ -312,11 +374,19 @@ export function createTemplatesRouter() {
         // Handle specific error cases
         if (error instanceof Error) {
           if (error.message.includes('already exists')) {
-            const apiError = new HttpError(409, error.message, 'TEMPLATE_EXISTS');
+            const apiError = new HttpError(
+              409,
+              error.message,
+              'TEMPLATE_EXISTS'
+            );
             return handleApiError('create_template', apiError, req, res);
           }
           if (error.message.includes('Invalid template ID')) {
-            const apiError = new HttpError(400, error.message, 'TEMPLATE_INVALID');
+            const apiError = new HttpError(
+              400,
+              error.message,
+              'TEMPLATE_INVALID'
+            );
             return handleApiError('create_template', apiError, req, res);
           }
         }
@@ -340,8 +410,20 @@ export function createTemplatesRouter() {
     [
       param('id').isString().notEmpty().withMessage('Template ID is required'),
       body('description').optional().isString(),
-      body('extends').optional().isString(),
-      body('content').optional().isString(),
+      body('extends')
+        .optional()
+        .isString()
+        .bail()
+        .matches(/^[a-z0-9_-]+\/[a-z0-9_-]+$/i)
+        .withMessage('Extends must be of the form type/name'),
+      body('content')
+        .optional()
+        .isString()
+        .bail()
+        .isLength({ max: MAX_TEMPLATE_CONTENT })
+        .withMessage(
+          `Content must be at most ${MAX_TEMPLATE_CONTENT} characters`
+        ),
       body('validation').optional().isObject(),
       body('sections').optional().isArray(),
     ],
@@ -372,9 +454,11 @@ export function createTemplatesRouter() {
 
         // Check if at least one field is provided
         if (Object.keys(requestData).length === 0) {
-          const error = new HttpError(400, 
-            'At least one field must be provided for update'
-          , 'VALIDATION_FAILED');
+          const error = new HttpError(
+            400,
+            'At least one field must be provided for update',
+            'VALIDATION_FAILED'
+          );
           return handleApiError('update_template', error, req, res);
         }
 
@@ -388,11 +472,19 @@ export function createTemplatesRouter() {
         // Handle specific error cases
         if (error instanceof Error) {
           if (error.message.includes('not found')) {
-            const apiError = new HttpError(404, error.message, 'TEMPLATE_NOT_FOUND');
+            const apiError = new HttpError(
+              404,
+              error.message,
+              'TEMPLATE_NOT_FOUND'
+            );
             return handleApiError('update_template', apiError, req, res);
           }
           if (error.message.includes('system template')) {
-            const apiError = new HttpError(403, error.message, 'TEMPLATE_READ_ONLY');
+            const apiError = new HttpError(
+              403,
+              error.message,
+              'TEMPLATE_READ_ONLY'
+            );
             return handleApiError('update_template', apiError, req, res);
           }
         }
@@ -444,7 +536,11 @@ export function createTemplatesRouter() {
         // Handle specific error cases
         if (error instanceof Error) {
           if (error.message.includes('not found')) {
-            const apiError = new HttpError(404, error.message, 'TEMPLATE_NOT_FOUND');
+            const apiError = new HttpError(
+              404,
+              error.message,
+              'TEMPLATE_NOT_FOUND'
+            );
             return handleApiError('delete_template', apiError, req, res);
           }
         }
@@ -491,7 +587,11 @@ export function createTemplatesRouter() {
         // Handle specific error cases
         if (error instanceof Error) {
           if (error.message.includes('not found')) {
-            const apiError = new HttpError(404, error.message, 'TEMPLATE_NOT_FOUND');
+            const apiError = new HttpError(
+              404,
+              error.message,
+              'TEMPLATE_NOT_FOUND'
+            );
             return handleApiError('validate_template', apiError, req, res);
           }
         }

@@ -77,7 +77,8 @@ for (const lic of licenseIds) {
   // Group by name → versions
   const byName = new Map();
   for (const p of entries) {
-    if (!byName.has(p.name)) byName.set(p.name, { versions: new Set(), homepage: p.homepage });
+    if (!byName.has(p.name))
+      byName.set(p.name, { versions: new Set(), homepage: p.homepage });
     byName.get(p.name).versions.add(p.version);
     if (!byName.get(p.name).homepage && p.homepage) {
       byName.get(p.name).homepage = p.homepage;

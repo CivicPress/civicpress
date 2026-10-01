@@ -11,7 +11,7 @@
  * @module records/record-parser
  */
 
-import matter from 'gray-matter';
+import { parseFrontmatter } from '../utils/frontmatter.js';
 import { stringify } from 'yaml';
 import { RecordData } from './record-manager.js';
 import { Logger } from '../utils/logger.js';
@@ -155,7 +155,8 @@ export class RecordParser {
    */
   static parseFromMarkdown(content: string, filePath?: string): RecordData {
     try {
-      const { data: frontmatter, content: markdownContent } = matter(content);
+      const { data: frontmatter, content: markdownContent } =
+        parseFrontmatter(content);
 
       if (!frontmatter || typeof frontmatter !== 'object') {
         throw new ValidationError('Invalid or missing frontmatter', {

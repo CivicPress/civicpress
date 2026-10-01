@@ -37,6 +37,13 @@ searchRouter.get(
       .withMessage('Page must be a positive integer'),
     query('sort')
       .optional()
+      // `isString().bail()` first. `isIn` runs per element, so a `sort` sent
+      // twice passed it as an array — and the sanitizer below then called
+      // `.toLowerCase()` on that array and threw. On a public route, that was
+      // a 500 for anyone who asked.
+      .isString()
+      .withMessage('Sort must be a string')
+      .bail()
       .isIn([
         'relevance',
         'updated_desc',

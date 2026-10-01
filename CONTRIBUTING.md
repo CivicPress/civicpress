@@ -157,9 +157,11 @@ couple of seconds, and nothing that needs a database, a network, or built
 output:
 
 - **lint-staged** — Prettier (and markdownlint on `.md`) over the staged files,
-  then ESLint over the staged JS/TS/Vue. Each file is linted by the package that
-  owns it, since ESLint is installed per package rather than at the root. Lint
-  **errors** block the commit; warnings do not.
+  then ESLint over the staged JS/TS/Vue, `.mjs` and `.cjs` included. Each file
+  is linted by the package that owns it, since ESLint is installed per package
+  rather than at the root; a file with no owning package (root `scripts/`,
+  `tests/`, the root Vitest configs) is reported as skipped rather than passed.
+  Lint **errors** block the commit; warnings do not.
 - **`pnpm registry:check`** — catches duplicate CLI commands, endpoints, or
   components (~0.2s).
 

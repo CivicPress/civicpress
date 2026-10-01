@@ -1,8 +1,16 @@
 <script setup lang="ts">
 import { errorMessage } from '~/utils/errors';
+import { useAuthOptions } from '~/composables/useAuthOptions';
 
 const authStore = useAuthStore();
 const { t } = useI18n();
+// `auth.registration.enabled` — when an operator has closed self-service
+// accounts the form is replaced by a notice; the API answers 403
+// REGISTRATION_DISABLED regardless, this only says so before the attempt.
+const { registrationEnabled, load: loadAuthOptions } = useAuthOptions();
+onMounted(() => {
+  void loadAuthOptions();
+});
 
 const state = reactive({
   username: '',
@@ -162,7 +170,17 @@ watch(
                 </p>
               </div>
 
+              <UAlert
+                v-if="!registrationEnabled"
+                color="neutral"
+                variant="soft"
+                icon="i-lucide-lock"
+                :title="t('auth.registrationClosed')"
+                :description="t('auth.registrationClosedDesc')"
+                data-testid="registration-closed"
+              />
               <UForm
+                v-else
                 :state="state"
                 class="flex flex-col gap-4"
                 @submit="handleRegister"

@@ -19,7 +19,7 @@ import * as path from 'path';
 import { RecordParser } from '../records/record-parser.js';
 import { RecordSchemaValidator } from '../records/record-schema-validator.js';
 import { ensureDirectoryForRecordPath } from '../utils/record-paths.js';
-import matter from 'gray-matter';
+import { parseFrontmatter } from '../utils/frontmatter.js';
 import { RecordValidationError } from '../errors/domain-errors.js';
 
 /**
@@ -110,9 +110,8 @@ class MoveToRecordsStep extends BaseSagaStep<PublishDraftContext, RecordData> {
 
         // Ensure path is set (use existing path or generate new one)
         if (!updatedRecord.path) {
-          const { buildRecordRelativePath } = await import(
-            '../utils/record-paths.js'
-          );
+          const { buildRecordRelativePath } =
+            await import('../utils/record-paths.js');
           updatedRecord.path = buildRecordRelativePath(
             updatedRecord.type,
             updatedRecord.id,
@@ -268,7 +267,7 @@ class CreateOrUpdateFileStep extends BaseSagaStep<PublishDraftContext, string> {
       const content = this.createMarkdownContent(normalizedRecord);
 
       // Validate schema
-      const { data: frontmatter } = matter(content);
+      const { data: frontmatter } = parseFrontmatter(content);
       const normalizedFrontmatter =
         this.normalizeFrontmatterForValidation(frontmatter);
 
@@ -433,10 +432,10 @@ class DeleteDraftStep extends BaseSagaStep<PublishDraftContext, void> {
   async compensate(context: PublishDraftContext): Promise<void> {
     const backup = context.deletedDraftBackup;
     if (!backup) {
-      coreDebug(
-        `Draft ${context.draftId} deletion had no backup to restore`,
-        { draftId: context.draftId, correlationId: context.correlationId }
-      );
+      coreDebug(`Draft ${context.draftId} deletion had no backup to restore`, {
+        draftId: context.draftId,
+        correlationId: context.correlationId,
+      });
       return;
     }
     try {

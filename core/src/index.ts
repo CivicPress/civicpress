@@ -9,6 +9,16 @@ export * from './diagnostics/index.js';
 // Export record management
 export { RecordManager, RecordData } from './records/record-manager.js';
 export { RecordParser } from './records/record-parser.js';
+// The only sanctioned way to read or write front matter — a bare `gray-matter`
+// call will execute a block tagged `---js`. See utils/frontmatter.ts.
+export { parseFrontmatter, stringifyFrontmatter } from './utils/frontmatter.js';
+export type { ParsedFrontmatter } from './utils/frontmatter.js';
+// Keeping a caller-supplied name inside the directory it belongs to.
+export {
+  isSafeSegment,
+  resolveChild,
+  resolveInside,
+} from './utils/path-containment.js';
 export { RecordValidator } from './records/record-validator.js';
 export { RecordSchemaBuilder } from './records/record-schema-builder.js';
 export { RecordSchemaValidator } from './records/record-schema-validator.js';

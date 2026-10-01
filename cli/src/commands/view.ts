@@ -3,7 +3,7 @@ import { CAC } from 'cac';
 import chalk from 'chalk';
 import * as fs from 'fs';
 import * as path from 'path';
-import matter = require('gray-matter');
+import { parseFrontmatter } from '@civicpress/core';
 import { userCan } from '@civicpress/core';
 import { withCli } from '../utils/with-cli.js';
 import { AuthUtils } from '../utils/auth-utils.js';
@@ -91,7 +91,7 @@ export const viewCommand = (cli: CAC) => {
           // Read and parse the record
           const content = fs.readFileSync(recordPath, 'utf8');
           const { data: frontmatter, content: markdownContent } =
-            matter(content);
+            parseFrontmatter(content);
 
           // Create record object for JSON output
           const pathFromDataRoot = path

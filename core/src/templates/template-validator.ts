@@ -7,7 +7,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { getInstanceContext } from '../config/instance-context.js';
-import matter from 'gray-matter';
+import { parseFrontmatter } from '../utils/frontmatter.js';
 import type { Template } from '../utils/template-engine.js';
 import type { ValidationResult, TemplateId } from './types.js';
 import { parseTemplateId } from './types.js';
@@ -195,7 +195,7 @@ export class TemplateValidator {
     const errors: string[] = [];
 
     try {
-      const { data: frontmatter } = matter(content);
+      const { data: frontmatter } = parseFrontmatter(content);
 
       // Check for required frontmatter fields
       if (!frontmatter.type) {
@@ -285,7 +285,8 @@ export class TemplateValidator {
     if (fs.existsSync(customPath)) {
       try {
         const content = fs.readFileSync(customPath, 'utf8');
-        const { data: frontmatter, content: markdownContent } = matter(content);
+        const { data: frontmatter, content: markdownContent } =
+          parseFrontmatter(content);
         return {
           name,
           type,
@@ -305,7 +306,8 @@ export class TemplateValidator {
     if (fs.existsSync(basePath)) {
       try {
         const content = fs.readFileSync(basePath, 'utf8');
-        const { data: frontmatter, content: markdownContent } = matter(content);
+        const { data: frontmatter, content: markdownContent } =
+          parseFrontmatter(content);
         return {
           name,
           type,

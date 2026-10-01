@@ -11,7 +11,7 @@ if (!fs.existsSync(dir)) {
   process.exit(1);
 }
 
-const specs = fs.readdirSync(dir).filter(f => f.endsWith('.md'));
+const specs = fs.readdirSync(dir).filter((f) => f.endsWith('.md'));
 for (const f of specs) {
   const p = path.join(dir, f);
   const txt = fs.readFileSync(p, 'utf8');
@@ -25,7 +25,9 @@ for (const f of specs) {
   const hasStatus = /\bStatus[\s*]*:/i.test(txt);
   if (!hasHeader || !hasStatus) {
     failures++;
-    console.log(`Spec issue: ${f} -> missing ${!hasHeader ? 'header' : ''}${!hasHeader && !hasStatus ? ' and ' : ''}${!hasStatus ? 'status' : ''}`);
+    console.log(
+      `Spec issue: ${f} -> missing ${!hasHeader ? 'header' : ''}${!hasHeader && !hasStatus ? ' and ' : ''}${!hasStatus ? 'status' : ''}`
+    );
   }
 }
 

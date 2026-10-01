@@ -37,7 +37,12 @@ for (const root of ROOTS) {
     const m = line.match(/^([^:]+):(\d+):(.*)$/);
     if (!m) continue;
     const [, file, ln, snippet] = m;
-    if (file.includes('__tests__/') || file.endsWith('.test.ts') || file.endsWith('.spec.ts')) continue;
+    if (
+      file.includes('__tests__/') ||
+      file.endsWith('.test.ts') ||
+      file.endsWith('.spec.ts')
+    )
+      continue;
     const type = /\bas any\b/.test(snippet) ? 'as-any' : 'colon-any';
     out.push({ file, line: Number(ln), type, snippet: snippet.trim() });
   }

@@ -72,12 +72,47 @@ const SOURCE_EXTS = new Set([
 
 // Node built-ins (extended) — never need to be declared in package.json
 const BUILTINS = new Set([
-  'assert', 'async_hooks', 'buffer', 'child_process', 'cluster', 'console',
-  'constants', 'crypto', 'dgram', 'diagnostics_channel', 'dns', 'domain',
-  'events', 'fs', 'http', 'http2', 'https', 'inspector', 'module',
-  'net', 'os', 'path', 'perf_hooks', 'process', 'punycode', 'querystring',
-  'readline', 'repl', 'stream', 'string_decoder', 'sys', 'timers', 'tls',
-  'trace_events', 'tty', 'url', 'util', 'v8', 'vm', 'wasi', 'worker_threads',
+  'assert',
+  'async_hooks',
+  'buffer',
+  'child_process',
+  'cluster',
+  'console',
+  'constants',
+  'crypto',
+  'dgram',
+  'diagnostics_channel',
+  'dns',
+  'domain',
+  'events',
+  'fs',
+  'http',
+  'http2',
+  'https',
+  'inspector',
+  'module',
+  'net',
+  'os',
+  'path',
+  'perf_hooks',
+  'process',
+  'punycode',
+  'querystring',
+  'readline',
+  'repl',
+  'stream',
+  'string_decoder',
+  'sys',
+  'timers',
+  'tls',
+  'trace_events',
+  'tty',
+  'url',
+  'util',
+  'v8',
+  'vm',
+  'wasi',
+  'worker_threads',
   'zlib',
 ]);
 
@@ -112,7 +147,13 @@ function collectSourceFiles(target, out = []) {
     return out;
   }
   for (const entry of fs.readdirSync(target, { withFileTypes: true })) {
-    if (entry.name === 'node_modules' || entry.name === 'dist' || entry.name === '.nuxt' || entry.name === '.output') continue;
+    if (
+      entry.name === 'node_modules' ||
+      entry.name === 'dist' ||
+      entry.name === '.nuxt' ||
+      entry.name === '.output'
+    )
+      continue;
     const full = path.join(target, entry.name);
     if (entry.isDirectory()) {
       collectSourceFiles(full, out);
@@ -123,7 +164,8 @@ function collectSourceFiles(target, out = []) {
   return out;
 }
 
-const IMPORT_RE = /(?:^|[^.\w])(?:import\s+(?:[\s\S]+?)\s+from\s+|import\s+|import\s*\(\s*|require\s*\(\s*)['"]([^'"]+)['"]/gm;
+const IMPORT_RE =
+  /(?:^|[^.\w])(?:import\s+(?:[\s\S]+?)\s+from\s+|import\s+|import\s*\(\s*|require\s*\(\s*)['"]([^'"]+)['"]/gm;
 
 function stripComments(content) {
   // Strip /* ... */ blocks and // line comments. Approximate but good enough

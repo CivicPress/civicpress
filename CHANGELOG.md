@@ -53,6 +53,127 @@ could issue one number twice. Numbering now happens on every create path,
 through a single authority, against a reservation table that makes uniqueness a
 database guarantee rather than a convention.
 
+### Security
+
+- **A record file could execute code.** `gray-matter` ships a JavaScript
+  front-matter engine and selects it from the text that follows the opening
+  delimiter, so a file beginning `---js` was passed to `eval` by whatever parsed
+  it — which includes the indexer, at API startup. Every writer the API owns
+  emits a YAML header it builds itself, so this was **not** reachable from a
+  request body. It was reachable by a file that arrived in the data directory
+  any other way: `civic import`, a restored backup, or a data repository edited
+  or merged through Git. Planting such a file and running the indexer against it
+  executed the payload; that is now a regression test.
+
+  Front matter is read and written through `parseFrontmatter` /
+  `stringifyFrontmatter` (`@civicpress/core`), which refuse that engine instead
+  of running it. All 24 call sites were moved — 22 parses, and the two
+  `matter.stringify` calls, which parse their argument before serializing it and
+  were therefore parse sites too. A refused file is reported as invalid and
+  skipped; the rest of the index is unaffected. Importing `gray-matter` anywhere
+  else is now a lint error, so the guarantee cannot quietly lapse.
+
+  ⚠️ **If you have ever imported records from a source you do not control, or
+  accept contributions to your data repository, check it:**
+  `grep -rliE '^---[[:space:]]*(js|javascript)[[:space:]]*$' data/`. A match on
+  a file's **first line** is the one that matters. YAML and JSON front matter
+  are unaffected.
+
+  The same change fixes a second defect. Called without options, `gray-matter`
+  kept every distinct input in a process-wide cache keyed by the whole file
+  content, never evicted it, and handed the cached object back by reference: a
+  long-running API grew without bound, and a caller that modified the front
+  matter it received changed what the next caller got for the same text.
+  `stringifyFrontmatter` also stops re-parsing the body it is given, so a
+  document whose body begins with `---` is no longer folded into its own
+  metadata on save.
+
+- **🔴 A commit parameter could make git write a file.**
+  `GET /api/v1/diff/:id?commit1=…&commit2=…` validated the two revisions only as
+  non-empty strings and passed them to git as arguments. Git takes an argument
+  beginning with `-` as an option, and `git show --output=<path>` writes its
+  output to `<path>` — so a caller with `records:view`, which the `public` role
+  holds, could make the server create or overwrite a file anywhere the process
+  can write. Measured, as a self-registered user: the request created the file.
+  A revision is now one name for one commit (a hash, or a ref with `~`/`^`
+  ancestry), validated at the route and asserted again where the git command
+  line is built. Found beside a scanner alert, not by one.
+
+- **A name could walk out of its directory.** A record type on
+  `POST /api/v1/validation/record` (and `GET /validation/record/:id`,
+  `/validation/bulk`, `/status/records`, `/templates`) was validated only as "a
+  string" and then joined onto the records root. `type=../../outside` made the
+  server walk the named directory, recursively and synchronously, and answer
+  differently depending on whether `<recordId>.md` existed there — a 500 where
+  the name was a file, a 200 where it was not. Existence leaked; no content did.
+  The geography listing, which is anonymous, went further and **read** the files
+  it found under a traversing `category`; its route's allowlist was the only
+  thing in front of it. Every function that turns a caller-supplied name into a
+  path now confines the result to its root (`resolveInside` / `resolveChild` in
+  `@civicpress/core`), beside the filesystem call, and the routes answer `400`
+  for a name that is not one. Also covered: a template's `extends`, which
+  resolved one level above the template directory; the record type interpolated
+  into a schema-file path; and a `startsWith(root)` check that a sibling
+  directory passes.
+
+- **A template variable's name was a regular expression.** The preview route
+  (`templates:view` — the clerk) interpolated each variable's name into a
+  pattern unescaped: `.*` replaced every placeholder, `a(` was a 500, and a name
+  with a nested quantifier was exponential against a line of ordinary text — 28
+  characters took 2 s, and the shipped bylaw template has a line of 45. Names
+  are escaped; values are supplied through a function so `$&` in a value is
+  literal; the partial and `{{#if}}` scans, which were quadratic on a body of
+  openings with no closing, are a single linear pass compared against the
+  original on 300,000 generated inputs; preview input is bounded (100 variables,
+  20 KB) and a template is at most 200 KB.
+
+- **Classifying a device's error message was quadratic.** A device ack that
+  fails without an `errorCode` has its `error` text classified by five `/a.*b/`
+  patterns, with the 10 MiB frame as the only bound. 1 MB of "device" repeated
+  blocked the process for 62 seconds. The text is cut to 2 KB and the five are
+  substring checks. Three misclassifications fixed on the way: `ice` matched
+  inside "device", so "Device is busy" was a WebRTC failure; "File not found",
+  "Preview already active" and "Capture already active" were answered by the
+  general test above them.
+
+- **Emails showed a value as markup.** The HTML part of every notification email
+  was assembled without encoding, and the password-reset email carries the
+  account's username, which registration accepts from anyone. A username of
+  `<a href="https://…">sign in here</a>`, registered against someone else's
+  address, arrived in that inbox as a link in an email from the municipality.
+  The body is encoded now; the assembled document is no longer run through
+  variable replacement a second time (a value containing `{{…}}` used to throw
+  and stop the email); and the text part is the message rather than the HTML
+  with its tags deleted, which began every text email with the stylesheet.
+  `validateRequest` now checks the size of the data before scanning it — the
+  scan was quadratic and ran first: 169 s for 1 MB.
+
+- **The device-registration rate limiter counted by an address the client
+  chose.** It read the first entry of `X-Forwarded-For`; a proxy appends to that
+  header. Eight requests with eight values, eight 200s. It keys on `req.ip` now,
+  which honours `trust proxy`, and the same helper supplies the `registrationIp`
+  stored with a device, which was equally the client's to invent. The per-code
+  key is bounded to 64 characters.
+
+- **Repeated query parameters were anonymous 500s.** express-validator's `isIn`,
+  `isLength` and `matches` run per element on an array, so `?sort=a&sort=b`
+  passed them and then broke a `.toLowerCase()`: 500 on `GET /search` and
+  `GET /records` with no login. `isString().bail()` now precedes them;
+  `/indexing/search` gained validation it never had; `/validation/bulk` is
+  bounded to 100 string ids.
+
+- **The rest of the CodeQL baseline.** 195 alerts had been open since the
+  scanner was enabled on 2026-07-30; none had been triaged. Every production
+  alert now has a verdict in `docs/audits/2026-09-29-codeql-baseline-triage.md`.
+  Beyond the items above: diagnostic-check timers are cleared when the check
+  finishes and capped at five minutes in core; realtime client ids come from
+  `randomUUID()`; enrollment codes use `crypto.randomInt()`; the search and
+  geography parsers' quadratic patterns are linear (compared on generated
+  input); upload paths are confined beside each use; a table cell collapses `\r`
+  as well as `\n`; two dead sanitizers and three dead helpers are deleted.
+  Fourteen production alerts remain by decision, each with its dismissal reason
+  in the triage document.
+
 ### Added
 
 - **`resolveInstanceContext()`** (`@civicpress/core`) — resolves the instance
@@ -72,6 +193,32 @@ database guarantee rather than a convention.
   from issued numbers and reservations together, so a database predating the
   table needs no backfill. Saga compensation hands a number back rather than
   burning it.
+
+### Security
+
+- **Being logged in no longer counts as clearance to read unpublished records.**
+  The published-only gate on anonymous reads asked one question — "is there a
+  user?" — while `POST /users/register` hands anyone a `public` account with no
+  verification and no switch. Measured before the fix: a self-registered account
+  listed every status, read a draft's full body where the anonymous request got
+  a 404, and got the same set back from search and the summary histogram. The
+  line is now a permission, **`records:view_unpublished`**, granted to `admin`
+  and `clerk` in the shipped roles and held by nobody else; every read path
+  (list, by id, frontmatter, search, summary, linked records) asks it through
+  one function, and the realtime handshake asks the same question: joining a
+  draft's collaboration room by id used to need only `records:view`. ⚠️ **An
+  instance with its own `roles.yml`** keeps working, but its reviewer roles see
+  only public statuses until the line is added — that is the fail-closed side of
+  the change, and the intended one.
+- **Self-registration has a switch.** `auth.registration.enabled: false` in
+  `.civicrc` closes `POST /users/register` (`403 REGISTRATION_DISABLED`, before
+  the body is read), `GET /auth/providers` says so, and the web UI hides the
+  link and the form. On by default, so an upgrade changes nothing; `civic init`
+  writes the key so it can be found.
+- **A 404 no longer lists the record tree.** The not-found bodies of `/diff/*`
+  and `/validation/record/*` carried `availableRecords`: every record file on
+  disk, in every status, to any caller with `records:view` — the published-only
+  gate defeated by an error message. Removed.
 
 ### Fixed
 
@@ -290,6 +437,27 @@ database guarantee rather than a convention.
   subprocesses, and a global setup hook gives every test one real event-loop
   turn, bounding the worst-case block to a single test's synchronous work.
 
+- **`GET /api/v1/diff/:id` returned an empty diff unless every option was
+  spelled out, and its history filters always failed.** `showMetadata`,
+  `showContent` and `includeStats` defaulted to the boolean `true` and were then
+  compared with the string `'true'`; the documented defaults now apply. `author`
+  and `since` reached simple-git as `{ author: 'x' }`, which it passed to git as
+  the argument `author=x` — a revision that does not exist — so both were a 500
+  whenever used. `limit` is validated (1–200). The one compare test had never
+  compared anything: it returned early when the fixture's record had fewer than
+  two commits, which it always did.
+- **`GET /api/v1/status/records` has always reported `byStatus: {}`.** It joined
+  the data directory to each record path with the `records/` prefix removed,
+  looked one directory too high, and counted nothing. The status is now read
+  from the record's front matter rather than from the first `status:` anywhere
+  in the file, which for a recorded session is `redaction_status`.
+- **The raw configuration routes depended on the working directory.**
+  `notifications` was read and written under `./.system-data`, and the shipped
+  defaults under `./core/src/defaults`, which exists in a source checkout and
+  nowhere else — so in a container a raw read of a file the operator had not
+  customised was a 404. They ask the configuration service now, which is given
+  the instance's system-data directory.
+
 ### Changed
 
 - **The shipped review chain can be walked, and it ends on a public status.**
@@ -367,10 +535,74 @@ database guarantee rather than a convention.
 - **Two duplicate `.civicrc` walk-ups removed** (the diagnostics one silently
   gave up after 10 levels, so it could report on a different config file than
   the one actually loaded); one implementation remains.
+- **`module.json` no longer advertises capabilities that do not exist.** The
+  manifest's `routes`, `audit`, `cli` and `lifecycle` flags were declared in the
+  public `ModuleCapabilities` type, documented in the module contract, and read
+  by nothing — no dispatch for any of them was ever built. They are removed from
+  the type, the JSON schema and the contract; a manifest describes schema
+  extensions only. ⚠️ **A manifest that still sets one of the four now fails
+  validation** (`ModuleManifestInvalid`, naming the key) instead of being
+  silently ignored — delete the line. Neither shipped manifest set any. The
+  contract also now says that a module's `entry` is declared, not loaded:
+  nothing in core, the API or the CLI imports it, and the `ModuleEntry`
+  interface that described a call order is withdrawn until module loading is
+  designed with a threat model.
+- **The `/api/v1/workflows` and `/api/v1/hooks` stubs stop naming a release.**
+  Both still answer `501 NOT_IMPLEMENTED`, but the message no longer says
+  "planned for v0.4.x" and the `retry_after_milestone` detail is gone — the
+  programmable workflow engine they would manage was split out of v0.4.x into
+  its own, unscheduled milestone on 2026-09-30 (`docs/roadmap.md` §5a). The
+  OpenAPI text says the same.
+- **CodeQL no longer scans tests.** `.github/codeql/codeql-config.yml` excludes
+  `tests/`, `e2e/`, `__tests__/` and `*.test.ts`; `scripts/` stays scanned
+  because it runs with repository privileges. 116 of the 195 baseline alerts
+  were in test code, 111 of them one rule fired by CLI tests building a shell
+  command from a temp path; they close on the next default-branch scan rather
+  than being dismissed by hand forever. The workflow's header comment also stops
+  calling the analysis "report-only": GitHub's per-PR "CodeQL" status check goes
+  red on any new alert, and has caught real defects twice.
 - **Hermetic test harness.** `createTestInstance()` builds an isolated instance
   and installs it, replacing fixtures that had to `process.chdir()` into their
   own directory to be discovered. Test runs no longer write a stray
   `.system-data` into the repository checkout.
+- **Dependency advisories refreshed: 87 → 1.** An OSV scan of the lockfile found
+  26 package versions carrying 87 advisory hits, accumulated since the last
+  override sweep. Every one is closed by a patch or minor bump except
+  GHSA-82fw-gwwq-j7x9 on `vitest` 3.2.6 and its `@vitest/mocker` (dev-only; the
+  fix is vitest 4, which is its own migration). Notable moves: `nodemailer` 7 →
+  10 (Node ≥ 20, an error code renamed, remote-content TLS validated — none used
+  by `EmailChannel`, which was also driven end-to-end against a live SMTP
+  server), `nuxt` 4.4.7 → 4.5.2, `@nuxtjs/i18n` 10.2 → 10.6, every `@tiptap/*`
+  package to 3.31.3 (pinned by override so @nuxt/ui's seventeen copies match the
+  editor's), `markdown-it`, `multer`, `postcss`, `undici`, `js-yaml`, `qs`,
+  `nanoid`, `devalue`, `brace-expansion`, `fast-uri`, `ip-address`. The tree was
+  then deduplicated: it had been carrying two copies each of `vue`,
+  `vue-router`, `prosemirror-model` and `prosemirror-view`, which is what broke
+  `nuxt typecheck`. `@nuxt/scripts` is removed — a `nuxi init` leftover that was
+  never registered as a module or imported, and the source of the only peer
+  conflict. `@types/nodemailer` is removed because nodemailer 10 ships its own
+  types. `useCivicApi` now types its options as `UseFetchOptions<T>` (Nuxt's own
+  recipe) instead of `Parameters<typeof useFetch<T>>[1]`, which picked whichever
+  overload Nuxt happened to list last. ⚠️ `vue-i18n` is now declared by
+  `modules/ui`, which imports it directly: the UI test config had aliased it to
+  a hard-coded pnpm virtual-store directory that only still existed on the
+  machine that wrote it, so the suite was green there and red on a clean clone
+  the moment the tree moved. The alias now resolves through `modules/ui` like
+  its neighbours.
+- **Manifests declare what actually runs.** Seventeen `package.json` lines named
+  a version the root overrides do not install — `multer` 1.4.5 in three packages
+  while 2.4.0 runs, `tar` ^6 while 7.5.21 runs, `vitest` 3.2.4 vs 3.2.6, and
+  patch-level drift on `happy-dom`, `ajv`, `diff`, `uuid`. Each now names the
+  version that resolves, and `@types/multer` follows multer to 2.x. `yaml` is
+  the one whose running version moved: four packages declare `^2.9.0`, but the
+  July override had pinned `yaml@2` to 2.8.3 — below the declared range, and a
+  downgrade, since 2.9.0 predates the pin and was never in the advisory's range.
+  The override is now 2.9.1.
+- **The pre-commit hook lints `.mjs` and `.cjs` files.** The lint-staged pattern
+  named `ts,tsx,js,jsx,vue`, so those files got neither Prettier nor ESLint at
+  commit time — which is how the hard-coded store path above got in. The 25 such
+  files that had never been formatted are formatted once, in a commit of their
+  own, so the hook does not do it piecemeal inside unrelated changes.
 
 ## [0.3.1] - 2026-08-06
 

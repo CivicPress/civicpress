@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { HttpError } from '../utils/http-error.js';
 import {
+  AuthConfigManager,
   CivicPress,
   CsrfProtection,
   isSimulatedAuthEnabled,
@@ -56,8 +57,13 @@ router.post('/login', async (req, res) => {
     // Check if provider is supported
     const availableProviders = authService.getAvailableOAuthProviders();
     if (!availableProviders.includes(provider)) {
-      const error = new HttpError(400, `OAuth provider '${provider}' is not supported`, 'UNSUPPORTED_PROVIDER', { details: { availableProviders } });
-    return handleApiError('login', error, req, res);
+      const error = new HttpError(
+        400,
+        `OAuth provider '${provider}' is not supported`,
+        'UNSUPPORTED_PROVIDER',
+        { details: { availableProviders } }
+      );
+      return handleApiError('login', error, req, res);
     }
 
     // Authenticate with OAuth provider
@@ -235,7 +241,13 @@ router.post('/reset-password', async (req, res) => {
       { operation: 'reset_password' }
     );
   } catch (error) {
-    handleApiError('reset_password', error, req, res, 'Failed to reset password');
+    handleApiError(
+      'reset_password',
+      error,
+      req,
+      res,
+      'Failed to reset password'
+    );
   }
 });
 
@@ -252,8 +264,15 @@ router.get('/providers', async (req, res) => {
     const authService = civicPress.getAuthService();
 
     const providers = authService.getAvailableOAuthProviders();
+    // Whether self-registration is open, so the UI can hide the door it would
+    // otherwise send people through (`auth.registration.enabled`).
+    const registration = {
+      enabled: AuthConfigManager.getInstance().isRegistrationEnabled(),
+    };
 
-    sendSuccess({ providers }, req, res, { operation: 'get_providers' });
+    sendSuccess({ providers, registration }, req, res, {
+      operation: 'get_providers',
+    });
   } catch (error) {
     handleApiError('get_providers', error, req, res, 'Failed to get providers');
   }
@@ -270,7 +289,11 @@ router.get('/me', async (req, res) => {
     const authHeader = req.headers.authorization;
 
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      const error = new HttpError(401, 'Authorization header required', 'MISSING_AUTH');
+      const error = new HttpError(
+        401,
+        'Authorization header required',
+        'MISSING_AUTH'
+      );
       return handleApiError('get_me', error, req, res);
     }
 
@@ -284,7 +307,11 @@ router.get('/me', async (req, res) => {
     const user = await authService.validateSession(token);
 
     if (!user) {
-      const error = new HttpError(401, 'Invalid or expired token', 'INVALID_TOKEN');
+      const error = new HttpError(
+        401,
+        'Invalid or expired token',
+        'INVALID_TOKEN'
+      );
       return handleApiError('get_me', error, req, res);
     }
 
@@ -328,7 +355,11 @@ router.post('/logout', async (req, res) => {
     // scheme) so a token that authenticates can never fail to revoke.
     const [scheme, token] = (authHeader ?? '').split(/\s+/);
     if (!scheme || scheme.toLowerCase() !== 'bearer' || !token) {
-      const error = new HttpError(401, 'Authorization header required', 'MISSING_AUTH');
+      const error = new HttpError(
+        401,
+        'Authorization header required',
+        'MISSING_AUTH'
+      );
       return handleApiError('logout', error, req, res);
     }
 
@@ -365,9 +396,14 @@ router.post('/simulated', async (req, res) => {
     const { username, role = 'public' } = req.body;
 
     if (!username) {
-      const error = new HttpError(400, 'Username is required', 'MISSING_USERNAME');
+      const error = new HttpError(
+        400,
+        'Username is required',
+        'MISSING_USERNAME'
+      );
       return handleApiError(
-        'simulated_login', error,
+        'simulated_login',
+        error,
         req,
         res,
         'Username is required'
@@ -381,11 +417,18 @@ router.post('/simulated', async (req, res) => {
     // Validate role
     const isValidRole = await authService.isValidRole(role);
     if (!isValidRole) {
-      const error = new HttpError(400, `Invalid role: ${role}`, 'INVALID_ROLE', { details: {
-        role,
-        availableRoles: await authService.getAvailableRoles(),
-      } });
-    return handleApiError('simulated_login', error, req, res);
+      const error = new HttpError(
+        400,
+        `Invalid role: ${role}`,
+        'INVALID_ROLE',
+        {
+          details: {
+            role,
+            availableRoles: await authService.getAvailableRoles(),
+          },
+        }
+      );
+      return handleApiError('simulated_login', error, req, res);
     }
 
     // Authenticate with simulated account

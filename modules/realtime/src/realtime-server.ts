@@ -4,6 +4,7 @@
  * Main WebSocket server for realtime collaborative editing
  */
 
+import { randomUUID } from 'crypto';
 import { WebSocketServer, WebSocket } from 'ws';
 import type {
   Logger,
@@ -106,7 +107,10 @@ function readSessionRevokedPayload(
   if (key.length === 0) {
     return null;
   }
-  return { userId: key, reason: typeof reason === 'string' ? reason : undefined };
+  return {
+    userId: key,
+    reason: typeof reason === 'string' ? reason : undefined,
+  };
 }
 
 /** The connection identity used for limits, per-user tracking, and metadata. */
@@ -467,12 +471,7 @@ export class RealtimeServer {
       } catch {
         // Best-effort notice; the close below is what enforces the revocation.
       }
-      this.closeWithCode(
-        ws,
-        4001,
-        'SESSION_REVOKED',
-        reason ? { reason } : {}
-      );
+      this.closeWithCode(ws, 4001, 'SESSION_REVOKED', reason ? { reason } : {});
       closed++;
     }
 
@@ -630,16 +629,13 @@ export class RealtimeServer {
       // FA-BB-010: query-string tokens are no longer accepted (they leak
       // into proxy/access logs). Tell the operator why the client fails.
       if (tokenResult.rejectedQueryToken) {
-        coreWarn(
-          'WebSocket connection sent a query-string token — rejected',
-          {
-            operation: 'realtime:auth:query-token-rejected',
-            clientId,
-            ip: clientIp,
-            recommendation:
-              'Use Authorization header (Node.js) or subprotocol (browser) instead',
-          }
-        );
+        coreWarn('WebSocket connection sent a query-string token — rejected', {
+          operation: 'realtime:auth:query-token-rejected',
+          clientId,
+          ip: clientIp,
+          recommendation:
+            'Use Authorization header (Node.js) or subprotocol (browser) instead',
+        });
       }
 
       if (!tokenResult.token) {
@@ -879,7 +875,11 @@ export class RealtimeServer {
     // Device connections: index clientId → device identity so device rooms can
     // resolve THIS socket for outbound commands (DeviceRoom.sendToDevice).
     if (authResult.deviceAuth) {
-      const d = authResult.deviceAuth as any;
+      const d = authResult.deviceAuth as {
+        deviceId: string | number;
+        deviceUuid: string;
+        organizationId?: string;
+      };
       this.clientToDevice.set(clientId, {
         deviceId: String(d.deviceId),
         deviceUuid: d.deviceUuid,
@@ -1396,9 +1396,18 @@ export class RealtimeServer {
     ws.send(JSON.stringify(message));
   }
 
-  /** Generate unique client ID. */
+  /**
+   * Generate unique client ID.
+   *
+   * The id is a routing key, not a credential: the server assigns it and no
+   * frame from a client is ever read for one. But it has to be UNIQUE — it
+   * keys the connection, rate-limit and revocation maps, and two sockets with
+   * one id would share an entry in each, so that revoking one user's sessions
+   * could close another user's socket. A millisecond and 36 bits of
+   * `Math.random()` made that unlikely. This makes it not a question.
+   */
   private generateClientId(): string {
-    return `client_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+    return `client_${randomUUID()}`;
   }
 
   /** Emit hook event. */

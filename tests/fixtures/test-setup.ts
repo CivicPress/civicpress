@@ -28,6 +28,7 @@ import {
   CentralConfigManager,
   setInstanceContext,
   resolveInstanceContext,
+  AuthConfigManager,
 } from '@civicpress/core';
 
 /**
@@ -935,6 +936,7 @@ export function createRolesConfig(config: TestConfig) {
             'records:edit',
             'records:delete',
             'records:view',
+            'records:view_unpublished',
             'users:manage',
             'workflows:manage',
             'records:import',
@@ -974,6 +976,7 @@ export function createRolesConfig(config: TestConfig) {
             'records:create',
             'records:edit',
             'records:view',
+            'records:view_unpublished',
             'storage:upload',
             'storage:download',
             'storage:manage',
@@ -1027,6 +1030,10 @@ export function createRolesConfig(config: TestConfig) {
       },
       'records:view': {
         description: 'View records',
+        level: 'record',
+      },
+      'records:view_unpublished': {
+        description: 'View records in a non-public status',
         level: 'record',
       },
       'users:manage': {
@@ -1478,14 +1485,8 @@ export function cleanupCLITestContext(context: CLITestContext) {
 // API test helpers
 export async function createAPITestContext(
   options: {
-    /**
-     * Run this instance on the SHIPPED `workflows.yml`, `roles.yml` and
-     * `config.yml` (copied from core/src/defaults) instead of the fixture's
-     * hand-written ones. The fixture's configuration is what most tests need;
-     * it is also how a shipped review chain that could not be walked stayed
-     * green for months — nothing exercised the files an instance is born with.
-     */
-    shippedDefaults?: boolean;
+    /** Extra `.civicrc` fields for this instance (e.g. `auth.registration`). */
+    civicrc?: Record<string, unknown>;
   } = {}
 ): Promise<APITestContext> {
   // One hermetic instance (directory + every config file + both git repos),
@@ -1494,8 +1495,7 @@ export async function createAPITestContext(
   const instance = createTestInstance({
     prefix: 'api-test',
     records: true,
-    workflows: !options.shippedDefaults,
-    roles: !options.shippedDefaults,
+    civicrc: options.civicrc,
   });
   const config = instance.config;
   if (options.shippedDefaults) {
@@ -1599,6 +1599,10 @@ export async function createAPITestContext(
   // reset() first (it drops the cached config AND the memoized context), then
   // re-install — the same order createTestInstance uses.
   CentralConfigManager.reset();
+  // AuthConfigManager is a process singleton that caches on first load; a
+  // second context in the same file (one with `auth.registration` overridden,
+  // say) would otherwise keep the first one's configuration.
+  AuthConfigManager.getInstance().reset();
   setInstanceContext(instance.context);
 
   // Initialize CivicPress core first, then force reload role config before setting up routes

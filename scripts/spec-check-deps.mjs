@@ -13,7 +13,8 @@ if (!fs.existsSync(indexPath)) {
 
 const index = fs.readFileSync(indexPath, 'utf8');
 const re = /\]\((specs\/[a-z0-9\-]+\.md)\)/gi;
-let m; const refs = new Set();
+let m;
+const refs = new Set();
 while ((m = re.exec(index))) refs.add(m[1]);
 
 const missing = [];

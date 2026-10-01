@@ -1,13 +1,12 @@
 import { Router, Response } from 'express';
 import { body, param, query, validationResult } from 'express-validator';
+import { isName } from '../utils/name-validators.js';
 import { AuthenticatedRequest, requirePermission } from '../middleware/auth.js';
 import {
   Logger,
   RecordValidator,
   RecordSchemaValidator,
   findRecordFileSync,
-  parseRecordRelativePath,
-  listRecordFilesSync,
 } from '@civicpress/core';
 import {
   sendSuccess,
@@ -17,7 +16,7 @@ import {
 } from '../utils/api-logger.js';
 import * as fs from 'fs';
 import * as path from 'path';
-import matter from 'gray-matter';
+import { parseFrontmatter } from '@civicpress/core';
 import { resolveInsideRecordsRoot } from '../utils/record-path-guard.js';
 
 type Severity = 'error' | 'warning' | 'info';
@@ -72,7 +71,7 @@ export function createValidationRouter() {
         .isString()
         .notEmpty()
         .withMessage('Record ID is required'),
-      body('type').optional().isString().withMessage('Type must be a string'),
+      isName(body('type').optional(), 'Type'),
     ],
     async (req: AuthenticatedRequest, res: Response) => {
       logApiRequest(req, { operation: 'validate_record' });
@@ -129,8 +128,23 @@ export function createValidationRouter() {
     '/bulk',
     requirePermission('records:view'),
     [
-      body('recordIds').isArray().withMessage('Record IDs must be an array'),
-      body('types').optional().isArray().withMessage('Types must be an array'),
+      // Each entry starts a synchronous search of the records tree, so the
+      // list is bounded, and its entries are checked: `isArray()` alone said
+      // nothing about what was in it.
+      body('recordIds')
+        .isArray({ min: 1, max: 100 })
+        .withMessage('Record IDs must be an array of 1 to 100 entries'),
+      body('recordIds.*')
+        .isString()
+        .withMessage('Each record ID must be a string')
+        .bail()
+        .isLength({ min: 1, max: 300 })
+        .withMessage('Each record ID must be between 1 and 300 characters'),
+      body('types')
+        .optional()
+        .isArray({ max: 100 })
+        .withMessage('Types must be an array of at most 100 entries'),
+      isName(body('types.*'), 'Each type'),
       body('includeContent')
         .optional()
         .isBoolean()
@@ -197,7 +211,7 @@ export function createValidationRouter() {
     '/status',
     requirePermission('records:view'),
     [
-      query('type').optional().isString().withMessage('Type must be a string'),
+      isName(query('type').optional(), 'Type'),
       query('severity')
         .optional()
         .isIn(['error', 'warning', 'info'])
@@ -268,7 +282,7 @@ export function createValidationRouter() {
         .isString()
         .notEmpty()
         .withMessage('Record ID is required'),
-      query('type').optional().isString().withMessage('Type must be a string'),
+      isName(query('type').optional(), 'Type'),
     ],
     async (req: AuthenticatedRequest, res: Response) => {
       logApiRequest(req, { operation: 'get_record_validation' });
@@ -366,30 +380,13 @@ async function validateSingleRecord(
   }
 
   if (!recordRelativePath) {
-    const availableRecords = listRecordFilesSync(dataDir).reduce(
-      (acc, relPath) => {
-        const parsed = parseRecordRelativePath(relPath);
-        if (!parsed.type) {
-          return acc;
-        }
-        if (!acc[parsed.type]) {
-          acc[parsed.type] = [];
-        }
-        const name = parsed.year ? `${parsed.year}/${parsed.id}` : parsed.id;
-        acc[parsed.type].push(name);
-        return acc;
-      },
-      {} as Record<string, string[]>
-    );
-
+    // No `availableRecords` here either: it enumerated every record file on
+    // disk, in every status, to any caller with records:view.
     issues.push({
       severity: 'error' as Severity,
       code: 'RECORD_NOT_FOUND',
       message: `Record '${recordId}' not found`,
       field: 'recordId',
-      metadata: {
-        availableRecords,
-      },
     });
     return {
       recordId,
@@ -458,11 +455,11 @@ async function validateSingleRecord(
 async function validateRecordContent(
   content: string,
   recordId: string
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): Promise<any> {
   try {
     // Extract frontmatter for schema validation
-    const { data: frontmatter } = matter(content);
+    const { data: frontmatter } = parseFrontmatter(content);
     const recordType = frontmatter?.type;
 
     // STEP 1: Schema validation (fail fast)
@@ -573,7 +570,7 @@ async function validateBulkRecords(
   recordIds: string[],
   types?: string[],
   includeContent = false
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): Promise<any> {
   const results = [];
   const summary = {
@@ -629,7 +626,7 @@ async function getValidationStatus(
     severity?: string;
     limit?: number;
   }
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): Promise<any> {
   const recordsDir = path.join(dataDir, 'records');
   const allIssues: Array<

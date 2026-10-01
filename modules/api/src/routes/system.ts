@@ -72,6 +72,14 @@ router.get('/record-statuses', (req, res) => {
     const recordStatusesMetadata =
       getRecordStatusesWithMetadata(recordStatusesConfig);
 
+    // Whether an anonymous reader may see records in a status is decided by
+    // configuration (the `public` flag, fail-closed). Serve that answer, so a
+    // client asks instead of keeping its own list of "published" statuses —
+    // the editor did, and its list disagreed with the read gate.
+    const publicStatuses = new Set(
+      CentralConfigManager.getPublicRecordStatuses()
+    );
+
     // Transform to API response format with additional metadata
     const recordStatuses = recordStatusesMetadata.map((status) => ({
       key: status.key,
@@ -79,11 +87,15 @@ router.get('/record-statuses', (req, res) => {
       description: status.description,
       source: status.source,
       priority: status.priority,
+      public: publicStatuses.has(status.key),
       // Map status keys to UI colors (can be extended in config later)
       color: getStatusColor(status.key),
       // Transitions would come from workflow config (not implemented here)
       transitions: [],
-      editable: !['published', 'archived', 'expired'].includes(status.key),
+      // Was a literal ['published', 'archived', 'expired'] — the default public
+      // set, written out a second time. Same answer for a default instance;
+      // for a configured one it now follows the configuration.
+      editable: !publicStatuses.has(status.key),
     }));
 
     res.json({

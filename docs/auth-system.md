@@ -75,7 +75,7 @@ curl -X POST http://localhost:3000/auth/simulated \
 | `admin`   | Full system access | All permissions             |
 | `clerk`   | Municipal clerk    | Create, edit, view records  |
 | `council` | Council member     | Approve, edit, view records |
-| `public`  | Public citizen     | View published records only |
+| `public`  | Public citizen     | View public-status records  |
 
 ### Permission System
 
@@ -83,10 +83,32 @@ Permissions are granular and role-based:
 
 - **`records:create`** - Create new civic records
 - **`records:edit`** - Edit existing records
-- **`records:view`** - View records
+- **`records:view`** - View records in a public status
+- **`records:view_unpublished`** - View records in a non-public status (drafts,
+  the review chain). Kept separate from `records:view`, which every
+  self-registered account holds: until 2026-09-30 the read gate asked only
+  whether the caller was logged in, and registration is open. The shipped roles
+  grant it to `admin` and `clerk`; an instance with its own `roles.yml` adds it
+  to the roles that review.
 - **`records:delete`** - Archive/delete records
 - **`system:admin`** - Administrative access
 - **`workflows:execute`** - Execute workflows
+
+### Closing self-registration
+
+`POST /api/v1/users/register` is open by default. To have administrators create
+every account instead, set in `.civicrc`:
+
+```yaml
+auth:
+  registration:
+    enabled: false
+```
+
+The endpoint then answers `403 REGISTRATION_DISABLED` without reading the body,
+and `GET /api/v1/auth/providers` reports `registration.enabled: false`, which
+the web UI uses to hide the "create one" link and the registration form.
+`civic init` writes the key as `true` so it is visible in every new instance.
 
 ## API Authentication
 
@@ -398,6 +420,7 @@ curl -X GET http://localhost:3000/api/records \
    - Set callback URL to your CivicPress instance
 
 2. **Environment Variables**:
+
    ```bash
    export GITHUB_CLIENT_ID="your_client_id"
    export GITHUB_CLIENT_SECRET="your_client_secret"

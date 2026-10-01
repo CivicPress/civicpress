@@ -104,10 +104,15 @@ export function createGeographyRouter(
   // GET /api/v1/geography - List geography files
   router.get(
     '/',
+    // `isString().bail()` first: `isIn` runs per element on an array, so
+    // `?type[]=geojson` passed it and reached the manager as an array, on a
+    // route that needs no login.
     query('category')
       .optional()
+      .isString()
+      .bail()
       .isIn(['zone', 'boundary', 'district', 'facility', 'route']),
-    query('type').optional().isIn(['geojson']),
+    query('type').optional().isString().bail().isIn(['geojson']),
     query('page').optional().isInt({ min: 1 }),
     query('limit').optional().isInt({ min: 1, max: 100 }),
     async (req: Request, res: Response) => {

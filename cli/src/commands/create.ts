@@ -12,7 +12,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { withCli } from '../utils/with-cli.js';
 import { AuthUtils } from '../utils/auth-utils.js';
-import matter from 'gray-matter';
+import { parseFrontmatter } from '@civicpress/core';
 import { cliSuccess, cliError, cliWarn } from '../utils/cli-output.js';
 
 export const createCommand = (cli: CAC) => {
@@ -224,7 +224,7 @@ export const createCommand = (cli: CAC) => {
             const fullContent = RecordParser.serializeToMarkdown(recordData);
 
             // Validate schema before saving (fail fast)
-            const { data: frontmatter } = matter(fullContent);
+            const { data: frontmatter } = parseFrontmatter(fullContent);
             const schemaValidation = RecordSchemaValidator.validate(
               frontmatter,
               type,

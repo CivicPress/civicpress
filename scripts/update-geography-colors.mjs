@@ -7,7 +7,9 @@ import fs from 'fs';
 import matter from 'gray-matter';
 import { stringify } from 'yaml';
 
-const filePath = process.argv[2] || 'data/geography/geojson/zone/grandes-affectations-du-territoire-1763321502869.md';
+const filePath =
+  process.argv[2] ||
+  'data/geography/geojson/zone/grandes-affectations-du-territoire-1763321502869.md';
 
 if (!fs.existsSync(filePath)) {
   console.error(`File not found: ${filePath}`);
@@ -15,7 +17,18 @@ if (!fs.existsSync(filePath)) {
 }
 
 const content = fs.readFileSync(filePath, 'utf8');
-const { data: frontmatter, content: markdownContent } = matter(content);
+// A bare matter() call EXECUTES front matter tagged `---js`. Refuse that
+// engine, as core/src/utils/frontmatter.ts does — this script runs unbuilt
+// and so cannot import the wrapper.
+const refuseExecutableFrontmatter = () => {
+  throw new Error('Front matter declared as JavaScript is not accepted');
+};
+const { data: frontmatter, content: markdownContent } = matter(content, {
+  engines: {
+    js: refuseExecutableFrontmatter,
+    javascript: refuseExecutableFrontmatter,
+  },
+});
 
 // Extract GeoJSON from code block
 const geoJsonMatch = markdownContent.match(/```json\s*\n([\s\S]*?)\n```/);
@@ -92,4 +105,3 @@ ${JSON.stringify(geoJson, null, 2)}
 fs.writeFileSync(filePath, newContent, 'utf8');
 console.log('✅ Updated geography file with color mapping');
 console.log('Color assignments:', colors);
-
