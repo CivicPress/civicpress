@@ -8,8 +8,13 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import matter from 'gray-matter';
+import { parseFrontmatter } from '../frontmatter.js';
 import { getInstanceContext } from '../../config/instance-context.js';
+import {
+  isSafeSegment,
+  resolveChild,
+  resolveInside,
+} from '../path-containment.js';
 import type {
   Template,
   TemplateValidation,
@@ -36,27 +41,41 @@ export class TemplateLoader {
   }
 
   /**
+   * `<root>/<type>/<name>.md` — or null unless `type` and `name` are both
+   * plain names. They arrive from a query string, a template id, or another
+   * template's `extends`, and were joined onto the root unchecked.
+   */
+  private templateFile(
+    root: string,
+    type: unknown,
+    name: unknown
+  ): string | null {
+    if (!isSafeSegment(type) || !isSafeSegment(name)) return null;
+    return resolveInside(root, type, `${name}.md`);
+  }
+
+  /**
    * Load a template by type and name with inheritance support
    */
   async loadTemplate(
     type: string,
     templateName: string = 'default'
   ): Promise<Template | null> {
-    const customPath = path.join(
+    const customPath = this.templateFile(
       this.customTemplatePath,
       type,
-      `${templateName}.md`
+      templateName
     );
-    if (fs.existsSync(customPath)) {
+    if (customPath && fs.existsSync(customPath)) {
       return this.parseTemplateWithInheritance(customPath, type, templateName);
     }
 
-    const basePath = path.join(
+    const basePath = this.templateFile(
       this.baseTemplatePath,
       type,
-      `${templateName}.md`
+      templateName
     );
-    if (fs.existsSync(basePath)) {
+    if (basePath && fs.existsSync(basePath)) {
       return this.parseTemplateWithInheritance(basePath, type, templateName);
     }
 
@@ -69,7 +88,8 @@ export class TemplateLoader {
     name: string
   ): Promise<Template> {
     const content = fs.readFileSync(filePath, 'utf8');
-    const { data: frontmatter, content: markdownContent } = matter(content);
+    const { data: frontmatter, content: markdownContent } =
+      parseFrontmatter(content);
 
     const template: Template = {
       name,
@@ -95,14 +115,16 @@ export class TemplateLoader {
   private async loadParentTemplate(
     extendsPath: string
   ): Promise<Template | null> {
-    const [parentType, parentName] = extendsPath.split('/');
+    // `extends: '../x'` used to resolve to `<dataDir>/.civic/x.md`: one level
+    // above the template directory, read as if it were a template.
+    const [parentType, parentName] = String(extendsPath).split('/');
 
-    const customParentPath = path.join(
+    const customParentPath = this.templateFile(
       this.customTemplatePath,
       parentType,
-      `${parentName}.md`
+      parentName
     );
-    if (fs.existsSync(customParentPath)) {
+    if (customParentPath && fs.existsSync(customParentPath)) {
       return this.parseTemplateWithInheritance(
         customParentPath,
         parentType,
@@ -110,12 +132,12 @@ export class TemplateLoader {
       );
     }
 
-    const baseParentPath = path.join(
+    const baseParentPath = this.templateFile(
       this.baseTemplatePath,
       parentType,
-      `${parentName}.md`
+      parentName
     );
-    if (fs.existsSync(baseParentPath)) {
+    if (baseParentPath && fs.existsSync(baseParentPath)) {
       return this.parseTemplateWithInheritance(
         baseParentPath,
         parentType,
@@ -189,8 +211,8 @@ export class TemplateLoader {
   listTemplates(type: string): string[] {
     const templates: string[] = [];
 
-    const customTypePath = path.join(this.customTemplatePath, type);
-    if (fs.existsSync(customTypePath)) {
+    const customTypePath = resolveChild(this.customTemplatePath, type);
+    if (customTypePath && fs.existsSync(customTypePath)) {
       const files = fs.readdirSync(customTypePath);
       for (const file of files) {
         if (file.endsWith('.md')) {
@@ -199,8 +221,8 @@ export class TemplateLoader {
       }
     }
 
-    const baseTypePath = path.join(this.baseTemplatePath, type);
-    if (fs.existsSync(baseTypePath)) {
+    const baseTypePath = resolveChild(this.baseTemplatePath, type);
+    if (baseTypePath && fs.existsSync(baseTypePath)) {
       const files = fs.readdirSync(baseTypePath);
       for (const file of files) {
         if (file.endsWith('.md')) {
@@ -220,13 +242,16 @@ export class TemplateLoader {
    */
   loadPartial(partialName: string): Partial | null {
     try {
-      const customPartialPath = path.join(
+      if (!isSafeSegment(partialName)) return null;
+
+      const customPartialPath = resolveInside(
         this.partialsPath,
         `${partialName}.md`
       );
-      if (fs.existsSync(customPartialPath)) {
+      if (customPartialPath && fs.existsSync(customPartialPath)) {
         const content = fs.readFileSync(customPartialPath, 'utf8');
-        const { data: frontmatter, content: markdownContent } = matter(content);
+        const { data: frontmatter, content: markdownContent } =
+          parseFrontmatter(content);
         return {
           name: partialName,
           content: markdownContent,
@@ -235,14 +260,15 @@ export class TemplateLoader {
         };
       }
 
-      const basePartialPath = path.join(
+      const basePartialPath = resolveInside(
         this.baseTemplatePath,
         'partials',
         `${partialName}.md`
       );
-      if (fs.existsSync(basePartialPath)) {
+      if (basePartialPath && fs.existsSync(basePartialPath)) {
         const content = fs.readFileSync(basePartialPath, 'utf8');
-        const { data: frontmatter, content: markdownContent } = matter(content);
+        const { data: frontmatter, content: markdownContent } =
+          parseFrontmatter(content);
         return {
           name: partialName,
           content: markdownContent,

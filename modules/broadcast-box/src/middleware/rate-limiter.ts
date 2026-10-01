@@ -6,6 +6,7 @@
 
 import type { Request, Response, NextFunction } from 'express';
 import type { Logger } from '@civicpress/core';
+import { clientIp } from '../utils/client-ip.js';
 
 interface RateLimitEntry {
   count: number;
@@ -36,29 +37,6 @@ export class DeviceRegistrationRateLimiter {
       },
       5 * 60 * 1000
     );
-  }
-
-  /**
-   * Get client IP address from request
-   */
-  private getClientIp(req: Request): string {
-    // Check X-Forwarded-For header (for proxies/load balancers)
-    const forwarded = req.headers['x-forwarded-for'];
-    if (forwarded) {
-      const ips = Array.isArray(forwarded)
-        ? forwarded[0]
-        : forwarded.split(',')[0];
-      return ips.trim();
-    }
-
-    // Check X-Real-IP header
-    const realIp = req.headers['x-real-ip'];
-    if (realIp) {
-      return Array.isArray(realIp) ? realIp[0] : realIp;
-    }
-
-    // Fallback to connection remote address
-    return req.socket.remoteAddress || 'unknown';
   }
 
   /**
@@ -179,8 +157,14 @@ export class DeviceRegistrationRateLimiter {
         return;
       }
 
-      const ip = this.getClientIp(req);
-      const enrollmentCode = req.body?.enrollmentCode as string | undefined;
+      const ip = clientIp(req);
+      // The key of the per-code allowance, so it is bounded: a real code is
+      // 14 characters, and the body is not validated until after this runs.
+      const submitted = req.body?.enrollmentCode;
+      const enrollmentCode =
+        typeof submitted === 'string' && submitted
+          ? submitted.slice(0, 64)
+          : undefined;
 
       // Check IP-based rate limit
       const ipLimit = this.checkIpLimit(ip);

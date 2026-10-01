@@ -20,7 +20,7 @@ import {
   RecordSchemaValidator,
   parseRecordRelativePath,
 } from '@civicpress/core';
-import matter from 'gray-matter';
+import { parseFrontmatter } from '@civicpress/core';
 import {
   getAvailableRecords,
   resolveRecordReference,
@@ -288,7 +288,7 @@ async function validateRecord(
   const suggestions: string[] = [];
 
   // STEP 1: Schema validation (explicit for CLI output)
-  const { data: frontmatter } = matter(content);
+  const { data: frontmatter } = parseFrontmatter(content);
   const schemaValidation = RecordSchemaValidator.validate(
     frontmatter,
     record.type,

@@ -19,7 +19,7 @@ import * as path from 'path';
 import { RecordParser } from '../records/record-parser.js';
 import { RecordSchemaValidator } from '../records/record-schema-validator.js';
 import { ensureDirectoryForRecordPath } from '../utils/record-paths.js';
-import matter from 'gray-matter';
+import { parseFrontmatter } from '../utils/frontmatter.js';
 import { RecordValidationError } from '../errors/domain-errors.js';
 
 /**
@@ -286,7 +286,7 @@ class UpdateFileStep extends BaseSagaStep<UpdateRecordContext, string> {
       const content = this.createMarkdownContent(normalizedRecord);
 
       // Validate schema
-      const { data: frontmatter } = matter(content);
+      const { data: frontmatter } = parseFrontmatter(content);
       const normalizedFrontmatter =
         this.normalizeFrontmatterForValidation(frontmatter);
 

@@ -1,12 +1,12 @@
-import { describe, it, expect } from 'vitest'
-import * as Y from 'yjs'
+import { describe, it, expect } from 'vitest';
+import * as Y from 'yjs';
 import {
   editorSchema,
   serializeDocToMarkdown,
   parseMarkdownToDoc,
   yXmlFragmentToMarkdown,
   prosemirrorJSONToYDoc,
-} from '../index.js'
+} from '../index.js';
 
 /**
  * GFM pipe-table round-trip (user-directed addition to the Phase 3 schema —
@@ -34,11 +34,11 @@ describe('GFM table round-trip', () => {
       '| --- | --- |',
       '| Ada | Engineer |',
       '| Linus | Maintainer |',
-    ].join('\n')
-    const doc = parseMarkdownToDoc(md)
-    const back = serializeDocToMarkdown(doc)
-    expect(back.trim()).toBe(md)
-  })
+    ].join('\n');
+    const doc = parseMarkdownToDoc(md);
+    const back = serializeDocToMarkdown(doc);
+    expect(back.trim()).toBe(md);
+  });
 
   it('round-trips column alignment (left / center / right / none)', () => {
     // AUTHORED:  | :--- | :--: | ---: | --- |   (varying delimiter widths)
@@ -49,11 +49,11 @@ describe('GFM table round-trip', () => {
       '| :-- | :-: | --: | --- |',
       '| Chairs | 4 | 200 | bulk |',
       '| Desks | 2 | 500 | oak |',
-    ].join('\n')
-    const doc = parseMarkdownToDoc(md)
-    const back = serializeDocToMarkdown(doc)
-    expect(back.trim()).toBe(md)
-  })
+    ].join('\n');
+    const doc = parseMarkdownToDoc(md);
+    const back = serializeDocToMarkdown(doc);
+    expect(back.trim()).toBe(md);
+  });
 
   it('round-trips inline marks + a civic-ref inside cells', () => {
     // Cells carry bold/italic/inline-code/a link and a civic-ref comment.
@@ -62,11 +62,11 @@ describe('GFM table round-trip', () => {
       '| --- | --- |',
       '| **Bold** and *italic* | `code` here |',
       '| [site](https://civicpress.io) | <!--civic-ref type="record" id="rec-1" label="Budget 2026"--> |',
-    ].join('\n')
-    const doc = parseMarkdownToDoc(md)
-    const back = serializeDocToMarkdown(doc)
-    expect(back.trim()).toBe(md)
-  })
+    ].join('\n');
+    const doc = parseMarkdownToDoc(md);
+    const back = serializeDocToMarkdown(doc);
+    expect(back.trim()).toBe(md);
+  });
 
   it('escapes a literal pipe in cell content', () => {
     // A `|` inside a cell must be backslash-escaped so it does not split the
@@ -75,44 +75,40 @@ describe('GFM table round-trip', () => {
       '| Expr | Meaning |',
       '| --- | --- |',
       '| a \\| b | a or b |',
-    ].join('\n')
-    const doc = parseMarkdownToDoc(md)
-    const back = serializeDocToMarkdown(doc)
-    expect(back.trim()).toBe(md)
-  })
+    ].join('\n');
+    const doc = parseMarkdownToDoc(md);
+    const back = serializeDocToMarkdown(doc);
+    expect(back.trim()).toBe(md);
+  });
 
   it('exposes table node types on the schema', () => {
-    expect(editorSchema.nodes.table).toBeDefined()
-    expect(editorSchema.nodes.table_row).toBeDefined()
-    expect(editorSchema.nodes.table_cell).toBeDefined()
-    expect(editorSchema.nodes.table_header).toBeDefined()
-  })
+    expect(editorSchema.nodes.table).toBeDefined();
+    expect(editorSchema.nodes.table_row).toBeDefined();
+    expect(editorSchema.nodes.table_cell).toBeDefined();
+    expect(editorSchema.nodes.table_header).toBeDefined();
+  });
 
   it('preserves cells/rows/alignment structurally (doc-level, not just text)', () => {
-    const md = [
-      '| A | B |',
-      '| :-- | --: |',
-      '| 1 | 2 |',
-    ].join('\n')
-    const doc = parseMarkdownToDoc(md)
-    let table: import('prosemirror-model').Node | null = null
+    const md = ['| A | B |', '| :-- | --: |', '| 1 | 2 |'].join('\n');
+    const doc = parseMarkdownToDoc(md);
+    let table: import('prosemirror-model').Node | null = null;
     doc.descendants((node) => {
-      if (node.type.name === 'table') table = node
-    })
-    expect(table).not.toBeNull()
-    const t = table as unknown as import('prosemirror-model').Node
+      if (node.type.name === 'table') table = node;
+    });
+    expect(table).not.toBeNull();
+    const t = table as unknown as import('prosemirror-model').Node;
     // header row + 1 body row = 2 rows
-    expect(t.childCount).toBe(2)
+    expect(t.childCount).toBe(2);
     // 2 cells per row
-    expect(t.child(0).childCount).toBe(2)
-    expect(t.child(1).childCount).toBe(2)
+    expect(t.child(0).childCount).toBe(2);
+    expect(t.child(1).childCount).toBe(2);
     // header cells are table_header, body cells are table_cell
-    expect(t.child(0).child(0).type.name).toBe('table_header')
-    expect(t.child(1).child(0).type.name).toBe('table_cell')
+    expect(t.child(0).child(0).type.name).toBe('table_header');
+    expect(t.child(1).child(0).type.name).toBe('table_cell');
     // alignment carried on cell attrs
-    expect(t.child(0).child(0).attrs.align).toBe('left')
-    expect(t.child(0).child(1).attrs.align).toBe('right')
-  })
+    expect(t.child(0).child(0).attrs.align).toBe('left');
+    expect(t.child(0).child(1).attrs.align).toBe('right');
+  });
 
   it('round-trips a table nested in a blockquote (per-line delimiter)', () => {
     // Regression: a table is multi-line, so every line — not just the first —
@@ -122,24 +118,22 @@ describe('GFM table round-trip', () => {
       '> | :-- | --: |',
       '> | 1 | 2 |',
       '> | 3 | 4 |',
-    ].join('\n')
-    const doc = parseMarkdownToDoc(md)
-    const back = serializeDocToMarkdown(doc)
-    expect(back.trim()).toBe(md)
-  })
+    ].join('\n');
+    const doc = parseMarkdownToDoc(md);
+    const back = serializeDocToMarkdown(doc);
+    expect(back.trim()).toBe(md);
+  });
 
   it('pads a ragged body row and round-trips it (GFM fixed point)', () => {
     // A body row with fewer cells than the header is padded with empty cells by
     // GFM; the padded form is the canonical fixed point.
-    const md = [
-      '| A | B | C |',
-      '| --- | --- | --- |',
-      '| 1 | 2 |  |',
-    ].join('\n')
-    const doc = parseMarkdownToDoc(md)
-    const back = serializeDocToMarkdown(doc)
-    expect(back.trim()).toBe(md)
-  })
+    const md = ['| A | B | C |', '| --- | --- | --- |', '| 1 | 2 |  |'].join(
+      '\n'
+    );
+    const doc = parseMarkdownToDoc(md);
+    const back = serializeDocToMarkdown(doc);
+    expect(back.trim()).toBe(md);
+  });
 
   it('survives the Yjs round-trip (Markdown → Y.Doc → Markdown)', () => {
     const md = [
@@ -147,11 +141,88 @@ describe('GFM table round-trip', () => {
       '| --- | --: |',
       '| Jan | 1000 |',
       '| Feb | **2000** |',
-    ].join('\n')
-    const pmDoc = parseMarkdownToDoc(md)
-    const yDoc = new Y.Doc()
-    prosemirrorJSONToYDoc(pmDoc, yDoc)
-    const back = yXmlFragmentToMarkdown(yDoc.getXmlFragment('default'), editorSchema)
-    expect(back.trim()).toBe(md)
-  })
-})
+    ].join('\n');
+    const pmDoc = parseMarkdownToDoc(md);
+    const yDoc = new Y.Doc();
+    prosemirrorJSONToYDoc(pmDoc, yDoc);
+    const back = yXmlFragmentToMarkdown(
+      yDoc.getXmlFragment('default'),
+      editorSchema
+    );
+    expect(back.trim()).toBe(md);
+  });
+});
+
+/**
+ * A cell is one line of a pipe table. Whatever line breaks its text holds
+ * have to be gone by the time the row is written.
+ */
+describe('a table cell stays on one line', () => {
+  const table = (cellText: string) =>
+    editorSchema.nodeFromJSON({
+      type: 'doc',
+      content: [
+        {
+          type: 'table',
+          content: [
+            {
+              type: 'table_row',
+              content: ['H1', 'H2'].map((text) => ({
+                type: 'table_header',
+                content: [
+                  { type: 'paragraph', content: [{ type: 'text', text }] },
+                ],
+              })),
+            },
+            {
+              type: 'table_row',
+              content: [cellText, 'second'].map((text) => ({
+                type: 'table_cell',
+                content: [
+                  { type: 'paragraph', content: [{ type: 'text', text }] },
+                ],
+              })),
+            },
+          ],
+        },
+      ],
+    });
+
+  it.each([
+    ['a newline', 'before\nafter'],
+    ['a carriage return', 'before\rafter'],
+    ['a Windows line ending', 'before\r\nafter'],
+    ['several of each', 'before\r\r\n\nafter'],
+  ])('collapses %s to a space', (_label, text) => {
+    const markdown = serializeDocToMarkdown(table(text)).trim();
+
+    expect(markdown.split(/\r\n|\r|\n/)).toEqual([
+      '| H1 | H2 |',
+      '| --- | --- |',
+      '| before after | second |',
+    ]);
+  });
+
+  it('cannot be used to write a heading after the table', () => {
+    // Only `\n` was collapsed. With a bare `\r` left in, what was written as
+    // one row was read back as a table, then a heading, then a paragraph.
+    const markdown = serializeDocToMarkdown(
+      table('cell\r\r# injected heading\r\rtail')
+    );
+
+    const reread = parseMarkdownToDoc(markdown);
+    const types: string[] = [];
+    reread.forEach((node) => types.push(node.type.name));
+
+    expect(types).toEqual(['table']);
+  });
+
+  it('still escapes a pipe, and only a pipe', () => {
+    const markdown = serializeDocToMarkdown(table('a|b')).trim();
+
+    expect(markdown.split('\n')[2]).toBe('| a\\|b | second |');
+    expect(serializeDocToMarkdown(parseMarkdownToDoc(markdown)).trim()).toBe(
+      markdown
+    );
+  });
+});

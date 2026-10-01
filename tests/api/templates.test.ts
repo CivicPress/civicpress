@@ -114,4 +114,129 @@ describe('API Templates Integration', () => {
       expect(del.body.success).toBe(true);
     });
   });
+
+  /**
+   * Preview substitutes caller-supplied variables into a template. It needs
+   * only `templates:view`, which the shipped `roles.yml` gives the clerk role.
+   * (The fixture's does not, so these run as admin.)
+   */
+  describe('POST /api/v1/templates/:id/preview', () => {
+    const TEMPLATE = [
+      '# {{title}}',
+      '',
+      // A run of ordinary text: what a pattern with a nested quantifier gets
+      // stuck on.
+      'the quick brown fox jumps over the lazy dog and keeps on running',
+      '',
+      'By {{author}}.',
+    ].join('\n');
+
+    beforeEach(async () => {
+      const created = await request(context.api.getApp())
+        .post('/api/v1/templates')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ type: 'bylaw', name: 'preview-me', content: TEMPLATE });
+      expect(created.status).toBe(201);
+    });
+
+    const preview = (variables: unknown) =>
+      request(context.api.getApp())
+        .post('/api/v1/templates/bylaw%2Fpreview-me/preview')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ variables });
+
+    it('substitutes the variables it is given', async () => {
+      const response = await preview({ title: 'Noise', author: 'Ada' });
+
+      expect(response.status).toBe(200);
+      expect(response.body.data.rendered).toContain('# Noise');
+      expect(response.body.data.rendered).toContain('By Ada.');
+    });
+
+    it('treats a variable NAME as a name, not as a pattern', async () => {
+      // The name used to go into a regular expression as written. This one
+      // is exponential against the line of text above; the request did not
+      // come back.
+      const started = Date.now();
+
+      const response = await preview({
+        title: 'Noise',
+        author: 'Ada',
+        'q|([a-z ]+)+!|q': 'x',
+      });
+
+      expect(response.status).toBe(200);
+      expect(Date.now() - started).toBeLessThan(3000);
+      expect(response.body.data.rendered).toContain(
+        'the quick brown fox jumps over the lazy dog'
+      );
+    });
+
+    it('does not let one name replace every placeholder', async () => {
+      const response = await preview({ author: 'Ada', '.*': 'TAKEN' });
+
+      expect(response.status).toBe(200);
+      expect(response.body.data.rendered).toContain('By Ada.');
+      expect(response.body.data.rendered).not.toContain('TAKEN');
+    });
+
+    it('answers 200, not 500, for a name that is not a valid pattern', async () => {
+      const response = await preview({ title: 'Noise', 'a(': 'x' });
+
+      expect(response.status).toBe(200);
+    });
+
+    it('keeps replacement patterns in a value literal', async () => {
+      const response = await preview({ title: "[$`|$&|$']", author: 'Ada' });
+
+      expect(response.body.data.rendered).toContain("# [$`|$&|$']");
+    });
+
+    it.each([
+      [
+        'more than 100 variables',
+        Object.fromEntries(
+          Array.from({ length: 101 }, (_, i) => [`v${i}`, 'x'])
+        ),
+      ],
+      ['a value of 20 KB', { title: 'x'.repeat(20001) }],
+      [
+        'values that add up to 20 KB',
+        { a: 'x'.repeat(10000), b: 'y'.repeat(10001) },
+      ],
+      ['a name of 101 characters', { ['n'.repeat(101)]: 'x' }],
+      ['an empty name', { '': 'x' }],
+      ['a list instead of an object', ['title']],
+    ])('refuses %s', async (_label, variables) => {
+      expect((await preview(variables)).status).toBe(400);
+    });
+  });
+
+  describe('what a template may contain', () => {
+    const create = (body: Record<string, unknown>) =>
+      request(context.api.getApp())
+        .post('/api/v1/templates')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          type: 'bylaw',
+          name: 'bounded',
+          content: '# {{title}}',
+          ...body,
+        });
+
+    it('refuses a body over 200 KB', async () => {
+      expect((await create({ content: 'x'.repeat(200001) })).status).toBe(400);
+    });
+
+    it.each(['../private', '../../x/y', 'bylaw', 'a/b/c', '/etc/passwd'])(
+      'refuses extends: %j',
+      async (parent) => {
+        expect((await create({ extends: parent })).status).toBe(400);
+      }
+    );
+
+    it('accepts extends: type/name', async () => {
+      expect((await create({ extends: 'bylaw/default' })).status).toBe(201);
+    });
+  });
 });

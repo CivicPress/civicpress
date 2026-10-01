@@ -88,6 +88,27 @@ module.exports = [
         { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
       ],
       '@typescript-eslint/no-explicit-any': 'error',
+      // A bare gray-matter call EXECUTES front matter tagged `---js`. The
+      // wrapper refuses that engine; nothing else may import the library.
+      '@typescript-eslint/no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: 'gray-matter',
+              message:
+                "Use parseFrontmatter / stringifyFrontmatter from core/src/utils/frontmatter.ts — a bare gray-matter call executes front matter tagged `---js`.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    // The wrapper itself — the one file allowed to import the library.
+    files: ['src/utils/frontmatter.ts'],
+    rules: {
+      '@typescript-eslint/no-restricted-imports': 'off',
     },
   },
   {

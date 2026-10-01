@@ -9,7 +9,7 @@
 
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import matter from 'gray-matter';
+import { parseFrontmatter } from '../../utils/frontmatter.js';
 import type { GitEngine } from '../../git/git-engine.js';
 import { RecordSchemaValidator } from '../record-schema-validator.js';
 import { RecordValidationError } from '../../errors/domain-errors.js';
@@ -91,7 +91,9 @@ export class RecordFileOps {
     ensureDirectoryForRecordPath(this.deps.dataDir, archivePath);
     await fs.rename(sourcePath, targetPath);
 
-    await this.deps.git.commit(`Archive record: ${record.title}`, [archivePath]);
+    await this.deps.git.commit(`Archive record: ${record.title}`, [
+      archivePath,
+    ]);
   }
 
   // ----- internal -----
@@ -111,8 +113,9 @@ export class RecordFileOps {
     record: RecordData,
     action: 'saving' | 'updating'
   ): void {
-    const { data: frontmatter } = matter(content);
-    const normalizedFrontmatter = normalizeFrontmatterForValidation(frontmatter);
+    const { data: frontmatter } = parseFrontmatter(content);
+    const normalizedFrontmatter =
+      normalizeFrontmatterForValidation(frontmatter);
 
     const schemaValidation = RecordSchemaValidator.validate(
       normalizedFrontmatter,

@@ -11,26 +11,151 @@
 import { execSync } from 'node:child_process';
 import type { Template, TemplateVariable, Partial } from './types.js';
 
+/** `value` as a literal inside a regular expression. */
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * Replace every `{{ key }}` in `content` with `value`.
+ *
+ * The key is ESCAPED. It used to be interpolated into the pattern as written,
+ * and on the preview route the keys come from the request body: a key of `.*`
+ * replaced every placeholder in the template, a key of `a(` threw, and a key
+ * with a nested quantifier — `q|([a-z ]+)+!|q` — sent the match exponential
+ * against the first long line of ordinary text. One request from anyone with
+ * `templates:view` stalled the process.
+ *
+ * The value is supplied through a FUNCTION. Passed as a string, `$&`, `$'`
+ * and `` $` `` in it are replacement patterns: a value could pull the text
+ * around its placeholder into the output.
+ */
+function substitute(content: string, key: string, value: string): string {
+  const placeholder = new RegExp(`{{\\s*${escapeRegExp(key)}\\s*}}`, 'g');
+  return content.replace(placeholder, () => value);
+}
+
+/**
+ * Finds `{{<open> … }}` tags in one pass over `content`.
+ *
+ * This replaces two global regular expressions that did the same job in
+ * quadratic time. A pattern of the form `{{>…[^}]*…}}` has to scan from each
+ * opening to the next `}` to learn that it does not match, so a body made of
+ * openings with no closing cost n² — 2.8 s for 50 KB, measured.
+ *
+ * Here nothing is scanned twice. A tag cannot contain `}`, so its closing is
+ * at the FIRST `}` after its opening, and that position is remembered: every
+ * opening before it shares it.
+ */
+class TagScanner {
+  private nextBrace = -1;
+
+  constructor(
+    private readonly content: string,
+    private readonly open: string
+  ) {}
+
+  /** Index of the first `}` at or after `from`, or -1. Never looks back. */
+  private firstBraceFrom(from: number): number {
+    if (this.nextBrace !== -1 && this.nextBrace >= from) return this.nextBrace;
+    if (this.nextBrace === -2) return -1;
+    const found = this.content.indexOf('}', from);
+    this.nextBrace = found === -1 ? -2 : found;
+    return found;
+  }
+
+  /**
+   * Replace each tag `render` accepts. `render` is given where the text
+   * inside the tag starts and ends, and where the content resumes after the
+   * closing `}}`; it returns the replacement and the position to continue
+   * from, or null to leave the tag as written.
+   */
+  replace(
+    render: (
+      innerStart: number,
+      innerEnd: number,
+      afterClose: number
+    ) => { text: string; resume: number } | null
+  ): string {
+    const { content, open } = this;
+    let out = '';
+    let position = 0;
+
+    for (;;) {
+      const start = content.indexOf(open, position);
+      if (start === -1) break;
+
+      const innerStart = start + open.length;
+      const brace = this.firstBraceFrom(innerStart);
+      if (brace === -1) break;
+
+      const rendered =
+        content[brace + 1] === '}'
+          ? render(innerStart, brace, brace + 2)
+          : null;
+
+      if (rendered) {
+        out += content.slice(position, start) + rendered.text;
+        position = rendered.resume;
+      } else {
+        out += content.slice(position, innerStart);
+        position = innerStart;
+      }
+    }
+
+    return out + content.slice(position);
+  }
+}
+
+/**
+ * What `\s+([^}]+)` captured from `content[from, to)`, or null if it did not
+ * match. `to` is the closing brace, so the range holds no `}`.
+ *
+ * The pattern needs at least one whitespace character and then at least one
+ * character of anything. Both are greedy, so: the whole leading run of
+ * whitespace is skipped — unless the range is nothing BUT whitespace, in which
+ * case the pattern gives the last character back to have something to
+ * capture. One character of whitespace alone is therefore no match.
+ */
+function afterWhitespace(
+  content: string,
+  from: number,
+  to: number
+): string | null {
+  if (to - from < 2 || !/\s/.test(content[from])) return null;
+
+  let index = from;
+  while (index < to && /\s/.test(content[index])) index++;
+  return index === to ? content[to - 1] : content.slice(index, to);
+}
+
+const NAME_CHARACTER = /[a-zA-Z0-9_-]/;
+
 export class TemplateGenerator {
   constructor(private partialLoader: (name: string) => Partial | null) {}
 
   /**
    * Generate content from template with variables
    */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  generateContent(template: Template, variables: Record<string, any> = {}): string {
+  generateContent(
+    template: Template,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    variables: Record<string, any> = {}
+  ): string {
     let content = template.content;
 
-    const processedVariables = this.processTemplateVariables(variables, template);
+    const processedVariables = this.processTemplateVariables(
+      variables,
+      template
+    );
 
     // Process partials first
     content = this.processPartials(content, processedVariables);
 
     // Replace variables in content (with sanitization to prevent injection)
     for (const [key, value] of Object.entries(processedVariables)) {
-      const regex = new RegExp(`{{\\s*${key}\\s*}}`, 'g');
       const sanitizedValue = this.sanitizeVariableValue(String(value || ''));
-      content = content.replace(regex, sanitizedValue);
+      content = substitute(content, key, sanitizedValue);
     }
 
     // Process conditional blocks
@@ -99,36 +224,57 @@ export class TemplateGenerator {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     variables: Record<string, any>
   ): string {
-    const partialRegex = /{{>\s*([a-zA-Z0-9_-]+)(?:\s+([^}]+))?}}/g;
+    // `{{>` name [parameters] `}}` — what `/{{>\s*([a-zA-Z0-9_-]+)(?:\s+([^}]+))?}}/`
+    // matched, including that `{{> name }}`, with a single space before the
+    // braces, does not: the optional group needs a character after the space,
+    // and without the group the name has to be followed by `}}` directly.
+    // Preserved, not endorsed.
+    return new TagScanner(content, '{{>').replace(
+      (innerStart, innerEnd, afterClose) => {
+        let index = innerStart;
+        while (index < innerEnd && /\s/.test(content[index])) index++;
+        const nameStart = index;
+        while (index < innerEnd && NAME_CHARACTER.test(content[index])) index++;
+        if (index === nameStart) return null;
 
-    return content.replace(partialRegex, (_match, partialName, params) => {
-      const partial = this.partialLoader(partialName);
-      if (!partial) {
-        return `<!-- Partial not found: ${partialName} -->`;
+        const partialName = content.slice(nameStart, index);
+        let params: string | undefined;
+        if (index < innerEnd) {
+          const captured = afterWhitespace(content, index, innerEnd);
+          if (captured === null) return null;
+          params = captured;
+        }
+
+        const partial = this.partialLoader(partialName);
+        if (!partial) {
+          return {
+            text: `<!-- Partial not found: ${partialName} -->`,
+            resume: afterClose,
+          };
+        }
+
+        const partialVariables = this.parsePartialParameters(params, variables);
+
+        let partialContent = partial.content;
+        for (const [key, value] of Object.entries(partialVariables)) {
+          partialContent = substitute(partialContent, key, String(value || ''));
+        }
+
+        partialContent = this.processConditionalBlocks(
+          partialContent,
+          partialVariables
+        );
+
+        return { text: partialContent, resume: afterClose };
       }
-
-      const partialVariables = this.parsePartialParameters(params, variables);
-
-      let partialContent = partial.content;
-      for (const [key, value] of Object.entries(partialVariables)) {
-        const regex = new RegExp(`{{\\s*${key}\\s*}}`, 'g');
-        partialContent = partialContent.replace(regex, String(value || ''));
-      }
-
-      partialContent = this.processConditionalBlocks(
-        partialContent,
-        partialVariables
-      );
-
-      return partialContent;
-    });
+    );
   }
 
   private parsePartialParameters(
     paramsString: string | undefined,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     globalVariables: Record<string, any>
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ): Record<string, any> {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const partialVariables: Record<string, any> = {};
@@ -155,7 +301,7 @@ export class TemplateGenerator {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     variables: Record<string, any>,
     template: Template
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ): Record<string, any> {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const processed: Record<string, any> = { ...variables };
@@ -208,13 +354,32 @@ export class TemplateGenerator {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     variables: Record<string, any>
   ): string {
-    const ifBlockRegex = /{{#if\s+([^}]+)}}([\s\S]*?){{\/if}}/g;
-    return content.replace(ifBlockRegex, (_match, condition, blockContent) => {
-      if (this.evaluateCondition(condition, variables)) {
-        return blockContent;
+    // `{{#if <condition>}}…{{/if}}`, to the FIRST `{{/if}}` — blocks do not
+    // nest, and did not before.
+    const END = '{{/if}}';
+    // Once a search for the ending has failed, every later one will.
+    let noMoreEndings = false;
+
+    return new TagScanner(content, '{{#if').replace(
+      (innerStart, innerEnd, afterClose) => {
+        const condition = afterWhitespace(content, innerStart, innerEnd);
+        if (condition === null || noMoreEndings) return null;
+
+        const end = content.indexOf(END, afterClose);
+        if (end === -1) {
+          noMoreEndings = true;
+          return null;
+        }
+
+        const blockContent = content.slice(afterClose, end);
+        return {
+          text: this.evaluateCondition(condition, variables)
+            ? blockContent
+            : '',
+          resume: end + END.length,
+        };
       }
-      return '';
-    });
+    );
   }
 
   private evaluateCondition(
@@ -223,7 +388,12 @@ export class TemplateGenerator {
     variables: Record<string, any>
   ): boolean {
     // Supports: field, !field, field == 'value', field != 'value'
-    const parts = condition.trim().split(/\s*(==|!=)\s*/);
+    // Split on the operator, then trim — not `/\s*(==|!=)\s*/`, which is
+    // quadratic in a run of spaces that no operator follows.
+    const parts = condition
+      .trim()
+      .split(/(==|!=)/)
+      .map((part) => part.trim());
 
     if (parts.length === 1) {
       const field = parts[0].replace(/^!/, '');

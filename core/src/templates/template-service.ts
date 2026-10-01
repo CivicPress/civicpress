@@ -16,7 +16,8 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import matter from 'gray-matter';
+import { parseFrontmatter } from '../utils/frontmatter.js';
+import { resolveInside } from '../utils/path-containment.js';
 import yaml from 'yaml';
 import { TemplateEngine } from '../utils/template-engine.js';
 import { TemplateCacheAdapter } from './template-cache-adapter.js';
@@ -193,7 +194,7 @@ export class TemplateService implements ITemplateService {
 
     // Extract description from frontmatter
     try {
-      const { data: frontmatter } = matter(template.rawContent);
+      const { data: frontmatter } = parseFrontmatter(template.rawContent);
       if (frontmatter.description) {
         response.description = frontmatter.description;
       }
@@ -256,22 +257,27 @@ export class TemplateService implements ITemplateService {
       );
     }
 
-    // Validate file system permissions - ensure we're writing to custom directory
-    const templateDir = path.join(this.customTemplatePath, data.type);
-    const resolvedDir = path.resolve(templateDir);
-    const resolvedCustomPath = path.resolve(this.customTemplatePath);
-
-    if (!resolvedDir.startsWith(resolvedCustomPath)) {
+    // The file being written must be inside the custom template directory.
+    // This used to test `resolvedDir.startsWith(resolvedCustomPath)`, which
+    // `.civic/templates-evil` passes (it starts with `.civic/templates`), and
+    // it tested the DIRECTORY rather than the file that is actually written.
+    // Unreachable in practice — the id is validated above — which is exactly
+    // when a check like that goes unnoticed.
+    const templatePath = resolveInside(
+      this.customTemplatePath,
+      data.type,
+      `${data.name}.md`
+    );
+    if (!templatePath) {
       throw new FileSystemError(
         'Invalid template directory path',
-        templateDir,
+        path.join(this.customTemplatePath, String(data.type)),
         'create'
       );
     }
+    const templateDir = path.dirname(templatePath);
 
     await fs.promises.mkdir(templateDir, { recursive: true });
-
-    const templatePath = path.join(templateDir, `${data.name}.md`);
 
     // Validate frontmatter structure before writing
     const frontmatterValidation = this.validator.validateFrontmatter(
@@ -341,14 +347,15 @@ export class TemplateService implements ITemplateService {
     }
 
     const { type, name } = parseTemplateId(id);
-    const templatePath = path.join(this.customTemplatePath, type, `${name}.md`);
 
     // Security check: Ensure template is in custom directory (writable)
     // System templates in .system-data/templates/ are read-only
-    const resolvedPath = path.resolve(templatePath);
-    const resolvedCustomPath = path.resolve(this.customTemplatePath);
-
-    if (!resolvedPath.startsWith(resolvedCustomPath)) {
+    const templatePath = resolveInside(
+      this.customTemplatePath,
+      type,
+      `${name}.md`
+    );
+    if (!templatePath) {
       throw new TemplateSystemError(id);
     }
 
@@ -359,7 +366,7 @@ export class TemplateService implements ITemplateService {
     // Load existing template
     const existingContent = await fs.promises.readFile(templatePath, 'utf8');
     const { data: frontmatter, content: markdownContent } =
-      matter(existingContent);
+      parseFrontmatter(existingContent);
 
     // Update fields
     if (data.description !== undefined)

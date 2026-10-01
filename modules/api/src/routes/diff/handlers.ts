@@ -6,12 +6,47 @@ import {
   sendSuccess,
   logApiRequest,
   handleApiError,
+  handleValidationError,
 } from '../../utils/api-logger.js';
 import { requirePermission } from '../../middleware/auth.js';
 import { AuthenticatedRequest } from '../../middleware/auth.js';
 import { requireRecordPath, parseRecordMetadata } from './record-paths.js';
 import { compareRecordVersions } from './diff-engine.js';
-import { getRecordCommitHistory, getFileContent } from './git-history.js';
+import {
+  getRecordCommitHistory,
+  getFileContent,
+  historyFilterOptions,
+} from './git-history.js';
+import { isRevision } from './revision.js';
+
+/** A boolean query parameter, or `fallback` when the request leaves it out. */
+function flag(value: unknown, fallback: boolean): boolean {
+  if (value === undefined) return fallback;
+  return value === true || value === 'true' || value === '1';
+}
+
+/**
+ * Filters shared by the three history routes. They had no validation at all:
+ * `limit` went through `parseInt` and could reach git as `NaN`, and a filter
+ * sent twice arrived as an array.
+ */
+const historyFilters = [
+  param('recordId').isString().notEmpty().withMessage('Record ID is required'),
+  query('limit')
+    .optional()
+    .isInt({ min: 1, max: 200 })
+    .withMessage('limit must be an integer between 1 and 200'),
+  query('author')
+    .optional()
+    .isString()
+    .isLength({ min: 1, max: 200 })
+    .withMessage('author must be a string of at most 200 characters'),
+  query('since')
+    .optional()
+    .isString()
+    .isLength({ min: 1, max: 64 })
+    .withMessage('since must be a string of at most 64 characters'),
+];
 
 export function registerDiffRoutes(router: Router): void {
   // GET /api/diff/:recordId - Compare record versions
@@ -23,14 +58,13 @@ export function registerDiffRoutes(router: Router): void {
         .isString()
         .notEmpty()
         .withMessage('Record ID is required'),
+      // A revision, never a git option — see ./revision.ts.
       query('commit1')
-        .isString()
-        .notEmpty()
-        .withMessage('Commit 1 is required'),
+        .custom(isRevision)
+        .withMessage('commit1 must be a commit hash or ref'),
       query('commit2')
-        .isString()
-        .notEmpty()
-        .withMessage('Commit 2 is required'),
+        .custom(isRevision)
+        .withMessage('commit2 must be a commit hash or ref'),
       query('format')
         .optional()
         .isIn(['unified', 'side-by-side', 'json'])
@@ -62,12 +96,12 @@ export function registerDiffRoutes(router: Router): void {
       try {
         const errors = validationResult(req);
         if (!errors.isEmpty()) {
-          return res.status(400).json({
-            error: {
-              message: 'Validation failed',
-              details: errors.array(),
-            },
-          });
+          return handleValidationError(
+            'compare_record_versions',
+            errors.array(),
+            req,
+            res
+          );
         }
 
         const { recordId } = req.params;
@@ -76,10 +110,10 @@ export function registerDiffRoutes(router: Router): void {
           commit2,
           format = 'unified',
           context = 3,
-          showMetadata = true,
-          showContent = true,
-          wordLevel = false,
-          includeStats = true,
+          showMetadata,
+          showContent,
+          wordLevel,
+          includeStats,
         } = req.query;
 
         const civicPress = req.civicPress;
@@ -92,10 +126,16 @@ export function registerDiffRoutes(router: Router): void {
 
         const git = simpleGit(dataDir);
 
-        // Validate commits exist
+        // Validate commits exist. `rev-parse --verify` rather than `show`:
+        // it resolves the name and prints a hash, where `show` rendered the
+        // whole commit only to have the output thrown away. `^{commit}` makes
+        // a tree or a blob that happens to share the name a miss. No
+        // `--quiet`: with it git fails silently, and simple-git reports a
+        // failure with nothing on stderr as success.
         try {
-          await git.show([commit1 as string]);
-          await git.show([commit2 as string]);
+          for (const revision of [commit1, commit2]) {
+            await git.revparse(['--verify', `${revision as string}^{commit}`]);
+          }
         } catch {
           throw new HttpError(
             400,
@@ -112,10 +152,14 @@ export function registerDiffRoutes(router: Router): void {
           {
             format: format as 'unified' | 'side-by-side' | 'json' | undefined,
             context: parseInt(context.toString()),
-            showMetadata: showMetadata === 'true',
-            showContent: showContent === 'true',
-            wordLevel: wordLevel === 'true',
-            includeStats: includeStats === 'true',
+            // These defaulted to the boolean `true` and were then compared
+            // with the STRING 'true', so a request that left them out got
+            // `false` for all of them — and an empty diff. The documented
+            // defaults are true, true, false, true.
+            showMetadata: flag(showMetadata, true),
+            showContent: flag(showContent, true),
+            wordLevel: flag(wordLevel, false),
+            includeStats: flag(includeStats, true),
           }
         );
 
@@ -152,10 +196,21 @@ export function registerDiffRoutes(router: Router): void {
   router.get(
     '/:recordId/history',
     requirePermission('records:view'),
+    historyFilters,
     async (req: AuthenticatedRequest, res: Response) => {
       logApiRequest(req, { operation: 'get_record_history' });
 
       try {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+          return handleValidationError(
+            'get_record_history',
+            errors.array(),
+            req,
+            res
+          );
+        }
+
         const { recordId } = req.params;
         const { limit = 20, author, since } = req.query;
 
@@ -207,10 +262,21 @@ export function registerDiffRoutes(router: Router): void {
   router.get(
     '/:recordId/commits',
     requirePermission('records:view'),
+    historyFilters,
     async (req: AuthenticatedRequest, res: Response) => {
       logApiRequest(req, { operation: 'get_record_commits' });
 
       try {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+          return handleValidationError(
+            'get_record_commits',
+            errors.array(),
+            req,
+            res
+          );
+        }
+
         const { recordId } = req.params;
         const { limit = 20, author, since } = req.query;
 
@@ -228,12 +294,7 @@ export function registerDiffRoutes(router: Router): void {
         const log = await git.log({
           file: recordPath,
           maxCount: parseInt(limit.toString()),
-          // Only pass the optional filters when supplied — simple-git turns
-          // `author: undefined` / `since: undefined` into malformed git args,
-          // so the whole log call throws and the default (unfiltered) request
-          // 500s.
-          ...(author ? { author: author as string } : {}),
-          ...(since ? { since: since as string } : {}),
+          ...historyFilterOptions(author, since),
         });
 
         const commits = log.all.map((commit) => ({
@@ -277,10 +338,21 @@ export function registerDiffRoutes(router: Router): void {
   router.get(
     '/:recordId/versions',
     requirePermission('records:view'),
+    historyFilters,
     async (req: AuthenticatedRequest, res: Response) => {
       logApiRequest(req, { operation: 'get_record_versions' });
 
       try {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+          return handleValidationError(
+            'get_record_versions',
+            errors.array(),
+            req,
+            res
+          );
+        }
+
         const { recordId } = req.params;
         const { limit = 20 } = req.query;
 
