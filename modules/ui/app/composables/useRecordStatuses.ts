@@ -7,6 +7,11 @@ export interface RecordStatusMetadata {
   source: 'core' | 'module' | 'plugin';
   source_name?: string;
   priority: number;
+  /**
+   * May an anonymous reader see records in this status? Decided by the
+   * instance's configuration and served by the API. Absent means no.
+   */
+  public?: boolean;
 }
 
 export interface RecordStatusesResponse {
@@ -90,7 +95,9 @@ export function useRecordStatuses() {
         throw new Error('Invalid response format');
       }
     } catch (err: unknown) {
-      const errorMessage = (err instanceof Error ? err.message : '') || 'Failed to fetch record statuses';
+      const errorMessage =
+        (err instanceof Error ? err.message : '') ||
+        'Failed to fetch record statuses';
       error.value = errorMessage;
       globalError = errorMessage;
       console.error('Error fetching record statuses:', err);
@@ -131,6 +138,14 @@ export function useRecordStatuses() {
     return recordStatuses.value.find((status) => status.key === key);
   };
 
+  /**
+   * Is this a status an anonymous reader can see? The configuration decides,
+   * not the UI. An unknown status — or statuses that have not loaded yet —
+   * answers no, the same fail-closed default the read gate uses.
+   */
+  const isPublicStatus = (key: string) =>
+    getRecordStatusByKey(key)?.public === true;
+
   const getRecordStatusLabel = (key: string) => {
     const recordStatus = getRecordStatusByKey(key);
     const fallback = recordStatus?.label || key;
@@ -167,6 +182,7 @@ export function useRecordStatuses() {
     error: readonly(error),
     fetchRecordStatuses,
     getRecordStatusByKey,
+    isPublicStatus,
     getRecordStatusLabel,
     getRecordStatusDescription,
     recordStatusOptions,

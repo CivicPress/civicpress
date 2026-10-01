@@ -2331,14 +2331,92 @@ about either.
 
 ### Correctness and honesty
 
-- [ ] **`EditorHeader.vue` still decides for itself what "published" means.**
-      The v0.4.x scoping document lists this as gap 4 and its outcome note says
-      shape A — which included it — "is done". Half of A is:
-      `modules/ui/app/components/editor/EditorHeader.vue` still hardcodes
-      `['published', 'active', 'approved']` in two places. Since 2026-08-09 the
-      authority is the `public` flag on each record status, and the two
-      disagree: `approved` is not public, but the editor treats an approved
-      record as published.
+- [x] **`EditorHeader.vue` still decides for itself what "published" means.
+      FIXED 2026-09-29.** `GET /api/v1/system/record-statuses` now serves the
+      `public` flag for every status, `useRecordStatuses` exposes
+      `isPublicStatus()`, and the editor asks instead of keeping a list. Unknown
+      or not-yet-loaded statuses answer "not public", the same fail-closed
+      default as the read gate.
+
+      The list turned out to be the smaller half of the problem. Three dialogs
+      **stated** things about public visibility that configuration did not back:
+      publish promised "will become publicly accessible" for any status; archive
+      said archived records are "not publicly accessible", which has been false
+      by default since 2026-08-09; unpublish warned about leaving public view
+      for records that were never in it. All three now follow the flag.
+
+      Behaviour changes, stated rather than buried: "Return to draft" is offered
+      from any status the workflow allows it from (it was offered for the
+      hardcoded statuses only, and `draft` was also filtered out of the generic
+      list, so other statuses had no route back from this menu); and the menu
+      lists every transition the workflow allows except `draft` and `archived`,
+      which have their own items — so a reviewed record now shows "Change
+      status to Approved".
+
+      Pinned by 17 component tests that read the real menu and the real dialog
+      text, against a status table the test can reconfigure. Run against the old
+      component, 9 of them fail. The 8 tests that existed before only asserted
+      that the component rendered.
+
+      The original entry follows. The v0.4.x scoping document lists this as gap
+      4 and its outcome note says shape A — which included it — "is done". Half
+      of A is: `modules/ui/app/components/editor/EditorHeader.vue` still
+      hardcodes `['published', 'active', 'approved']` in two places. Since
+      2026-08-09 the authority is the `public` flag on each record status, and
+      the two disagree: `approved` is not public, but the editor treats an
+      approved record as published.
+
+- [ ] **🔴 The shipped review chain cannot be walked (needs a decision).** Found
+      while checking the fix above against a default instance, and **measured**
+      on one built from the shipped `workflows.yml` and `roles.yml`. The project
+      ships two status vocabularies and they do not agree:
+
+  | Source                                   | Statuses                                                                                              |
+  | ---------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+  | `workflows.yml` (transitions)            | `draft`, `proposed`, `reviewed`, `approved`, `archived`                                               |
+  | `record_statuses_config` (record schema) | `draft`, `pending_review`, `under_review`, `approved`, `published`, `rejected`, `archived`, `expired` |
+
+  `proposed` and `reviewed` — the first two steps of the shipped workflow — are
+  not valid record statuses. Walking the chain as an admin, and again as a
+  clerk:
+  - A draft saved with `status: proposed` is accepted (200).
+  - Publishing it answers **500**:
+    `Schema validation failed: /status must be one of: draft, pending_review, under_review, approved, published, …`.
+  - Publishing straight to `approved` is refused (403): "Allowed transitions:
+    proposed, archived". The guard insists on the step that cannot be taken.
+  - Publishing as `published` succeeds (201), and the record is then readable
+    anonymously. `published` is not a workflow-controlled status, so this needs
+    only `records:edit`.
+
+  So in a default instance the review chain is unreachable **and** unnecessary:
+  the one route to a public record goes around it. `approved`, where the shipped
+  workflow ends, is not public.
+
+  Which vocabulary wins is a product decision and it changes shipped defaults,
+  so nothing was changed. The shapes: rename the workflow's steps to statuses
+  the schema accepts; add `proposed` / `reviewed` to the record statuses; or
+  make `published` a workflow target so publication is reached through the chain
+  rather than beside it.
+
+  ⚠️ The suite could not have caught this. The API fixture's `workflows.yml`
+  does not define the `admin` role at all — the same probe against the fixture
+  stops at "Role 'admin' not found in configuration" — so no test exercises the
+  shipped chain. It is the fixture-versus-shipped-configuration lesson from the
+  2026-08-12 sweep, again.
+
+- [ ] **A draft that was never published has no transitions.**
+      `GET /api/v1/records/:id/transitions` returns `[]` for it, for every role:
+      `getAllowedTransitions` looks the record up in the `records` table, and a
+      never-published draft is only in `record_drafts`. The editor's status menu
+      is therefore empty for exactly the records that are still moving through
+      review. Measured alongside the entry above.
+
+- [ ] **"Change status to …" answers 500 when there is nothing to publish.** The
+      editor's generic status items go through `POST /records/:id/publish`,
+      which requires a draft. For a record with no draft it throws a plain
+      `Error('Draft not found')`, which surfaces as `500 INTERNAL_ERROR`
+      ("Failed to publish record") rather than a 4xx. Return-to-draft and
+      archive do not have this problem: they use `POST /records/:id/status`.
 
 - [ ] **Two routers promise the milestone that is about to ship (needs a
       decision).** `/api/v1/workflows` and `/api/v1/hooks` answer every request
@@ -2380,3 +2458,93 @@ Recorded because "the tracker said so" is how each of these survived:
 - The `[ ]` under "Needs a decision" in the 2026-08-12 sweep —
   `roles.yml status_transitions` — is the original text of an entry that was
   fixed the same day and kept for the record. It is not open work.
+
+### Notification configuration sweep
+
+The pass the two config sweeps left undone. Same method — enumerate the declared
+keys, find a reader for each — with one addition that turned out to matter more
+than the method: the file was loaded through the real reader, in the shape an
+instance actually has, and the result was looked at.
+
+- [x] **🔴 No notification could be sent on an instance created by
+      `civic     init`. FIXED 2026-09-29.** Every writer the project owns
+      produces `notifications.yml` in the _field_ shape
+      (`enabled: { value: false, type: 'boolean', … }`): `civic init`, which
+      copies the shipped defaults byte for byte; the config editor;
+      reset-to-defaults; the migration. `NotificationConfig.loadConfig()` cast
+      the parsed file to its typed plain shape without unwrapping it.
+
+      Measured, on the shipped file:
+
+  | Read                         | Got                       | Consequence                                  |
+  | ---------------------------- | ------------------------- | -------------------------------------------- |
+  | `isChannelEnabled('email')`  | the field object (truthy) | a channel switched **off** reads as on       |
+  | `rate_limits.email_per_hour` | the field object          | `limit - count` is `NaN`; `NaN > 0` is false |
+  | `checkRateLimit(['email'])`  | `allowed: false`          | **every send refused** as rate-limited       |
+
+  It made no difference what the operator configured: with email switched on and
+  SMTP details entered, the send was still refused. And because "off" read as
+  on, a forgot-password request **minted a reset token that nothing could
+  deliver**, against the documented rule that a token is minted only when a
+  channel can reach the user.
+
+  The reader now unwraps once, at load (`core/src/config/config-values.ts`), and
+  accepts either shape or a mix. Pinned by tests that load the **shipped** file;
+  against the old reader 10 of 11 fail, including the one that shows the token
+  being minted.
+
+  ⚠️ **This is the fixture lesson a third time, and the costliest.** Every
+  notification test loads `tests/fixtures/notifications.yml`, which is written
+  in the plain shape — a shape no tool in the project produces. The suite
+  certified a feature that did not work on any instance. The rate-limit tests
+  additionally mock `checkRateLimit`, so nothing pinned the path from a number
+  in the file to a decision.
+
+- [x] **A failed test email was reported as sent. FIXED 2026-09-29.**
+      `POST     /api/v1/notifications/test` answered
+      `{ success: true, data: result }` whatever `result.success` said, so the
+      settings page showed "Test email sent" for mail that never left, and the
+      raw channel errors went out in `data.errors`. Now a `500` with the generic
+      message.
+
+- [ ] **Settings that are written, documented, and read by nothing (needs a
+      decision).** Each was checked by searching every spelling repo-wide and
+      reading what came back. "Implement or remove" is the same call as in the
+      two earlier sweeps, so none was changed.
+
+  | Setting                                      | An operator would believe                     | What happens                                                                        |
+  | -------------------------------------------- | --------------------------------------------- | ----------------------------------------------------------------------------------- |
+  | `security.filter_pii`                        | personal data is filtered                     | nothing is filtered; `sanitizeContent()` has no caller                              |
+  | `security.encrypt_sensitive_data`            | credentials or payloads are encrypted         | nothing is encrypted; `encryptSensitiveData()` has no caller                        |
+  | `security.audit_all_notifications`           | it switches auditing on                       | auditing is unconditional                                                           |
+  | `rules.retry_attempts`, `rules.retry_delay`  | a failed send is retried 3 times              | nothing retries; the queue is constructed and never used                            |
+  | `auth_templates.*` (four templates)          | editing the subject or body changes the email | the text is hard-coded at the call site                                             |
+  | `auth_templates.two_factor_auth`             | a verification-code email exists              | there is no two-factor feature                                                      |
+  | `auth_templates.security_alert`              | the account owner is emailed                  | no email path; an operator-inbox row is written                                     |
+  | `channels.email.provider`                    | it selects the provider                       | real mail always uses the `smtp` block; the setting is consulted by test sends only |
+  | `channels.email.ses.*`                       | AWS SES is supported                          | there is no SES transport                                                           |
+  | `channels.email.replyTo`                     | replies go to that address                    | never passed to the mailer                                                          |
+  | `channels.email.sendgrid.sandboxMode`        | test sends do not deliver                     | no reader                                                                           |
+  | `SMTP_*`, `SENDGRID_*`, `AWS_SES_*` env vars | the "preferred" way to supply credentials     | no code reads any of them; `docs/notifications.md` recommends them                  |
+
+  ⚠️ The ones that misstate a protection are `security.*`, `two_factor_auth` and
+  `security_alert`. `provider` is the one that misleads in practice: with
+  `provider: sendgrid` and an untouched `smtp` block, a test email succeeds
+  through SendGrid while real mail goes to `localhost:587`.
+
+  `channels.sms.*` and `channels.slack.*` are not findings: they do nothing, and
+  `docs/project-status.md` and the notifications spec say so.
+
+#### Checked and NOT findings
+
+Recorded so they are not re-investigated:
+
+- The limiter looks up `<channel>_per_hour`, which matches the key names in the
+  file, and it is consulted on the send path. It was the **shape** that broke
+  it, not the wiring.
+- `channels.email.smtp.*`, including `tls.rejectUnauthorized`, is read and
+  unwrapped correctly by the production wiring.
+- No public or non-admin route serves the notification configuration. The three
+  that return it are behind `config:manage` plus `system:admin`, and
+  configuration export excludes it.
+- Notification audit rows carry no recipient and no template data.

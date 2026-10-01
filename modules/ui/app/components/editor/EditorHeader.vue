@@ -41,7 +41,8 @@ const emit = defineEmits<{
   export: [];
 }>();
 
-const { recordStatusOptions } = useRecordStatuses();
+const { recordStatusOptions, getRecordStatusLabel, isPublicStatus } =
+  useRecordStatuses();
 
 // Modal states
 const showPublishModal = ref(false);
@@ -70,11 +71,31 @@ const availableTransitions = computed(() => {
   );
 });
 
-// Check if status is published (not draft)
-const isPublished = computed(() => {
-  const publishedStatuses = ['published', 'active', 'approved'];
-  return publishedStatuses.includes(props.status.toLowerCase());
-});
+// Can an anonymous reader see this record in its current status?
+//
+// The instance's configuration decides — the `public` flag on each status,
+// served by the API — and this component asks. It used to keep its own list,
+// ['published', 'active', 'approved'], which called an approved record
+// published when the read gate does not serve it to the public, and did not
+// know about a status a municipality had declared public itself.
+const isPublished = computed(() => isPublicStatus(props.status.toLowerCase()));
+
+// The status the publish dialog is about to write: the one picked from the
+// menu, or the record's own when "Save and publish" was chosen.
+const publishTargetStatus = computed(
+  () => selectedPublishStatus.value ?? props.status
+);
+
+// Publishing commits a record to the repository. Whether that makes it PUBLIC
+// depends on the status it is published in, so the dialog must not promise
+// "publicly accessible" for a status that is not.
+const publishMakesPublic = computed(() =>
+  isPublicStatus(publishTargetStatus.value.toLowerCase())
+);
+
+// `archived` is public by default — a repealed bylaw stays part of the public
+// record — but an instance may configure otherwise.
+const archivedIsPublic = computed(() => isPublicStatus('archived'));
 
 // Check if status is archived
 const isArchived = computed(() => {
@@ -123,18 +144,21 @@ const dropdownItems = computed(() => {
   // Status transitions section
   const transitionsSection: DropdownItem[] = [];
 
-  // Status transitions based on current state
-  if (isPublished.value) {
-    // For published records: Unpublish option
-    if (props.allowedTransitions.includes('draft')) {
-      transitionsSection.push({
-        label: t('records.editor.unpublishToDraft'),
-        icon: 'i-lucide-undo',
-        onClick: () => {
-          showUnpublishModal.value = true;
-        },
-      });
-    }
+  // Back to draft, whenever the workflow allows it. One action whatever the
+  // current status; only the wording differs, because only a record that is
+  // public is being taken out of public view. (This used to be offered for the
+  // hardcoded "published" statuses alone, so a record in any other status had
+  // no way back to draft from this menu even when the workflow allowed one.)
+  if (props.allowedTransitions.includes('draft')) {
+    transitionsSection.push({
+      label: isPublished.value
+        ? t('records.editor.unpublishToDraft')
+        : t('records.editor.returnToDraft'),
+      icon: 'i-lucide-undo',
+      onClick: () => {
+        showUnpublishModal.value = true;
+      },
+    });
   }
   // Note: Publish option is now in firstSection, not here
 
@@ -149,13 +173,13 @@ const dropdownItems = computed(() => {
     });
   }
 
-  // Other status transitions
+  // Every other transition the workflow allows. `draft` and `archived` are left
+  // out only because each has its own item, with its own confirmation, above.
+  // Nothing is hidden for being "published-like": which statuses are is the
+  // configuration's call, and what may be reached is the workflow's.
   const otherTransitions = availableTransitions.value.filter((option) => {
     const status = option.value.toLowerCase();
-    // Exclude draft (handled by unpublish), published/active/approved (handled by publish), archived (handled separately)
-    return !['draft', 'published', 'active', 'approved', 'archived'].includes(
-      status
-    );
+    return status !== 'draft' && status !== 'archived';
   });
 
   otherTransitions.forEach((option) => {
@@ -382,7 +406,13 @@ const formatTime = (date: Date) => {
       <template #body>
         <div class="space-y-4">
           <p class="text-gray-700 dark:text-gray-300">
-            {{ t('records.editor.publishDescription') }}
+            {{
+              publishMakesPublic
+                ? t('records.editor.publishDescription')
+                : t('records.editor.publishDescriptionNotPublic', {
+                    status: getRecordStatusLabel(publishTargetStatus),
+                  })
+            }}
           </p>
           <div
             class="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4"
@@ -396,7 +426,14 @@ const formatTime = (date: Date) => {
                 <p class="font-medium">{{ t('records.editor.warning') }}</p>
                 <ul class="mt-1 space-y-1">
                   <li>• {{ t('records.editor.willBeCommittedToGit') }}</li>
-                  <li>• {{ t('records.editor.changesPubliclyVisible') }}</li>
+                  <li>
+                    •
+                    {{
+                      publishMakesPublic
+                        ? t('records.editor.changesPubliclyVisible')
+                        : t('records.editor.changesNotPubliclyVisible')
+                    }}
+                  </li>
                   <li>• {{ t('records.editor.cannotBeUndone') }}</li>
                 </ul>
               </div>
@@ -420,12 +457,20 @@ const formatTime = (date: Date) => {
     <!-- Unpublish Confirmation Modal -->
     <UModal
       v-model:open="showUnpublishModal"
-      :title="t('records.editor.unpublishRecord')"
+      :title="
+        isPublished
+          ? t('records.editor.unpublishRecord')
+          : t('records.editor.returnToDraft')
+      "
     >
       <template #body>
         <div class="space-y-4">
           <p class="text-gray-700 dark:text-gray-300">
-            {{ t('records.editor.unpublishDescription') }}
+            {{
+              isPublished
+                ? t('records.editor.unpublishDescription')
+                : t('records.editor.returnToDraftDescription')
+            }}
           </p>
           <div
             class="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4"
@@ -439,7 +484,9 @@ const formatTime = (date: Date) => {
                 <p class="font-medium">{{ t('records.editor.warning') }}</p>
                 <ul class="mt-1 space-y-1">
                   <li>• {{ t('records.editor.willRevertToDraft') }}</li>
-                  <li>• {{ t('records.editor.willNoLongerBePublic') }}</li>
+                  <li v-if="isPublished">
+                    • {{ t('records.editor.willNoLongerBePublic') }}
+                  </li>
                 </ul>
               </div>
             </div>
@@ -453,7 +500,11 @@ const formatTime = (date: Date) => {
             {{ t('common.cancel') }}
           </UButton>
           <UButton color="primary" @click="confirmUnpublish">
-            {{ t('records.editor.unpublishToDraft') }}
+            {{
+              isPublished
+                ? t('records.editor.unpublishToDraft')
+                : t('records.editor.returnToDraft')
+            }}
           </UButton>
         </div>
       </template>
@@ -467,7 +518,11 @@ const formatTime = (date: Date) => {
       <template #body>
         <div class="space-y-4">
           <p class="text-gray-700 dark:text-gray-300">
-            {{ t('records.editor.archiveDescription') }}
+            {{
+              archivedIsPublic
+                ? t('records.editor.archiveDescriptionPublic')
+                : t('records.editor.archiveDescription')
+            }}
           </p>
           <div
             class="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4"
@@ -482,7 +537,14 @@ const formatTime = (date: Date) => {
                 <ul class="mt-1 space-y-1">
                   <li>• {{ t('records.editor.willBeArchived') }}</li>
                   <li>• {{ t('records.editor.willBeReadOnly') }}</li>
-                  <li>• {{ t('records.editor.willNotBePublic') }}</li>
+                  <li>
+                    •
+                    {{
+                      archivedIsPublic
+                        ? t('records.editor.willRemainPublic')
+                        : t('records.editor.willNotBePublic')
+                    }}
+                  </li>
                 </ul>
               </div>
             </div>
