@@ -5,7 +5,6 @@ import {
 } from './notification-template.js';
 import { NotificationConfig } from './notification-config.js';
 import { NotificationAudit } from './notification-audit.js';
-import { NotificationQueue } from './notification-queue.js';
 import { NotificationSecurity } from './notification-security.js';
 import { NotificationRateLimiter } from './notification-rate-limiter.js';
 import { NotificationLogger } from './notification-logger.js';
@@ -37,7 +36,6 @@ export class NotificationService {
   private templates: Map<string, NotificationTemplate> = new Map();
   private config: NotificationConfig;
   private audit: NotificationAudit;
-  private queue: NotificationQueue;
   private security: NotificationSecurity;
   private rateLimiter: NotificationRateLimiter;
   private logger: NotificationLogger;
@@ -45,7 +43,6 @@ export class NotificationService {
   constructor(config: NotificationConfig) {
     this.config = config;
     this.audit = new NotificationAudit();
-    this.queue = new NotificationQueue();
     this.security = new NotificationSecurity();
     this.rateLimiter = new NotificationRateLimiter(config.getRateLimits());
     this.logger = new NotificationLogger();

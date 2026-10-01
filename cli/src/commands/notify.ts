@@ -6,80 +6,24 @@ import {
   NotificationConfig,
   AuthTemplate,
   EmailChannel,
+  emailChannelOptionsFromConfig,
+  authTemplateFromConfig,
+  AUTH_TEMPLATE_NAMES,
+  EMAIL_PROVIDERS,
+  UnknownEmailProviderError,
+  type AuthTemplateName,
   type EmailChannelOptions,
 } from '@civicpress/core';
 import { cliSuccess, cliError, cliWarn } from '../utils/cli-output.js';
-
-// Deep-normalize metadata-shaped values { value, type, ... } -> value
-function normalizeMetadata<T = any>(input: any): T {
-  if (input == null) return input as T;
-  if (Array.isArray(input))
-    return input.map((i) => normalizeMetadata(i)) as any;
-  if (typeof input === 'object') {
-    // If this looks like a metadata field, unwrap its value
-    if (
-      'value' in input &&
-      Object.keys(input).some(
-        (k) =>
-          k === 'type' ||
-          k === 'description' ||
-          k === 'required' ||
-          k === 'options' ||
-          k === 'value'
-      )
-    ) {
-      return normalizeMetadata((input as any).value) as T;
-    }
-    const out: any = {};
-    for (const [k, v] of Object.entries(input)) {
-      out[k] = normalizeMetadata(v);
-    }
-    return out as T;
-  }
-  return input as T;
-}
 
 // Adapter: NotificationService dispatches via the {getName, isEnabled, send}
 // channel surface with a `ChannelRequest`. The canonical EmailChannel speaks
 // the simpler `EmailMessage` envelope. This adapter glues them together so
 // the CLI's notify command can register one channel without re-implementing
-// nodemailer transport setup.
-//
-// Built from a flat config object whose shape mirrors what
-// `NotificationConfig.getChannelConfig('email')` returns plus the provider
-// chosen by the --provider flag.
-type CliEmailAdapterInput = {
-  enabled: boolean;
-  provider: 'sendgrid' | 'smtp' | 'nodemailer';
-  credentials: any;
-  settings?: Record<string, any>;
-};
-
-function buildEmailChannelAdapter(input: CliEmailAdapterInput) {
-  const normalized = normalizeMetadata(input);
-  const creds = normalized.credentials || {};
-
-  const options: EmailChannelOptions = (() => {
-    if (normalized.provider === 'sendgrid') {
-      return {
-        sendgrid: { apiKey: creds.apiKey },
-        defaultFrom: creds.from,
-      };
-    }
-    // smtp + nodemailer both map to the SMTP transport (they were aliases in
-    // the legacy code — nodemailer was just a label for "generic SMTP").
-    return {
-      smtp: {
-        host: creds.host,
-        port: Number(creds.port ?? 587),
-        secure: Boolean(creds.secure),
-        auth: creds.auth,
-        tls: creds.tls || { rejectUnauthorized: false },
-      },
-      defaultFrom: creds.from,
-    };
-  })();
-
+// transport setup — the options come from `emailChannelOptionsFromConfig`,
+// the same function the real-mail path uses, so a test send exercises the
+// transport real mail will use.
+function buildEmailChannelAdapter(options: EmailChannelOptions) {
   const canonical = new EmailChannel(options);
 
   return {
@@ -87,18 +31,15 @@ function buildEmailChannelAdapter(input: CliEmailAdapterInput) {
       return 'email';
     },
     isEnabled(): boolean {
-      return normalized.enabled === true;
+      return true;
     },
     async send(request: any) {
       try {
-        const normalizedRequest = normalizeMetadata(request);
         const { messageId } = await canonical.send({
-          to: normalizedRequest.to,
-          subject:
-            normalizedRequest.content?.subject || 'CivicPress Notification',
-          text:
-            normalizedRequest.content?.text || normalizedRequest.content?.body,
-          html: normalizedRequest.content?.html,
+          to: request.to,
+          subject: request.content?.subject || 'CivicPress Notification',
+          text: request.content?.text || request.content?.body,
+          html: request.content?.html,
         });
         return { success: true, messageId };
       } catch (error) {
@@ -119,14 +60,11 @@ export default function notifyCommand(cli: CAC) {
     .option('-m, --message <message>', 'Email message')
     .option(
       '-p, --provider <provider>',
-      'Email provider (sendgrid, nodemailer, ses, smtp)',
-      {
-        default: 'sendgrid',
-      }
+      `Transport for this send: ${EMAIL_PROVIDERS.join(' or ')} (default: the configured provider)`
     )
     .option(
       '--template <template>',
-      'Use predefined template (email_verification, password_reset, etc.)'
+      `Send an authentication email template (${AUTH_TEMPLATE_NAMES.join(', ')}) as configured in notifications.yml`
     )
     .option('--variables <variables>', 'Template variables as JSON string')
     .option('--json', 'Output in JSON format')
@@ -161,47 +99,39 @@ export default function notifyCommand(cli: CAC) {
           }
 
           // Create and register email channel (adapter around canonical
-          // EmailChannel from @civicpress/core).
-          const rawCreds =
-            (emailConfig as any)[provider as any] ||
-            (emailConfig as any).sendgrid;
-          const emailChannel = buildEmailChannelAdapter({
-            enabled: emailConfig.enabled,
-            provider: provider as 'sendgrid' | 'smtp' | 'nodemailer',
-            credentials: rawCreds,
-            settings: {},
-          });
+          // EmailChannel from @civicpress/core). `--provider` overrides the
+          // configured transport for this send only.
+          let channelOptions: EmailChannelOptions;
+          try {
+            channelOptions = emailChannelOptionsFromConfig(emailConfig, {
+              provider,
+            });
+          } catch (error) {
+            if (error instanceof UnknownEmailProviderError) {
+              throw new Error(error.message);
+            }
+            throw error;
+          }
+          const emailChannel = buildEmailChannelAdapter(channelOptions);
 
           notificationService.registerChannel('email', emailChannel as any);
 
           // Handle template-based sending
           if (template) {
-            // Register template
-            let templateContent = '';
-            let templateName = template;
-
-            switch (template) {
-              case 'email_verification':
-                templateContent =
-                  'Please click the following link to verify your account: {{verification_url}}';
-                break;
-              case 'password_reset':
-                templateContent =
-                  'Click here to reset your password: {{reset_url}}';
-                break;
-              case 'two_factor_auth':
-                templateContent = 'Your verification code is: {{code}}';
-                break;
-              case 'security_alert':
-                templateContent = 'Suspicious activity detected: {{details}}';
-                break;
-              default:
-                throw new Error(`Unknown template: ${template}`);
+            // The template as the instance configures it (auth_templates in
+            // notifications.yml), with the same placeholder checks and
+            // fallback the authentication flows apply — so a test send shows
+            // the operator the email a user would get.
+            if (!AUTH_TEMPLATE_NAMES.includes(template as AuthTemplateName)) {
+              throw new Error(
+                `Unknown template: ${template} (expected one of: ${AUTH_TEMPLATE_NAMES.join(', ')})`
+              );
             }
-
-            const authTemplate = new AuthTemplate(
+            const templateName = template as AuthTemplateName;
+            const authTemplate = authTemplateFromConfig(
+              config,
               templateName,
-              templateContent
+              (message) => cliWarn(message, 'notify:test')
             );
             notificationService.registerTemplate(templateName, authTemplate);
 
@@ -215,8 +145,13 @@ export default function notifyCommand(cli: CAC) {
               }
             }
 
+            if (!to) {
+              throw new Error('Recipient email address required (use --to)');
+            }
+
             // Send template-based notification
             const result = await notificationService.sendNotification({
+              email: to,
               channels: ['email'],
               template: templateName,
               data: templateData,
@@ -351,7 +286,7 @@ export default function notifyCommand(cli: CAC) {
     );
 
   cli
-    .command('notify:queue', 'List notification queue status')
+    .command('notify:queue', 'Show notification history and statistics')
     .option(
       '--status <status>',
       'Filter by status (pending, processing, completed, failed)',
@@ -436,69 +371,6 @@ export default function notifyCommand(cli: CAC) {
               queueLength: filteredHistory.length,
             }
           );
-        }
-      )
-    );
-
-  cli
-    .command('notify:retry', 'Retry failed notifications')
-    .option('--id <id>', 'Retry specific notification by ID')
-    .option('--all', 'Retry all failed notifications')
-    .option(
-      '--limit <number>',
-      'Maximum number of failed notifications to retry',
-      {
-        default: '10',
-      }
-    )
-    .option('--json', 'Output in JSON format')
-    .option('--silent', 'Suppress output')
-    .action(
-      withCli<[any]>(
-        {
-          operation: 'notify:retry',
-          errorMessage: 'Failed to retry notifications',
-          errorCode: 'RETRY_FAILED',
-          // Faithful to the old `errorMessage` local: a non-Error throw
-          // read 'Unknown error' here, not String(error).
-          details: (error) => ({
-            error: error instanceof Error ? error.message : 'Unknown error',
-          }),
-        },
-        async (_ctx, options: any) => {
-          const { id, all, limit } = options;
-
-          // Initialize configuration
-          const config = new NotificationConfig();
-
-          // Create notification service
-          const notificationService = new NotificationService(config);
-
-          if (id) {
-            // Retry specific notification
-            cliWarn('Retry functionality not yet implemented', 'notify:retry');
-          } else if (all) {
-            // Retry all failed notifications
-            const history = await notificationService.getHistory(
-              parseInt(limit)
-            );
-            const failedNotifications = history.filter(
-              (entry) => !entry.details?.success
-            );
-
-            cliWarn(
-              `Found ${failedNotifications.length} failed notification${failedNotifications.length === 1 ? '' : 's'} to retry, but retry functionality is not yet implemented`,
-              'notify:retry'
-            );
-          } else {
-            cliError(
-              'Please specify --id or --all',
-              'VALIDATION_ERROR',
-              undefined,
-              'notify:retry'
-            );
-            process.exit(1);
-          }
         }
       )
     );

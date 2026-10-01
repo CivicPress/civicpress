@@ -82,7 +82,7 @@ describe('Notification System', () => {
       // wrap it in a NotificationChannel-shaped adapter so the
       // notification-service dispatcher can drive it.
       const emailConfig = config.getChannelConfig('email');
-      const smtp = (emailConfig as any).nodemailer;
+      const smtp = (emailConfig as any).smtp;
       const canonical = new EmailChannel(
         {
           smtp: {
@@ -194,7 +194,7 @@ describe('Notification System', () => {
   describe('EmailChannel (canonical, smoke)', () => {
     it('constructs from fixture SMTP config without throwing', () => {
       const emailConfig = config.getChannelConfig('email');
-      const smtp = (emailConfig as any).nodemailer;
+      const smtp = (emailConfig as any).smtp;
       const options: EmailChannelOptions = {
         smtp: {
           host: smtp.host,

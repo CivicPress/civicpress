@@ -2,86 +2,84 @@
 
 ## Overview
 
-The CivicPress notification system provides flexible email delivery through
-multiple providers including SMTP and SendGrid. It supports both direct email
-sending and template-based notifications for authentication workflows.
+CivicPress sends email through one transport you choose — an SMTP relay or
+SendGrid — and uses it for the authentication emails (account verification,
+email-change verification, password reset) and for test sends. Everything else
+that needs an operator's attention goes to the
+[operator notification center](#operator-notification-center), which needs no
+channel at all.
 
-## Features
+## What exists, and what does not
 
-- **Multi-Provider Support**: SMTP, SendGrid, AWS SES, Nodemailer
-- **Template System**: Pre-built templates for authentication workflows
-- **SSL/TLS Support**: Secure email delivery with certificate handling
-- **Debug Logging**: Comprehensive debugging for troubleshooting
-- **Queue Management**: Email queue monitoring and retry logic
-- **Rate Limiting**: Configurable rate limits per provider
+- **Email only.** The `sms` and `slack` blocks are in the file for shape, and
+  nothing implements them (`docs/project-status.md` says the same).
+- **Two transports: `smtp` and `sendgrid`.** Nothing else. A file that names
+  another provider is refused with a message naming these two.
+- **No queue, no retry.** A send either happens or is reported as a failure: the
+  test endpoint answers `500`, account verification logs the failure and still
+  returns the token, and password recovery falls back to an operator task.
+  Nothing retries later.
+- **No environment-variable credentials.** `notifications.yml` is the only place
+  the transport is configured.
+
+Until 2026-10-01 this page, the shipped file and the settings editor promised
+more — AWS SES, a `nodemailer` provider, SendGrid sandbox mode, retry rules, a
+two-factor template, a security-alert template, `SMTP_*`/`SENDGRID_*` variables
+— and none of it was read by anything. Those settings are gone from the shipped
+file; a file that still carries them keeps working (the extra keys are ignored,
+and `provider: nodemailer` is read as `smtp`).
 
 ## Configuration
 
 ### Location
 
-Notification configuration is stored in `.system-data/notifications.yml`
-(sensitive data, not in Git).
+`.system-data/notifications.yml` — outside Git, created by `civic init` from the
+shipped default, editable in **Settings → Configuration → Notifications** or by
+hand.
 
-### Environment Variables (Preferred)
+The file `civic init` writes carries every value inside a
+`{ value, type, description }` field so the settings editor can render a form
+from it; a hand-written file in the plain shape below is read just the same.
 
-For a complete example of all available environment variables, see
-[`notifications-credentials.example`](./notifications-credentials.example). Copy
-the relevant variables to your `.env.local` file.
-
-### Configuration Structure
+### Structure
 
 ```yaml
 channels:
   email:
-    enabled: true
-    provider: 'smtp'  # or 'sendgrid', 'ses', 'nodemailer'
+    enabled: false # off by default — nothing is sent until you turn it on
+    provider: 'smtp' # 'smtp' or 'sendgrid': the transport used for every email
 
-# SMTP Configuration
     smtp:
       host: 'mail.example.com'
       port: 587
-      secure: false
+      secure: false # true for implicit TLS (usually port 465)
       auth:
-        user: 'smtp@example.com'
+        user: 'smtp@example.com' # leave empty for a relay that takes no credentials
         pass: 'your-password'
-      from: 'smtp@example.com'
+      from: 'clerk@example.com'
       tls:
-        rejectUnauthorized: false  # For SSL certificate issues
+        rejectUnauthorized: true # false only for a self-signed test relay
 
-# SendGrid Configuration
     sendgrid:
       apiKey: 'SG.your-api-key'
       from: 'noreply@example.com'
-      sandboxMode: true  # For testing without domain verification
 
-# AWS SES Configuration
-    ses:
-      accessKeyId: 'your-access-key'
-      secretAccessKey: 'your-secret-key'
-      region: 'us-east-1'
-      from: 'noreply@example.com'
+    replyTo: 'records@example.com' # optional — Reply-To on every email sent
 
-auth_templates:
+auth_templates: # see "Templates" below
   email_verification:
     subject: 'Verify your CivicPress account'
-    body: 'Please click the following link to verify your account: {{verification_url}}'
+    body: "Please click the following link to verify your account:\n{{verification_url}}"
+  email_change_verification:
+    subject: 'Verify your new CivicPress email address'
+    body: "Please click the following link to verify your new email address:\n{{verification_url}}"
   password_reset:
     subject: 'Reset your CivicPress password'
-    body: 'Click here to reset your password: {{reset_url}}'
-  two_factor_auth:
-    subject: 'Your CivicPress verification code'
-    body: 'Your verification code is: {{code}}'
-  security_alert:
-    subject: 'Security alert for your account'
-    body: 'Suspicious activity detected: {{details}}'
+    body: "A password reset was requested for your CivicPress account \"{{username}}\".\n\nReset your password here:\n{{reset_url}}\n\nThis link can be used once and expires in 1 hour. If you did not request this, you can safely ignore this message — your password will not change."
 
 rules:
   rate_limits:
-    email_per_hour: 100
-    sms_per_hour: 50
-    slack_per_hour: 200
-  retry_attempts: 3
-  retry_delay: 5000
+    email_per_hour: 100 # sends past this limit in an hour are refused
 
 security:
   encrypt_sensitive_data: true
@@ -89,187 +87,106 @@ security:
   filter_pii: true
 ```
 
-## CLI Commands
+The three `security` keys are decided but not yet implemented (2026-09-30,
+decision 5 in `docs/plans/2026-08-11-v04x-scoping.md`): until that lands they
+are read by nothing.
 
-### Test Notification System
+### Providers
+
+**SMTP** — any relay: your own server, your hosting provider's, or a
+transactional service's SMTP endpoint. `secure: true` means implicit TLS (port
+465); `false` means STARTTLS is negotiated when the server offers it (port 587).
+The server certificate is validated unless `tls.rejectUnauthorized` is `false`.
+`provider: nodemailer` in an older file means the same thing and is read as
+`smtp`.
+
+**SendGrid** — through SendGrid's SMTP relay (`smtp.sendgrid.net`) with the API
+key as the password. SendGrid's Web-API-only features (sandbox mode, dynamic
+templates) are not available through this path.
+
+Whichever transport is selected is the one every email uses — the authentication
+emails and the test send alike. A test send can try the other transport for that
+send only (`--provider` in the CLI, the selector on the settings page) without
+changing the file.
+
+### Templates
+
+The authentication emails take their subject and body from `auth_templates`.
+Placeholders are written `{{name}}`; each email provides the ones listed below,
+and the body must keep the link placeholder:
+
+| Template                    | Provides                                              | Body must contain      |
+| --------------------------- | ----------------------------------------------------- | ---------------------- |
+| `email_verification`        | `{{verification_url}}`, `{{token}}`, `{{expires_at}}` | `{{verification_url}}` |
+| `email_change_verification` | `{{verification_url}}`, `{{token}}`, `{{expires_at}}` | `{{verification_url}}` |
+| `password_reset`            | `{{reset_url}}`, `{{username}}`                       | `{{reset_url}}`        |
+
+A configured template that drops the required placeholder, or uses one the email
+does not provide, is not sent: the built-in text is used instead and a warning
+naming the template is written to the server log. Use a test send to see exactly
+what a user would receive:
 
 ```bash
-# Test with SMTP
-civic notify:test --to user@example.com --subject "Test Email" --message "Test message" --provider smtp
-
-# Test with SendGrid
-civic notify:test --to user@example.com --subject "Test Email" --message "Test message" --provider sendgrid
-
-# Test with template
-civic notify:test --to user@example.com --template email_verification --variables '{"verification_url":"https://example.com/verify"}' --provider smtp
-
-# JSON output
-civic notify:test --to user@example.com --subject "Test" --message "Test" --provider smtp --json
+civic notify:test --to you@example.com --template password_reset \
+  --variables '{"reset_url":"https://example.com/reset?token=x","username":"you"}'
 ```
 
-### Monitor Notification Queue
+## CLI Commands
 
 ```bash
-# View notification queue
-civic notify:queue
+# A direct message through the configured transport
+civic notify:test --to user@example.com --subject "Test Email" --message "Test message"
 
-# JSON output
+# The same, forcing the other transport for this send only
+civic notify:test --to user@example.com --subject "Test" --message "Test" --provider sendgrid
+
+# One of the authentication templates, as configured
+civic notify:test --to user@example.com --template email_verification \
+  --variables '{"verification_url":"https://example.com/verify"}'
+
+# What the file says (API key masked)
+civic notify:config
+
+# Send history and statistics from the notification audit log
 civic notify:queue --json
 ```
 
-### Retry Failed Notifications
-
-```bash
-# Retry failed notifications
-civic notify:retry
-
-# Retry specific notification
-civic notify:retry --id notification-id
-```
-
-## Providers
-
-### SMTP
-
-**Best for**: Self-hosted email servers, custom domains
-
-**Configuration**:
-
-```yaml
-smtp:
-  host: 'mail.example.com'
-  port: 587
-  secure: false
-  auth:
-    user: 'smtp@example.com'
-    pass: 'your-password'
-  from: 'smtp@example.com'
-  tls:
-    rejectUnauthorized: false  # For SSL certificate issues
-```
-
-**Common Providers**:
-
-- Gmail: `smtp.gmail.com:587`
-- Outlook: `smtp-mail.outlook.com:587`
-- Yahoo: `smtp.mail.yahoo.com:587`
-- Custom: `mail.yourdomain.com:587`
-
-### SendGrid
-
-**Best for**: High-volume email, marketing campaigns
-
-**Configuration**:
-
-```yaml
-sendgrid:
-  apiKey: 'SG.your-api-key'
-  from: 'noreply@example.com'
-  sandboxMode: true  # For testing
-```
-
-**Features**:
-
-- Sandbox mode for testing without domain verification
-- Template support
-- Delivery tracking
-- Rate limiting
-
-### AWS SES
-
-**Best for**: AWS infrastructure, high reliability
-
-**Configuration**:
-
-```yaml
-ses:
-  accessKeyId: 'your-access-key'
-  secretAccessKey: 'your-secret-key'
-  region: 'us-east-1'
-  from: 'noreply@example.com'
-```
-
-## Templates
-
-### Built-in Templates
-
-- `email_verification`: Account verification emails
-- `password_reset`: Password reset emails
-- `two_factor_auth`: 2FA code emails
-- `security_alert`: Security notification emails
-
-### Custom Templates
-
-Create custom templates by adding to the `auth_templates` section:
-
-```yaml
-auth_templates:
-  welcome_email:
-    subject: 'Welcome to CivicPress'
-    body: 'Welcome {{name}}! Your account has been created successfully.'
-  record_updated:
-    subject: 'Record Updated'
-    body: 'Record {{record_id}} has been updated by {{user}}.'
-```
+`notify:queue` reads the audit log; there is no queue behind it, and the name is
+kept for compatibility.
 
 ## Troubleshooting
 
-### SSL Certificate Issues
+### Certificate errors
 
-If you get SSL certificate errors:
+`rejectUnauthorized: false` under `smtp.tls` accepts a self-signed certificate.
+Use it for a test relay, not for a server on the internet.
 
-```yaml
-tls:
-  rejectUnauthorized: false
-```
+### Nothing is sent
 
-### Authentication Issues
-
-1. Check credentials are correct
-2. Verify SMTP server settings
-3. Check if authentication is required
-4. Test connection manually
-
-### SendGrid Sandbox Mode
-
-In sandbox mode, emails only deliver to verified recipients:
-
-1. Go to SendGrid dashboard
-2. Navigate to Settings > Sender Authentication
-3. Add recipient email addresses
-4. Verify via email link
-
-### Debug Mode
-
-Enable debug logging to troubleshoot:
-
-```bash
-# Verbose output
-civic notify:test --to test@example.com --subject "Debug" --message "Test" --provider smtp --verbose
-
-# Check queue for errors
-civic notify:queue --json
-```
+1. `channels.email.enabled` must be `true` — the shipped file says `false`.
+2. `provider` must be `smtp` or `sendgrid`, and that block must be filled in.
+3. Run `civic notify:test --to you@example.com --subject t --message t`; a
+   failure is reported as one, with the transport's error.
+4. Past `rules.rate_limits.email_per_hour` sends in an hour, further sends are
+   refused until the hour turns.
 
 ## Security Considerations
 
-- Store sensitive configuration in `.system-data/` (not in Git)
-- Use environment variables for API keys in production
-- Enable SSL/TLS for all email providers
-- Implement rate limiting to prevent abuse
-- Audit all notification activities
-- Filter PII from notification content
+- `.system-data/notifications.yml` holds credentials; it is outside Git and
+  readable by the settings editor. Keep file permissions tight.
+- Leave `tls.rejectUnauthorized` at `true` for any server on the internet.
+- Every send attempt is recorded in the notification audit log without the
+  message body; a failed test send never returns the transport's raw error to
+  the browser (it may carry hosts and credential hints).
 
 ## Integration
 
 ### Authentication Workflows
 
-The notification system integrates with authentication workflows:
-
-- Email verification for new accounts
-- Password reset functionality (see below)
-- Two-factor authentication
-- Security alerts
+- Email verification for new accounts and for email changes
+  (`email_verification`, `email_change_verification`)
+- Password reset (`password_reset`) — see below
+- Security alerts go to the operator notification center, not to email
 
 ## Password recovery (forgot-password)
 
@@ -324,26 +241,3 @@ database (not Git) and is the zero-config fallback sink.
 `update_available` entry — local/cron-friendly, `--latest` for offline). To emit
 your own, call
 `civicPress.getOperatorNotifier().notify|systemError|securityAlert|updateAvailable(...)`.
-
-### Hook System
-
-Notifications can be triggered by system events:
-
-```yaml
-hooks:
-  - event: 'user:registered'
-    action: 'notify:email_verification'
-  - event: 'record:created'
-    action: 'notify:record_created'
-```
-
-## Best Practices
-
-1. **Test thoroughly** before production use
-2. **Monitor delivery rates** and bounce rates
-3. **Use templates** for consistent messaging
-4. **Implement retry logic** for failed deliveries
-5. **Log all activities** for audit purposes
-6. **Rate limit** to prevent abuse
-7. **Secure credentials** properly
-8. **Test with multiple providers** for redundancy

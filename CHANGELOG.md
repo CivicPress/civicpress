@@ -222,6 +222,29 @@ database guarantee rather than a convention.
 
 ### Fixed
 
+- **Real mail ignored the configured email provider.** The real-mail path always
+  built an SMTP transport from the `smtp` block, whatever
+  `channels.email.provider` said; only `civic notify:test` and the settings
+  page's test send honoured it. With `provider: sendgrid` and an untouched
+  `smtp` block, a test email went out through SendGrid while every real email —
+  verification, password reset — went to `localhost:587`. One function now
+  builds the transport for all three (`emailChannelOptionsFromConfig`), and
+  `replyTo`, declared and documented since the file existed, is applied to every
+  email instead of to nothing. A relay configured without credentials works:
+  nodemailer, handed an empty user, refused client-side with "Missing
+  credentials" whenever the server advertised AUTH, so `auth` is now left out.
+
+- **The authentication emails ignored their templates.** `auth_templates` was
+  shipped, rendered by the settings editor and read by `getAuthTemplate()`,
+  which nothing called; the subject and body of the verification and reset
+  emails were constants beside each send. They now come from the file, with a
+  guard: a configured body that drops the link placeholder, or uses one the
+  email does not provide, is replaced by the built-in text and a warning naming
+  the template is logged. The email-change verification gains its own template
+  (`email_change_verification`) and its own subject. ⚠️ The shipped file wrote
+  the bodies in single-quoted YAML, where `\n` is two characters; now that they
+  are read, they are double-quoted so the line break is one.
+
 - **The built-in workflow default had no `admin` role.** `WorkflowConfigManager`
   falls back to an inline configuration when `workflows.yml` is absent — and
   that copy knew clerk, council and public only, so a default instance answered
@@ -531,6 +554,28 @@ database guarantee rather than a convention.
   with the generic message; the detail stays in the audit log.
 
 ### Changed
+
+- **Notification settings that did nothing are no longer shipped.** The
+  2026-09-29 sweep found twelve `notifications.yml` keys written by every
+  writer, documented, and read by nothing. Decided 2026-10-01: the three
+  `security.*` keys are to be implemented (separate change); `replyTo` and
+  `provider` now work (above); the rest is gone from the shipped file, the
+  `civic init` fallback, the reader's type and the docs — `channels.email.ses`
+  and the `ses` provider (no SES transport exists), the `nodemailer` provider
+  and block (the SMTP transport under a second name), `sendgrid.sandboxMode` (a
+  Web-API feature; our SendGrid path is their SMTP relay),
+  `rules.retry_attempts` / `retry_delay` (the in-memory queue they described was
+  constructed and never used, and `civic notify:retry` printed "not yet
+  implemented" — queue and command removed), and the `two_factor_auth` and
+  `security_alert` templates (no two-factor feature exists; security alerts go
+  to the operator inbox). `docs/notifications.md` recommended `SMTP_*`,
+  `SENDGRID_*` and `AWS_SES_*` environment variables as the preferred way to
+  supply credentials; no code read them, and the section and its example file
+  are removed. An existing instance's file keeps working: unknown keys are
+  ignored; `provider: nodemailer` is read as `smtp`, taking the `nodemailer`
+  block when the operator filled it; a template body the old file wrote with a
+  two-character `\n` gets its line break; and a body that is still the old
+  shipped default gets the current built-in text.
 
 - **The shipped review chain can be walked, and it ends on a public status.**
   The project shipped two status vocabularies that did not agree: the workflow's

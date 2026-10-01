@@ -8,6 +8,26 @@ export { AuthTemplate } from './templates/auth-template.js';
 // Channels (canonical implementations)
 export { EmailChannel } from './channels/email-channel.js';
 export {
+  emailChannelOptionsFromConfig,
+  resolveEmailProvider,
+  UnknownEmailProviderError,
+  EMAIL_PROVIDERS,
+} from './channels/email-channel-options.js';
+export type {
+  EmailProvider,
+  EmailChannelConfigLike,
+} from './channels/email-channel-options.js';
+export {
+  authTemplateFromConfig,
+  resolveAuthTemplateText,
+  AUTH_TEMPLATE_CONTRACTS,
+  AUTH_TEMPLATE_NAMES,
+} from './templates/auth-templates-from-config.js';
+export type {
+  AuthTemplateName,
+  AuthTemplateText,
+} from './templates/auth-templates-from-config.js';
+export {
   ConsoleChannel,
   isConsoleChannelEnabled,
 } from './channels/console-channel.js';
@@ -21,7 +41,6 @@ export {
 
 // Supporting classes
 export { NotificationAudit } from './notification-audit.js';
-export { NotificationQueue } from './notification-queue.js';
 export { NotificationSecurity } from './notification-security.js';
 export { NotificationRateLimiter } from './notification-rate-limiter.js';
 export { NotificationLogger, LogLevel } from './notification-logger.js';
@@ -45,8 +64,6 @@ export type {
 
 export type { AuditEntry } from './notification-audit.js';
 
-export type { QueuedNotification } from './notification-queue.js';
-
 export type {
   RateLimitConfig,
   RateLimitResult,
@@ -61,9 +78,7 @@ export type {
   OperatorNotificationView,
 } from './operator-notifier.js';
 
-export type {
-  ConsoleChannelOptions,
-} from './channels/console-channel.js';
+export type { ConsoleChannelOptions } from './channels/console-channel.js';
 
 export type {
   ResetTokenIssuer,

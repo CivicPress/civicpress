@@ -21,7 +21,8 @@ import * as path from 'path';
 import { NotificationService } from './notification-service.js';
 import { NotificationConfig } from './notification-config.js';
 import { registerEmailChannelOn } from '../auth/email-validation-service/email-channel-setup.js';
-import { AuthTemplate } from './templates/auth-template.js';
+import type { AuthTemplate } from './templates/auth-template.js';
+import { authTemplateFromConfig } from './templates/auth-templates-from-config.js';
 import {
   ConsoleChannel,
   isConsoleChannelEnabled,
@@ -70,14 +71,6 @@ export interface PasswordRecoveryDeps {
   notificationService?: NotificationService;
 }
 
-const RESET_TEMPLATE_BODY =
-  'A password reset was requested for your CivicPress account "{{username}}".\n\n' +
-  'Reset your password here:\n{{reset_url}}\n\n' +
-  'This link can be used once and expires in 1 hour. If you did not request ' +
-  'this, you can safely ignore this message — your password will not change.';
-
-const RESET_TEMPLATE_SUBJECT = 'Reset your CivicPress password';
-
 export class PasswordRecoveryService {
   private issuer: ResetTokenIssuer;
   private operatorNotifier: OperatorNotifier;
@@ -94,7 +87,8 @@ export class PasswordRecoveryService {
 
     // Own NotificationService for the email path — mirrors the proven
     // email-verification setup (its own config + registered email channel).
-    this.notificationConfig = deps.notificationConfig ?? new NotificationConfig();
+    this.notificationConfig =
+      deps.notificationConfig ?? new NotificationConfig();
     const injectedService = !!deps.notificationService;
     this.notificationService =
       deps.notificationService ??
@@ -105,10 +99,12 @@ export class PasswordRecoveryService {
       registerEmailChannelOn(this.notificationService, deps.logger);
     }
 
-    this.resetTemplate = new AuthTemplate(
+    // Subject and body from `auth_templates.password_reset`, falling back to
+    // the built-in text when the configured one lacks `{{reset_url}}`.
+    this.resetTemplate = authTemplateFromConfig(
+      this.notificationConfig,
       'password_reset',
-      RESET_TEMPLATE_BODY,
-      RESET_TEMPLATE_SUBJECT
+      (message) => this.logger?.warn?.(message)
     );
     this.notificationService.registerTemplate(
       'password_reset',

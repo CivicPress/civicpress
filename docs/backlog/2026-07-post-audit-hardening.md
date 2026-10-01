@@ -2574,10 +2574,10 @@ instance actually has, and the result was looked at.
       raw channel errors went out in `data.errors`. Now a `500` with the generic
       message.
 
-- [ ] **Settings that are written, documented, and read by nothing (needs a
-      decision).** Each was checked by searching every spelling repo-wide and
-      reading what came back. "Implement or remove" is the same call as in the
-      two earlier sweeps, so none was changed.
+- [x] **Settings that are written, documented, and read by nothing. DECIDED
+      2026-10-01, DONE for nine of twelve.** Each was checked by searching every
+      spelling repo-wide and reading what came back. "Implement or remove" is
+      the same call as in the two earlier sweeps, so none was changed.
 
   | Setting                                      | An operator would believe                     | What happens                                                                        |
   | -------------------------------------------- | --------------------------------------------- | ----------------------------------------------------------------------------------- |
@@ -2602,11 +2602,24 @@ instance actually has, and the result was looked at.
   `channels.sms.*` and `channels.slack.*` are not findings: they do nothing, and
   `docs/project-status.md` and the notifications spec say so.
 
-      **Decision 2026-09-30, partial:** the three `security.*` keys are to be
-      implemented (see the privacy-settings entry above). The other nine rows of
-      this table — retry rules, the four `auth_templates.*`, `provider`, `ses.*`,
-      `replyTo`, `sandboxMode`, and the environment variables the docs
-      recommend — are still undecided.
+      **Outcome (2026-10-01).** The three `security.*` keys are to be
+      implemented (decision 5 of 2026-09-30; see the privacy-settings entry
+      above). The other nine were decided and landed the same day:
+      implemented — `replyTo` (applied to every email) and `provider` (real
+      mail now builds the transport the file names; it always used the `smtp`
+      block) and the `email_verification` / `password_reset` templates (the
+      emails now take subject and body from the file, with a placeholder
+      guard); removed — `two_factor_auth`, `security_alert`, `channels.email.ses`
+      and the `ses` option, the `nodemailer` provider and block,
+      `sendgrid.sandboxMode`, `rules.retry_*` with the unused queue and the
+      `notify:retry` stub, and the `SMTP_*` / `SENDGRID_*` / `AWS_SES_*`
+      environment-variable section and example file. An existing instance's
+      file keeps working (unknown keys ignored, `nodemailer` read as `smtp`).
+
+      Recorded for the deployment epic, not done: environment-variable
+      overrides for the mail credentials would keep secrets out of a YAML the
+      settings page can display; it adds a second source of truth and a
+      precedence rule, so it wants designing with the Docker deploy, not here.
 
 #### Checked and NOT findings
 

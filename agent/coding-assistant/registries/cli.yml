@@ -69,12 +69,7 @@ commands:
 
   - id: notify:queue
     file: cli/src/commands/notify.ts
-    desc: List notification queue status
-    status: stable
-
-  - id: notify:retry
-    file: cli/src/commands/notify.ts
-    desc: Retry failed notifications
+    desc: Show notification history and statistics
     status: stable
 
   - id: index
