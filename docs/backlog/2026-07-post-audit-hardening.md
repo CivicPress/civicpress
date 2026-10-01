@@ -2371,6 +2371,13 @@ about either.
       covered; the full pass is recorded under "Notification configuration
       sweep" at the end of this section.
 
+      **Decision 2026-09-30:** implement all three (scoping doc, decision 5).
+      `filter_pii` redacts what is *persisted* (audit entries, operator-inbox
+      rows), not the sent message; `audit_all_notifications` writes one audit
+      entry per send without the body; `encrypt_sensitive_data` encrypts
+      `operator_notifications.body/data` at rest with a key derived from the
+      instance secret, migrating existing rows. Not started as of 2026-10-01.
+
 ### Correctness and honesty
 
 - [x] **`EditorHeader.vue` still decides for itself what "published" means.
@@ -2408,10 +2415,11 @@ about either.
       the two disagree: `approved` is not public, but the editor treats an
       approved record as published.
 
-- [ ] **🔴 The shipped review chain cannot be walked (needs a decision).** Found
-      while checking the fix above against a default instance, and **measured**
-      on one built from the shipped `workflows.yml` and `roles.yml`. The project
-      ships two status vocabularies and they do not agree:
+- [x] **🔴 The shipped review chain cannot be walked. FIXED 2026-10-01 (PR
+      #46).** Found while checking the fix above against a default instance, and
+      **measured** on one built from the shipped `workflows.yml` and
+      `roles.yml`. The project ships two status vocabularies and they do not
+      agree:
 
   | Source                                   | Statuses                                                                                              |
   | ---------------------------------------- | ----------------------------------------------------------------------------------------------------- |
@@ -2446,12 +2454,19 @@ about either.
   shipped chain. It is the fixture-versus-shipped-configuration lesson from the
   2026-08-12 sweep, again.
 
-- [ ] **A draft that was never published has no transitions.**
-      `GET /api/v1/records/:id/transitions` returns `[]` for it, for every role:
-      `getAllowedTransitions` looks the record up in the `records` table, and a
-      never-published draft is only in `record_drafts`. The editor's status menu
-      is therefore empty for exactly the records that are still moving through
-      review. Measured alongside the entry above.
+      **Outcome.** Decision 6 of 2026-09-30: `proposed` and `reviewed` are record
+      statuses (non-public) and the shipped workflow gains `approved → published`,
+      so the chain ends on a public status; the inline default gains `admin`.
+      `tests/api/shipped-review-chain.test.ts` walks it on the shipped files.
+
+- [x] **A draft that was never published has no transitions. FIXED 2026-10-01
+      (PR #46).** `GET /api/v1/records/:id/transitions` returns `[]` for it, for
+      every role: `getAllowedTransitions` looks the record up in the `records`
+      table, and a never-published draft is only in `record_drafts`. The
+      editor's status menu is therefore empty for exactly the records that are
+      still moving through review. Measured alongside the entry above.
+
+      **Outcome.** `getAllowedTransitions` falls back to the `record_drafts` row.
 
 - [ ] **"Change status to …" answers 500 when there is nothing to publish.** The
       editor's generic status items go through `POST /records/:id/publish`,
@@ -2460,14 +2475,19 @@ about either.
       ("Failed to publish record") rather than a 4xx. Return-to-draft and
       archive do not have this problem: they use `POST /records/:id/status`.
 
-- [ ] **Two routers promise the milestone that is about to ship (needs a
-      decision).** `/api/v1/workflows` and `/api/v1/hooks` answer every request
-      with `501` and the message "planned for v0.4.x"
-      (`retry_after_milestone: 'v0.4.x'`); the OpenAPI description in
-      `modules/api/src/routes/docs.ts` repeats it. Tagging 0.4.0 with these
+      Still open after the v0.4.x batch — PR #46 did not touch the publish path.
+
+- [x] **Two routers promise the milestone that is about to ship. DECIDED
+      2026-09-30, DONE 2026-10-01 (PR #44).** `/api/v1/workflows` and
+      `/api/v1/hooks` answer every request with `501` and the message "planned
+      for v0.4.x" (`retry_after_milestone: 'v0.4.x'`); the OpenAPI description
+      in `modules/api/src/routes/docs.ts` repeats it. Tagging 0.4.0 with these
       unchanged makes the API state something false about itself. The options
       differ in kind — implement read-only views over `workflows.yml` and
       `hooks.yml`, re-point the milestone, or delete the routers.
+
+      **Outcome.** Kept and retargeted: the `501` message names no release and
+      `retry_after_milestone` is gone, in both routers and in the OpenAPI text.
 
 - [ ] **The audit trail: what "comprehensive" would have to mean (needs a
       decision).** Scoping question 4 asked whether the audit log is a gap at
@@ -2486,6 +2506,11 @@ about either.
     file is complete but lossy, and the table is durable but partial.
   - Geography, templates, file upload and delete, indexing and record locks
     write no audit entry in either layer.
+
+    **Decision 2026-09-30:** full coverage in v0.4.x (scoping doc, decision 3):
+    rotate into dated archives instead of deleting, route API-layer events
+    through the DB channel, add entries on the five silent surfaces, and give
+    `audit_logs` a production reader. Not started as of 2026-10-01.
 
 ### Tracker corrections
 
@@ -2576,6 +2601,12 @@ instance actually has, and the result was looked at.
 
   `channels.sms.*` and `channels.slack.*` are not findings: they do nothing, and
   `docs/project-status.md` and the notifications spec say so.
+
+      **Decision 2026-09-30, partial:** the three `security.*` keys are to be
+      implemented (see the privacy-settings entry above). The other nine rows of
+      this table — retry rules, the four `auth_templates.*`, `provider`, `ses.*`,
+      `replyTo`, `sandboxMode`, and the environment variables the docs
+      recommend — are still undecided.
 
 #### Checked and NOT findings
 

@@ -6,6 +6,18 @@
 > pass 2026-07-30; refreshed 2026-08-08 for the v0.2.1 → v0.3.1 releases —
 > browser-e2e tests, an opt-in live-cloud storage test, and a one-command
 > deployment layer + BroadcastBox operator UI), not aspirational claims.
+>
+> **Refreshed 2026-10-01 for the v0.4.x batch (PRs #39–#46, on `develop`, not
+> yet released):** a record file can no longer execute code through its front
+> matter; unpublished records need the `records:view_unpublished` permission
+> rather than any login, and self-registration has a switch; the shipped review
+> chain (draft → proposed → reviewed → approved → published) can be walked; the
+> notification configuration every writer produces is read correctly (it was
+> silently refusing every send on a `civic init` instance); dependency
+> advisories 87 → 1 and the CodeQL baseline triaged; `module.json` no longer
+> advertises capabilities nothing reads. Still owed for 0.4.0: full audit
+> coverage and the notification privacy settings — see
+> `docs/plans/2026-08-11-v04x-scoping.md`, "Decisions (2026-09-30)".
 > Authoritative trackers: the `FA-*` security registry
 > (`docs/audits/2026-07-02-full-audit.md`), the hardening backlog
 > (`docs/backlog/2026-07-post-audit-hardening.md`), the roadmap
@@ -129,9 +141,12 @@ named gaps. **Stub/Planned**: advertised but not yet functional.
   green suite into evidence of nothing.
 
 - **Supply chain:** osv-scanner (PR diff-gate + weekly) and CodeQL SAST
-  (report-only) run in CI; dependency advisories were remediated 94 → 2 (the
-  residual two are a brace-expansion DoS not reachable from the request
-  surface); a `SECURITY.md` disclosure policy is published.
+  (report-only as a workflow; the per-PR alert gate is real) run in CI;
+  dependency advisories were remediated 94 → 2 in July and again 87 → 1 on
+  2026-09-30 (the remaining one is on `vitest`, dev-only; vitest 4 is scheduled
+  after 0.4.0); the CodeQL baseline was triaged on 2026-09-29
+  (`docs/audits/2026-09-29-codeql-baseline-triage.md`); a `SECURITY.md`
+  disclosure policy is published.
 - **Tests & CI:** ~265 test files (~2,500 cases) run green in parallel in CI.
   Honest coverage gaps: the auth-flow pages and editor composables have
   component tests, but there is no full editor-SFC mount; the browser layer is a
