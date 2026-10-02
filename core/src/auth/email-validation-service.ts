@@ -9,7 +9,7 @@ import { coreError, coreDebug } from '../utils/core-output.js';
 import { SecretsManager } from '../security/secrets.js';
 import { AuditChannel } from '../audit/audit-channel.js';
 import { registerEmailChannelOn } from './email-validation-service/email-channel-setup.js';
-import { AuthTemplate } from '../notifications/templates/auth-template.js';
+import { authTemplateFromConfig } from '../notifications/templates/auth-templates-from-config.js';
 
 const logger = new Logger();
 
@@ -63,6 +63,7 @@ export class EmailValidationService {
   private db: DatabaseService;
   private tokenExpiryHours: number = 24; // 24 hours for email verification
   private notificationService: NotificationService;
+  private notificationConfig: NotificationConfig;
   private secretsManager?: SecretsManager;
   private auditChannel?: AuditChannel;
 
@@ -70,8 +71,8 @@ export class EmailValidationService {
     this.db = db;
     this.auditChannel = auditChannel;
     // Initialize notification service
-    const notificationConfig = new NotificationConfig();
-    this.notificationService = new NotificationService(notificationConfig);
+    this.notificationConfig = new NotificationConfig();
+    this.notificationService = new NotificationService(this.notificationConfig);
     // Register email channel and templates
     this.registerEmailChannel();
     this.registerEmailTemplates();
@@ -123,25 +124,27 @@ export class EmailValidationService {
    */
   private registerEmailTemplates(): void {
     try {
-      // Initial email verification template
-      const emailVerificationTemplate = new AuthTemplate(
-        'email_verification',
-        'Please click the following link to verify your account: {{verification_url}}'
-      );
-
-      // Email change verification template
-      const emailChangeTemplate = new AuthTemplate(
-        'email_change_verification',
-        'Please click the following link to verify your new email address: {{verification_url}}'
-      );
-
+      // Subject and body come from `auth_templates` in notifications.yml;
+      // the built-in text is the fallback when the configured one would not
+      // carry the verification link. The text used to be hard-coded here
+      // while the file shipped (and the editor offered) a template nothing
+      // read.
+      const warn = (message: string) => logger.warn(message);
       this.notificationService.registerTemplate(
         'email_verification',
-        emailVerificationTemplate
+        authTemplateFromConfig(
+          this.notificationConfig,
+          'email_verification',
+          warn
+        )
       );
       this.notificationService.registerTemplate(
         'email_change_verification',
-        emailChangeTemplate
+        authTemplateFromConfig(
+          this.notificationConfig,
+          'email_change_verification',
+          warn
+        )
       );
     } catch (error) {
       logger.error('Error registering email templates:', error);

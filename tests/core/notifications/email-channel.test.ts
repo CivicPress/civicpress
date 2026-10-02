@@ -132,3 +132,45 @@ describe('EmailChannel (canonical)', () => {
     );
   });
 });
+
+describe('EmailChannel defaultReplyTo', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    sendMail.mockResolvedValue({ messageId: 'test-id-1' });
+  });
+
+  it('applies the channel-wide reply-to when the message has none', async () => {
+    const channel = new EmailChannel(
+      {
+        smtp: { host: 'smtp.example.com', port: 587 },
+        defaultFrom: 'noreply@civicpress.org',
+        defaultReplyTo: 'records@civicpress.org',
+      },
+      createTransport
+    );
+    await channel.send({ to: 'a@b.c', subject: 'Hi', text: 'Body' });
+    expect(sendMail).toHaveBeenCalledWith(
+      expect.objectContaining({ replyTo: 'records@civicpress.org' })
+    );
+  });
+
+  it('lets a message set its own reply-to', async () => {
+    const channel = new EmailChannel(
+      {
+        smtp: { host: 'smtp.example.com', port: 587 },
+        defaultFrom: 'noreply@civicpress.org',
+        defaultReplyTo: 'records@civicpress.org',
+      },
+      createTransport
+    );
+    await channel.send({
+      to: 'a@b.c',
+      subject: 'Hi',
+      text: 'Body',
+      replyTo: 'clerk@civicpress.org',
+    });
+    expect(sendMail).toHaveBeenCalledWith(
+      expect.objectContaining({ replyTo: 'clerk@civicpress.org' })
+    );
+  });
+});

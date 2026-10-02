@@ -6,6 +6,8 @@ import {
   NotificationConfig,
   AuthTemplate,
   EmailChannel,
+  emailChannelOptionsFromConfig,
+  UnknownEmailProviderError,
 } from '@civicpress/core';
 
 const router = Router();
@@ -13,28 +15,6 @@ const audit = new AuditLogger();
 
 // Protect all routes
 router.use(requirePermission('system:admin'));
-
-// Normalize metadata-shaped values { value, type, ... } to plain scalars
-function normalizeMetadata<T = unknown>(input: unknown): T {
-  if (input == null) return input as T;
-  if (Array.isArray(input))
-    return input.map((i) => normalizeMetadata(i)) as unknown as T;
-  if (typeof input === 'object') {
-    const obj = input as Record<string, unknown>;
-    if (
-      'value' in obj &&
-      Object.keys(obj).some((k) =>
-        ['type', 'description', 'required', 'options', 'value'].includes(k)
-      )
-    ) {
-      return normalizeMetadata(obj.value) as T;
-    }
-    const out: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(obj)) out[k] = normalizeMetadata(v);
-    return out as T;
-  }
-  return input as T;
-}
 
 // POST /api/v1/notifications/test
 router.post('/test', async (req, res) => {
@@ -64,38 +44,27 @@ router.post('/test', async (req, res) => {
       });
     }
 
-    // Build the canonical EmailChannel for this test send (Phase 2c.5 T3 —
-    // closes the 4th ad-hoc EmailChannel impl that Phase 2c T6 missed).
-    const effectiveProvider = provider || emailConfig.provider || 'sendgrid';
-    // Provider-specific credential blocks (sendgrid / smtp / nodemailer / etc.)
-    // are stored as siblings of the typed channel fields; lookup is dynamic.
-    const cfgRecord = emailConfig as unknown as Record<string, unknown>;
-    const rawCreds = cfgRecord[effectiveProvider] ?? cfgRecord.sendgrid;
-    const credentials = normalizeMetadata<Record<string, unknown>>(rawCreds);
-
+    // The transport comes from the same function the real-mail path uses, so
+    // this test send exercises what real mail will do. `provider` in the body
+    // (the settings page's selector) overrides the configured one for this
+    // send only.
     let channel: EmailChannel;
-    if (effectiveProvider === 'smtp' || effectiveProvider === 'nodemailer') {
-      channel = new EmailChannel({
-        smtp: {
-          host: String(credentials.host || ''),
-          port: Number(credentials.port ?? 587),
-          secure: Boolean(credentials.secure),
-          auth: credentials.auth as { user: string; pass: string } | undefined,
-          // FA-API-017: validate the SMTP server cert by default. Only an
-          // explicit tls block may opt out (e.g. a self-signed test relay).
-          tls: (credentials.tls as
-            | { rejectUnauthorized: boolean }
-            | undefined) || {
-            rejectUnauthorized: true,
+    let effectiveProvider: string;
+    try {
+      const options = emailChannelOptionsFromConfig(emailConfig, { provider });
+      effectiveProvider = options.sendgrid ? 'sendgrid' : 'smtp';
+      channel = new EmailChannel(options);
+    } catch (error) {
+      if (error instanceof UnknownEmailProviderError) {
+        return res.status(400).json({
+          success: false,
+          error: {
+            message: error.message,
+            code: 'UNKNOWN_EMAIL_PROVIDER',
           },
-        },
-        defaultFrom: credentials.from as string | undefined,
-      });
-    } else {
-      channel = new EmailChannel({
-        sendgrid: { apiKey: String(credentials.apiKey || '') },
-        defaultFrom: credentials.from as string | undefined,
-      });
+        });
+      }
+      throw error;
     }
 
     // Wrap the canonical EmailChannel in a NotificationChannel-shaped adapter

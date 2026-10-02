@@ -1629,26 +1629,25 @@ async function setupNotifications(
             sendgrid: {
               apiKey: '',
               from: 'noreply@civicpress.local',
-              sandboxMode: true,
             },
           },
         },
         auth_templates: {
           email_verification: {
             subject: 'Verify your CivicPress account',
-            body: 'Please click the following link to verify your account: {{verification_url}}',
+            body: 'Please click the following link to verify your account:\n{{verification_url}}',
+          },
+          email_change_verification: {
+            subject: 'Verify your new CivicPress email address',
+            body: 'Please click the following link to verify your new email address:\n{{verification_url}}',
           },
           password_reset: {
             subject: 'Reset your CivicPress password',
-            body: 'Click here to reset your password: {{reset_url}}',
-          },
-          two_factor_auth: {
-            subject: 'Your CivicPress verification code',
-            body: 'Your verification code is: {{code}}',
-          },
-          security_alert: {
-            subject: 'Security alert for your account',
-            body: 'Suspicious activity detected: {{details}}',
+            body:
+              'A password reset was requested for your CivicPress account "{{username}}".\n\n' +
+              'Reset your password here:\n{{reset_url}}\n\n' +
+              'This link can be used once and expires in 1 hour. If you did not request ' +
+              'this, you can safely ignore this message — your password will not change.',
           },
         },
         rules: {
@@ -1657,8 +1656,6 @@ async function setupNotifications(
             sms_per_hour: 50,
             slack_per_hour: 200,
           },
-          retry_attempts: 3,
-          retry_delay: 5000,
         },
         security: {
           encrypt_sensitive_data: true,

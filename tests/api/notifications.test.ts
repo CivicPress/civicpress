@@ -153,5 +153,18 @@ describe('API Notifications Integration', () => {
         /ECONNREFUSED|127\.0\.0\.1|rate-limited/i
       );
     });
+
+    it('refuses a transport that does not exist instead of guessing one', async () => {
+      install((yaml) =>
+        yaml.replace(/(email:\n\s+enabled:\n\s+value: )false/, '$1true')
+      );
+      const response = await request(context.api.getApp())
+        .post('/api/v1/notifications/test')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ to: 'someone@example.com', message: 'Test', provider: 'ses' });
+      expect(response.status).toBe(400);
+      expect(response.body.error.code).toBe('UNKNOWN_EMAIL_PROVIDER');
+      expect(response.body.error.message).toMatch(/smtp, sendgrid/);
+    });
   });
 });

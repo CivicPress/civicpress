@@ -3,8 +3,9 @@ import { NotificationService } from '../../notifications/notification-service.js
 import { NotificationConfig } from '../../notifications/notification-config.js';
 import {
   EmailChannel,
-  type EmailChannelOptions,
+  type CreateTransport,
 } from '../../notifications/channels/email-channel.js';
+import { emailChannelOptionsFromConfig } from '../../notifications/channels/email-channel-options.js';
 import type { ChannelRequest } from '../../notifications/notification-channel.js';
 
 /**
@@ -15,7 +16,8 @@ import type { ChannelRequest } from '../../notifications/notification-channel.js
  * the previous in-class implementation:
  *
  *   - reads channel config via {@link NotificationConfig}
- *   - normalizes the metadata-shaped SMTP config (`{ value: ... }` wrappers)
+ *   - builds the transport the configured `provider` names
+ *     (`emailChannelOptionsFromConfig`), with `replyTo` applied
  *   - constructs a canonical {@link EmailChannel}
  *   - wraps it in a thin `NotificationChannel`-shaped adapter that translates
  *     the notification system's `ChannelRequest` envelope into the canonical
@@ -27,11 +29,17 @@ import type { ChannelRequest } from '../../notifications/notification-channel.js
  */
 export function registerEmailChannelOn(
   notificationService: NotificationService,
-  logger: Logger
+  logger: Logger,
+  deps: {
+    /** The configuration to read; defaults to the instance's file. */
+    notificationConfig?: NotificationConfig;
+    /** Transport factory, injectable so tests never open a socket. */
+    createTransport?: CreateTransport;
+  } = {}
 ): void {
   try {
-    // Create notification config to get email configuration
-    const notificationConfig = new NotificationConfig();
+    const notificationConfig =
+      deps.notificationConfig ?? new NotificationConfig();
     const emailConfig = notificationConfig.getChannelConfig('email');
 
     if (!emailConfig || !emailConfig.enabled) {
@@ -39,56 +47,15 @@ export function registerEmailChannelOn(
       return;
     }
 
-    // Normalize the configuration (handle metadata format).
-    // Loose `unknown` input: either the raw value, or `{ value: ... }` wrapper.
-    // Returns `unknown` so callsites narrow explicitly per-field.
-    const normalizeValue = (obj: unknown): unknown =>
-      obj && typeof obj === 'object' && 'value' in obj
-        ? (obj as { value: unknown }).value
-        : obj;
-
-    type SmtpShape = {
-      host?: unknown;
-      port?: unknown;
-      secure?: unknown;
-      auth?: { user?: unknown; pass?: unknown };
-      from?: unknown;
-      tls?: unknown;
-    };
-    const smtpConfig = normalizeValue(
-      emailConfig.smtp || emailConfig
-    ) as SmtpShape;
-    const host = String(normalizeValue(smtpConfig.host) ?? '');
-    const port = Number(normalizeValue(smtpConfig.port) ?? 587);
-    const secure = Boolean(normalizeValue(smtpConfig.secure));
-    const auth = {
-      user: String(normalizeValue(smtpConfig.auth?.user) ?? ''),
-      pass: String(normalizeValue(smtpConfig.auth?.pass) ?? ''),
-    };
-    const from = String(normalizeValue(smtpConfig.from) ?? '');
-    const tlsRaw = normalizeValue(smtpConfig.tls) as
-      | { rejectUnauthorized?: unknown }
-      | null
-      | undefined;
-    // FA-API-017: validate the SMTP server cert by default; only an explicit
-    // rejectUnauthorized:false in config may turn it off (e.g. a test relay).
-    const rejectUnauthorized =
-      tlsRaw?.rejectUnauthorized !== undefined
-        ? Boolean(normalizeValue(tlsRaw.rejectUnauthorized))
-        : true;
-
-    const options: EmailChannelOptions = {
-      smtp: {
-        host,
-        port,
-        secure,
-        auth,
-        tls: { rejectUnauthorized },
-      },
-      defaultFrom: from,
-    };
-
-    const canonical = new EmailChannel(options);
+    // The configured provider decides the transport — `smtp` or `sendgrid` —
+    // and `replyTo` rides along. Until 2026-10-01 this path built an SMTP
+    // transport from the `smtp` block whatever `provider` said, so a file that
+    // selected SendGrid sent real mail to `localhost:587` while the test send
+    // (which did honour it) succeeded.
+    const options = emailChannelOptionsFromConfig(emailConfig);
+    const canonical = deps.createTransport
+      ? new EmailChannel(options, deps.createTransport)
+      : new EmailChannel(options);
 
     const emailChannel = {
       getName() {
@@ -113,8 +80,7 @@ export function registerEmailChannelOn(
         } catch (error) {
           return {
             success: false,
-            error:
-              error instanceof Error ? error.message : 'Email send failed',
+            error: error instanceof Error ? error.message : 'Email send failed',
           };
         }
       },

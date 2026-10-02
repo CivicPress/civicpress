@@ -248,3 +248,61 @@ describe('PasswordRecoveryService', () => {
     expect(issuer.findResetEligibleUser).toHaveBeenCalledWith('some@email.org');
   });
 });
+
+describe('the reset email takes its text from auth_templates', () => {
+  it('sends the configured subject and body', async () => {
+    process.env.CIVIC_CONSOLE_NOTIFICATIONS = 'false';
+    const sink: ChannelRequest[] = [];
+    const { service, config } = serviceWithFakeEmail(sink);
+    config.updateAuthTemplate('password_reset', {
+      subject: 'Mot de passe — {{username}}',
+      body: 'Bonjour {{username}}, réinitialisez ici : {{reset_url}}',
+    });
+    const issuer = fakeIssuer({
+      userId: 7,
+      username: 'lea',
+      email: 'lea@x.org',
+    });
+    const svc = new PasswordRecoveryService({
+      issuer,
+      operatorNotifier: fakeOperatorNotifier() as never,
+      notificationConfig: config,
+      notificationService: service,
+    });
+    await svc.requestReset('lea', OPTS);
+    expect(sink).toHaveLength(1);
+    expect(sink[0].content.subject).toBe('Mot de passe — lea');
+    expect(sink[0].content.body).toContain('Bonjour lea, réinitialisez ici : ');
+    expect(sink[0].content.body).toContain('token=plaintext-token-xyz');
+  });
+
+  it('keeps the built-in text when the configured body has no reset link', async () => {
+    process.env.CIVIC_CONSOLE_NOTIFICATIONS = 'false';
+    const sink: ChannelRequest[] = [];
+    const { service, config } = serviceWithFakeEmail(sink);
+    config.updateAuthTemplate('password_reset', {
+      subject: 'Your password',
+      body: 'Call the clerk to reset your password.',
+    });
+    const warn = vi.fn();
+    const issuer = fakeIssuer({
+      userId: 8,
+      username: 'kim',
+      email: 'kim@x.org',
+    });
+    const svc = new PasswordRecoveryService({
+      issuer,
+      operatorNotifier: fakeOperatorNotifier() as never,
+      notificationConfig: config,
+      notificationService: service,
+      logger: { warn } as never,
+    });
+    await svc.requestReset('kim', OPTS);
+    expect(sink).toHaveLength(1);
+    expect(sink[0].content.subject).toBe('Your password');
+    expect(sink[0].content.body).toContain('token=plaintext-token-xyz');
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringMatching(/password_reset\.body is missing \{\{reset_url\}\}/)
+    );
+  });
+});

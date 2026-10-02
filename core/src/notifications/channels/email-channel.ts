@@ -43,6 +43,10 @@ export type EmailChannelOptions = {
   // SendGrid path (mutually exclusive with smtp).
   sendgrid?: SendGridOptions;
   defaultFrom?: string;
+  // Applied to every message that does not set its own `replyTo`. Comes from
+  // `channels.email.replyTo`, which was declared and read by nothing until
+  // 2026-10-01.
+  defaultReplyTo?: string;
 };
 
 export type EmailSendResult = {
@@ -58,6 +62,7 @@ export type CreateTransport = typeof nodemailer.createTransport;
 
 export class EmailChannel {
   private readonly transporter: Transporter;
+  private readonly defaultReplyTo?: string;
   private readonly defaultFrom?: string;
 
   constructor(
@@ -65,6 +70,7 @@ export class EmailChannel {
     createTransport: CreateTransport = nodemailer.createTransport
   ) {
     this.defaultFrom = options.defaultFrom;
+    this.defaultReplyTo = options.defaultReplyTo;
     if (options.smtp && options.sendgrid) {
       throw new Error(
         '[EmailChannel] options must include EITHER smtp{} or sendgrid{}, not both'
@@ -109,7 +115,7 @@ export class EmailChannel {
         subject: message.subject,
         text: message.text,
         html: message.html,
-        replyTo: message.replyTo,
+        replyTo: message.replyTo ?? this.defaultReplyTo,
       });
       return { messageId: info.messageId };
     } catch (err) {

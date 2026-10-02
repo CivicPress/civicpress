@@ -146,7 +146,6 @@ describe('NotificationConfig, reading what an instance really has', () => {
       expect(email.smtp.secure).toBe(false);
       expect(email.smtp.auth.user).toBe('');
       expect(email.smtp.tls.rejectUnauthorized).toBe(true);
-      expect(config.getRetrySettings()).toEqual({ attempts: 3, delay: 5000 });
       expect(config.getSecuritySettings()).toEqual({
         encrypt_sensitive_data: true,
         audit_all_notifications: true,
@@ -299,8 +298,6 @@ describe('NotificationConfig, reading what an instance really has', () => {
           '    email_per_hour: 7',
           '    sms_per_hour: 50',
           '    slack_per_hour: 200',
-          '  retry_attempts: 3',
-          '  retry_delay: 5000',
           '',
         ].join('\n')
       );
@@ -327,5 +324,137 @@ describe('NotificationConfig, reading what an instance really has', () => {
       expect(config.isChannelEnabled('email')).toBe(false);
       expect(config.getRateLimits()).toMatchObject({ email_per_hour: 7 });
     });
+  });
+});
+
+describe('the shipped auth_templates', () => {
+  let tmp: string;
+  beforeEach(() => {
+    tmp = mkdtempSync(join(tmpdir(), 'civic-shipped-templates-'));
+    copyFileSync(SHIPPED, join(tmp, 'notifications.yml'));
+  });
+  afterEach(() => rmSync(tmp, { recursive: true, force: true }));
+
+  it('ship the three emails the authentication flows send, with real line breaks', () => {
+    const templates = new NotificationConfig(tmp).getConfig().auth_templates;
+    expect(Object.keys(templates).sort()).toEqual([
+      'email_change_verification',
+      'email_verification',
+      'password_reset',
+    ]);
+    // Single-quoted YAML does not interpret `\n`; the file used to ship the
+    // two characters, which no reader noticed because none read it.
+    expect(templates.email_verification.body).toContain(
+      '\n{{verification_url}}'
+    );
+    expect(templates.email_verification.body).not.toContain('\\n');
+    expect(templates.password_reset.body).toContain('{{reset_url}}');
+    expect(templates.password_reset.body).toContain('{{username}}');
+  });
+
+  it('read a file from before 2026-10-01 — provider nodemailer and its block — as smtp', () => {
+    writeFileSync(
+      join(tmp, 'notifications.yml'),
+      [
+        'channels:',
+        '  email:',
+        '    enabled: true',
+        '    provider: nodemailer',
+        '    nodemailer:',
+        '      host: old.relay',
+        '      port: 25',
+        '      secure: false',
+        '      auth: { user: u, pass: p }',
+        '      from: clerk@town.example',
+        '    replyTo: null',
+        '',
+      ].join('\n')
+    );
+    const email = new NotificationConfig(tmp).getChannelConfig('email')!;
+    expect(email.provider).toBe('smtp');
+    expect(email.smtp?.host).toBe('old.relay');
+    expect(email.replyTo).toBeUndefined();
+    expect(email).not.toHaveProperty('nodemailer');
+  });
+});
+
+describe('a file written by the shipped default from before 2026-10-01', () => {
+  let tmp: string;
+  beforeEach(() => {
+    tmp = mkdtempSync(join(tmpdir(), 'civic-legacy-notif-'));
+  });
+  afterEach(() => rmSync(tmp, { recursive: true, force: true }));
+
+  /** The old shipped shape: both transport blocks, single-quoted bodies. */
+  const legacyFile = (opts: { provider: string; nodemailerHost: string }) =>
+    [
+      'channels:',
+      '  email:',
+      '    enabled: true',
+      `    provider: '${opts.provider}'`,
+      '    smtp:',
+      "      host: 'localhost'",
+      '      port: 587',
+      '      secure: false',
+      "      auth: { user: '', pass: '' }",
+      "      from: 'noreply@civicpress.local'",
+      '    nodemailer:',
+      `      host: '${opts.nodemailerHost}'`,
+      '      port: 587',
+      '      secure: false',
+      "      auth: { user: '', pass: '' }",
+      "      from: 'noreply@civicpress.local'",
+      '    replyTo: null',
+      'auth_templates:',
+      '  email_verification:',
+      "    subject: 'Verify your CivicPress account'",
+      "    body: 'Please click the following link to verify your account:\\n{{verification_url}}'",
+      '  password_reset:',
+      "    subject: 'Reset your CivicPress password'",
+      "    body: 'Click here to reset your password: {{reset_url}}'",
+      '',
+    ].join('\n');
+
+  it('turns the two-character \\n the old file wrote into a line break, and replaces the old default bodies', () => {
+    writeFileSync(
+      join(tmp, 'notifications.yml'),
+      legacyFile({ provider: 'nodemailer', nodemailerHost: 'localhost' })
+    );
+    const templates = new NotificationConfig(tmp).getConfig().auth_templates;
+    expect(templates.email_verification.body).toBe(
+      'Please click the following link to verify your account:\n{{verification_url}}'
+    );
+    expect(templates.email_verification.body).not.toContain('\\n');
+    // The old one-line reset body was never read; the current text says more.
+    expect(templates.password_reset.body).toContain('{{username}}');
+    expect(templates.password_reset.body).toContain('expires in 1 hour');
+  });
+
+  it('uses the nodemailer block the operator filled when provider was nodemailer', () => {
+    writeFileSync(
+      join(tmp, 'notifications.yml'),
+      legacyFile({
+        provider: 'nodemailer',
+        nodemailerHost: 'mail.town.example',
+      })
+    );
+    const email = new NotificationConfig(tmp).getChannelConfig('email')!;
+    expect(email.provider).toBe('smtp');
+    expect(email.smtp?.host).toBe('mail.town.example');
+  });
+
+  it('keeps the smtp block when the nodemailer block was left untouched', () => {
+    writeFileSync(
+      join(tmp, 'notifications.yml'),
+      legacyFile({
+        provider: 'nodemailer',
+        nodemailerHost: 'localhost',
+      }).replace(
+        "    smtp:\n      host: 'localhost'",
+        "    smtp:\n      host: 'relay.town.example'"
+      )
+    );
+    const email = new NotificationConfig(tmp).getChannelConfig('email')!;
+    expect(email.smtp?.host).toBe('relay.town.example');
   });
 });
