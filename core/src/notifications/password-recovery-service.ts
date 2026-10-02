@@ -29,6 +29,7 @@ import {
 } from './channels/console-channel.js';
 import type { OperatorNotifier } from './operator-notifier.js';
 import type { Logger } from '../utils/logger.js';
+import type { AuditChannel } from '../audit/audit-channel.js';
 
 /** The subset of AuthService this service needs — decouples the wiring. */
 export interface ResetTokenIssuer {
@@ -69,6 +70,10 @@ export interface PasswordRecoveryDeps {
    */
   notificationConfig?: NotificationConfig;
   notificationService?: NotificationService;
+  /** The unified audit trail, for `security.audit_all_notifications`. */
+  auditChannel?: AuditChannel;
+  /** The key recipients are hashed with in that trail; none → no recipient recorded. */
+  recipientKey?: () => Buffer | undefined;
 }
 
 export class PasswordRecoveryService {
@@ -92,7 +97,10 @@ export class PasswordRecoveryService {
     const injectedService = !!deps.notificationService;
     this.notificationService =
       deps.notificationService ??
-      new NotificationService(this.notificationConfig);
+      new NotificationService(this.notificationConfig, {
+        auditChannel: deps.auditChannel,
+        recipientKey: deps.recipientKey,
+      });
     // Register the real email channel only when we built the service; an
     // injected service already carries whatever channels the caller wants.
     if (!injectedService && deps.logger) {

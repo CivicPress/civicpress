@@ -203,15 +203,23 @@ security:
   encrypt_sensitive_data:
     value: true
     type: 'boolean'
-    description: 'Encrypt sensitive notification data'
+    description:
+      'Encrypt the operator-inbox body and data at rest (AES-256-GCM, key
+      derived from the instance secret); rows written before are sealed on next
+      start'
     required: true
   audit_all_notifications:
     value: true
     type: 'boolean'
-    description: 'Log all notification attempts for audit'
+    description:
+      'Write every send attempt to the unified audit trail — channels, template,
+      outcome and a hash of the recipient, never the message'
     required: true
   filter_pii:
     value: true
     type: 'boolean'
-    description: 'Filter personally identifiable information from logs'
+    description:
+      'Redact email addresses, phone numbers and similar from what is stored —
+      the notification audit log and operator-inbox rows — not from the messages
+      sent'
     required: true

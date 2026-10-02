@@ -1,3 +1,5 @@
+import { redactPii } from './pii-redaction.js';
+
 export interface SecurityValidationResult {
   valid: boolean;
   errors: string[];
@@ -5,13 +7,6 @@ export interface SecurityValidationResult {
 }
 
 export class NotificationSecurity {
-  private piiPatterns: RegExp[] = [
-    /\b\d{3}-\d{2}-\d{4}\b/g, // SSN
-    /\b\d{4}-\d{4}-\d{4}-\d{4}\b/g, // Credit card
-    /\b\d{10,11}\b/g, // Phone numbers
-    /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g, // Email addresses (fixed: was `[A-Z|a-z]` with a literal pipe inside the char class — notifications-003)
-  ];
-
   /**
    * Validate notification request
    */
@@ -66,50 +61,13 @@ export class NotificationSecurity {
   }
 
   /**
-   * Sanitize content to remove PII
+   * A copy of `data` with personal data redacted from every string in it.
+   * Used on what is PERSISTED (audit entries, operator-inbox rows), never on
+   * a message to its recipient — see `pii-redaction.ts`.
    */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   sanitizeContent(data: Record<string, any>): Record<string, any> {
-    const sanitized = { ...data };
-
-    // Recursively sanitize object
-    this.sanitizeObject(sanitized);
-
-    return sanitized;
-  }
-
-  /**
-   * Recursively sanitize object
-   */
-  private sanitizeObject(obj: Record<string, unknown>): void {
-    for (const key in obj) {
-      const value = obj[key];
-      if (typeof value === 'string') {
-        obj[key] = this.sanitizeString(value);
-      } else if (typeof value === 'object' && value !== null) {
-        this.sanitizeObject(value as Record<string, unknown>);
-      }
-    }
-  }
-
-  /**
-   * Sanitize string content
-   */
-  private sanitizeString(str: string): string {
-    let sanitized = str;
-
-    // Replace PII patterns
-    this.piiPatterns.forEach((pattern) => {
-      sanitized = sanitized.replace(pattern, '[REDACTED]');
-    });
-
-    // Remove potentially dangerous content
-    sanitized = sanitized
-      .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-      .replace(/javascript:/gi, '')
-      .replace(/on\w+\s*=/gi, '');
-
-    return sanitized;
+    return redactPii(data);
   }
 
   /**
@@ -129,23 +87,5 @@ export class NotificationSecurity {
     ];
 
     return suspiciousPatterns.some((pattern) => pattern.test(content));
-  }
-
-  /**
-   * Encrypt sensitive data
-   */
-  encryptSensitiveData(data: string): string {
-    // In production, use proper encryption
-    // For now, just return the data as-is
-    return data;
-  }
-
-  /**
-   * Decrypt sensitive data
-   */
-  decryptSensitiveData(encryptedData: string): string {
-    // In production, use proper decryption
-    // For now, just return the data as-is
-    return encryptedData;
   }
 }

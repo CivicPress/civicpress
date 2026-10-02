@@ -12,6 +12,13 @@
  */
 
 import { DatabaseAdapter, SqlParam } from '../database-adapter.js';
+import { AtRestCodec } from '../../security/at-rest-codec.js';
+import { redactPii } from '../../notifications/pii-redaction.js';
+import { coreError } from '../../utils/core-output.js';
+
+/** What a reader sees in place of a body that cannot be unsealed. */
+export const UNREADABLE_PLACEHOLDER =
+  '[unreadable: sealed under another instance secret]';
 import type {
   OperatorNotificationRow,
   OperatorNotificationSeverity,
@@ -44,19 +51,142 @@ export interface ListOperatorNotificationsOptions {
   offset?: number;
 }
 
+/**
+ * What `notifications.yml`'s `security` keys ask of the inbox. Set once at
+ * service initialization (`completeServiceInitialization`); a store that was
+ * never configured writes plain rows, as it always did.
+ */
+export interface OperatorNotificationProtection {
+  /** `security.filter_pii`: redact addresses, phone numbers, … from `body` and `data` before they are stored. */
+  redactPii: boolean;
+  /** `security.encrypt_sensitive_data`: seal `body` and `data` with the codec before they are stored, and migrate rows that are still plain. */
+  encryptAtRest: boolean;
+  /** Present whenever the instance secret is available; reads decrypt through it even when `encryptAtRest` is off. */
+  codec?: AtRestCodec;
+}
+
 export class OperatorNotificationStore {
   private adapter: DatabaseAdapter;
+  private protection?: OperatorNotificationProtection;
+  private unreadableLogged = false;
 
   constructor(adapter: DatabaseAdapter) {
     this.adapter = adapter;
   }
 
+  /** Apply the instance's `security` settings to every write and read from now on. */
+  configureProtection(protection: OperatorNotificationProtection): void {
+    if (protection.encryptAtRest && !protection.codec) {
+      throw new Error(
+        '[OperatorNotificationStore] encryptAtRest needs a codec (the instance secret)'
+      );
+    }
+    this.protection = protection;
+  }
+
   /**
-   * Insert a notification, honoring dedupeKey. Returns the row id (existing
-   * one if deduped). Dedup considers only ACTIVE rows (status != 'dismissed'):
-   * once an operator dismisses "update available", the next occurrence is a
-   * fresh, actionable row rather than being silently swallowed.
+   * Seal the `body` and `data` of rows written before encryption was on.
+   * Idempotent: only rows without the marker are touched. Returns how many.
    */
+  async migratePlaintextRows(): Promise<number> {
+    const codec = this.protection?.codec;
+    if (!this.protection?.encryptAtRest || !codec) return 0;
+    const rows = await this.adapter.query<{
+      id: number;
+      body: string | null;
+      data: string | null;
+    }>(
+      `SELECT id, body, data FROM operator_notifications
+        WHERE (body IS NOT NULL AND body NOT LIKE 'enc:v1:%')
+           OR (data IS NOT NULL AND data NOT LIKE 'enc:v1:%')`
+    );
+    for (const row of rows) {
+      await this.adapter.execute(
+        'UPDATE operator_notifications SET body = ?, data = ? WHERE id = ?',
+        [
+          row.body !== null && !AtRestCodec.isEncrypted(row.body)
+            ? codec.encrypt(row.body)
+            : row.body,
+          row.data !== null && !AtRestCodec.isEncrypted(row.data)
+            ? codec.encrypt(row.data)
+            : row.data,
+          row.id,
+        ]
+      );
+    }
+    return rows.length;
+  }
+
+  /** `body` as it is stored: redacted, then sealed, as configured. */
+  private protectBody(body: string | null): string | null {
+    if (body === null || !this.protection) return body;
+    const text = this.protection.redactPii ? redactPii(body) : body;
+    return this.seal(text);
+  }
+
+  /**
+   * `data` as it is stored: redacted as an OBJECT (so a numeric value or a key
+   * is never rewritten into something that is no longer JSON), serialized,
+   * then sealed.
+   */
+  private protectData(
+    data: Record<string, unknown> | undefined
+  ): string | null {
+    if (!data) return null;
+    const object = this.protection?.redactPii ? redactPii(data) : data;
+    return this.seal(JSON.stringify(object));
+  }
+
+  private seal(text: string): string {
+    return this.protection?.encryptAtRest && this.protection.codec
+      ? this.protection.codec.encrypt(text)
+      : text;
+  }
+
+  /**
+   * A stored row with `body`/`data` readable again. A value that cannot be
+   * unsealed — written under another instance secret, or altered — becomes
+   * {@link UNREADABLE_PLACEHOLDER} (and `null` for `data`) so one such row
+   * does not take the whole inbox down: the operator can still see, read and
+   * dismiss it. Logged once per process.
+   */
+  private reveal(row: OperatorNotificationRow): OperatorNotificationRow {
+    const codec = this.protection?.codec;
+    if (!codec) return row;
+    return {
+      ...row,
+      body: this.unseal(row, 'body', row.body),
+      data: this.unseal(row, 'data', row.data),
+    };
+  }
+
+  private unseal(
+    row: OperatorNotificationRow,
+    field: 'body' | 'data',
+    value: string | undefined
+  ): string | undefined {
+    const codec = this.protection?.codec;
+    if (typeof value !== 'string' || !codec) return value;
+    try {
+      return codec.decrypt(value);
+    } catch (error) {
+      if (!this.unreadableLogged) {
+        this.unreadableLogged = true;
+        coreError(
+          'An operator notification cannot be unsealed — written under another instance secret, or altered',
+          'OPERATOR_NOTIFICATION_UNREADABLE',
+          {
+            id: row.id,
+            field,
+            error: error instanceof Error ? error.message : String(error),
+          },
+          { operation: 'operator-notifications:reveal' }
+        );
+      }
+      return field === 'body' ? UNREADABLE_PLACEHOLDER : undefined;
+    }
+  }
+
   async create(input: CreateOperatorNotificationInput): Promise<number> {
     if (input.dedupeKey) {
       const existing = await this.adapter.query<{ id: number }>(
@@ -78,8 +208,8 @@ export class OperatorNotificationStore {
         input.type,
         input.severity,
         input.title,
-        input.body ?? null,
-        input.data ? JSON.stringify(input.data) : null,
+        this.protectBody(input.body ?? null),
+        this.protectData(input.data),
         input.audienceRole ?? null,
         input.dedupeKey ?? null,
       ]
@@ -129,7 +259,10 @@ export class OperatorNotificationStore {
       sql,
       params
     );
-    return { notifications, total };
+    return {
+      notifications: notifications.map((row) => this.reveal(row)),
+      total,
+    };
   }
 
   async getById(id: number): Promise<OperatorNotificationRow | null> {
@@ -137,7 +270,7 @@ export class OperatorNotificationStore {
       'SELECT * FROM operator_notifications WHERE id = ?',
       [id]
     );
-    return rows.length > 0 ? rows[0] : null;
+    return rows.length > 0 ? this.reveal(rows[0]) : null;
   }
 
   /** Count active (non-dismissed) unread notifications — the bell badge. */

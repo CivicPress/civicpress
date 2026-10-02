@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { coreError } from '../utils/core-output.js';
 import { getInstanceContext } from '../config/instance-context.js';
+import { redactPii } from './pii-redaction.js';
 
 export interface AuditEntry {
   id: string;
@@ -48,15 +49,25 @@ export class NotificationAudit {
   private maxEntries: number = 10000;
 
   /**
+   * `security.filter_pii`: redact addresses, phone numbers, … from every
+   * entry before it is written. Delivery errors quote the recipient
+   * ("550 <someone@…> user unknown"), so without this the log keeps what
+   * the message was careful to hand only to its recipient.
+   */
+  private redactPii: boolean;
+
+  /**
    * @param dataDir Where the audit log lives. Defaults to the instance's
    * `.system-data`. It used to default to the RELATIVE string `.system-data`,
    * which resolved against `process.cwd()` — so every notification audited by a
    * process running outside the instance root appended to a stray
    * `<cwd>/.system-data/notification-audit.jsonl` instead of the instance's own
    * (in the repo, that meant test runs writing into the checkout).
+   * @param options.redactPii `security.filter_pii` — see the field above.
    */
-  constructor(dataDir?: string) {
+  constructor(dataDir?: string, options: { redactPii?: boolean } = {}) {
     this.explicitDataDir = dataDir ?? null;
+    this.redactPii = options.redactPii ?? false;
   }
 
   /**
@@ -107,6 +118,13 @@ export class NotificationAudit {
    * Write audit entry to file
    */
   private async writeAuditEntry(entry: AuditEntry): Promise<void> {
+    if (this.redactPii) {
+      entry = {
+        ...entry,
+        details: redactPii(entry.details),
+        metadata: entry.metadata ? redactPii(entry.metadata) : entry.metadata,
+      };
+    }
     try {
       // Ensure directory exists
       const dir = path.dirname(this.auditLogPath);

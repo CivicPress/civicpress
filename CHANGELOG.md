@@ -222,6 +222,32 @@ database guarantee rather than a convention.
 
 ### Fixed
 
+- **The notification privacy settings now do what they say.**
+  `security.filter_pii`, `security.audit_all_notifications` and
+  `security.encrypt_sensitive_data` shipped `true` in every `notifications.yml`
+  and were read by nothing; the functions they named had no callers. Decided
+  2026-09-30, implemented 2026-10-02: `filter_pii` redacts addresses, phone
+  numbers and similar from what is _persisted_ — the notification audit log,
+  where a delivery error quotes the recipient, and the `body`/`data` of
+  operator-inbox entries — and never from a message on its way to its recipient
+  (that was removed on purpose in notifications-003); `audit_all_notifications`
+  mirrors every send attempt into the unified audit trail with channels,
+  template, outcome and a hash of the recipient, never the message;
+  `encrypt_sensitive_data` seals operator-inbox `body` and `data` at rest
+  (AES-256-GCM under a key derived from the instance secret), seals the rows
+  written before it was on at the next start, and keeps sealed rows readable if
+  it is later switched off. The HTML-stripping half of the old `sanitizeString`
+  is gone with it: the persisted paths need redaction, not a tag filter, and two
+  CodeQL alerts sat on that code. The recipient hash is keyed (HMAC under a key
+  derived from the instance secret), so the activity log is not an oracle for
+  "was this address notified"; without the key no recipient is recorded. An
+  inbox entry sealed under another instance secret reads as unreadable and can
+  still be dismissed, instead of taking the whole inbox down. `civic backup` and
+  `civic system:check-updates`, which write to the inbox through a bare database
+  service, apply the same settings (`protectOperatorInbox`). A send that fails
+  before delivery (template missing, rendering threw) now leaves an entry in
+  both audits; it used to leave none.
+
 - **Real mail ignored the configured email provider.** The real-mail path always
   built an SMTP transport from the `smtp` block, whatever
   `channels.email.provider` said; only `civic notify:test` and the settings

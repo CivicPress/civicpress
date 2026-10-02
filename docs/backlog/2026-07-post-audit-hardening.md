@@ -2354,14 +2354,15 @@ about either.
       scanned by `validateRequest` (now after the size check). A bound is not
       controversial; what the bound and the character set should be is a call.
 
-- [ ] **`notifications.yml` privacy settings do nothing (needs a decision).**
-      `security.filter_pii`, `security.encrypt_sensitive_data` and
-      `security.audit_all_notifications` ship as `true`, are written into every
-      instance by `civic init`, and are read by nothing —
-      `NotificationConfig.getSecuritySettings()` has no caller. The functions
-      they would control, `NotificationSecurity.sanitizeContent()` and
-      `encryptSensitiveData()`, have no callers either, so the behaviour is
-      absent rather than merely unconditional.
+- [x] **`notifications.yml` privacy settings do nothing. DECIDED 2026-09-30,
+      DONE 2026-10-02.** `security.filter_pii`,
+      `security.encrypt_sensitive_data` and `security.audit_all_notifications`
+      ship as `true`, are written into every instance by `civic init`, and are
+      read by nothing — `NotificationConfig.getSecuritySettings()` has no
+      caller. The functions they would control,
+      `NotificationSecurity.sanitizeContent()` and `encryptSensitiveData()`,
+      have no callers either, so the behaviour is absent rather than merely
+      unconditional.
 
       Same defect class as the two config sweeps above, with a sharper edge: an
       operator reading `filter_pii: true` believes personal data is being
@@ -2371,12 +2372,16 @@ about either.
       covered; the full pass is recorded under "Notification configuration
       sweep" at the end of this section.
 
-      **Decision 2026-09-30:** implement all three (scoping doc, decision 5).
-      `filter_pii` redacts what is *persisted* (audit entries, operator-inbox
-      rows), not the sent message; `audit_all_notifications` writes one audit
-      entry per send without the body; `encrypt_sensitive_data` encrypts
-      `operator_notifications.body/data` at rest with a key derived from the
-      instance secret, migrating existing rows. Not started as of 2026-10-01.
+      **Outcome (2026-10-02).** All three implemented as decided (decision 5):
+      `filter_pii` redacts what is persisted — the notification audit log and
+      operator-inbox `body`/`data` — through `pii-redaction.ts`, never the
+      sent message; `audit_all_notifications` mirrors every send attempt into
+      the unified `AuditChannel` (channels, template, outcome, hashed
+      recipient); `encrypt_sensitive_data` seals inbox `body`/`data` at rest
+      with `AtRestCodec` (AES-256-GCM, `SecretsManager.deriveKey`), migrating
+      plain rows once at start and decrypting through if later switched off.
+      Wired in `completeServiceInitialization`; verified on a booted instance.
+      The `sanitizeString` tag filter CodeQL flagged (#181, #186) is removed.
 
 ### Correctness and honesty
 

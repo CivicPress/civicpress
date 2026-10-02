@@ -42,6 +42,17 @@ export {
 // Supporting classes
 export { NotificationAudit } from './notification-audit.js';
 export { NotificationSecurity } from './notification-security.js';
+export {
+  redactPii,
+  redactPiiFromString,
+  REDACTED,
+  PII_PATTERNS,
+} from './pii-redaction.js';
+export { protectOperatorInbox } from './operator-inbox-protection.js';
+export type {
+  ProtectOperatorInboxOptions,
+  OperatorInboxProtectionOutcome,
+} from './operator-inbox-protection.js';
 export { NotificationRateLimiter } from './notification-rate-limiter.js';
 export { NotificationLogger, LogLevel } from './notification-logger.js';
 

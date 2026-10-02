@@ -7,6 +7,8 @@ import {
   OperatorNotifier,
   UpdateChecker,
   fetchLatestReleaseTag,
+  getInstanceContext,
+  protectOperatorInbox,
 } from '@civicpress/core';
 import { withCli } from '../utils/with-cli.js';
 import { cliSuccess, cliError } from '../utils/cli-output.js';
@@ -63,6 +65,13 @@ export function registerSystemCommand(cli: CAC): void {
           const db = new DatabaseService(dbConfig);
           await db.initialize();
           try {
+            // The inbox the booted instance keeps redacted and sealed; a
+            // bare DatabaseService knows nothing of that unless told.
+            const instance = getInstanceContext();
+            await protectOperatorInbox(db, {
+              dataDir: instance.dataDir,
+              systemDataDir: instance.systemDataDir,
+            });
             const notifier = new OperatorNotifier(db);
             const fetchLatest = options.latest
               ? async () => String(options.latest)

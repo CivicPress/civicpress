@@ -41,6 +41,7 @@ import {
 } from './saga/index.js';
 import { UnifiedCacheManager } from './cache/unified-cache-manager.js';
 import { SecretsManager } from './security/secrets.js';
+import { protectOperatorInbox } from './notifications/operator-inbox-protection.js';
 import { AuditLogger } from './audit/audit-logger.js';
 import { AuditChannel } from './audit/audit-channel.js';
 import { ModuleResolver } from './modules/module-resolver.js';
@@ -170,7 +171,13 @@ export function registerCivicPressServices(
   container.singleton('notification', (c) => {
     const notificationConfig =
       c.resolve<NotificationConfig>('notificationConfig');
-    return new NotificationService(notificationConfig);
+    // The unified audit trail, for `security.audit_all_notifications`.
+    const auditChannel = c.resolve<AuditChannel>('auditChannel');
+    const secretsManager = c.resolve<SecretsManager>('secretsManager');
+    return new NotificationService(notificationConfig, {
+      auditChannel,
+      recipientKey: () => recipientHashKey(secretsManager),
+    });
   });
 
   // Operator notification center (the "inbox") — depends on: database, logger
@@ -193,6 +200,9 @@ export function registerCivicPressServices(
       operatorNotifier,
       outboxDir: defaultOutboxDir(resolveSystemDataDir(cfg)),
       logger,
+      auditChannel: c.resolve<AuditChannel>('auditChannel'),
+      recipientKey: () =>
+        recipientHashKey(c.resolve<SecretsManager>('secretsManager')),
     });
   });
 
@@ -306,6 +316,18 @@ export async function completeServiceInitialization(
   const authService = container.resolve<AuthService>('auth');
   authService.initializeSecrets(secretsManager);
   authService.initializeEmailValidationSecrets(secretsManager);
+
+  // `notifications.yml` → `security`: what the operator inbox does with the
+  // body and data it stores — `filter_pii` redacts them, `encrypt_sensitive_data`
+  // seals them under a key derived from the instance secret and, once, seals
+  // the rows written before it was switched on. Non-fatal by design, like
+  // saga recovery: an inbox that cannot be configured must not stop a boot.
+  // These three keys shipped `true` and were read by nothing until 2026-10-02.
+  await protectOperatorInbox(container.resolve<DatabaseService>('database'), {
+    notificationConfig:
+      container.resolve<NotificationConfig>('notificationConfig'),
+    secretsManager,
+  });
 
   // Set up indexing service with CivicPress instance
   const indexingService = new IndexingService(
@@ -534,4 +556,18 @@ export async function completeServiceInitialization(
   await cacheManager.initialize();
 
   logger.debug('Unified cache manager initialized with all caches');
+}
+
+/**
+ * The key the unified audit trail hashes recipients with
+ * (`security.audit_all_notifications`). Undefined until the secrets manager
+ * is initialized, in which case the entry carries no recipient at all rather
+ * than an unkeyed hash.
+ */
+function recipientHashKey(secretsManager: SecretsManager): Buffer | undefined {
+  try {
+    return secretsManager.deriveKey('notifications', 'recipient-hash');
+  } catch {
+    return undefined;
+  }
 }

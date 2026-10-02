@@ -309,6 +309,19 @@ export class DatabaseService {
 
   // ---------------------------------------------------------------------------
   // Operator notifications — delegated to OperatorNotificationStore
+
+  /**
+   * Apply `notifications.yml`'s `security` keys to the operator inbox:
+   * redaction and at-rest encryption of `body`/`data`, plus a one-time pass
+   * that seals rows written before encryption was switched on.
+   */
+  async configureOperatorNotificationProtection(
+    ...args: Parameters<OperatorNotificationStore['configureProtection']>
+  ): Promise<number> {
+    this.operatorNotifications.configureProtection(...args);
+    return this.operatorNotifications.migratePlaintextRows();
+  }
+
   // ---------------------------------------------------------------------------
 
   async createOperatorNotification(
