@@ -222,6 +222,16 @@ database guarantee rather than a convention.
 
 ### Fixed
 
+- **Template variables are no longer mangled by a tag stripper.** Values
+  substituted into a record template went through a filter that deleted
+  `<script>` and `<iframe>` blocks, `javascript:` and anything shaped like an
+  event handler (`on\w+=`). It could be walked around — `<scr<script>ipt>`
+  reassembled after one pass — and it corrupted ordinary text: "The condition =
+  approved" came out as "The c approved". The output is Markdown, and every
+  renderer in the repo runs DOMPurify when it becomes HTML, which is where
+  markup safety belongs. Removed; values go in as given. Five CodeQL alerts sat
+  on that code (#170, #182–#184, #187).
+
 - **The notification privacy settings now do what they say.**
   `security.filter_pii`, `security.audit_all_notifications` and
   `security.encrypt_sensitive_data` shipped `true` in every `notifications.yml`

@@ -12,7 +12,7 @@
  * What this pins:
  * 1. generateContent variable substitution + smart defaults
  * 2. processConditionalBlocks ({{#if}}...{{/if}})
- * 3. sanitizeVariableValue (XSS hardening — script / iframe / javascript: / event handlers)
+ * 3. value substitution passes values through unchanged (markup safety is the renderer's)
  * 4. listTemplates + listPartials discovery
  * 5. getTemplateVariables introspection shape
  * 6. partial loading and parameterized substitution
@@ -20,7 +20,10 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { TemplateEngine, type Template } from '../../../core/src/utils/template-engine';
+import {
+  TemplateEngine,
+  type Template,
+} from '../../../core/src/utils/template-engine';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -139,7 +142,12 @@ describe('TemplateEngine — generateContent (W2-T1 characterization)', () => {
   });
 });
 
-describe('TemplateEngine — sanitizeVariableValue (XSS hardening, W2-T1 characterization)', () => {
+describe('TemplateEngine — substituted values go in as given', () => {
+  // A stripper used to sit on this path ("<script>", "<iframe>",
+  // "javascript:", "on\w+="). It was bypassable (`<scr<script>ipt>`
+  // reassembled after one pass) and it corrupted ordinary text. The output is
+  // Markdown; every renderer in the repo runs DOMPurify, which is where
+  // markup safety belongs. Removed 2026-10-02.
   let engine: TemplateEngine;
 
   beforeAll(() => {
@@ -156,39 +164,27 @@ describe('TemplateEngine — sanitizeVariableValue (XSS hardening, W2-T1 charact
     }
   });
 
-  it('strips <script> tags from variable substitutions', () => {
-    const template = makeTemplate({ content: '{{evil}}' });
+  it('no longer corrupts text that happens to look like an event handler', () => {
+    const template = makeTemplate({ content: '{{clause}}' });
     const out = engine.generateContent(template, {
-      evil: '<script>alert("xss")</script>safe',
+      clause: 'The condition = approved; onward = yes',
     });
-    expect(out).not.toContain('<script>');
-    expect(out).toContain('safe');
+    // Used to come out as "The c approved; ward = yes" ("ondition =" and
+    // "on" + "ward =" matched /on\w+\s*=/).
+    expect(out).toBe('The condition = approved; onward = yes');
   });
 
-  it('strips <iframe> tags from variable substitutions', () => {
-    const template = makeTemplate({ content: '{{evil}}' });
-    const out = engine.generateContent(template, {
-      evil: '<iframe src="x"></iframe>safe',
-    });
-    expect(out).not.toContain('<iframe');
-    expect(out).toContain('safe');
-  });
-
-  it('strips javascript: protocol URLs', () => {
-    const template = makeTemplate({ content: '{{link}}' });
-    const out = engine.generateContent(template, {
-      link: 'javascript:alert(1)',
-    });
-    expect(out).not.toContain('javascript:');
-  });
-
-  it('strips on* event handlers (onclick, onerror, ...)', () => {
-    const template = makeTemplate({ content: '{{evil}}' });
-    const out = engine.generateContent(template, {
-      evil: 'onclick="alert(1)" onerror="x"',
-    });
-    expect(out).not.toMatch(/onclick\s*=/i);
-    expect(out).not.toMatch(/onerror\s*=/i);
+  it('passes markup through unchanged — the renderer decides what survives', () => {
+    const template = makeTemplate({ content: '{{value}}' });
+    for (const value of [
+      '<script>alert("xss")</script>safe',
+      '<iframe src="x"></iframe>safe',
+      'javascript:alert(1)',
+      'onclick="alert(1)" onerror="x"',
+      '<scr<script>ipt>alert(1)</script>',
+    ]) {
+      expect(engine.generateContent(template, { value })).toBe(value);
+    }
   });
 });
 

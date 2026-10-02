@@ -57,10 +57,11 @@ const PREVIEW_LIMITS = { variables: 100, keyLength: 100, totalSize: 20_000 };
 /**
  * Bounds on what a preview request may ask the generator to substitute.
  *
- * The generator passes every value through a set of patterns that are
- * quadratic in the worst case, and the only limit on a value used to be the
- * 10 MB body limit. What those patterns should do is a separate question (see
- * the backlog); how much text they are given need not wait for the answer.
+ * Added when the generator still ran every value through a set of patterns
+ * that were quadratic in the worst case, with the 10 MB body limit as the
+ * only bound. Those patterns are gone (2026-10-02); the bounds stay, because
+ * a preview is a cheap authenticated request and the work it can ask for
+ * should have a ceiling regardless.
  */
 function withinPreviewLimits(variables: Record<string, unknown>): true {
   const entries = Object.entries(variables);
