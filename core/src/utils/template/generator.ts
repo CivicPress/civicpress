@@ -2,10 +2,11 @@
  * TemplateGenerator — extracted from template-engine.ts in Phase 2d W2-T1.
  *
  * Pure-ish content-generation responsibilities: variable substitution,
- * conditional block processing, partial inlining, smart-default variable
- * fills, and XSS-sanitization of substituted values. Takes a partial-
- * loader callback (typically TemplateLoader.loadPartial) so it doesn't
- * carry filesystem state itself.
+ * conditional block processing, partial inlining and smart-default variable
+ * fills. Substituted values are not filtered here — the output is Markdown
+ * and markup safety belongs to the renderer (see generateContent). Takes a
+ * partial-loader callback (typically TemplateLoader.loadPartial) so it
+ * doesn't carry filesystem state itself.
  */
 
 import { execSync } from 'node:child_process';
@@ -152,10 +153,17 @@ export class TemplateGenerator {
     // Process partials first
     content = this.processPartials(content, processedVariables);
 
-    // Replace variables in content (with sanitization to prevent injection)
+    // Replace variables in content. Values go in as given: the output is
+    // Markdown, and markup safety is decided where Markdown becomes HTML —
+    // every renderer in the repo runs DOMPurify. A stripper used to sit here
+    // ("<script>", "<iframe>", "javascript:", "on\w+=") and it did two wrong
+    // things at once: it could be walked around (`<scr<script>ipt>`
+    // reassembles after one pass) and it corrupted ordinary text — "The
+    // condition = approved" became "The c approved", because "ondition ="
+    // matched the event-handler pattern. Removed 2026-10-02 (CodeQL #170,
+    // #182–#184, #187).
     for (const [key, value] of Object.entries(processedVariables)) {
-      const sanitizedValue = this.sanitizeVariableValue(String(value || ''));
-      content = substitute(content, key, sanitizedValue);
+      content = substitute(content, key, String(value || ''));
     }
 
     // Process conditional blocks
@@ -449,29 +457,5 @@ export class TemplateGenerator {
     const year = new Date().getFullYear();
     const random = Math.floor(Math.random() * 999) + 1;
     return `RES-${year}-${random.toString().padStart(3, '0')}`;
-  }
-
-  // ----- sanitization -----
-
-  /**
-   * Sanitize variable value to prevent code injection in template
-   * substitution output. Strips script/iframe tags, javascript: protocol,
-   * and on* event handlers.
-   */
-  private sanitizeVariableValue(value: string): string {
-    if (!value) return '';
-
-    let sanitized = value.replace(
-      /<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi,
-      ''
-    );
-    sanitized = sanitized.replace(
-      /<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi,
-      ''
-    );
-    sanitized = sanitized.replace(/javascript:/gi, '');
-    sanitized = sanitized.replace(/on\w+\s*=/gi, '');
-
-    return sanitized;
   }
 }

@@ -2334,19 +2334,23 @@ about either.
       404 bodies of `/diff/*` and `/validation/*` no longer list the record
       tree.
 
-- [ ] **`sanitizeVariableValue` in the template generator (needs a decision).**
-      Five CodeQL alerts. It strips `<script>`, `<iframe>`, `javascript:` and
-      `on\w+=` from values substituted into a **Markdown** template. It is
-      bypassable (`<scr<script>ipt>` reassembles) and it **corrupts text**: "The
-      condition = approved" becomes "The c approved", because `ondition =`
-      matches. Every in-repo HTML render runs DOMPurify, so no active payload
-      survives today. The choices: remove it and rely on output encoding at
-      render (two characterization tests assert the current stripping); or keep
-      it and accept both defects. Input to it is now bounded (20 KB per preview)
-      so the quadratic patterns cannot stall the process meanwhile.
+- [x] **`sanitizeVariableValue` in the template generator. DECIDED 2026-09-30,
+      REMOVED 2026-10-02.** Five CodeQL alerts. It strips `<script>`,
+      `<iframe>`, `javascript:` and `on\w+=` from values substituted into a
+      **Markdown** template. It is bypassable (`<scr<script>ipt>` reassembles)
+      and it **corrupts text**: "The condition = approved" becomes "The c
+      approved", because `ondition =` matches. Every in-repo HTML render runs
+      DOMPurify, so no active payload survives today. The choices: remove it and
+      rely on output encoding at render (two characterization tests assert the
+      current stripping); or keep it and accept both defects. Input to it is now
+      bounded (20 KB per preview) so the quadratic patterns cannot stall the
+      process meanwhile.
 
-      **Decision 2026-09-30:** remove it (`docs/plans/2026-08-11-v04x-scoping.md`,
-      decision 8). Not done yet — it follows the merged develop.
+      **Outcome (2026-10-02).** Removed, with its call; values are substituted
+      as given and the two characterization tests now pin that (including the
+      text-corruption case). Markup safety stays with the renderers, which all
+      run DOMPurify. The preview size bounds stay. The five CodeQL alerts close
+      with the next scan of `main`.
 
 - [ ] **A username has no length limit at registration.** `POST /users/register`
       requires a username and checks nothing else about it. It is stored, it is
