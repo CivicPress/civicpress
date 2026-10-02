@@ -6,7 +6,8 @@ import {
   sendSuccess,
   handleApiError,
 } from '../../utils/api-logger.js';
-import { audit, ChangePasswordRequest } from './handlers-common.js';
+import { ChangePasswordRequest } from './handlers-common.js';
+import { auditFor } from '../../utils/audit.js';
 
 export function registerPasswordRoutes(router: Router): void {
   /**
@@ -21,13 +22,23 @@ export function registerPasswordRoutes(router: Router): void {
       const { currentPassword, newPassword }: ChangePasswordRequest = req.body;
       const requestingUser = req.user;
       if (!requestingUser) {
-        return res.status(401).json({ success: false, error: { code: 'UNAUTHENTICATED', message: 'Authentication required' } });
+        return res.status(401).json({
+          success: false,
+          error: {
+            code: 'UNAUTHENTICATED',
+            message: 'Authentication required',
+          },
+        });
       }
 
       if (!currentPassword || !newPassword) {
-        const error = new HttpError(400, 'Current password and new password are required');
+        const error = new HttpError(
+          400,
+          'Current password and new password are required'
+        );
         return handleApiError(
-          'change_password', error,
+          'change_password',
+          error,
           req,
           res,
           'Current password and new password are required'
@@ -46,7 +57,8 @@ export function registerPasswordRoutes(router: Router): void {
         if (!canManageUsers) {
           const error = new HttpError(403, 'Insufficient permissions');
           return handleApiError(
-            'change_password', error,
+            'change_password',
+            error,
             req,
             res,
             'You can only change your own password'
@@ -65,7 +77,13 @@ export function registerPasswordRoutes(router: Router): void {
           `Users authenticated via ${provider} cannot change passwords. Password management is handled by the external authentication.`,
           'EXTERNAL_AUTH_PASSWORD_FORBIDDEN'
         );
-        return handleApiError('change_password', error, req, res, error.message);
+        return handleApiError(
+          'change_password',
+          error,
+          req,
+          res,
+          error.message
+        );
       }
 
       // Change password with security guards
@@ -77,11 +95,17 @@ export function registerPasswordRoutes(router: Router): void {
 
       if (!result.success) {
         const error = new HttpError(400, result.message);
-        return handleApiError('change_password', error, req, res, result.message);
+        return handleApiError(
+          'change_password',
+          error,
+          req,
+          res,
+          result.message
+        );
       }
 
       // Log audit event
-      await audit.log({
+      await auditFor(req).log({
         source: 'api',
         actor: { id: requestingUser.id, username: requestingUser.username },
         action: 'password_changed',
@@ -123,13 +147,20 @@ export function registerPasswordRoutes(router: Router): void {
       const { newPassword } = req.body;
       const requestingUser = req.user;
       if (!requestingUser) {
-        return res.status(401).json({ success: false, error: { code: 'UNAUTHENTICATED', message: 'Authentication required' } });
+        return res.status(401).json({
+          success: false,
+          error: {
+            code: 'UNAUTHENTICATED',
+            message: 'Authentication required',
+          },
+        });
       }
 
       if (!newPassword) {
         const error = new HttpError(400, 'New password is required');
         return handleApiError(
-          'set_password', error,
+          'set_password',
+          error,
           req,
           res,
           'New password is required'
@@ -147,7 +178,8 @@ export function registerPasswordRoutes(router: Router): void {
       if (!canManageUsers) {
         const error = new HttpError(403, 'Insufficient permissions');
         return handleApiError(
-          'set_password', error,
+          'set_password',
+          error,
           req,
           res,
           'Admin privileges required to set user passwords'
@@ -160,7 +192,13 @@ export function registerPasswordRoutes(router: Router): void {
       const targetUser = await authService.getUserById(userId);
       if (!targetUser) {
         const error = new HttpError(404, 'User not found', 'USER_NOT_FOUND');
-        return handleApiError('set_password', error, req, res, 'User not found');
+        return handleApiError(
+          'set_password',
+          error,
+          req,
+          res,
+          'User not found'
+        );
       }
 
       // External-auth accounts cannot hold a local password. Reject with 403
@@ -188,7 +226,7 @@ export function registerPasswordRoutes(router: Router): void {
       }
 
       // Log audit event
-      await audit.log({
+      await auditFor(req).log({
         source: 'api',
         actor: { id: requestingUser.id, username: requestingUser.username },
         action: 'admin_password_set',

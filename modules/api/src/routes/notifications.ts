@@ -1,7 +1,6 @@
 import { Router } from 'express';
 import { requirePermission } from '../middleware/auth.js';
 import {
-  AuditLogger,
   NotificationService,
   NotificationConfig,
   AuthTemplate,
@@ -9,9 +8,9 @@ import {
   emailChannelOptionsFromConfig,
   UnknownEmailProviderError,
 } from '@civicpress/core';
+import { auditFor } from '../utils/audit.js';
 
 const router = Router();
-const audit = new AuditLogger();
 
 // Protect all routes
 router.use(requirePermission('system:admin'));
@@ -126,7 +125,7 @@ router.post('/test', async (req, res) => {
     });
 
     const actor = req.user;
-    await audit.log({
+    await auditFor(req).log({
       source: 'api',
       actor: { id: actor?.id, username: actor?.username, role: actor?.role },
       action: 'notifications:test',
@@ -154,7 +153,7 @@ router.post('/test', async (req, res) => {
   } catch (error: unknown) {
     const actor = req.user;
     const errorMessage = error instanceof Error ? error.message : String(error);
-    await audit.log({
+    await auditFor(req).log({
       source: 'api',
       actor: { id: actor?.id, username: actor?.username, role: actor?.role },
       action: 'notifications:test',

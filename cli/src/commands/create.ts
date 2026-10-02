@@ -54,8 +54,12 @@ export const createCommand = (cli: CAC) => {
             options.token,
             globalOptions.json
           );
+          // The unified audit channel: activity file AND audit_logs table.
+          // This command used to construct a file-only logger (2026-10-02).
+          const audit = civic
+            .getContainer()
+            .resolve<import('@civicpress/core').AuditChannel>('auditChannel');
           const coreMod: any = await import('@civicpress/core');
-          const audit = new coreMod.AuditLogger();
           // Get data directory from civic instance
           const dataDir = civic.getDataDir();
 

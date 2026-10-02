@@ -12,6 +12,7 @@ import { coreError, coreDebug } from '../utils/core-output.js';
 import { CORE_TABLE_STATEMENTS } from './schema/tables.js';
 import {
   runSimpleColumnMigrations,
+  runAuditLogMigrations,
   ensureRecordLocksWithoutFk,
   ensureWorkflowStateColumn,
   runUserSecurityMigrations,
@@ -227,6 +228,8 @@ export class SQLiteAdapter implements DatabaseAdapter {
 
     // Step 5: user security migrations
     await runUserSecurityMigrations(exec);
+    // Step 5b: audit_logs gains the activity-file columns
+    await runAuditLogMigrations(exec);
 
     // Step 6: search_index column migrations
     await migrateSearchIndexColumns(exec);
@@ -308,7 +311,6 @@ export class SQLiteAdapter implements DatabaseAdapter {
   }
 }
 
- 
 // Placeholder for PostgreSQL adapter (future implementation)
 export class PostgresAdapter implements DatabaseAdapter {
   private config: DatabaseConfig;
@@ -372,7 +374,6 @@ export class PostgresAdapter implements DatabaseAdapter {
     );
   }
 }
- 
 
 /**
  * Factory: pick the adapter for the configured database type.

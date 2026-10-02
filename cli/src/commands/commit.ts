@@ -33,8 +33,11 @@ export const commitCommand = (cli: CAC) => {
             options.token,
             globalOptions.json
           );
-          const coreMod: any = await import('@civicpress/core');
-          const audit = new coreMod.AuditLogger();
+          // The unified audit channel: activity file AND audit_logs table.
+          // This command used to construct a file-only logger (2026-10-02).
+          const audit = civic
+            .getContainer()
+            .resolve<import('@civicpress/core').AuditChannel>('auditChannel');
           const dataDir = civic.getDataDir();
 
           // Check commit permissions

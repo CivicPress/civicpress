@@ -22,6 +22,9 @@ import {
   AuditLogger,
   type ActivityOutcome,
   type ActivitySource,
+  type ActivityActor,
+  type ActivityTarget,
+  type ActivityLogEntry,
 } from './audit-logger.js';
 import { coreError } from '../utils/core-output.js';
 
@@ -43,6 +46,10 @@ export type AuditEvent = {
   /** Free-form structured details (saga step, error class, etc.). */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   details?: Record<string, any>;
+  /** Who acted, when more than the numeric id is known (username, role). */
+  actor?: ActivityActor;
+  /** What was acted on, when more than type and id is known (name, path). */
+  target?: ActivityTarget;
 };
 
 export class AuditChannel {
@@ -61,49 +68,91 @@ export class AuditChannel {
    */
   async record(event: AuditEvent): Promise<void> {
     const outcome: ActivityOutcome = event.outcome ?? 'success';
+    const actorId = event.actor?.id ?? event.userId;
+    const actor: ActivityActor | undefined =
+      actorId !== undefined || event.actor?.username
+        ? { ...event.actor, id: actorId }
+        : undefined;
+    const target: ActivityTarget | undefined = event.resourceType
+      ? {
+          type: event.resourceType as
+            | 'config'
+            | 'user'
+            | 'record'
+            | 'system'
+            | string,
+          id: event.resourceId,
+          ...event.target,
+        }
+      : event.target;
+    await this.write(
+      {
+        source: event.source as ActivitySource,
+        actor,
+        action: event.action,
+        target,
+        outcome,
+        message: event.message,
+        metadata: event.details,
+      },
+      { throwOnDbFailure: true }
+    );
+  }
 
-    await this.fileLogger.log({
-      source: event.source as ActivitySource,
-      actor: event.userId ? { id: event.userId } : undefined,
-      action: event.action,
-      target: event.resourceType
-        ? {
-            type: event.resourceType as
-              | 'config'
-              | 'user'
-              | 'record'
-              | 'system'
-              | string,
-            id: event.resourceId,
-          }
-        : undefined,
-      outcome,
-      message: event.message,
-      metadata: event.details,
-    });
+  /**
+   * Write an entry in the activity file's own shape — what the API and CLI
+   * handlers have always written to their file-only `AuditLogger`. With this
+   * they write to both sinks through one call, unchanged at the call site.
+   *
+   * Best effort on the database side: a request that did its work must not
+   * fail because the queryable trail could not take the row; the file still
+   * has it, and the failure is logged.
+   */
+  async log(entry: Omit<ActivityLogEntry, 'id' | 'timestamp'>): Promise<void> {
+    await this.write(entry, { throwOnDbFailure: false });
+  }
 
+  private async write(
+    entry: Omit<ActivityLogEntry, 'id' | 'timestamp'>,
+    options: { throwOnDbFailure: boolean }
+  ): Promise<void> {
+    await this.fileLogger.log(entry);
+
+    const userId =
+      typeof entry.actor?.id === 'number'
+        ? entry.actor.id
+        : typeof entry.actor?.id === 'string' && /^\d+$/.test(entry.actor.id)
+          ? Number(entry.actor.id)
+          : undefined;
     try {
       await this.db.logAuditEvent({
-        userId: typeof event.userId === 'number' ? event.userId : undefined,
-        action: event.action,
-        resourceType: event.resourceType,
+        userId,
+        action: entry.action,
+        resourceType: entry.target?.type,
         resourceId:
-          event.resourceId !== undefined ? String(event.resourceId) : undefined,
-        details: event.message ?? this.stringifyDetails(event.details),
+          entry.target?.id !== undefined ? String(entry.target.id) : undefined,
+        details: entry.message ?? this.stringifyDetails(entry.metadata),
+        source: entry.source,
+        outcome: entry.outcome,
+        message: entry.message,
+        metadata: entry.metadata,
+        actorUsername: entry.actor?.username,
+        actorRole: entry.actor?.role,
+        targetName: entry.target?.name ?? entry.target?.path,
       });
     } catch (err) {
       coreError(
         '[AuditChannel] DB write failed; on-disk JSONL still has the entry',
         'AUDIT_DB_WRITE_FAILED',
         {
-          action: event.action,
-          resourceType: event.resourceType,
-          resourceId: event.resourceId,
+          action: entry.action,
+          resourceType: entry.target?.type,
+          resourceId: entry.target?.id,
           error: err instanceof Error ? err.message : String(err),
         },
         { operation: 'audit:record' }
       );
-      throw err;
+      if (options.throwOnDbFailure) throw err;
     }
   }
 

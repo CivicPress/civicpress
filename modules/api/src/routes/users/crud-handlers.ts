@@ -7,11 +7,8 @@ import {
   sendSuccess,
   handleApiError,
 } from '../../utils/api-logger.js';
-import {
-  audit,
-  CreateUserRequest,
-  UpdateUserRequest,
-} from './handlers-common.js';
+import { auditFor } from '../../utils/audit.js';
+import { CreateUserRequest, UpdateUserRequest } from './handlers-common.js';
 
 export function registerCrudRoutes(router: Router): void {
   /**
@@ -141,17 +138,28 @@ export function registerCrudRoutes(router: Router): void {
       // Check if user can manage users
       const canManageUsers = await authService.userCan(user, 'users:manage');
       if (!canManageUsers) {
-        const error = new HttpError(403, 'Insufficient permissions to create users', 'INSUFFICIENT_PERMISSIONS');
+        const error = new HttpError(
+          403,
+          'Insufficient permissions to create users',
+          'INSUFFICIENT_PERMISSIONS'
+        );
         return handleApiError('create_user', error, req, res);
       }
 
       // Validate role if provided
       if (userData.role && !(await authService.isValidRole(userData.role))) {
-        const error = new HttpError(400, `Invalid role: ${userData.role}`, 'INVALID_ROLE', { details: {
-          role: userData.role,
-          availableRoles: await authService.getAvailableRoles(),
-        } });
-    return handleApiError('create_user', error, req, res);
+        const error = new HttpError(
+          400,
+          `Invalid role: ${userData.role}`,
+          'INVALID_ROLE',
+          {
+            details: {
+              role: userData.role,
+              availableRoles: await authService.getAvailableRoles(),
+            },
+          }
+        );
+        return handleApiError('create_user', error, req, res);
       }
 
       // Hash password if provided
@@ -199,7 +207,7 @@ export function registerCrudRoutes(router: Router): void {
       // Log audit event BEFORE sending response
       try {
         const actor: Partial<AuthUser> = req.user ?? {};
-        await audit.log({
+        await auditFor(req).log({
           source: 'api',
           actor: { id: actor.id, username: actor.username, role: actor.role },
           action: 'users:create',
@@ -229,7 +237,7 @@ export function registerCrudRoutes(router: Router): void {
       try {
         const actor: Partial<AuthUser> = req.user ?? {};
         const body = req.body || {};
-        await audit.log({
+        await auditFor(req).log({
           source: 'api',
           actor: { id: actor.id, username: actor.username, role: actor.role },
           action: 'users:create',
@@ -291,7 +299,11 @@ export function registerCrudRoutes(router: Router): void {
       const isSelf = userId !== undefined && user.id === userId;
 
       if (!canManageUsers && !isSelf) {
-        const error = new HttpError(403, 'Insufficient permissions to view user', 'INSUFFICIENT_PERMISSIONS');
+        const error = new HttpError(
+          403,
+          'Insufficient permissions to view user',
+          'INSUFFICIENT_PERMISSIONS'
+        );
         return handleApiError('get_user', error, req, res);
       }
 
@@ -378,7 +390,11 @@ export function registerCrudRoutes(router: Router): void {
       const isSelf = userId !== undefined && user.id === userId;
 
       if (!canManageUsers && !isSelf) {
-        const error = new HttpError(403, 'Insufficient permissions to update user', 'INSUFFICIENT_PERMISSIONS');
+        const error = new HttpError(
+          403,
+          'Insufficient permissions to update user',
+          'INSUFFICIENT_PERMISSIONS'
+        );
         return handleApiError('update_user', error, req, res);
       }
 
@@ -394,11 +410,18 @@ export function registerCrudRoutes(router: Router): void {
         canManageUsers &&
         !(await authService.isValidRole(userData.role))
       ) {
-        const error = new HttpError(400, `Invalid role: ${userData.role}`, 'INVALID_ROLE', { details: {
-          role: userData.role,
-          availableRoles: await authService.getAvailableRoles(),
-        } });
-    return handleApiError('update_user', error, req, res);
+        const error = new HttpError(
+          400,
+          `Invalid role: ${userData.role}`,
+          'INVALID_ROLE',
+          {
+            details: {
+              role: userData.role,
+              availableRoles: await authService.getAvailableRoles(),
+            },
+          }
+        );
+        return handleApiError('update_user', error, req, res);
       }
 
       // Hash password if provided (with security guards)
@@ -410,9 +433,11 @@ export function registerCrudRoutes(router: Router): void {
           // 403 (not 400): this is an authorization refusal, and the error code
           // literally says FORBIDDEN. "external authentication" wording matches
           // the change-password / set-password guards and the API docs.
-          const error = new HttpError(403,
-            `Users authenticated via ${provider} cannot set passwords. Password management is handled by the external authentication.`
-          , 'EXTERNAL_AUTH_PASSWORD_FORBIDDEN');
+          const error = new HttpError(
+            403,
+            `Users authenticated via ${provider} cannot set passwords. Password management is handled by the external authentication.`,
+            'EXTERNAL_AUTH_PASSWORD_FORBIDDEN'
+          );
           return handleApiError('update_user', error, req, res);
         }
 
@@ -470,7 +495,7 @@ export function registerCrudRoutes(router: Router): void {
         { operation: 'update_user' }
       );
       const actor: Partial<AuthUser> = req.user ?? {};
-      await audit.log({
+      await auditFor(req).log({
         source: 'api',
         actor: { id: actor.id, username: actor.username, role: actor.role },
         action: 'users:update',
@@ -484,7 +509,7 @@ export function registerCrudRoutes(router: Router): void {
     } catch (error) {
       const actor: Partial<AuthUser> = req.user ?? {};
       const idParam = req.params?.id;
-      await audit.log({
+      await auditFor(req).log({
         source: 'api',
         actor: { id: actor.id, username: actor.username, role: actor.role },
         action: 'users:update',
@@ -547,13 +572,21 @@ export function registerCrudRoutes(router: Router): void {
       // Check if user can manage users
       const canManageUsers = await authService.userCan(user, 'users:manage');
       if (!canManageUsers) {
-        const error = new HttpError(403, 'Insufficient permissions to delete users', 'INSUFFICIENT_PERMISSIONS');
+        const error = new HttpError(
+          403,
+          'Insufficient permissions to delete users',
+          'INSUFFICIENT_PERMISSIONS'
+        );
         return handleApiError('delete_user', error, req, res);
       }
 
       // Prevent self-deletion
       if (userId !== undefined && user.id === userId) {
-        const error = new HttpError(400, 'Cannot delete your own account', 'SELF_DELETION_NOT_ALLOWED');
+        const error = new HttpError(
+          400,
+          'Cannot delete your own account',
+          'SELF_DELETION_NOT_ALLOWED'
+        );
         return handleApiError('delete_user', error, req, res);
       }
 
@@ -579,7 +612,7 @@ export function registerCrudRoutes(router: Router): void {
         { operation: 'delete_user' }
       );
       const actor: Partial<AuthUser> = req.user ?? {};
-      await audit.log({
+      await auditFor(req).log({
         source: 'api',
         actor: { id: actor.id, username: actor.username, role: actor.role },
         action: 'users:delete',
@@ -589,7 +622,7 @@ export function registerCrudRoutes(router: Router): void {
     } catch (error) {
       const actor: Partial<AuthUser> = req.user ?? {};
       const idParam = req.params?.id;
-      await audit.log({
+      await auditFor(req).log({
         source: 'api',
         actor: { id: actor.id, username: actor.username, role: actor.role },
         action: 'users:delete',

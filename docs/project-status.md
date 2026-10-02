@@ -15,10 +15,10 @@
 > notification configuration every writer produces is read correctly (it was
 > silently refusing every send on a `civic init` instance); dependency
 > advisories 87 → 1 and the CodeQL baseline triaged; `module.json` no longer
-> advertises capabilities nothing reads. Still owed for 0.4.0: full audit
-> coverage and the notification privacy settings — see
-> `docs/plans/2026-08-11-v04x-scoping.md`, "Decisions (2026-09-30)".
-> Authoritative trackers: the `FA-*` security registry
+> advertises capabilities nothing reads. The audit coverage and the notification
+> privacy settings landed on 2026-10-02, as did the removal of the template tag
+> stripper; the decisions are in `docs/plans/2026-08-11-v04x-scoping.md`,
+> "Decisions (2026-09-30)". Authoritative trackers: the `FA-*` security registry
 > (`docs/audits/2026-07-02-full-audit.md`), the hardening backlog
 > (`docs/backlog/2026-07-post-audit-hardening.md`), the roadmap
 > (`docs/roadmap.md`), and `CHANGELOG.md`. Project history lives in the

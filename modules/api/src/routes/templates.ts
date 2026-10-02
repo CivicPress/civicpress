@@ -21,6 +21,7 @@ import {
   logApiRequest,
   handleValidationError,
 } from '../utils/api-logger.js';
+import { auditFor, actorOf } from '../utils/audit.js';
 
 /**
  * One TemplateService per CivicPress instance, reused across requests.
@@ -366,6 +367,13 @@ export function createTemplatesRouter() {
         };
 
         const template = await templateService.createTemplate(requestData);
+        await auditFor(req).log({
+          source: 'api',
+          actor: actorOf(req),
+          action: 'templates:create',
+          target: { type: 'template', id: template.id, name: template.name },
+          outcome: 'success',
+        });
 
         sendSuccess({ template }, req, res, {
           operation: 'create_template',
@@ -467,6 +475,13 @@ export function createTemplatesRouter() {
           id as TemplateId,
           requestData
         );
+        await auditFor(req).log({
+          source: 'api',
+          actor: actorOf(req),
+          action: 'templates:update',
+          target: { type: 'template', id: template.id, name: template.name },
+          outcome: 'success',
+        });
 
         sendSuccess({ template }, req, res, { operation: 'update_template' });
       } catch (error) {
@@ -526,6 +541,13 @@ export function createTemplatesRouter() {
         const { id } = req.params;
 
         await templateService.deleteTemplate(id as TemplateId);
+        await auditFor(req).log({
+          source: 'api',
+          actor: actorOf(req),
+          action: 'templates:delete',
+          target: { type: 'template', id: String(id) },
+          outcome: 'success',
+        });
 
         sendSuccess(
           { message: `Template ${id} deleted successfully` },

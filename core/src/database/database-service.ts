@@ -40,10 +40,12 @@ import { UserStore } from './stores/user-store.js';
 import { StorageFileStore } from './stores/storage-file-store.js';
 import { GeographyStore } from './stores/geography-store.js';
 import { OperatorNotificationStore } from './stores/operator-notification-store.js';
+import { MIGRATION_LEDGER_TABLE } from './schema/migrations.js';
 import type {
   RecordLockRow,
   AuditLogWithUserRow,
   StorageFileRow,
+  CountRow,
 } from './types/row-types.js';
 
 export class DatabaseService {
@@ -646,10 +648,27 @@ export class DatabaseService {
     resourceId?: string;
     details?: string;
     ipAddress?: string;
+    // The activity file's fields (columns added 2026-10-02).
+    source?: string;
+    outcome?: string;
+    message?: string;
+    /** Structured details, stored as JSON. */
+    metadata?: Record<string, unknown>;
+    actorUsername?: string;
+    actorRole?: string;
+    targetName?: string;
+    /** When the event happened, ISO. Defaults to the insert time. */
+    occurredAt?: string;
   }): Promise<void> {
+    const metadataJson = serializeMetadata(auditData.metadata);
+    const createdAt = toSqliteTimestamp(auditData.occurredAt);
     const insert = (userId: number | null, details?: string) =>
       this.adapter.execute(
-        'INSERT INTO audit_logs (user_id, action, resource_type, resource_id, details, ip_address) VALUES (?, ?, ?, ?, ?, ?)',
+        `INSERT INTO audit_logs
+           (user_id, action, resource_type, resource_id, details, ip_address,
+            source, outcome, message, metadata, actor_username, actor_role,
+            target_name${createdAt ? ', created_at' : ''})
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?${createdAt ? ', ?' : ''})`,
         [
           userId,
           auditData.action,
@@ -657,6 +676,14 @@ export class DatabaseService {
           auditData.resourceId,
           details,
           auditData.ipAddress,
+          auditData.source ?? null,
+          auditData.outcome ?? null,
+          auditData.message ?? null,
+          metadataJson,
+          auditData.actorUsername ?? null,
+          auditData.actorRole ?? null,
+          auditData.targetName ?? null,
+          ...(createdAt ? [createdAt] : []),
         ]
       );
 
@@ -681,6 +708,175 @@ export class DatabaseService {
     }
   }
 
+  /**
+   * The trail, filtered the way the Activity page asks: newest first, with
+   * the total for pagination. Rows written before 2026-10-02 have no
+   * `source`/`outcome`; a filter on either leaves them out, as it must.
+   */
+  async queryAuditLogs(
+    filters: AuditLogFilters = {},
+    page: { limit?: number; offset?: number } = {}
+  ): Promise<{ rows: AuditLogWithUserRow[]; total: number }> {
+    const where: string[] = [];
+    const params: SqlParam[] = [];
+    if (filters.source) {
+      where.push('al.source = ?');
+      params.push(filters.source);
+    }
+    if (filters.outcome) {
+      where.push('al.outcome = ?');
+      params.push(filters.outcome);
+    }
+    if (filters.action) {
+      where.push('al.action = ?');
+      params.push(filters.action);
+    }
+    if (filters.actor) {
+      // An id or a username, as the page's actor box takes either.
+      where.push(
+        '(CAST(al.user_id AS TEXT) = ? OR al.actor_username = ? OR u.username = ?)'
+      );
+      params.push(filters.actor, filters.actor, filters.actor);
+    }
+    const since = toSqliteTimestamp(filters.since);
+    if (since) {
+      where.push('al.created_at >= ?');
+      params.push(since);
+    }
+    const before = toSqliteTimestamp(filters.before);
+    if (before) {
+      where.push('al.created_at <= ?');
+      params.push(before);
+    }
+    const from = `FROM audit_logs al LEFT JOIN users u ON al.user_id = u.id${
+      where.length ? ' WHERE ' + where.join(' AND ') : ''
+    }`;
+    const countRows = await this.adapter.query<CountRow>(
+      `SELECT COUNT(*) as count ${from}`,
+      params
+    );
+    const limit = Math.max(
+      1,
+      Math.min(1000, Number.isFinite(page.limit) ? (page.limit as number) : 100)
+    );
+    const offset = Math.max(
+      0,
+      Number.isFinite(page.offset) ? (page.offset as number) : 0
+    );
+    const rows = await this.adapter.query<AuditLogWithUserRow>(
+      `SELECT al.*, u.username ${from} ORDER BY al.created_at DESC, al.id DESC LIMIT ? OFFSET ?`,
+      [...params, limit, offset]
+    );
+    return { rows, total: countRows[0].count };
+  }
+
+  /**
+   * Bulk insert, one transaction, for the one-time import of the activity
+   * file. `user_id` is kept only for users that exist, so the FOREIGN KEY
+   * never fires row by row; the numeric attribution survives in `details`.
+   */
+  async insertAuditEntries(
+    entries: Array<Parameters<DatabaseService['logAuditEvent']>[0]>
+  ): Promise<number> {
+    if (entries.length === 0) return 0;
+    const existing = new Set(
+      (await this.adapter.query<{ id: number }>('SELECT id FROM users')).map(
+        (row) => row.id
+      )
+    );
+    await this.adapter.execute('BEGIN');
+    try {
+      for (const entry of entries) {
+        const userId =
+          entry.userId != null && existing.has(entry.userId)
+            ? entry.userId
+            : null;
+        const details =
+          entry.userId != null && userId === null
+            ? `${entry.details ?? ''} [detached user_id=${entry.userId}: not in users]`.trim()
+            : entry.details;
+        const createdAt = toSqliteTimestamp(entry.occurredAt);
+        await this.adapter.execute(
+          `INSERT INTO audit_logs
+             (user_id, action, resource_type, resource_id, details, ip_address,
+              source, outcome, message, metadata, actor_username, actor_role,
+              target_name${createdAt ? ', created_at' : ''})
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?${createdAt ? ', ?' : ''})`,
+          [
+            userId,
+            entry.action,
+            entry.resourceType,
+            entry.resourceId,
+            details,
+            entry.ipAddress,
+            entry.source ?? null,
+            entry.outcome ?? null,
+            entry.message ?? null,
+            serializeMetadata(entry.metadata),
+            entry.actorUsername ?? null,
+            entry.actorRole ?? null,
+            entry.targetName ?? null,
+            ...(createdAt ? [createdAt] : []),
+          ]
+        );
+      }
+      await this.adapter.execute('COMMIT');
+    } catch (error) {
+      await this.adapter.execute('ROLLBACK').catch(() => {});
+      throw error;
+    }
+    return entries.length;
+  }
+
+  /** Has this one-off data migration been recorded in the schema ledger? */
+  async hasDataMigration(id: string): Promise<boolean> {
+    const rows = await this.adapter.query<{ id: string }>(
+      `SELECT id FROM ${MIGRATION_LEDGER_TABLE} WHERE id = ?`,
+      [id]
+    );
+    return rows.length > 0;
+  }
+
+  /** Record a one-off data migration in the schema ledger, so it never runs twice. */
+  async recordDataMigration(id: string): Promise<void> {
+    await this.adapter.execute(
+      `INSERT OR IGNORE INTO ${MIGRATION_LEDGER_TABLE} (id, outcome) VALUES (?, 'applied')`,
+      [id]
+    );
+  }
+
+  /** When the first row written through the channel happened (`YYYY-MM-DD HH:MM:SS`, UTC), or null. */
+  async earliestDurableAuditTimestamp(): Promise<string | null> {
+    const rows = await this.adapter.query<{ first: string | null }>(
+      'SELECT MIN(created_at) as first FROM audit_logs WHERE source IS NOT NULL'
+    );
+    return rows[0]?.first ?? null;
+  }
+
+  /** How many rows were written before the columns existed (no `source`). */
+  async countLegacyAuditEntries(): Promise<number> {
+    const rows = await this.adapter.query<CountRow>(
+      'SELECT COUNT(*) as count FROM audit_logs WHERE source IS NULL'
+    );
+    return rows[0].count;
+  }
+
+  /** How many rows the table holds at all. */
+  async countAuditEntries(): Promise<number> {
+    const rows = await this.adapter.query<CountRow>(
+      'SELECT COUNT(*) as count FROM audit_logs'
+    );
+    return rows[0].count;
+  }
+
+  /** How many rows carry the fields added 2026-10-02 — none means the table has not seen a channel write since then. */
+  async countDurableAuditEntries(): Promise<number> {
+    const rows = await this.adapter.query<CountRow>(
+      'SELECT COUNT(*) as count FROM audit_logs WHERE source IS NOT NULL'
+    );
+    return rows[0].count;
+  }
+
   async getAuditLogs(limit = 100, offset = 0): Promise<AuditLogWithUserRow[]> {
     return await this.adapter.query<AuditLogWithUserRow>(
       'SELECT al.*, u.username FROM audit_logs al LEFT JOIN users u ON al.user_id = u.id ORDER BY al.created_at DESC LIMIT ? OFFSET ?',
@@ -701,4 +897,43 @@ export class DatabaseService {
       return false;
     }
   }
+}
+
+export interface AuditLogFilters {
+  source?: string;
+  outcome?: string;
+  action?: string;
+  /** A user id or a username. */
+  actor?: string;
+  /** ISO string or epoch milliseconds, inclusive. */
+  since?: string | number;
+  before?: string | number;
+}
+
+function serializeMetadata(
+  metadata: Record<string, unknown> | undefined
+): string | null {
+  if (!metadata) return null;
+  try {
+    return JSON.stringify(metadata);
+  } catch {
+    return '{"unserializable":true}';
+  }
+}
+
+/**
+ * `audit_logs.created_at` is SQLite's `CURRENT_TIMESTAMP`: `YYYY-MM-DD HH:MM:SS`
+ * in UTC. Filters and explicit timestamps are written in that shape so they
+ * compare with it.
+ */
+function toSqliteTimestamp(value: string | number | undefined): string | null {
+  if (value === undefined || value === null || value === '') return null;
+  const ms =
+    typeof value === 'number'
+      ? value
+      : isNaN(Number(value))
+        ? Date.parse(value)
+        : Number(value);
+  if (!Number.isFinite(ms)) return null;
+  return new Date(ms).toISOString().slice(0, 19).replace('T', ' ');
 }

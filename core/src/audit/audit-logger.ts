@@ -148,6 +148,15 @@ export class AuditLogger {
     }
   }
 
+  /**
+   * Past `maxEntries` lines, move the oldest fifth of the file into a dated
+   * archive beside it and keep the newest four fifths as the live file — the
+   * same 8,000 lines `tail()` could always see. Nothing is deleted: until
+   * 2026-10-02 this rewrote the live file keeping those 8,000 and discarded
+   * the rest, so the trail had a fixed horizon measured in events, not time.
+   * The database table is the queryable trail; the archives are the on-disk
+   * record of everything that was ever appended.
+   */
   private async rotateIfNeeded(): Promise<void> {
     try {
       if (!fs.existsSync(this.logPath)) return;
@@ -157,7 +166,9 @@ export class AuditLogger {
         .filter((l) => l.trim());
       if (lines.length > this.maxEntries) {
         const keep = Math.floor(this.maxEntries * 0.8);
+        const archived = lines.slice(0, lines.length - keep);
         const kept = lines.slice(-keep);
+        fs.writeFileSync(this.archivePath(), archived.join('\n') + '\n');
         fs.writeFileSync(this.logPath, kept.join('\n') + '\n');
       }
     } catch (err) {
@@ -172,6 +183,65 @@ export class AuditLogger {
         { operation: 'audit:rotate' }
       );
     }
+  }
+
+  /**
+   * `<dir>/<name>-<UTC stamp>-<seq>.<ext>`: the stamp to the millisecond and a
+   * zero-padded sequence, so archives sort by name in the order they were
+   * written — also when several rotations land in the same millisecond.
+   */
+  private archivePath(): string {
+    const ext = path.extname(this.fileName);
+    const base = path.basename(this.fileName, ext);
+    const stamp = new Date().toISOString().replace(/[-:.]/g, '');
+    const dir = path.dirname(this.logPath);
+    for (let seq = 0; ; seq++) {
+      const candidate = path.join(
+        dir,
+        `${base}-${stamp}-${String(seq).padStart(3, '0')}${ext}`
+      );
+      if (!fs.existsSync(candidate)) return candidate;
+    }
+  }
+
+  /**
+   * Every entry ever appended, oldest first: the dated archives, then the
+   * live file. The complete on-disk trail, for an export or a forensic read;
+   * the table is the one to query.
+   */
+  async readEverything(): Promise<ActivityLogEntry[]> {
+    const out: ActivityLogEntry[] = [];
+    for (const file of this.listArchives()) {
+      out.push(...this.parseFile(file));
+    }
+    out.push(...(await this.readAll()));
+    return out;
+  }
+
+  private parseFile(file: string): ActivityLogEntry[] {
+    try {
+      return fs
+        .readFileSync(file, 'utf8')
+        .split('\n')
+        .filter((l) => l.trim())
+        .map((l) => JSON.parse(l) as ActivityLogEntry);
+    } catch {
+      return [];
+    }
+  }
+
+  /** The dated archives beside the live file, oldest first. */
+  listArchives(): string[] {
+    const dir = path.dirname(this.logPath);
+    if (!fs.existsSync(dir)) return [];
+    const ext = path.extname(this.fileName);
+    const base = path.basename(this.fileName, ext);
+    const prefix = `${base}-`;
+    return fs
+      .readdirSync(dir)
+      .filter((f) => f.startsWith(prefix) && f.endsWith(ext))
+      .sort()
+      .map((f) => path.join(dir, f));
   }
 
   private async readAll(): Promise<ActivityLogEntry[]> {

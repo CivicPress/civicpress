@@ -310,7 +310,11 @@ readings were considered, in increasing cost:
    the generic update path or the publish saga records no pair at all. So this
    needs a small piece of durable structure first (a `status_transitions` table,
    or structured columns on `audit_logs`), which is worth knowing before anyone
-   scopes it as an afternoon's work.
+   scopes it as an afternoon's work. _Update 2026-10-02:_ `audit_logs` now has
+   structured columns (source, outcome, metadata, actor, target) and every API
+   event — `records:status` with its from/to pair included — is written to it,
+   so the "rotating file" half of this blocker is gone. The generic update path
+   and the publish saga still record no pair.
 3. **N-of-M approvals** — "two councillors must sign off." Not a predicate but a
    feature: an approvals table, an endpoint to cast one, progress UI, and —
    easiest to overlook — a rule for invalidating approvals when the record is

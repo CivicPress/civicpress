@@ -166,10 +166,22 @@ export class NotificationAudit {
         .filter((line) => line.trim());
 
       if (lines.length > this.maxEntries) {
-        // Keep only the last 80% of entries
+        // Archive the oldest fifth beside the live file and keep the newest
+        // 8,000 — what the readers always saw. Nothing is deleted (it used to
+        // keep those 8,000 and drop the rest).
         const keepCount = Math.floor(this.maxEntries * 0.8);
+        const archived = lines.slice(0, lines.length - keepCount);
         const keptLines = lines.slice(-keepCount);
-
+        const stamp = new Date().toISOString().replace(/[-:.]/g, '');
+        let archivePath = '';
+        for (let seq = 0; ; seq++) {
+          archivePath = this.auditLogPath.replace(
+            /\.jsonl$/,
+            `-${stamp}-${String(seq).padStart(3, '0')}.jsonl`
+          );
+          if (!fs.existsSync(archivePath)) break;
+        }
+        fs.writeFileSync(archivePath, archived.join('\n') + '\n');
         fs.writeFileSync(this.auditLogPath, keptLines.join('\n') + '\n');
       }
     } catch (error) {

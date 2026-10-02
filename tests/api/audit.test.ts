@@ -4,6 +4,9 @@ import {
   createAPITestContext,
   cleanupAPITestContext,
 } from '../fixtures/test-setup';
+import { mkdirSync, writeFileSync } from 'fs';
+import { join, dirname } from 'path';
+import { tmpdir } from 'os';
 
 let context: Awaited<ReturnType<typeof createAPITestContext>>;
 
@@ -65,6 +68,83 @@ describe('Audit API', () => {
     );
     expect(hasConfigPut).toBe(true);
 
-    // Some deployments may return a raw array; pagination is optional
+    // Since 2026-10-02 the page reads `audit_logs`, where the API's events
+    // now land too. The entry carries who did it and from where, and the
+    // table answers the page's filters.
+    const configPut = entries.find((e: any) => e?.action === 'config:raw:put');
+    expect(configPut).toMatchObject({
+      source: 'api',
+      outcome: 'success',
+      actor: { username: 'admin-user', role: 'admin' },
+      target: { type: 'config', id: 'org-config' },
+    });
+    expect(configPut.id).toMatch(/^db_\d+$/);
+
+    const filtered = await request(context.api.getApp())
+      .get('/api/v1/audit?action=config:raw:put&source=api&actor=admin-user')
+      .set('Authorization', `Bearer ${adminToken}`);
+    expect(filtered.status).toBe(200);
+    expect(filtered.body.data.pagination.total).toBeGreaterThanOrEqual(1);
+    expect(
+      filtered.body.data.entries.every(
+        (e: any) => e.action === 'config:raw:put'
+      )
+    ).toBe(true);
+
+    const none = await request(context.api.getApp())
+      .get('/api/v1/audit?source=cli&action=config:raw:put')
+      .set('Authorization', `Bearer ${adminToken}`);
+    expect(none.body.data.pagination.total).toBe(0);
+
+    // A limit that is not a number is the default, not a 500.
+    const junk = await request(context.api.getApp())
+      .get('/api/v1/audit?limit=abc&offset=xyz')
+      .set('Authorization', `Bearer ${adminToken}`);
+    expect(junk.status).toBe(200);
+    expect(junk.body.data.pagination).toMatchObject({ limit: 100, offset: 0 });
+  });
+
+  it('imports the activity file an upgraded instance already has, on the first read', async () => {
+    const fresh = await createAPITestContext();
+    try {
+      // The instance's OWN system-data directory, derived from the running
+      // instance — never from CentralConfigManager, which can resolve to the
+      // repository's dev instance and overwrite its real files (it did once).
+      const dir = join(dirname(fresh.civic.getDataDir()), '.system-data');
+      expect(dir.startsWith(tmpdir())).toBe(true);
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(
+        join(dir, 'activity.log'),
+        JSON.stringify({
+          id: 'act_old',
+          timestamp: '2026-08-15T09:30:00.000Z',
+          source: 'cli',
+          actor: { username: 'ops' },
+          action: 'config:import',
+          target: { type: 'config', id: 'roles' },
+          outcome: 'success',
+          message: 'imported by hand',
+        }) + '\n'
+      );
+      const auth = await request(fresh.api.getApp())
+        .post('/api/v1/auth/simulated')
+        .send({ username: 'admin-user', role: 'admin' });
+      const token = auth.body?.data?.session?.token as string;
+      const res = await request(fresh.api.getApp())
+        .get('/api/v1/audit?action=config:import')
+        .set('Authorization', `Bearer ${token}`);
+      expect(res.status).toBe(200);
+      const [entry] = res.body.data.entries;
+      expect(entry).toMatchObject({
+        source: 'cli',
+        action: 'config:import',
+        actor: { username: 'ops' },
+        message: 'imported by hand',
+        timestamp: '2026-08-15T09:30:00.000Z',
+      });
+      expect(entry.id).toMatch(/^db_\d+$/);
+    } finally {
+      await cleanupAPITestContext(fresh);
+    }
   });
 });
