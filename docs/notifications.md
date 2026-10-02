@@ -87,9 +87,30 @@ security:
   filter_pii: true
 ```
 
-The three `security` keys are decided but not yet implemented (2026-09-30,
-decision 5 in `docs/plans/2026-08-11-v04x-scoping.md`): until that lands they
-are read by nothing.
+The three `security` keys do the following, all on what the system **keeps**,
+never on a message to its recipient:
+
+- `filter_pii` — email addresses, phone numbers, card and SSN-shaped numbers are
+  replaced by `[REDACTED]` in the notification audit log
+  (`.system-data/notification-audit.jsonl`, where a delivery error quotes the
+  recipient) and in the `body` and `data` of operator-inbox entries. The entry's
+  title — which names the user by username — is stored as it is. A
+  password-reset task therefore keeps the username and no longer carries the
+  address in its data.
+- `audit_all_notifications` — every send attempt, delivered or not, is also
+  written to the unified audit trail: the activity log the Settings → Activity
+  page shows carries channels, template, outcome and a keyed hash of the
+  recipient; the `audit_logs` table carries the outcome message. Never the
+  message sent, never the address.
+- `encrypt_sensitive_data` — the `body` and `data` of operator-inbox entries are
+  encrypted at rest (AES-256-GCM, key derived from the instance secret). Entries
+  written before the key was switched on are sealed on the next start; switching
+  it off leaves sealed entries readable as long as the instance secret is
+  unchanged. An entry sealed under another secret shows as unreadable and can
+  still be dismissed; the rest of the inbox is unaffected. A database file
+  copied elsewhere does not reveal them. `civic backup` and
+  `civic system:check-updates`, which write to the inbox without booting the
+  instance, apply the same settings.
 
 ### Providers
 
@@ -178,6 +199,9 @@ Use it for a test relay, not for a server on the internet.
 - Every send attempt is recorded in the notification audit log without the
   message body; a failed test send never returns the transport's raw error to
   the browser (it may carry hosts and credential hints).
+- The `security` keys above decide what the audit log and the operator inbox
+  keep; the instance secret (`CIVICPRESS_SECRET_FILE` in the deploy) is what
+  unseals encrypted inbox entries, so losing it means losing their text.
 
 ## Integration
 

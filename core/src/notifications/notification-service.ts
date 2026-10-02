@@ -9,6 +9,8 @@ import { NotificationSecurity } from './notification-security.js';
 import { NotificationRateLimiter } from './notification-rate-limiter.js';
 import { NotificationLogger } from './notification-logger.js';
 import { coreDebug, coreError } from '../utils/core-output.js';
+import { createHmac } from 'crypto';
+import type { AuditChannel } from '../audit/audit-channel.js';
 
 export interface NotificationRequest {
   userId?: string;
@@ -39,13 +41,105 @@ export class NotificationService {
   private security: NotificationSecurity;
   private rateLimiter: NotificationRateLimiter;
   private logger: NotificationLogger;
+  /**
+   * The unified audit trail (`audit_logs` + activity file). When
+   * `security.audit_all_notifications` is on, every send attempt is recorded
+   * there too — channels, template, outcome and a hash of the recipient,
+   * never the message. Optional: a service built without one (the CLI test
+   * send, a unit test) keeps the notification audit file only.
+   */
+  private auditChannel?: AuditChannel;
+  /**
+   * The key recipients are hashed with in the unified audit trail (HMAC, so
+   * the trail is not an oracle for "was this address notified"). Resolved at
+   * record time: the secrets manager is usually initialized after this
+   * service is built. Without a key, no recipient is recorded.
+   */
+  private recipientKey?: () => Buffer | undefined;
 
-  constructor(config: NotificationConfig) {
+  constructor(
+    config: NotificationConfig,
+    options: {
+      auditChannel?: AuditChannel;
+      recipientKey?: () => Buffer | undefined;
+    } = {}
+  ) {
     this.config = config;
-    this.audit = new NotificationAudit();
+    const security = config.getSecuritySettings();
+    this.audit = new NotificationAudit(undefined, {
+      redactPii: security.filter_pii === true,
+    });
     this.security = new NotificationSecurity();
     this.rateLimiter = new NotificationRateLimiter(config.getRateLimits());
     this.logger = new NotificationLogger();
+    this.auditChannel = options.auditChannel;
+    this.recipientKey = options.recipientKey;
+  }
+
+  /**
+   * The recipient as the audit trail may keep it: a truncated HMAC-SHA256 of
+   * the address (or phone number, or user id), lower-cased, under the
+   * instance's recipient-hash key — enough to tell "the same recipient
+   * again", not enough to look an address up. Undefined without a key.
+   */
+  private hashRecipient(request: NotificationRequest): string | undefined {
+    const key = this.recipientKey?.();
+    if (!key) return undefined;
+    const recipient = (request.email || request.phone || request.userId || '')
+      .toString()
+      .trim()
+      .toLowerCase();
+    if (!recipient) return undefined;
+    return createHmac('sha256', key)
+      .update(recipient)
+      .digest('hex')
+      .slice(0, 16);
+  }
+
+  /**
+   * `security.audit_all_notifications`: mirror a send attempt into the
+   * unified audit trail. Best effort — a trail that cannot be written must
+   * not turn a delivered email into a reported failure.
+   */
+  private async recordInUnifiedAudit(event: {
+    notificationId: string;
+    request: NotificationRequest;
+    outcome: 'success' | 'failure';
+    message: string;
+    details?: Record<string, unknown>;
+  }): Promise<void> {
+    if (!this.auditChannel) return;
+    if (this.config.getSecuritySettings().audit_all_notifications !== true) {
+      return;
+    }
+    const recipient = this.hashRecipient(event.request);
+    try {
+      await this.auditChannel.record({
+        action: 'notification:send',
+        resourceType: 'notification',
+        resourceId: event.notificationId,
+        source: 'core',
+        outcome: event.outcome,
+        message: event.message,
+        details: {
+          template: event.request.template,
+          channels: event.request.channels,
+          // Only under a key — never an unkeyed hash, and never an empty slot.
+          ...(recipient ? { recipient } : {}),
+          ...event.details,
+        },
+      });
+    } catch (error) {
+      coreError(
+        'Failed to record notification in the audit trail',
+        'NOTIFICATION_AUDIT_TRAIL_FAILED',
+        {
+          notificationId: event.notificationId,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        { operation: 'notification:send' }
+      );
+    }
   }
 
   /**
@@ -75,7 +169,10 @@ export class NotificationService {
     request: NotificationRequest
   ): Promise<NotificationResponse> {
     const notificationId = this.generateNotificationId();
-
+    // Set once the attempt has been written to the audit paths, so the catch
+    // block below records the attempts that fail elsewhere (template missing,
+    // rendering threw) without recording a rejected one twice.
+    let audited = false;
     try {
       coreDebug(`Notification ID: ${notificationId}`, {
         operation: 'notification:send',
@@ -110,6 +207,14 @@ export class NotificationService {
             channels: request.channels,
           },
         });
+        await this.recordInUnifiedAudit({
+          notificationId,
+          request,
+          outcome: 'failure',
+          message: 'Notification rejected: invalid request',
+          details: { reason: 'validation_failed' },
+        });
+        audited = true;
         throw new Error(
           `Notification request invalid: ${validation.errors.join(', ')}`
         );
@@ -130,6 +235,14 @@ export class NotificationService {
             channels: request.channels,
           },
         });
+        await this.recordInUnifiedAudit({
+          notificationId,
+          request,
+          outcome: 'failure',
+          message: 'Notification rejected: rate-limited',
+          details: { reason: 'rate_limited' },
+        });
+        audited = true;
         throw new Error(
           `Notification rate-limited. Retry after ${rateLimit.resetTime.toISOString()}.`
         );
@@ -206,6 +319,17 @@ export class NotificationService {
         },
       });
 
+      await this.recordInUnifiedAudit({
+        notificationId,
+        request,
+        outcome: allSucceeded ? 'success' : 'failure',
+        message: allSucceeded
+          ? `Notification sent (${request.template}) via ${sentChannels.join(', ')}`
+          : `Notification ${partial ? 'partially ' : ''}failed (${request.template}): ${failedChannels.join(', ')}`,
+        details: { sentChannels, failedChannels, partial },
+      });
+      audited = true;
+
       const response: NotificationResponse = {
         success: sentChannels.length > 0,
         notificationId,
@@ -220,6 +344,28 @@ export class NotificationService {
       this.logger.info(`Notification sent: ${notificationId}`, response);
       return response;
     } catch (error) {
+      if (!audited) {
+        // Template not found, rendering threw, a channel map blew up: an
+        // attempt that left no trail used to be invisible to both audits.
+        const reason = error instanceof Error ? error.message : String(error);
+        await this.audit.logNotification({
+          id: notificationId,
+          action: 'notification_failed',
+          details: {
+            success: false,
+            template: request.template,
+            channels: request.channels,
+            errors: [reason],
+          },
+        });
+        await this.recordInUnifiedAudit({
+          notificationId,
+          request,
+          outcome: 'failure',
+          message: 'Notification failed before delivery',
+          details: { reason: 'send_failed' },
+        });
+      }
       coreError(
         `Notification failed: ${notificationId}`,
         'NOTIFICATION_FAILED',

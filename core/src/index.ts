@@ -367,6 +367,8 @@ export {
   SecretsManager,
   isSecretAutoGenerationAllowed,
 } from './security/secrets.js';
+export { AtRestCodec, AT_REST_MARKER } from './security/at-rest-codec.js';
+export { UNREADABLE_PLACEHOLDER } from './database/stores/operator-notification-store.js';
 export { CsrfProtection } from './security/csrf.js';
 export type { CsrfToken } from './security/csrf.js';
 
@@ -378,6 +380,11 @@ export {
   NotificationTemplate,
   NotificationAudit,
   NotificationSecurity,
+  redactPii,
+  redactPiiFromString,
+  REDACTED,
+  PII_PATTERNS,
+  protectOperatorInbox,
   NotificationRateLimiter,
   NotificationLogger,
   AuthTemplate,

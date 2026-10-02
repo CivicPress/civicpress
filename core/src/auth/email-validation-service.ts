@@ -72,7 +72,24 @@ export class EmailValidationService {
     this.auditChannel = auditChannel;
     // Initialize notification service
     this.notificationConfig = new NotificationConfig();
-    this.notificationService = new NotificationService(this.notificationConfig);
+    this.notificationService = new NotificationService(
+      this.notificationConfig,
+      {
+        auditChannel,
+        // Keyed with the secrets manager handed over later by
+        // `initializeSecrets`; until then the trail carries no recipient.
+        recipientKey: () => {
+          try {
+            return this.secretsManager?.deriveKey(
+              'notifications',
+              'recipient-hash'
+            );
+          } catch {
+            return undefined;
+          }
+        },
+      }
+    );
     // Register email channel and templates
     this.registerEmailChannel();
     this.registerEmailTemplates();

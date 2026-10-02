@@ -9,6 +9,8 @@ import {
   OperatorNotifier,
   type BackupCreateResult,
   type BackupRestoreResult,
+  getInstanceContext,
+  protectOperatorInbox,
 } from '@civicpress/core';
 
 /**
@@ -25,6 +27,13 @@ async function notifyBackupFailure(
   try {
     db = new DatabaseService(dbConfig);
     await db.initialize();
+    // The inbox the booted instance keeps redacted and sealed; a bare
+    // DatabaseService knows nothing of that unless told.
+    const instance = getInstanceContext();
+    await protectOperatorInbox(db, {
+      dataDir: instance.dataDir,
+      systemDataDir: instance.systemDataDir,
+    });
     await new OperatorNotifier(db).systemError({
       title: 'Backup failed',
       body: error instanceof Error ? error.message : String(error),
