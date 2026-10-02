@@ -10,6 +10,7 @@ import {
   logApiRequest,
   handleValidationError,
 } from '../utils/api-logger.js';
+import { auditFor, actorOf } from '../utils/audit.js';
 
 const logger = new Logger();
 
@@ -115,6 +116,14 @@ export function createIndexingRouter() {
         });
 
         const index = await indexingService.generateIndexes(options);
+        await auditFor(req).log({
+          source: 'api',
+          actor: actorOf(req),
+          action: 'indexing:generate',
+          target: { type: 'system', name: 'index' },
+          outcome: 'success',
+          metadata: { records: index?.metadata?.totalRecords },
+        });
 
         logger.info('Indexes generated successfully', {
           totalRecords: index.metadata.totalRecords,
@@ -288,6 +297,14 @@ export function createIndexingRouter() {
         const index = await indexingService.generateIndexes({
           syncDatabase: true,
           conflictResolution,
+        });
+        await auditFor(req).log({
+          source: 'api',
+          actor: actorOf(req),
+          action: 'indexing:sync',
+          target: { type: 'system', name: 'index' },
+          outcome: 'success',
+          metadata: { records: index?.metadata?.totalRecords },
         });
 
         logger.info('Database sync completed successfully', {

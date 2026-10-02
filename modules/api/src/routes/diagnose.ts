@@ -11,7 +11,6 @@ import {
   DiagnosticService,
   CentralConfigManager,
   Logger,
-  AuditLogger,
   DatabaseDiagnosticChecker,
   SearchDiagnosticChecker,
   ConfigurationDiagnosticChecker,
@@ -28,6 +27,7 @@ import { requireDiagnosticAuth } from '../middleware/diagnostic-auth.js';
 import { validateDiagnosticParams } from '../middleware/diagnostic-validation.js';
 import { sanitizeDiagnosticReport } from '@civicpress/core';
 import type { DiagnosticReport } from '@civicpress/core';
+import { auditFor } from '../utils/audit.js';
 
 const logger = new Logger();
 
@@ -38,147 +38,151 @@ export function createDiagnoseRouter() {
   router.use(requireDiagnosticAuth);
 
   // GET /api/v1/diagnose - Run all diagnostic checks
-  router.get('/', validateDiagnosticParams, async (req: Request, res: Response) => {
-    logApiRequest(req, { operation: 'diagnose:run_all' });
+  router.get(
+    '/',
+    validateDiagnosticParams,
+    async (req: Request, res: Response) => {
+      logApiRequest(req, { operation: 'diagnose:run_all' });
 
-    try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return handleValidationError(
-          'diagnose:run_all',
-          errors.array(),
-          req,
-          res
+      try {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+          return handleValidationError(
+            'diagnose:run_all',
+            errors.array(),
+            req,
+            res
+          );
+        }
+
+        const civicPress = req.civicPress;
+        if (!civicPress) {
+          throw new Error('CivicPress not initialized');
+        }
+
+        const dataDir = civicPress.getDataDir();
+        const { component, fix, timeout, maxConcurrency } = req.query;
+
+        // Initialize diagnostic service
+        const diagnosticService = new DiagnosticService({
+          databaseService: civicPress.getDatabaseService(),
+          searchService: civicPress.getDatabaseService().getSearchService(),
+          configManager: CentralConfigManager,
+          logger: civicPress['logger'] as Logger,
+          auditLogger: auditFor(req),
+          dataDir,
+          cacheManager: civicPress.getCacheManager(),
+        });
+
+        // Register checkers
+        const databaseChecker = new DatabaseDiagnosticChecker(
+          civicPress.getDatabaseService(),
+          dataDir,
+          civicPress['logger'] as Logger
         );
-      }
+        diagnosticService.registerChecker(databaseChecker);
 
-      const civicPress = req.civicPress;
-      if (!civicPress) {
-        throw new Error('CivicPress not initialized');
-      }
-
-      const dataDir = civicPress.getDataDir();
-      const { component, fix, timeout, maxConcurrency } = req.query;
-
-      // Initialize diagnostic service
-      const diagnosticService = new DiagnosticService({
-        databaseService: civicPress.getDatabaseService(),
-        searchService: civicPress.getDatabaseService().getSearchService(),
-        configManager: CentralConfigManager,
-        logger: civicPress['logger'] as Logger,
-        auditLogger: new AuditLogger(),
-        dataDir,
-        cacheManager: civicPress.getCacheManager(),
-      });
-
-      // Register checkers
-      const databaseChecker = new DatabaseDiagnosticChecker(
-        civicPress.getDatabaseService(),
-        dataDir,
-        civicPress['logger'] as Logger
-      );
-      diagnosticService.registerChecker(databaseChecker);
-
-      const searchChecker = new SearchDiagnosticChecker(
-        civicPress.getDatabaseService(),
-        civicPress.getDatabaseService().getSearchService(),
-        dataDir,
-        civicPress['logger'] as Logger
-      );
-      diagnosticService.registerChecker(searchChecker);
-
-      const configChecker = new ConfigurationDiagnosticChecker(
-        CentralConfigManager,
-        dataDir,
-        civicPress['logger'] as Logger
-      );
-      diagnosticService.registerChecker(configChecker);
-
-      const filesystemChecker = new FilesystemDiagnosticChecker(
-        dataDir,
-        civicPress['logger'] as Logger
-      );
-      diagnosticService.registerChecker(filesystemChecker);
-
-      const systemChecker = new SystemDiagnosticChecker(
-        civicPress['logger'] as Logger
-      );
-      diagnosticService.registerChecker(systemChecker);
-
-      // Prepare options
-      const options = {
-        components: component ? [component as string] : undefined,
-        timeout: timeout ? parseInt(timeout as string, 10) : undefined,
-        maxConcurrency: maxConcurrency
-          ? parseInt(maxConcurrency as string, 10)
-          : undefined,
-        userId: req.user?.id !== undefined ? String(req.user.id) : undefined,
-        requestId: req.requestId,
-        enableAutoFix: fix === 'true',
-      };
-
-      // Run diagnostics
-      let result: DiagnosticReport;
-      if (component) {
-        const componentResult = await diagnosticService.runComponent(
-          component as string,
-          options
+        const searchChecker = new SearchDiagnosticChecker(
+          civicPress.getDatabaseService(),
+          civicPress.getDatabaseService().getSearchService(),
+          dataDir,
+          civicPress['logger'] as Logger
         );
-        // Convert ComponentResult to DiagnosticReport format for consistency
-        result = {
-          runId: `api_${Date.now()}`,
-          timestamp: new Date().toISOString(),
-          overallStatus: componentResult.status,
-          components: [componentResult],
-          summary: {
-            totalChecks: componentResult.checks.length,
-            passed: componentResult.checks.filter((c) => c.status === 'pass')
-              .length,
-            warnings: componentResult.checks.filter(
-              (c) => c.status === 'warning'
-            ).length,
-            errors: componentResult.checks.filter((c) => c.status === 'error')
-              .length,
-            skipped: componentResult.checks.filter(
-              (c) => c.status === 'skipped'
-            ).length,
-          },
-          issues: componentResult.issues,
-          recommendations: [],
-          duration: componentResult.duration,
+        diagnosticService.registerChecker(searchChecker);
+
+        const configChecker = new ConfigurationDiagnosticChecker(
+          CentralConfigManager,
+          dataDir,
+          civicPress['logger'] as Logger
+        );
+        diagnosticService.registerChecker(configChecker);
+
+        const filesystemChecker = new FilesystemDiagnosticChecker(
+          dataDir,
+          civicPress['logger'] as Logger
+        );
+        diagnosticService.registerChecker(filesystemChecker);
+
+        const systemChecker = new SystemDiagnosticChecker(
+          civicPress['logger'] as Logger
+        );
+        diagnosticService.registerChecker(systemChecker);
+
+        // Prepare options
+        const options = {
+          components: component ? [component as string] : undefined,
+          timeout: timeout ? parseInt(timeout as string, 10) : undefined,
+          maxConcurrency: maxConcurrency
+            ? parseInt(maxConcurrency as string, 10)
+            : undefined,
+          userId: req.user?.id !== undefined ? String(req.user.id) : undefined,
+          requestId: req.requestId,
+          enableAutoFix: fix === 'true',
         };
-      } else {
-        result = await diagnosticService.runAll(options);
-      }
 
-      // Sanitize results before sending
-      const sanitized = sanitizeDiagnosticReport(result);
+        // Run diagnostics
+        let result: DiagnosticReport;
+        if (component) {
+          const componentResult = await diagnosticService.runComponent(
+            component as string,
+            options
+          );
+          // Convert ComponentResult to DiagnosticReport format for consistency
+          result = {
+            runId: `api_${Date.now()}`,
+            timestamp: new Date().toISOString(),
+            overallStatus: componentResult.status,
+            components: [componentResult],
+            summary: {
+              totalChecks: componentResult.checks.length,
+              passed: componentResult.checks.filter((c) => c.status === 'pass')
+                .length,
+              warnings: componentResult.checks.filter(
+                (c) => c.status === 'warning'
+              ).length,
+              errors: componentResult.checks.filter((c) => c.status === 'error')
+                .length,
+              skipped: componentResult.checks.filter(
+                (c) => c.status === 'skipped'
+              ).length,
+            },
+            issues: componentResult.issues,
+            recommendations: [],
+            duration: componentResult.duration,
+          };
+        } else {
+          result = await diagnosticService.runAll(options);
+        }
 
-      logger.info('Diagnostic run completed', {
-        component: component || 'all',
-        status: sanitized.overallStatus,
-        issuesFound: sanitized.issues?.length || 0,
-        requestId: req.requestId,
-      });
+        // Sanitize results before sending
+        const sanitized = sanitizeDiagnosticReport(result);
 
-      sendSuccess(sanitized, req, res, {
-        operation: 'diagnose:run_all',
-        meta: {
+        logger.info('Diagnostic run completed', {
           component: component || 'all',
           status: sanitized.overallStatus,
           issuesFound: sanitized.issues?.length || 0,
-        },
-      });
-    } catch (error) {
-      handleApiError(
-        'diagnose:run_all',
-        error,
-        req,
-        res,
-        'Failed to run diagnostics'
-      );
+          requestId: req.requestId,
+        });
+
+        sendSuccess(sanitized, req, res, {
+          operation: 'diagnose:run_all',
+          meta: {
+            component: component || 'all',
+            status: sanitized.overallStatus,
+            issuesFound: sanitized.issues?.length || 0,
+          },
+        });
+      } catch (error) {
+        handleApiError(
+          'diagnose:run_all',
+          error,
+          req,
+          res,
+          'Failed to run diagnostics'
+        );
+      }
     }
-  });
+  );
 
   // GET /api/v1/diagnose/:component - Run diagnostics for specific component
   router.get(
@@ -229,7 +233,7 @@ export function createDiagnoseRouter() {
           searchService: civicPress.getDatabaseService().getSearchService(),
           configManager: CentralConfigManager,
           logger: civicPress['logger'] as Logger,
-          auditLogger: new AuditLogger(),
+          auditLogger: auditFor(req),
           dataDir,
         });
 
@@ -364,9 +368,11 @@ export function createDiagnoseRouter() {
         const dataDir = civicPress.getDataDir();
 
         if (!Array.isArray(issues) || issues.length === 0) {
-          throw new HttpError(400, 
-            'Issues array is required and must not be empty'
-          , 'INVALID_REQUEST');
+          throw new HttpError(
+            400,
+            'Issues array is required and must not be empty',
+            'INVALID_REQUEST'
+          );
         }
 
         // Initialize diagnostic service
@@ -375,7 +381,7 @@ export function createDiagnoseRouter() {
           searchService: civicPress.getDatabaseService().getSearchService(),
           configManager: CentralConfigManager,
           logger: civicPress['logger'] as Logger,
-          auditLogger: new AuditLogger(),
+          auditLogger: auditFor(req),
           dataDir,
         });
 

@@ -277,6 +277,21 @@ export {
   reportError,
 } from './errors/utils.js';
 export { AuditLogger } from './audit/audit-logger.js';
+export {
+  rowToActivityEntry,
+  sqliteTimestampToIso,
+  backfillAuditLogsFromActivityFile,
+} from './audit/audit-entries.js';
+export type { AuditLogFilters } from './database/database-service.js';
+export { AuditChannel } from './audit/audit-channel.js';
+export type { AuditEvent } from './audit/audit-channel.js';
+export type {
+  ActivityLogEntry,
+  ActivityActor,
+  ActivityTarget,
+  ActivitySource,
+  ActivityOutcome,
+} from './audit/audit-logger.js';
 export { DocumentNumberGenerator } from './utils/document-number-generator.js';
 export { ComplianceFieldHelpers } from './utils/compliance-helpers.js';
 export {

@@ -1,7 +1,3 @@
-import { AuditLogger } from '@civicpress/core';
-
-export const audit = new AuditLogger();
-
 export interface CreateUserRequest {
   username: string;
   email?: string;

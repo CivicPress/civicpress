@@ -6,7 +6,8 @@ import {
   sendSuccess,
   handleApiError,
 } from '../../utils/api-logger.js';
-import { audit, RequestEmailChangeRequest } from './handlers-common.js';
+import { RequestEmailChangeRequest } from './handlers-common.js';
+import { auditFor } from '../../utils/audit.js';
 
 export function registerEmailRoutes(router: Router): void {
   /**
@@ -21,13 +22,20 @@ export function registerEmailRoutes(router: Router): void {
       const { newEmail }: RequestEmailChangeRequest = req.body;
       const requestingUser = req.user;
       if (!requestingUser) {
-        return res.status(401).json({ success: false, error: { code: 'UNAUTHENTICATED', message: 'Authentication required' } });
+        return res.status(401).json({
+          success: false,
+          error: {
+            code: 'UNAUTHENTICATED',
+            message: 'Authentication required',
+          },
+        });
       }
 
       if (!newEmail) {
         const error = new HttpError(400, 'New email address is required');
         return handleApiError(
-          'request_email_change', error,
+          'request_email_change',
+          error,
           req,
           res,
           'New email address is required'
@@ -46,7 +54,8 @@ export function registerEmailRoutes(router: Router): void {
         if (!canManageUsers) {
           const error = new HttpError(403, 'Insufficient permissions');
           return handleApiError(
-            'request_email_change', error,
+            'request_email_change',
+            error,
             req,
             res,
             'You can only change your own email address'
@@ -60,7 +69,8 @@ export function registerEmailRoutes(router: Router): void {
       if (!result.success) {
         const error = new HttpError(400, result.message);
         return handleApiError(
-          'request_email_change', error,
+          'request_email_change',
+          error,
           req,
           res,
           result.message
@@ -68,7 +78,7 @@ export function registerEmailRoutes(router: Router): void {
       }
 
       // Log audit event
-      await audit.log({
+      await auditFor(req).log({
         source: 'api',
         actor: { id: requestingUser.id, username: requestingUser.username },
         action: 'email_change_requested',
@@ -111,7 +121,13 @@ export function registerEmailRoutes(router: Router): void {
       const userId = parseInt(req.params.id);
       const requestingUser = req.user;
       if (!requestingUser) {
-        return res.status(401).json({ success: false, error: { code: 'UNAUTHENTICATED', message: 'Authentication required' } });
+        return res.status(401).json({
+          success: false,
+          error: {
+            code: 'UNAUTHENTICATED',
+            message: 'Authentication required',
+          },
+        });
       }
 
       // Users can only cancel their own email change, unless they're admin
@@ -126,7 +142,8 @@ export function registerEmailRoutes(router: Router): void {
         if (!canManageUsers) {
           const error = new HttpError(403, 'Insufficient permissions');
           return handleApiError(
-            'cancel_email_change', error,
+            'cancel_email_change',
+            error,
             req,
             res,
             'You can only cancel your own email change request'
@@ -140,7 +157,8 @@ export function registerEmailRoutes(router: Router): void {
       if (!result.success) {
         const error = new HttpError(400, result.message);
         return handleApiError(
-          'cancel_email_change', error,
+          'cancel_email_change',
+          error,
           req,
           res,
           result.message
@@ -148,7 +166,7 @@ export function registerEmailRoutes(router: Router): void {
       }
 
       // Log audit event
-      await audit.log({
+      await auditFor(req).log({
         source: 'api',
         actor: { id: requestingUser.id, username: requestingUser.username },
         action: 'email_change_cancelled',
@@ -189,7 +207,13 @@ export function registerEmailRoutes(router: Router): void {
       const userId = parseInt(req.params.id);
       const requestingUser = req.user;
       if (!requestingUser) {
-        return res.status(401).json({ success: false, error: { code: 'UNAUTHENTICATED', message: 'Authentication required' } });
+        return res.status(401).json({
+          success: false,
+          error: {
+            code: 'UNAUTHENTICATED',
+            message: 'Authentication required',
+          },
+        });
       }
 
       // Users can only verify their own email, unless they're admin
@@ -204,7 +228,8 @@ export function registerEmailRoutes(router: Router): void {
         if (!canManageUsers) {
           const error = new HttpError(403, 'Insufficient permissions');
           return handleApiError(
-            'send_email_verification', error,
+            'send_email_verification',
+            error,
             req,
             res,
             'You can only verify your own email address'

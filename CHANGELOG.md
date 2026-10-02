@@ -222,6 +222,28 @@ database guarantee rather than a convention.
 
 ### Fixed
 
+- **The audit trail is complete and durable.** Three things were true of it
+  until 2026-10-02. The Settings → Activity page read the activity file — its
+  newest 5,000 lines of a file that deleted its oldest entries past 10,000 — so
+  the trail had a fixed horizon measured in events. Every API handler
+  (configuration, users, records, drafts, status changes, notification test
+  sends, diagnostics) wrote through its own file-only logger, so none of those
+  events ever reached the `audit_logs` table, which nothing read. And five
+  surfaces wrote no entry anywhere: geography, templates, file upload and delete
+  (single and batch), index generation and record locks. Now: the file is
+  archived beside itself in dated files, never cut (the notification audit log
+  too); `audit_logs` carries the file's fields (source, outcome, message,
+  metadata, actor username and role, target name — seven columns through the
+  migration ledger); every handler writes through the unified channel, which
+  fills both, and `civic publish` does too; the page reads the table, filtered
+  and paged in SQL; the activity file an upgraded instance already has is
+  imported into the table once, on the first read of the trail after the upgrade
+  (its core and saga events were in the table already, so only the API and CLI
+  entries are taken from it); and the five silent surfaces log their actions
+  with the acting user. `civic config` and `civic status` keep a file-only
+  logger — they run without an initialized database; `civic create`, `commit`,
+  `publish` and `diagnose` use the channel.
+
 - **Template variables are no longer mangled by a tag stripper.** Values
   substituted into a record template went through a filter that deleted
   `<script>` and `<iframe>` blocks, `javascript:` and anything shaped like an

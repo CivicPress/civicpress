@@ -22,6 +22,7 @@ import {
 } from '../middleware/auth.js';
 import { handleApiError, logApiSuccess } from '../utils/api-logger.js';
 import type { RecordsService } from '../services/records-service.js';
+import { auditFor, actorOf } from '../utils/audit.js';
 
 // (FA-API-014's `LINKED_RECORDS_SCAN_CAP` is gone: it bounded the in-JS scan of
 // the record corpus that `/linked-records` used to perform. The endpoint now
@@ -191,6 +192,17 @@ export function createGeographyRouter(
           },
           req.user
         );
+        await auditFor(req).log({
+          source: 'api',
+          actor: actorOf(req),
+          action: 'geography:create',
+          target: {
+            type: 'geography',
+            id: geographyFile.id,
+            name: geographyFile.name,
+          },
+          outcome: 'success',
+        });
 
         logApiSuccess('create_geography', req, {
           geographyFileId: geographyFile.id,
@@ -296,6 +308,17 @@ export function createGeographyRouter(
           existing_color_mapping,
           existing_icon_mapping
         );
+        await auditFor(req).log({
+          source: 'api',
+          actor: actorOf(req),
+          action: 'geography:apply_preset',
+          target: {
+            type: 'config',
+            id: 'geography',
+            name: String(req.params.key),
+          },
+          outcome: 'success',
+        });
 
         handleSuccess('apply_preset', result, res);
       } catch (error) {
@@ -421,6 +444,17 @@ export function createGeographyRouter(
           },
           req.user
         );
+        await auditFor(req).log({
+          source: 'api',
+          actor: actorOf(req),
+          action: 'geography:update',
+          target: {
+            type: 'geography',
+            id: geographyFile.id,
+            name: geographyFile.name,
+          },
+          outcome: 'success',
+        });
 
         handleSuccess('update_geography', geographyFile, res);
       } catch (error) {
@@ -454,6 +488,13 @@ export function createGeographyRouter(
       try {
         const { id } = req.params;
         await geographyManager.deleteGeographyFile(id, req.user);
+        await auditFor(req).log({
+          source: 'api',
+          actor: actorOf(req),
+          action: 'geography:delete',
+          target: { type: 'geography', id },
+          outcome: 'success',
+        });
 
         handleSuccess('delete_geography', { id }, res);
       } catch (error: unknown) {

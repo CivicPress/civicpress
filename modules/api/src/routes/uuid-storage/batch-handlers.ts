@@ -12,6 +12,7 @@ import {
 import { logApiRequest } from '../../utils/api-logger.js';
 import { Buffer } from 'node:buffer';
 import { upload, getStorageService } from './handlers-common.js';
+import { auditFor, actorOf } from '../../utils/audit.js';
 
 export function registerBatchRoutes(router: Router): void {
   // POST /api/v1/storage/files/batch - Batch upload files
@@ -77,6 +78,21 @@ export function registerBatchRoutes(router: Router): void {
             maxConcurrency: 5, // Configurable later
           }
         );
+        await auditFor(req).log({
+          source: 'api',
+          actor: actorOf(req),
+          action: 'storage:batch_upload',
+          target: {
+            type: 'file',
+            name: `${result.successfulCount} of ${result.total}`,
+          },
+          outcome: result.failedCount > 0 ? 'failure' : 'success',
+          metadata: {
+            successful: result.successfulCount,
+            failed: result.failedCount,
+            total: result.total,
+          },
+        });
 
         return handleStorageSuccess(
           'batch_upload',
@@ -146,6 +162,21 @@ export function registerBatchRoutes(router: Router): void {
             maxConcurrency: 10, // Configurable later
           }
         );
+        await auditFor(req).log({
+          source: 'api',
+          actor: actorOf(req),
+          action: 'storage:batch_delete',
+          target: {
+            type: 'file',
+            name: `${result.successfulCount} of ${result.total}`,
+          },
+          outcome: result.failedCount > 0 ? 'failure' : 'success',
+          metadata: {
+            successful: result.successfulCount,
+            failed: result.failedCount,
+            total: result.total,
+          },
+        });
 
         return handleStorageSuccess(
           'batch_delete',

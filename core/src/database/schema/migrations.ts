@@ -46,7 +46,12 @@ export type MigrationOutcome = 'applied' | 'adopted';
  * and this list is what keeps that interpolation to a closed set of literals
  * rather than anything a caller could influence.
  */
-type MigratableTable = 'records' | 'record_drafts' | 'users' | 'search_index';
+type MigratableTable =
+  | 'records'
+  | 'record_drafts'
+  | 'users'
+  | 'search_index'
+  | 'audit_logs';
 
 async function recordMigration(
   exec: DDLExecutor,
@@ -404,6 +409,74 @@ export async function migrateSearchIndexColumns(
 }
 
 /**
+ * `audit_logs` grew the columns the activity file always had. Until 2026-10-02
+ * the table held user_id / action / resource / details only, was written by
+ * core events alone and read by nothing; the file was the whole trail and it
+ * deleted its oldest entries. With these the table can answer the Settings →
+ * Activity page's filters (source, outcome, actor, action) and keep the
+ * structured metadata, and the API's events are written to it too.
+ */
+const AUDIT_LOG_MIGRATIONS: ColumnMigration[] = [
+  {
+    id: 'audit_logs.source',
+    table: 'audit_logs',
+    column: 'source',
+    ddl: 'ALTER TABLE audit_logs ADD COLUMN source TEXT',
+    description: 'Where the action originated: api, cli, ui, core, saga',
+  },
+  {
+    id: 'audit_logs.outcome',
+    table: 'audit_logs',
+    column: 'outcome',
+    ddl: 'ALTER TABLE audit_logs ADD COLUMN outcome TEXT',
+    description: 'success or failure',
+  },
+  {
+    id: 'audit_logs.message',
+    table: 'audit_logs',
+    column: 'message',
+    ddl: 'ALTER TABLE audit_logs ADD COLUMN message TEXT',
+    description:
+      'Human-readable message, separate from the legacy details column',
+  },
+  {
+    id: 'audit_logs.metadata',
+    table: 'audit_logs',
+    column: 'metadata',
+    ddl: 'ALTER TABLE audit_logs ADD COLUMN metadata TEXT',
+    description: 'Structured details as JSON',
+  },
+  {
+    id: 'audit_logs.actor_username',
+    table: 'audit_logs',
+    column: 'actor_username',
+    ddl: 'ALTER TABLE audit_logs ADD COLUMN actor_username TEXT',
+    description:
+      'Actor username at the time of the action (users may be renamed or deleted)',
+  },
+  {
+    id: 'audit_logs.actor_role',
+    table: 'audit_logs',
+    column: 'actor_role',
+    ddl: 'ALTER TABLE audit_logs ADD COLUMN actor_role TEXT',
+    description: 'Actor role at the time of the action',
+  },
+  {
+    id: 'audit_logs.target_name',
+    table: 'audit_logs',
+    column: 'target_name',
+    ddl: 'ALTER TABLE audit_logs ADD COLUMN target_name TEXT',
+    description:
+      'Target name or path, when the id alone does not say what it was',
+  },
+];
+
+/** Add the activity-file columns to `audit_logs` on an existing database. */
+export async function runAuditLogMigrations(exec: DDLExecutor): Promise<void> {
+  await ensureColumns(exec, AUDIT_LOG_MIGRATIONS);
+}
+
+/**
  * Ledger ids of every migration that adds a COLUMN — as opposed to the data
  * backfill and the index, which have no schema state to re-derive and so
  * legitimately report `applied` on a database that has only just been created.
@@ -416,6 +489,7 @@ export const COLUMN_MIGRATION_IDS: readonly string[] = [
   ...RECORD_COLUMN_MIGRATIONS,
   ...USER_SECURITY_MIGRATIONS,
   ...SEARCH_INDEX_MIGRATIONS,
+  ...AUDIT_LOG_MIGRATIONS,
   workflowStateMigration('records'),
   workflowStateMigration('record_drafts'),
 ].map((migration) => migration.id);

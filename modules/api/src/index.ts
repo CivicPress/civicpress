@@ -363,6 +363,15 @@ export class CivicPressAPI {
     // Health check (no auth required)
     this.app.use(apiPath('health'), healthRouter);
 
+    // Every router can reach the core instance. Until 2026-10-02 it was
+    // injected router by router and the ones without it — records, users,
+    // templates, indexing, audit — wrote their audit entries to a private
+    // file-only logger instead of the unified channel.
+    this.app.use((req, _res, next) => {
+      req.civicPress = this.civicPress;
+      next();
+    });
+
     // Documentation (no auth required)
     this.app.use(apiPath('docs'), docsRouter);
 

@@ -1189,8 +1189,12 @@ X-API-Version: 1.0.0
 
 ### Audit Trail Overview
 
-The platform records key actions across API and CLI into a JSONL audit log
-stored at `.system-data/activity.log` under the active `dataDir`.
+The platform records key actions across API, CLI and core into two places at
+once: the `audit_logs` database table, which `GET /api/v1/audit` and the
+Settings → Activity page read, and a JSONL activity log at
+`.system-data/activity.log`, which is archived beside itself in dated files past
+10,000 lines (never cut). Until 2026-10-02 the API's own events reached only the
+file, and the page read only its newest 5,000 lines.
 
 - Sources: `api`, `cli`, `ui`, `system`
 - Typical actions logged: config updates/resets/validations, user

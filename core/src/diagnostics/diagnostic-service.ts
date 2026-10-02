@@ -36,7 +36,8 @@ export interface DiagnosticServiceOptions {
   searchService?: SearchService;
   configManager: CentralConfigManager;
   logger?: Logger;
-  auditLogger?: AuditLogger;
+  /** Anything that takes an activity entry — the file logger, or the unified AuditChannel. */
+  auditLogger?: Pick<AuditLogger, 'log'>;
   dataDir: string;
   cacheManager?: UnifiedCacheManager;
 }
@@ -46,7 +47,7 @@ export class DiagnosticService {
   private searchService?: SearchService;
   private configManager: CentralConfigManager;
   private logger: Logger;
-  private auditLogger?: AuditLogger;
+  private auditLogger?: Pick<AuditLogger, 'log'>;
   private dataDir: string;
 
   private checkers: Map<string, DiagnosticChecker[]> = new Map();

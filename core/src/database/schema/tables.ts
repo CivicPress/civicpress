@@ -125,6 +125,13 @@ export const CORE_TABLE_STATEMENTS: string[] = [
     details TEXT,
     ip_address TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    source TEXT,
+    outcome TEXT,
+    message TEXT,
+    metadata TEXT,
+    actor_username TEXT,
+    actor_role TEXT,
+    target_name TEXT,
     FOREIGN KEY (user_id) REFERENCES users (id)
   )`,
 

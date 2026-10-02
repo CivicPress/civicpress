@@ -12,7 +12,8 @@ import {
   handleApiError,
   logApiRequest,
 } from '../../utils/api-logger.js';
-import { audit, handleRecordsValidationError } from './handlers-common.js';
+import { handleRecordsValidationError } from './handlers-common.js';
+import { auditFor } from '../../utils/audit.js';
 
 export function registerStatusRoutes(
   router: Router,
@@ -76,7 +77,7 @@ export function registerStatusRoutes(
             res,
             { operation: 'change_record_status' }
           );
-          await audit.log({
+          await auditFor(req).log({
             source: 'api',
             actor: {
               id: user.id,
@@ -102,7 +103,7 @@ export function registerStatusRoutes(
       } catch (error) {
         const user = req.user;
         const id = req.params?.id;
-        await audit.log({
+        await auditFor(req).log({
           source: 'api',
           actor: { id: user?.id, username: user?.username, role: user?.role },
           action: 'records:status',

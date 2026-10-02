@@ -156,6 +156,16 @@ export interface AuditLogRow extends SqlRow {
   details?: string;
   ip_address?: string;
   created_at?: string;
+  // Added 2026-10-02 — the activity file's fields, so the table can answer
+  // the Activity page. Null on rows written before.
+  source?: string;
+  outcome?: string;
+  message?: string;
+  /** JSON TEXT */
+  metadata?: string;
+  actor_username?: string;
+  actor_role?: string;
+  target_name?: string;
 }
 
 /** `getAuditLogs` joins `audit_logs` with `users` for username. */

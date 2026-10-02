@@ -19,7 +19,13 @@ export function registerSecurityRoutes(router: Router): void {
       const userId = parseInt(req.params.id);
       const requestingUser = req.user;
       if (!requestingUser) {
-        return res.status(401).json({ success: false, error: { code: 'UNAUTHENTICATED', message: 'Authentication required' } });
+        return res.status(401).json({
+          success: false,
+          error: {
+            code: 'UNAUTHENTICATED',
+            message: 'Authentication required',
+          },
+        });
       }
 
       // Users can only view their own security info, unless they're admin
@@ -34,7 +40,8 @@ export function registerSecurityRoutes(router: Router): void {
         if (!canManageUsers) {
           const error = new HttpError(403, 'Insufficient permissions');
           return handleApiError(
-            'get_security_info', error,
+            'get_security_info',
+            error,
             req,
             res,
             'You can only view your own security information'
@@ -47,7 +54,8 @@ export function registerSecurityRoutes(router: Router): void {
       if (!user) {
         const error = new HttpError(404, 'User not found');
         return handleApiError(
-          'get_security_info', error,
+          'get_security_info',
+          error,
           req,
           res,
           'User not found'
@@ -55,7 +63,8 @@ export function registerSecurityRoutes(router: Router): void {
       }
 
       // Get pending email change info
-      const pendingEmailChange = await authService.getPendingEmailChange(userId);
+      const pendingEmailChange =
+        await authService.getPendingEmailChange(userId);
 
       const securityInfo = {
         userId: user.id,

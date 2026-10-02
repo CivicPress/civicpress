@@ -15,6 +15,7 @@ import {
   getStorageConfigManager,
   checkFileReadAccess,
 } from './handlers-common.js';
+import { auditFor, actorOf } from '../../utils/audit.js';
 
 export function registerSingleFileRoutes(router: Router): void {
   // POST /api/v1/storage/files - Upload file (unified endpoint)
@@ -84,6 +85,18 @@ export function registerSingleFileRoutes(router: Router): void {
         });
 
         if (result.success && result.file) {
+          await auditFor(req).log({
+            source: 'api',
+            actor: actorOf(req),
+            action: 'storage:upload',
+            target: {
+              type: 'file',
+              id: result.file.id,
+              name: result.file.original_name,
+            },
+            outcome: 'success',
+            metadata: { size: result.file.size, folder: result.file.folder },
+          });
           return handleStorageSuccess(
             'upload_file',
             {
@@ -460,6 +473,13 @@ export function registerSingleFileRoutes(router: Router): void {
         const success = await storageService.deleteFile(fileId, userId);
 
         if (success) {
+          await auditFor(req).log({
+            source: 'api',
+            actor: actorOf(req),
+            action: 'storage:delete',
+            target: { type: 'file', id: fileId },
+            outcome: 'success',
+          });
           return handleStorageSuccess(
             'delete_file',
             { message: 'File deleted successfully', id: fileId },
@@ -513,6 +533,13 @@ export function registerSingleFileRoutes(router: Router): void {
         });
 
         if (success) {
+          await auditFor(req).log({
+            source: 'api',
+            actor: actorOf(req),
+            action: 'storage:update',
+            target: { type: 'file', id: fileId },
+            outcome: 'success',
+          });
           const updatedFile = await storageService.getFileById(fileId);
           return handleStorageSuccess(
             'update_file',

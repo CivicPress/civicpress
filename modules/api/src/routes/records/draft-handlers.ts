@@ -13,11 +13,8 @@ import {
   handleApiError,
   logApiRequest,
 } from '../../utils/api-logger.js';
-import {
-  logger,
-  audit,
-  handleRecordsValidationError,
-} from './handlers-common.js';
+import { auditFor } from '../../utils/audit.js';
+import { logger, handleRecordsValidationError } from './handlers-common.js';
 
 export function registerDraftRoutes(
   router: Router,
@@ -112,7 +109,8 @@ export function registerDraftRoutes(
           draft.created_by !== user.id?.toString() &&
           draft.created_by !== user.username
         ) {
-          throw new HttpError(403, 
+          throw new HttpError(
+            403,
             'Permission denied: You can only delete your own drafts'
           );
         }
@@ -123,7 +121,7 @@ export function registerDraftRoutes(
         sendSuccess({ message: 'Draft deleted successfully', id }, req, res, {
           operation: 'delete_draft',
         });
-        await audit.log({
+        await auditFor(req).log({
           source: 'api',
           actor: {
             id: user.id,
@@ -137,7 +135,7 @@ export function registerDraftRoutes(
       } catch (error) {
         const user = req.user;
         const id = req.params?.id;
-        await audit.log({
+        await auditFor(req).log({
           source: 'api',
           actor: { id: user?.id, username: user?.username, role: user?.role },
           action: 'records:delete_draft',
@@ -204,7 +202,8 @@ export function registerDraftRoutes(
           // Create new draft (if record exists, we'll create a draft from it)
           // For now, we'll require the full data for creation
           if (!updates.title || !updates.type) {
-            throw new HttpError(400, 
+            throw new HttpError(
+              400,
               'Title and type are required for new drafts'
             );
           }
@@ -227,7 +226,7 @@ export function registerDraftRoutes(
         }
 
         sendSuccess(draft, req, res, { operation: 'save_draft' });
-        await audit.log({
+        await auditFor(req).log({
           source: 'api',
           actor: {
             id: user.id,
@@ -241,7 +240,7 @@ export function registerDraftRoutes(
       } catch (error) {
         const user = req.user;
         const id = req.params?.id;
-        await audit.log({
+        await auditFor(req).log({
           source: 'api',
           actor: { id: user?.id, username: user?.username, role: user?.role },
           action: 'records:save_draft',
@@ -289,7 +288,7 @@ export function registerDraftRoutes(
           operation: 'publish_record',
           statusCode: 201,
         });
-        await audit.log({
+        await auditFor(req).log({
           source: 'api',
           actor: {
             id: user.id,
@@ -303,7 +302,7 @@ export function registerDraftRoutes(
       } catch (error) {
         const user = req.user;
         const id = req.params?.id;
-        await audit.log({
+        await auditFor(req).log({
           source: 'api',
           actor: { id: user?.id, username: user?.username, role: user?.role },
           action: 'records:publish',

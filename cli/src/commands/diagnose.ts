@@ -18,7 +18,7 @@ import {
   CivicPress,
   DiagnosticService,
   Logger,
-  AuditLogger,
+  type AuditChannel,
   DatabaseDiagnosticChecker,
   SearchDiagnosticChecker,
   ConfigurationDiagnosticChecker,
@@ -94,7 +94,9 @@ export function registerDiagnoseCommand(cli: CAC) {
             searchService: civic.getDatabaseService().getSearchService(),
             configManager: CentralConfigManager,
             logger: civic['logger'] as Logger,
-            auditLogger: new AuditLogger(),
+            auditLogger: civic
+              .getContainer()
+              .resolve<AuditChannel>('auditChannel'),
             dataDir,
             cacheManager: civic.getCacheManager(),
           });
@@ -278,7 +280,9 @@ function registerComponentCommands(cli: CAC) {
               searchService: civic.getDatabaseService().getSearchService(),
               configManager: CentralConfigManager,
               logger: civic['logger'] as Logger,
-              auditLogger: new AuditLogger(),
+              auditLogger: civic
+                .getContainer()
+                .resolve<AuditChannel>('auditChannel'),
               dataDir: config.dataDir,
             });
 

@@ -9,10 +9,9 @@ import { readFile, writeFile, mkdir } from 'fs/promises';
 import { join, dirname } from 'path';
 import { authMiddleware, requirePermission } from '../middleware/auth.js';
 import { logApiError } from '../utils/api-logger.js';
-import { AuditLogger } from '@civicpress/core';
+import { auditFor } from '../utils/audit.js';
 
 const router = Router();
-const audit = new AuditLogger();
 
 /**
  * Build a ConfigurationService against the RESOLVED data directory.
@@ -134,7 +133,7 @@ router.post(
       // Optional audit logging (don't require auth for validation)
       const actor = req.user;
       if (actor?.id) {
-        await audit.log({
+        await auditFor(req).log({
           source: 'api',
           actor: {
             id: actor?.id,
@@ -154,7 +153,7 @@ router.post(
       const { type } = req.params || {};
       const actor = req.user;
       if (actor?.id) {
-        await audit.log({
+        await auditFor(req).log({
           source: 'api',
           actor: {
             id: actor?.id,
@@ -394,7 +393,7 @@ router.put(
 
       // Audit success
       const actor = req.user;
-      await audit.log({
+      await auditFor(req).log({
         source: 'api',
         actor: { id: actor?.id, username: actor?.username, role: actor?.role },
         action: 'config:raw:put',
@@ -404,7 +403,7 @@ router.put(
     } catch (error) {
       const { type } = req.params || {};
       const actor = req.user;
-      await audit.log({
+      await auditFor(req).log({
         source: 'api',
         actor: { id: actor?.id, username: actor?.username, role: actor?.role },
         action: 'config:raw:put',
@@ -487,7 +486,7 @@ router.get('/export', async (req, res) => {
     });
 
     const actor = req.user;
-    await audit.log({
+    await auditFor(req).log({
       source: 'api',
       actor: { id: actor?.id, username: actor?.username, role: actor?.role },
       action: 'config:export',
@@ -606,7 +605,7 @@ router.post('/import', express.json({ limit: '5mb' }), async (req, res) => {
   });
 
   const actor = req.user;
-  await audit.log({
+  await auditFor(req).log({
     source: 'api',
     actor: { id: actor?.id, username: actor?.username, role: actor?.role },
     action: 'config:import',
@@ -681,7 +680,7 @@ router.put('/:type', guardSecretConfig, async (req, res) => {
     });
 
     const actor = req.user;
-    await audit.log({
+    await auditFor(req).log({
       source: 'api',
       actor: { id: actor?.id, username: actor?.username, role: actor?.role },
       action: 'config:save',
@@ -691,7 +690,7 @@ router.put('/:type', guardSecretConfig, async (req, res) => {
   } catch (error) {
     const { type } = req.params || {};
     const actor = req.user;
-    await audit.log({
+    await auditFor(req).log({
       source: 'api',
       actor: { id: actor?.id, username: actor?.username, role: actor?.role },
       action: 'config:save',
@@ -726,7 +725,7 @@ router.post('/:type/reset', guardSecretConfig, async (req, res) => {
     });
 
     const actor = req.user;
-    await audit.log({
+    await auditFor(req).log({
       source: 'api',
       actor: { id: actor?.id, username: actor?.username, role: actor?.role },
       action: 'config:reset',
@@ -736,7 +735,7 @@ router.post('/:type/reset', guardSecretConfig, async (req, res) => {
   } catch (error) {
     const { type } = req.params || {};
     const actor = req.user;
-    await audit.log({
+    await auditFor(req).log({
       source: 'api',
       actor: { id: actor?.id, username: actor?.username, role: actor?.role },
       action: 'config:reset',

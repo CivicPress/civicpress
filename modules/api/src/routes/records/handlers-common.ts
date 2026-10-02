@@ -1,9 +1,7 @@
 import type { Request, Response } from 'express';
 import { Logger } from '@civicpress/core';
-import { AuditLogger } from '@civicpress/core';
 
 export const logger = new Logger();
-export const audit = new AuditLogger();
 
 // Custom validation error handler for records API
 export function handleRecordsValidationError(

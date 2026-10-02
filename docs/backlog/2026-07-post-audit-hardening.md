@@ -2498,10 +2498,10 @@ about either.
       **Outcome.** Kept and retargeted: the `501` message names no release and
       `retry_after_milestone` is gone, in both routers and in the OpenAPI text.
 
-- [ ] **The audit trail: what "comprehensive" would have to mean (needs a
-      decision).** Scoping question 4 asked whether the audit log is a gap at
-      all, and said it could not be closed without a statement of what is
-      missing. This is that statement, verified from source:
+- [x] **The audit trail: what "comprehensive" would have to mean. DECIDED
+      2026-09-30, DONE 2026-10-02.** Scoping question 4 asked whether the audit
+      log is a gap at all, and said it could not be closed without a statement
+      of what is missing. This is that statement, verified from source:
   - `GET /api/v1/audit` — and therefore the Settings → Activity page — reads
     only the JSONL file, and only its newest 5,000 entries
     (`AuditLogger.tail(5000)`).
@@ -2516,10 +2516,35 @@ about either.
   - Geography, templates, file upload and delete, indexing and record locks
     write no audit entry in either layer.
 
-    **Decision 2026-09-30:** full coverage in v0.4.x (scoping doc, decision 3):
-    rotate into dated archives instead of deleting, route API-layer events
-    through the DB channel, add entries on the five silent surfaces, and give
-    `audit_logs` a production reader. Not started as of 2026-10-01.
+    **Outcome (2026-10-02).** All four parts landed: the activity file (and the
+    notification audit log) archive past the line limit instead of deleting;
+    `audit_logs` gained source / outcome / message / metadata / actor_username /
+    actor_role / target_name through the migration ledger and the API's events
+    go through `AuditChannel.log` (every `new AuditLogger()` in the API routes
+    is gone; `civic create`, `commit`, `publish` and `diagnose` use the channel;
+    `civic config` and `civic status` keep the file, they run without an
+    initialized database); `GET /api/v1/audit` reads the table, filtered and
+    paged in SQL, with a one-time import of the existing file on the first read;
+    geography, templates, storage (single + batch), indexing and record locks
+    log with the acting user. Verified by API tests through the reader.
+
+### Test hygiene — found 2026-10-02
+
+- [ ] **Tests that boot without a hermetic instance context write into the
+      repository's own `.system-data`.** During a suite run the repo's
+      `.system-data/notification-audit.jsonl` grows (mtime moves), and until
+      2026-10-02 the same was true of `activity.log`: core tests that call
+      `new CivicPress({ dataDir })` without `createTestInstance` /
+      `setInstanceContext` inherit the ambient (repo) context, so their audit
+      and notification writes land in the developer's instance. A test that
+      wrote through `CentralConfigManager.getSystemDataDir()` overwrote the dev
+      `activity.log` the same day (history before 2026-08-09 survives in
+      `.system-data/archive/`). Fix shape: make the ambient fallback refuse to
+      resolve to the repository root under `NODE_ENV=test` (fail loudly), and
+      sweep `tests/core/*.test.ts` for bare `new CivicPress(` without a hermetic
+      context (`user-management`, `database-integration`,
+      `record-manager-audit-channel`, …). Test writes should assert their target
+      starts with `os.tmpdir()`.
 
 ### Tracker corrections
 

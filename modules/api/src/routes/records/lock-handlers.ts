@@ -13,6 +13,7 @@ import {
   logApiRequest,
 } from '../../utils/api-logger.js';
 import { handleRecordsValidationError } from './handlers-common.js';
+import { auditFor, actorOf } from '../../utils/audit.js';
 
 export function registerLockRoutes(
   router: Router,
@@ -46,9 +47,26 @@ export function registerLockRoutes(
         }
 
         const acquired = await recordsService.acquireLock(id, user);
+        if (acquired) {
+          await auditFor(req).log({
+            source: 'api',
+            actor: actorOf(req),
+            action: 'records:lock',
+            target: { type: 'record', id },
+            outcome: 'success',
+          });
+        }
 
         if (!acquired) {
           const lock = await recordsService.getLock(id);
+          await auditFor(req).log({
+            source: 'api',
+            actor: actorOf(req),
+            action: 'records:lock',
+            target: { type: 'record', id },
+            outcome: 'failure',
+            message: `Locked by ${lock?.locked_by || 'another user'}`,
+          });
           throw new HttpError(
             409,
             `Record is locked by ${lock?.locked_by || 'another user'}`,
@@ -105,6 +123,14 @@ export function registerLockRoutes(
         }
 
         const released = await recordsService.releaseLock(id, user);
+        await auditFor(req).log({
+          source: 'api',
+          actor: actorOf(req),
+          action: 'records:unlock',
+          target: { type: 'record', id },
+          outcome: released ? 'success' : 'failure',
+          message: released ? undefined : 'No lock held by this user',
+        });
 
         sendSuccess({ locked: !released, recordId: id }, req, res, {
           operation: 'release_lock',
