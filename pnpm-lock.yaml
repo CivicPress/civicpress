@@ -71,9 +71,15 @@ importers:
         specifier: 3.1048.0
         version: 3.1048.0
     devDependencies:
+      '@civicpress/editor-schema':
+        specifier: workspace:*
+        version: link:packages/editor-schema
       '@playwright/test':
         specifier: 1.55.1
         version: 1.55.1
+      '@tiptap/core':
+        specifier: 3.31.3
+        version: 3.31.3(@tiptap/pm@3.31.3)
       '@types/bcrypt':
         specifier: 5.0.2
         version: 5.0.2
@@ -152,6 +158,9 @@ importers:
       yaml:
         specifier: 2.9.1
         version: 2.9.1
+      yjs:
+        specifier: 13.6.31
+        version: 13.6.31
 
   cli:
     dependencies:
