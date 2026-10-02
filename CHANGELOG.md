@@ -613,6 +613,14 @@ database guarantee rather than a convention.
 
 ### Changed
 
+- **The root test suite declares what it imports.** `tests/ui/editor/*` and
+  `tests/realtime/harness.ts` import `@civicpress/editor-schema`, `@tiptap/core`
+  and `yjs`, which only `modules/ui` and `modules/realtime` declared; the root
+  resolved them through test-config aliases into `modules/ui/node_modules` (the
+  last three lines `scripts/audit-package-imports.mjs` still reported). Declared
+  at the root now — the same workspace link and the same pinned versions, so
+  nothing new enters the lockfile — and the audit reports every workspace clean.
+
 - **Notification settings that did nothing are no longer shipped.** The
   2026-09-29 sweep found twelve `notifications.yml` keys written by every
   writer, documented, and read by nothing. Decided 2026-10-01: the three
